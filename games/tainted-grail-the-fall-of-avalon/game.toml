@@ -1,0 +1,25 @@
+# Tainted Grail: The Fall of Avalon. A Unity game in two builds: the default Steam build is IL2CPP (BepInEx 6), and the
+# `mono` beta branch is Mono (BepInEx 5). Both loaders put winhttp.dll and doorstop_config.ini at the root of the game
+# folder, plugins go to BepInEx/plugins, and the core under BepInEx/core differs by build. The user installs the loader that
+# matches the build of the game; Gobbo does not check it.
+#
+# Established from the file list of a Steam installation (Fall of Avalon.exe, Fall of Avalon_Data/il2cpp_data, no Managed
+# folder) and from the BepInEx zips BepInEx_win_x64_5.4.23.6 (Mono) and BepInEx-Unity.IL2CPP-win-x64-6.0.0-pre.2 (IL2CPP).
+# Not verified yet: the install folder name (the appmanifest installdir) and the file names of the Mono build.
+
+schema = 1
+id = "tainted-grail-the-fall-of-avalon"
+name = "Tainted Grail: The Fall of Avalon"
+providers = { nexus = { key = "taintedgrailthefallofavalon" } }
+# The shared BepInEx layout is the `bepinex` loader preset. The default IL2CPP build uses variant 6: it requires only the
+# proxy, not a core file, and mirrors dotnet/. The Mono build's BepInEx 5 core is still mirrored.
+loader = { id = "bepinex", variant = "6" }
+
+[detect]
+steam_app_ids = [1466060]
+steam_install_dirs = ["Tainted Grail The Fall of Avalon"] # not confirmed yet; the appmanifest of the game names the real folder
+markers = ["Fall of Avalon.exe", "Fall of Avalon_Data/app.info"]
+
+[[executables]]
+name = "Fall of Avalon"
+path = "Fall of Avalon.exe"

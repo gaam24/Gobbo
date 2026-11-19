@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-managed-games"
+description = "Enables the managed_games command without any pre-configured scope."
+commands.allow = ["managed_games"]
+
+[[permission]]
+identifier = "deny-managed-games"
+description = "Denies the managed_games command without any pre-configured scope."
+commands.deny = ["managed_games"]

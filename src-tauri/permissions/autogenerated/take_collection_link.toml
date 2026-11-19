@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-take-collection-link"
+description = "Enables the take_collection_link command without any pre-configured scope."
+commands.allow = ["take_collection_link"]
+
+[[permission]]
+identifier = "deny-take-collection-link"
+description = "Denies the take_collection_link command without any pre-configured scope."
+commands.deny = ["take_collection_link"]

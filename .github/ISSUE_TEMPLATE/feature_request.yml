@@ -1,0 +1,20 @@
+name: Suggest an idea
+description: Tell us what would make Gobbo better for you.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea. Please [search existing issues](https://github.com/gaam24/Gobbo/issues?q=is%3Aissue) first — someone may have suggested it already.
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like Gobbo to do?
+      description: A sentence or two is enough.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: What would it help with? (optional)
+      description: Tell us what you're trying to do today.

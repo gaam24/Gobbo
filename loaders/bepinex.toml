@@ -1,0 +1,62 @@
+# BepInEx, the loader of Unity games. A game takes the shared rules with `loader = "bepinex"` or, for the IL2CPP
+# build, `loader = { id = "bepinex", variant = "6" }`.
+#
+# A loader preset carries only shared `requires`, `requirements` and `[deploy]` rules. The game owns its folder,
+# detection, programs and tools.
+
+schema = 1
+id = "bepinex"
+name = "BepInEx"
+default_variant = "5"
+
+# Both BepInEx 5 and 6 load through this proxy. The settings file is deployed with it but is not required. A requirement
+# implies its path, so the proxy needs no separate `requires` entry.
+[[requirements]]
+name = "BepInEx"
+path = "winhttp.dll"
+url = "https://github.com/BepInEx/BepInEx/releases"
+
+[deploy]
+# The proxy and its settings, both in the game folder.
+root_files = ["winhttp.dll", "doorstop_config.ini"]
+
+# Archive folders that stand for the BepInEx folders. Many packages keep `plugins/` at the archive root, and some keep
+# `patchers/` or `monomod/` there too.
+[deploy.aliases]
+plugins = "BepInEx/plugins"
+core = "BepInEx/core"
+config = "BepInEx/config"
+patchers = "BepInEx/patchers"
+monomod = "BepInEx/monomod"
+
+# A plugin may be `BepInEx/plugins/<Mod>/<Mod>.dll`, a bare .dll at the archive root, or `<Mod>/<Mod>.dll` at the root.
+[[deploy.slots]]
+dir = "BepInEx/plugins"
+root_extensions = [".dll"]
+root_folder_extensions = [".dll"]
+
+# The core, the settings a mod ships and the patches BepInEx reads. They keep their paths.
+[[deploy.mirror]]
+dir = "BepInEx/core"
+
+[[deploy.mirror]]
+dir = "BepInEx/config"
+
+[[deploy.mirror]]
+dir = "BepInEx/patchers"
+
+[[deploy.mirror]]
+dir = "BepInEx/monomod"
+
+# BepInEx 5 (Mono) ships its core as BepInEx/core/BepInEx.dll.
+[variants."5"]
+[[variants."5".requirements]]
+name = "BepInEx 5"
+path = "BepInEx/core/BepInEx.dll"
+url = "https://github.com/BepInEx/BepInEx/releases"
+
+# BepInEx 6 (IL2CPP) ships the .NET runtime next to the program, under dotnet/. Its pre-release core file names changed,
+# so this variant requires only the proxy, not a specific core file.
+[variants."6"]
+[[variants."6".deploy.mirror]]
+dir = "dotnet"

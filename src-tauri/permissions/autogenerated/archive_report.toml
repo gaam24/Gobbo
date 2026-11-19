@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-archive-report"
+description = "Enables the archive_report command without any pre-configured scope."
+commands.allow = ["archive_report"]
+
+[[permission]]
+identifier = "deny-archive-report"
+description = "Denies the archive_report command without any pre-configured scope."
+commands.deny = ["archive_report"]

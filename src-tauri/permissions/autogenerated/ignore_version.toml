@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-ignore-version"
+description = "Enables the ignore_version command without any pre-configured scope."
+commands.allow = ["ignore_version"]
+
+[[permission]]
+identifier = "deny-ignore-version"
+description = "Denies the ignore_version command without any pre-configured scope."
+commands.deny = ["ignore_version"]

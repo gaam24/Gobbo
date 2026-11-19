@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-import-pack-with-progress"
+description = "Enables the import_pack_with_progress command without any pre-configured scope."
+commands.allow = ["import_pack_with_progress"]
+
+[[permission]]
+identifier = "deny-import-pack-with-progress"
+description = "Denies the import_pack_with_progress command without any pre-configured scope."
+commands.deny = ["import_pack_with_progress"]

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-manual-update-next"
+description = "Enables the manual_update_next command without any pre-configured scope."
+commands.allow = ["manual_update_next"]
+
+[[permission]]
+identifier = "deny-manual-update-next"
+description = "Denies the manual_update_next command without any pre-configured scope."
+commands.deny = ["manual_update_next"]

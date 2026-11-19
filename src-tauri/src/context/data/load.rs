@@ -1,0 +1,266 @@
+use std::path::PathBuf;
+use std::sync::Arc;
+
+use crate::domain::profiles::Profiles;
+use crate::error::AppError;
+use crate::games::GameDef;
+
+use crate::context::library::{ArchiveLabels, Library, lock_index};
+use crate::context::settings::{Settings, load_settings};
+
+use super::{Data, cached};
+
+/// Opens the data folder for this process: the shared caches, the file-layout migrations, the archive names of the
+/// libraries and the stale temp files. `archive_names` is the providers' reader (`providers::archive_name_from`).
+pub fn open(dir: PathBuf, archive_names: ArchiveLabels<'_>) -> Result<Data, AppError> {
+    let data = Data::with_cache(dir);
+    crate::context::managed::migrate(&data)?;
+    name_archives(&data, archive_names);
+    data.clean_stale_temps();
+    Ok(data)
+}
+
+/// Names the archives of every game's library that have no label yet. It runs on every start, like the file-layout
+/// migrations: an archive that already has its label is skipped, and a library is saved only when a label was added.
+/// A library that cannot be read is logged and skipped, so it never stops the app from starting.
+fn name_archives(root: &Data, archive_names: ArchiveLabels<'_>) {
+    let ids = match crate::context::managed::managed_ids(root) {
+        Ok(ids) => ids,
+        Err(error) => {
+            crate::infra::log::warn(format!("archive names: {error}"));
+            return;
+        }
+    };
+    for id in ids {
+        let named = root
+            .definition(&id)
+            .and_then(|game| name_game_archives(&root.game(&id), &game, archive_names));
+        if let Err(error) = named {
+            crate::infra::log::warn(format!("archive names of {id}: {error}"));
+        }
+    }
+}
+
+/// Names the archives of one game's library that have no label, and saves the index only when a label was added.
+/// Returns whether it saved. A game without an index has no archives to name.
+pub fn name_game_archives(
+    data: &Data,
+    game: &GameDef,
+    archive_names: ArchiveLabels<'_>,
+) -> Result<bool, AppError> {
+    if !data.index().is_file() {
+        return Ok(false);
+    }
+    let _index = lock_index();
+    let mut library = load_library(data, game)?;
+    if !library.name_archives(archive_names) {
+        return Ok(false);
+    }
+    data.save_library(library)?;
+    Ok(true)
+}
+
+/// A game as the service reads it: its definition, its settings, its library and its profiles.
+pub struct Loaded {
+    pub game: GameDef,
+    pub data: Data,
+    pub settings: Settings,
+    /// Read-only for these views; the app shares the parsed index between commands until the file changes.
+    pub library: Arc<Library>,
+    pub profiles: Profiles,
+}
+
+/// Reads what most views need about a game: its definition, its settings, its library and its profiles.
+pub fn load_game(root: &Data, game_id: &str) -> Result<Loaded, AppError> {
+    let game = root.definition(game_id)?;
+    let data = root.game(game_id);
+    let settings = load_settings(&data);
+    let library = load_library_shared(&data, &game)?;
+    let profiles = load_profiles(&data)?;
+    Ok(Loaded {
+        game,
+        data,
+        settings,
+        library,
+        profiles,
+    })
+}
+
+/// The game, its data and its settings, when the game is not running. Its files are not touched while it runs.
+pub fn load_stopped(root: &Data, game_id: &str) -> Result<(GameDef, Data, Settings), AppError> {
+    let game = root.definition(game_id)?;
+    let data = root.game(game_id);
+    if crate::context::running::game_running(root, game_id)? {
+        return Err(crate::error::game_running());
+    }
+    let settings = load_settings(&data);
+    Ok((game, data, settings))
+}
+
+/// The library index for a caller that may change it. The read-through cache is used when it still matches, so an edit
+/// after a status does not parse the whole file again; the caller saves through `Data::save_library`, which puts the
+/// changed value back. Callers hold `lock_index` while they change the index.
+pub fn load_library(data: &Data, game: &GameDef) -> Result<Library, AppError> {
+    let index = data.index();
+    let parse = || Library::load(&index, &data.library(), game);
+    data.library_cache()
+        .map_or_else(parse, |cache| cache.load_cloned(&index, parse))
+}
+
+/// The library index for read-only views. With the app's `Data`, an unchanged index comes from the cache.
+pub fn load_library_shared(data: &Data, game: &GameDef) -> Result<Arc<Library>, AppError> {
+    let index = data.index();
+    cached(data.library_cache(), &index, || {
+        Library::load(&index, &data.library(), game)
+    })
+}
+
+/// The game's profiles for a caller that will change them. A missing file starts the game with one empty profile.
+pub fn load_profiles(data: &Data) -> Result<Profiles, AppError> {
+    let path = data.profiles_file();
+    let parse = || Profiles::read_or_default(&path);
+    data.profiles_cache()
+        .map_or_else(parse, |cache| cache.load_cloned(&path, parse))
+}
+
+/// The game's profiles for read-only views. With the app's `Data`, an unchanged file comes from the cache and the
+/// parsed list is shared instead of copied.
+pub fn load_profiles_shared(data: &Data) -> Result<Arc<Profiles>, AppError> {
+    let path = data.profiles_file();
+    cached(data.profiles_cache(), &path, || {
+        Profiles::read_or_default(&path)
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::context::library::scan_mod;
+    use crate::domain::library::{Archive, ArchiveLabel};
+    use crate::test_support::{games as test_games, scratch};
+    use std::collections::BTreeMap;
+    use std::fs;
+
+    #[test]
+    fn a_library_without_labels_is_named_once_and_saved_with_them() {
+        let base = scratch!("archive-labels-backfill");
+        let root = Data::with_cache(base);
+        let data = root.game(test_games::SLOT_ID);
+        let game = test_games::slot();
+        let folder = data.library().join("modA");
+        fs::create_dir_all(folder.join("content")).unwrap();
+        fs::write(folder.join("content/x.ws"), "a").unwrap();
+
+        // An index as an older Gobbo wrote it: the archive has no label, so the file has no `named` key.
+        let mut library = Library::default();
+        let mut version = scan_mod(&data.library(), "modA", &game).unwrap();
+        version.archive = Some("sha-a".into());
+        version.parsed_sources.insert(
+            crate::domain::source::ProviderId::new("nexus"),
+            "35686".into(),
+        );
+        library.versions.insert("modA".into(), version);
+        library.archives.insert(
+            "sha-a".into(),
+            Archive {
+                original_name: "Remove Mods Menu 35686 1.2.0 2026-10-23T17-21Z Q6xF6llIa.zip"
+                    .into(),
+                file: "sha-a.zip".into(),
+                named: None,
+                source_files: BTreeMap::new(),
+                source_parts: BTreeMap::new(),
+                skipped: Vec::new(),
+                skipped_total: 0,
+            },
+        );
+        library.save(&data.index()).unwrap();
+        assert!(!fs::read_to_string(data.index()).unwrap().contains("named"));
+
+        let named = name_game_archives(&data, &game, &crate::providers::archive_name_from).unwrap();
+        assert!(named, "the first start names the archive and saves");
+        assert!(
+            fs::read_to_string(data.index())
+                .unwrap()
+                .contains("\"named\"")
+        );
+
+        let loaded = Library::load(&data.index(), &data.library(), &game).unwrap();
+        assert_eq!(
+            loaded.archives["sha-a"].named,
+            Some(ArchiveLabel {
+                name: Some("Remove Mods Menu".into()),
+                version: "1.2.0".into(),
+            })
+        );
+        assert_eq!(
+            loaded.version_string(&loaded.versions["modA"]).as_deref(),
+            Some("1.2.0")
+        );
+
+        // The next start finds the label, saves nothing and leaves the file as it is.
+        let before = fs::read(data.index()).unwrap();
+        assert!(!name_game_archives(&data, &game, &crate::providers::archive_name_from).unwrap());
+        assert_eq!(fs::read(data.index()).unwrap(), before);
+    }
+
+    #[test]
+    fn a_thunderstore_archive_gets_its_version_on_the_next_start_and_keeps_its_name() {
+        let base = scratch!("archive-labels-thunderstore");
+        let root = Data::with_cache(base);
+        let data = root.game(test_games::SLOT_ID);
+        let game = test_games::slot();
+        let folder = data.library().join("modA");
+        fs::create_dir_all(folder.join("content")).unwrap();
+        fs::write(folder.join("content/x.ws"), "a").unwrap();
+        fs::write(folder.join("info.json"), r#"{"modName":"Package Name"}"#).unwrap();
+
+        // The file name has the package slug and the version; the label must not rename the mod.
+        let mut library = Library::default();
+        let mut version = scan_mod(&data.library(), "modA", &game).unwrap();
+        version.archive = Some("sha-t".into());
+        version.parsed_sources.insert(
+            crate::domain::source::ProviderId::new("thunderstore"),
+            "example_owner-example_mod".into(),
+        );
+        library.versions.insert("modA".into(), version);
+        library.archives.insert(
+            "sha-t".into(),
+            Archive {
+                original_name: "example_owner-example_mod-1.0.0.zip".into(),
+                file: "sha-t.zip".into(),
+                named: None,
+                source_files: BTreeMap::new(),
+                source_parts: BTreeMap::new(),
+                skipped: Vec::new(),
+                skipped_total: 0,
+            },
+        );
+        library.save(&data.index()).unwrap();
+
+        let named = name_game_archives(&data, &game, &crate::providers::archive_name_from).unwrap();
+        assert!(
+            named,
+            "the first start gives the archive its version and saves"
+        );
+        let mut loaded = Library::load(&data.index(), &data.library(), &game).unwrap();
+        assert_eq!(
+            loaded.archives["sha-t"].named,
+            Some(ArchiveLabel {
+                name: None,
+                version: "1.0.0".into(),
+            })
+        );
+        assert_eq!(loaded.versions["modA"].info.name, "Package Name");
+        assert_eq!(
+            loaded.version_string(&loaded.versions["modA"]).as_deref(),
+            Some("1.0.0")
+        );
+
+        loaded.rescan(&data.library(), &game).unwrap();
+        assert_eq!(loaded.versions["modA"].info.name, "Package Name");
+        assert_eq!(
+            loaded.versions["modA"].info.version.as_deref(),
+            Some("1.0.0")
+        );
+    }
+}

@@ -1,0 +1,30 @@
+# Valheim. A Unity game with BepInEx 5 plugins, like Lethal Company.
+#
+# BepInEx comes from an enabled mod. The shared layout is the `bepinex` loader preset in loaders/bepinex.toml: the
+# proxy and settings at the root, the plugin slot, the core/config/patchers/monomod mirrors and the archive aliases.
+# The game also has a native Linux build; Gobbo starts Steam games through Proton, so this definition covers the Windows
+# build under Proton. The Linux executable is a marker so detection works on both installs.
+
+schema = 1
+id = "valheim"
+name = "Valheim"
+providers = { nexus = { key = "valheim" }, thunderstore = { key = "valheim" } }
+loader = "bepinex"
+
+[detect]
+steam_app_ids = [892970]
+steam_install_dirs = ["Valheim"]
+# The native Linux program is not chosen by the launcher yet, so detection covers the Proton install only.
+markers = ["valheim.exe"]
+any_marker = true
+
+[[executables]]
+name = "Valheim"
+path = "valheim.exe"
+
+[[user_data]]
+# Not yet verified on a real installation. Unity keeps the saves here on Windows, under Proton and on native Linux.
+id = "saves"
+kind = "saves"
+path = "{local_low}/IronGate/Valheim"
+path_linux = "{home}/.config/unity3d/IronGate/Valheim"

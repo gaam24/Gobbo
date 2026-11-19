@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-cancel-pack-download"
+description = "Enables the cancel_pack_download command without any pre-configured scope."
+commands.allow = ["cancel_pack_download"]
+
+[[permission]]
+identifier = "deny-cancel-pack-download"
+description = "Denies the cancel_pack_download command without any pre-configured scope."
+commands.deny = ["cancel_pack_download"]

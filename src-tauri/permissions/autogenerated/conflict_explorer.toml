@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-conflict-explorer"
+description = "Enables the conflict_explorer command without any pre-configured scope."
+commands.allow = ["conflict_explorer"]
+
+[[permission]]
+identifier = "deny-conflict-explorer"
+description = "Denies the conflict_explorer command without any pre-configured scope."
+commands.deny = ["conflict_explorer"]

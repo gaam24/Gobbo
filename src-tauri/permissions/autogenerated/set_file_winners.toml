@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-set-file-winners"
+description = "Enables the set_file_winners command without any pre-configured scope."
+commands.allow = ["set_file_winners"]
+
+[[permission]]
+identifier = "deny-set-file-winners"
+description = "Denies the set_file_winners command without any pre-configured scope."
+commands.deny = ["set_file_winners"]

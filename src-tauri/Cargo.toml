@@ -1,0 +1,281 @@
+[workspace]
+# The overlay crates: the layer rules, the launcher that loads the hook, and the hook DLL itself.
+members = ["crates/*"]
+resolver = "3"
+
+# Every member inherits these with `version.workspace = true` and the like, so a version, an edition or a lint is set once.
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97"
+license = "GPL-3.0-only"
+repository = "https://github.com/gaam24/Gobbo"
+
+[workspace.dependencies]
+gobbo-overlay-core = { path = "crates/overlay-core" }
+gobbo-overlay-decisions = { path = "crates/overlay-decisions" }
+gobbo-overlay-dump = { path = "crates/overlay-dump" }
+gobbo-overlay-launch = { path = "crates/overlay-launch" }
+gobbo-overlay-pe = { path = "crates/overlay-pe" }
+rustc-hash = "2"
+windows-sys = "0.61"
+
+# The lints stay at `warn` so they inform without blocking everyday work; CI and `bun run check:rust` treat them as gates.
+# `unsafe_code` is not here: the hook and the launcher call Win32 directly, so each crate states its own policy.
+[workspace.lints.rust]
+rust_2018_idioms = { level = "warn", priority = -1 }
+elided_lifetimes_in_paths = "allow"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -2 }
+nursery = { level = "warn", priority = -2 }
+module_name_repetitions = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+cast_possible_truncation = "allow"
+cast_sign_loss = "allow"
+cast_precision_loss = "allow"
+cast_possible_wrap = "allow"
+must_use_candidate = "allow"
+return_self_not_must_use = "allow"
+fn_params_excessive_bools = "allow"
+struct_excessive_bools = "allow"
+too_many_lines = "allow"
+assert_is_empty = "allow"
+struct_field_names = "allow"
+use_self = "allow"
+needless_pass_by_value = "allow"
+# Reenable candidates, one cleanup at a time:
+# redundant_clone = "warn"
+# significant_drop_tightening = "warn"
+
+[package]
+name = "gobbo"
+description = "Gobbo Mods Organizer: a mod manager for PC games"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "gobbo_lib"
+# The desktop app links this crate as an rlib. The staticlib/cdylib forms only exist for mobile targets,
+# which Gobbo does not build; leaving them out saves a second link of every build.
+crate-type = ["rlib"]
+
+[lints]
+workspace = true
+
+[features]
+# The release app uses mimalloc. Measured on the status benchmark: about 16% faster than the system allocator on
+# Linux and about 30% on Windows. `cargo build --no-default-features` builds without it for a size comparison.
+default = ["mimalloc"]
+# Exposes the benchmark fixtures. Never enable this in a release build.
+# The 7z fixture writes archives, so the `compress`-gated `ArchiveWriter` API must be on the lib's dependency too
+# (the dev-dependency already enables it, but dev-deps are not linked when checking the lib with this feature).
+bench = ["sevenz-rust2/compress"]
+# Replaces the allocator of the benchmark binary, for the F6 allocator experiment.
+bench-mimalloc = ["bench", "dep:mimalloc"]
+mimalloc = ["dep:mimalloc"]
+# Debug-only: the MCP bridge lets the coding assistant screenshot and drive the window. Start the app with
+# `--features mcp-bridge`. The code is also gated on `debug_assertions`, so a release build never starts it.
+mcp-bridge = ["dep:tauri-plugin-mcp-bridge"]
+# Debug-only: the embedded WebDriver server for the WebdriverIO E2E suite. The plugin is in the binary only when this
+# feature is enabled, so a normal debug or release build never opens the test endpoint.
+e2e = ["dep:tauri-plugin-wdio-webdriver"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dev-dependencies]
+criterion = { version = "0.8", features = ["html_reports"] }
+dhat = "0.3"
+goblin = "0.9"
+# Property tests for the parsers that read untrusted bytes and names. Test-only: the shipped app never links it.
+proptest = "1"
+# The writer is only a test and benchmark fixture. The release build reads 7z archives; it never writes one, so the
+# encoder (`compress`, and the lzma encoder behind it) stays out of the shipped binary.
+sevenz-rust2 = { version = "0.24", default-features = false, features = ["compress", "util"] }
+
+[[bench]]
+name = "backend"
+harness = false
+required-features = ["bench"]
+
+[[bench]]
+name = "alloc"
+harness = false
+required-features = ["bench"]
+
+[[bench]]
+name = "instructions"
+harness = false
+required-features = ["bench"]
+
+[[test]]
+name = "alloc_budget"
+required-features = ["bench"]
+
+[dependencies]
+gobbo-overlay-core.workspace = true
+gobbo-overlay-decisions.workspace = true
+# The default feature set plus its platform pieces, without `dynamic-acl`: every capability is static in
+# `capabilities/default.json`, so the runtime ACL editor is dead weight in the binary. `linux-libxdo` is left out on
+# purpose: it is only used by predefined Copy/Cut/Paste menu items, which the tray does not have, and it needs an extra
+# system library on Linux.
+tauri = { version = "2", default-features = false, features = [
+    "common-controls-v6",
+    "compression",
+    "dbus",
+    "image-ico",
+    "image-png",
+    "tray-icon",
+    "wry",
+    "x11",
+] }
+tauri-plugin-opener = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-dialog = "2"
+base64 = "0.23"
+dirs = "7"
+serde = { version = "1", features = ["derive", "rc"] }
+serde_json = "1"
+toml = "1.1"
+tauri-specta = { version = "=2.0.0-rc.26", features = ["derive", "typescript"] }
+specta = { version = "=2.0.0-rc.26", features = ["derive"] }
+specta-typescript = "=0.0.13"
+# Every decompression method the format offers is supported: a mod packed outside Nexus may use any of them. Zopfli is
+# only an optional deflate encoder for writing, so the reader keeps the smaller flate2 backend instead.
+zip = { version = "9", default-features = false, features = [
+    "aes-crypto",
+    "bzip2",
+    "deflate64",
+    "deflate-flate2-zlib-rs",
+    "lzma",
+    "ppmd",
+    "time",
+    "xz",
+    "zstd",
+] }
+sha2 = "0.11"
+crc32fast = "1"
+bsdiff = "0.2"
+md-5 = "0.11"
+faster-hex = { version = "1", default-features = false, features = ["std"] }
+memchr = "2"
+rustc-hash.workspace = true
+time = { version = "0.3", default-features = false, features = ["std", "parsing", "formatting"] }
+# Parsing `nxm://` links: the OS may percent-encode the key and the expiry, and a URL parser gets the
+# scheme, host and query decoding right where a hand-written split does not.
+url = "2"
+roxmltree = "0.21"
+same-file = "1"
+tempfile = "3"
+sevenz-rust2 = { version = "0.24", default-features = false, features = ["util"] }
+unrar = "0.5"
+keyring = "4"
+thiserror = "2"
+tauri-plugin-deep-link = "2"
+tauri-plugin-window-state = "2"
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
+# The first-start storage question runs before Tauri starts, so it cannot use the dialog plugin. `rfd` (MIT) shows it on
+# Windows and macOS. On Linux the question uses the `gtk` crate directly, because `rfd`'s GTK backend initializes GTK on
+# a background thread, which breaks Tauri's event loop; `rfd`'s `gtk3` feature stays enabled for `tauri-plugin-dialog`'s
+# own dialogs. `sys-locale` (MIT/Apache-2.0) is a small, maintained crate for the language of that one question.
+rfd = { version = "0.17", default-features = false, features = ["common-controls-v6", "gtk3"] }
+sys-locale = "0.3"
+# The free space on the drive that holds a game or its mods, for the preflight check. The same crate already drives the
+# Windows process list; `disk` is the one feature the preflight adds.
+sysinfo = { version = "0.39.6", default-features = false, features = ["disk", "system"] }
+mimalloc = { version = "0.1", optional = true }
+# The MCP bridge for the coding assistant: a debug-only dev aid behind the `mcp-bridge` feature (MIT).
+tauri-plugin-mcp-bridge = { version = "0.13", optional = true }
+# The in-app WebDriver server for the `e2e` feature, used only by the WebdriverIO suite (MIT).
+tauri-plugin-wdio-webdriver = { version = "=1.5.1", optional = true }
+
+# The same gtk-rs binding Tauri uses on Linux, and the same version as the workspace lock. It is a direct dependency
+# only for the first-start dialog, which must run before Tauri and on the main thread.
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = "0.18"
+# Native TLS on Windows is SChannel, which the system already has; Linux keeps rustls. Both are HTTP/1 clients for the
+# provider APIs; `infra/http.rs` names the provider each build enables, because ureq defaults to rustls in both cases.
+ureq = { version = "3", default-features = false, features = ["rustls", "gzip"] }
+
+# Sending SIGKILL to a game's process tree. Already in the lock through the archive reader; only the signal calls are used.
+[target.'cfg(unix)'.dependencies]
+nix = { version = "0.31", default-features = false, features = ["signal"] }
+
+# Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
+[profile.release]
+# Measured on the 5k status benchmark: `opt-level = 2` was as fast as `3` (12.35 ms vs 12.70 ms) and about 1 MiB
+# smaller; `opt-level = "s"` was 14.2 ms. The release binary is about 13.8 MiB with mimalloc.
+codegen-units = 1
+lto = true
+opt-level = 2
+panic = "abort"
+strip = true
+
+# `cargo bloat` needs symbols and benchmarks need unwinding; the shipped release profile strips them and aborts. The
+# profile keeps the release optimization level, so a benchmark measures the code a release build generates.
+[profile.release-bench]
+inherits = "release"
+strip = false
+debug = 1
+panic = "unwind"
+
+# The hook ships with a PDB: a crash dump is only useful when the stack has names. The rest of the app stays small.
+[profile.release.package.gobbo-overlay-hook]
+debug = "line-tables-only"
+opt-level = 3
+strip = false
+
+# The overlay crates and their benchmark must be measured at the optimization level they ship with. Without these, a
+# `cargo run -p gobbo-overlay-bench` (dev profile) measures a hook compiled with `opt-level = 0`.
+[profile.dev.package.gobbo-overlay-hook]
+opt-level = 3
+
+[profile.dev.package.gobbo-overlay-core]
+opt-level = 3
+
+[profile.dev.package.gobbo-overlay-decisions]
+opt-level = 3
+
+[profile.dev.package.gobbo-overlay-launch]
+opt-level = 3
+
+[profile.release-bench.package.gobbo-overlay-hook]
+opt-level = 3
+
+[profile.release-bench.package.gobbo-overlay-core]
+opt-level = 3
+
+[profile.release-bench.package.gobbo-overlay-decisions]
+opt-level = 3
+
+[profile.release-bench.package.gobbo-overlay-launch]
+opt-level = 3
+
+[profile.release-bench.package.gobbo-overlay-bench]
+opt-level = 3
+
+[target."cfg(windows)".dependencies]
+gobbo-overlay-dump.workspace = true
+gobbo-overlay-launch.workspace = true
+# SChannel through the Windows certificate store, instead of a bundled rustls/ring/webpki stack. `infra/http.rs` selects
+# this provider; ureq would otherwise assume rustls, which this feature set does not build.
+ureq = { version = "3", default-features = false, features = ["native-tls", "gzip"] }
+# Windows 11 Efficiency mode (EcoQoS): a safe wrapper for SetProcessInformation, so the app keeps
+# `#![forbid(unsafe_code)]`. It uses the `windows`/`windows-result` versions already in the tree.
+win32-ecoqos = { version = "0.6", default-features = false }
+
+[target.'cfg(any(target_os = "linux", windows))'.dependencies]
+tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
+
+[target.'cfg(target_os = "linux")'.dev-dependencies]
+iai-callgrind = "0.16"

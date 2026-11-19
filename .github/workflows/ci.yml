@@ -1,0 +1,331 @@
+name: CI
+
+# The changes job asks GitHub which files a push or pull request touched. The fast checks run on every change. A pull
+# request runs the cheap Linux clippy gate; the slow test and Windows gates run on main, nightly and reusable calls, or
+# on a pull request that touches Windows-only code. This keeps a PR to one Rust compile instead of four.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      e2e:
+        description: "Also run the full E2E suite (off for the release gate)"
+        type: boolean
+        required: false
+        default: true
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+env:
+  LEFTHOOK: "0" # skip git hooks installed by the `prepare` script
+  BUN_VERSION: "1.4.4"
+  CARGO_INCREMENTAL: "0" # an incremental cache is never reused across runner jobs
+
+jobs:
+  changes:
+    name: Changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      all: ${{ steps.classify.outputs.all }}
+      web: ${{ steps.classify.outputs.web }}
+      rust: ${{ steps.classify.outputs.rust }}
+      windows: ${{ steps.classify.outputs.windows }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Classify changed paths
+        id: classify
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bun scripts/ci-changes.ts
+
+  fast:
+    name: Fast checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Cache Bun packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+          restore-keys: ${{ runner.os }}-bun-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # Formatting needs the rustfmt binary, not the WebKitGTK headers or a compiled workspace.
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          components: rustfmt
+
+      - name: Format
+        working-directory: src-tauri
+        run: cargo fmt --all --check
+
+      - name: Lint, types and architecture
+        run: bun run lint
+
+  web:
+    name: Web
+    needs: changes
+    if: needs.changes.outputs.all == 'true' || needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Cache Bun packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+          restore-keys: ${{ runner.os }}-bun-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Unit tests
+        run: bun test
+
+      # The fast job already ran tsc; this only bundles and checks the E2E hooks.
+      - name: Build the web bundle
+        run: bun run build:web:ci
+
+  # One Linux job. clippy is the PR gate; the slow test suite and the quarantined overlay test run on main and nightly.
+  # Splitting clippy and tests into two jobs looked parallel but made the workspace compile twice as often, because
+  # rust-cache deliberately drops workspace artifacts before saving.
+  rust:
+    name: Rust
+    needs: changes
+    if: needs.changes.outputs.all == 'true' || needs.changes.outputs.rust == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          components: clippy
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          workspaces: src-tauri
+          shared-key: backend-ubuntu
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      # --all-targets type-checks the test code too, so a PR still catches broken tests without running the suite.
+      - name: Clippy
+        working-directory: src-tauri
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+      - name: Allow overlay user namespaces
+        if: github.event_name != 'pull_request'
+        run: |
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+          sudo sysctl -w kernel.unprivileged_userns_clone=1 || true
+          if ! unshare --user --map-root-user --mount --propagation private -- true; then
+            echo "::warning::user namespaces are unavailable; overlay session tests will be skipped"
+          fi
+
+      - name: Tests
+        if: github.event_name != 'pull_request'
+        working-directory: src-tauri
+        run: cargo test --workspace --features bench --locked
+
+      # The one test that cannot find its helper process on a hosted runner is quarantined from the blocking suite.
+      # It still runs on main and nightly, where a failure is visible but does not hold a pull request.
+      - name: Quarantined overlay tests
+        if: github.event_name != 'pull_request'
+        working-directory: src-tauri
+        continue-on-error: true
+        run: cargo test --workspace --locked -- --ignored
+
+  # Windows is expensive: its build script needs the staged hook binaries before anything can compile. It runs on main
+  # and nightly, and on a PR only when Windows-only code changed. One job keeps the hook build to a single occurrence.
+  windows:
+    name: Windows
+    needs: changes
+    if: needs.changes.outputs.all == 'true' || needs.changes.outputs.windows == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          components: clippy
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          workspaces: src-tauri
+          shared-key: backend-windows
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Install the 32-bit Rust target
+        run: rustup target add i686-pc-windows-msvc
+
+      - name: Build the overlay hooks, probe and 32-bit injector
+        working-directory: src-tauri
+        run: |
+          cargo build -p gobbo-overlay-hook
+          cargo build -p gobbo-overlay-hook --target i686-pc-windows-msvc
+          cargo build -p gobbo-overlay-launch --bin gobbo_overlay_inject32 --target i686-pc-windows-msvc
+          cargo build -p gobbo-overlay-probe
+          cargo build -p gobbo-overlay-probe --target i686-pc-windows-msvc
+          cargo build -p gobbo-overlay-dump --bin gobbo_overlay_dump32 --target i686-pc-windows-msvc
+
+      - name: Stage the overlay resources and test binaries
+        working-directory: src-tauri
+        run: |
+          New-Item -ItemType Directory -Force overlay-hook | Out-Null
+          Copy-Item target/debug/gobbo_overlay_hook.dll overlay-hook/gobbo_overlay_hook.dll
+          Copy-Item target/debug/gobbo_overlay_hook.pdb overlay-hook/gobbo_overlay_hook.pdb
+          Copy-Item target/i686-pc-windows-msvc/debug/gobbo_overlay_hook.dll overlay-hook/gobbo_overlay_hook32.dll
+          Copy-Item target/i686-pc-windows-msvc/debug/gobbo_overlay_hook.pdb overlay-hook/gobbo_overlay_hook32.pdb
+          Copy-Item target/i686-pc-windows-msvc/debug/gobbo_overlay_inject32.exe overlay-hook/gobbo_overlay_inject32.exe
+          Copy-Item target/debug/overlay-probe.exe overlay-hook/gobbo_overlay_probe.exe
+          Copy-Item target/i686-pc-windows-msvc/debug/overlay-probe.exe overlay-hook/gobbo_overlay_probe32.exe
+          Copy-Item target/i686-pc-windows-msvc/debug/gobbo_overlay_dump32.exe overlay-hook/gobbo_overlay_dump32.exe
+          Copy-Item target/i686-pc-windows-msvc/debug/gobbo_overlay_hook.dll target/debug/gobbo_overlay_hook32.dll
+          Copy-Item target/i686-pc-windows-msvc/debug/gobbo_overlay_inject32.exe target/debug/gobbo_overlay_inject32.exe
+          Copy-Item target/i686-pc-windows-msvc/debug/overlay-probe.exe target/debug/gobbo_overlay_probe32.exe
+          Copy-Item target/i686-pc-windows-msvc/debug/gobbo_overlay_dump32.exe target/debug/gobbo_overlay_dump32.exe
+
+      - name: Clippy
+        working-directory: src-tauri
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+      - name: Tests
+        working-directory: src-tauri
+        run: cargo test --workspace --locked
+
+  e2e:
+    name: E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # A pull request and a push to main stay fast; the nightly run, a tag and a manual dispatch run every spec. A
+    # reusable call can turn it off, which is how the release gate skips this long, environment-dependent suite.
+    if: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')) && (github.event_name != 'workflow_call' || inputs.e2e) }}
+    env:
+      # WebKitGTK under Xvfb has no DMA-BUF renderer.
+      WEBKIT_DISABLE_DMABUF_RENDERER: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      # WebdriverIO's expect-webdriverio does not run under Bun; the suite uses this Node.
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 24
+
+      - name: Cache Bun packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+          restore-keys: ${{ runner.os }}-bun-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf xvfb
+
+      - name: Allow overlay user namespaces
+        run: |
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+          sudo sysctl -w kernel.unprivileged_userns_clone=1 || true
+          if ! unshare --user --map-root-user --mount --propagation private -- true; then
+            echo "::warning::user namespaces are unavailable; overlay specs will take the documented failure path"
+          fi
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          workspaces: src-tauri
+          shared-key: e2e
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build the E2E app
+        run: bun run e2e:build
+
+      - name: Run E2E
+        run: xvfb-run -a bun run e2e
+
+      - name: Upload E2E data
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: e2e-data
+          path: |
+            target/e2e-data
+            target/e2e-artifacts
+          if-no-files-found: ignore

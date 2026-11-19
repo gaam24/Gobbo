@@ -1,0 +1,110 @@
+# Template for a new game. Copy this folder to games/<id>/ and delete what does not apply.
+# Unknown keys are errors. games/README.md explains every key and shows the common patterns;
+# `cargo test` checks this file and every shipped definition.
+
+schema = 1
+id = "examplegame"
+name = "Example Game"
+providers = { nexus = { key = "examplegame" } }
+
+# A shared loader preset in loaders/<id>.toml brings the common `requires` and `[deploy]` rules. A string uses the
+# preset's default variant; a table picks one.
+# loader = "bepinex"
+# loader = { id = "bepinex", variant = "6" }
+
+# Files that must exist in the game folder before mods are deployed, with no name or page to show. A loader preset adds
+# its own. A file the setup check should name and link goes in `[[requirements]]` instead: its path is required too, so
+# it does not need a `requires` entry.
+# requires = ["Example/core.dll"]
+
+# Simple files and folders kept separately for each profile by copying them around a launch.
+# profile_data = ["{documents}/Example Game/saves"]
+
+# A folder outside the game that the game treats as its own user data. Each profile chooses whether to share it or
+# keep it separate. `redirect` serves it through the overlay without copying; `copy` is the fallback.
+# `kind` is a universal label the frontend translates: "user-data", "settings", "saves", "config" or "mods".
+# [[user_data]]
+# id = "documents"
+# kind = "saves"
+# path = "{documents}/Example Game"
+# mode = "redirect"
+# default = "isolated"
+# inherit = true
+
+[detect]
+steam_app_ids = [123456]
+steam_install_dirs = ["Example Game"]
+markers = ["ExampleGame.exe"] # files that identify the game folder
+# any_marker = true           # one marker is enough (builds with different file names)
+
+# The programs the game starts with. The first one is the default.
+[[executables]]
+name = "Example Game"
+path = "ExampleGame.exe"
+# args = ["-some-required-flag"]
+
+[deploy]
+# Overlay is the only deployment method. The keys here describe the game's mod layout: where each file from an archive
+# lands. A simple game needs one of `slots`, `mirror` or `full_root`; the other keys refine it.
+# root = "{appdata}/ExampleGame"             # mods outside the game folder; the overlay covers this root too
+# root_linux = "{local_appdata}/ExampleGame" # the same for a native Linux install
+# root_files = ["winhttp.dll"]               # bare files at the archive root that keep their name
+# protected = ["bin"]                        # game folders an archive may place files into only through a mirror
+# resource_names = true                      # equal file names conflict across folders
+# aliases = { plugins = "BepInEx/plugins" }  # archive folder name -> game folder inside a slot or mirror
+
+# The whole deployment root is the mod layout: every archive path is a game path, so a new loader or framework needs
+# no mirror entry. Use it instead of slots and mirror; a bare file at the archive root still needs root_files or move.
+# full_root = true
+
+# A bare file at the archive root goes to the folder the game reads it from, keeping its name. This is the MO2-style
+# rule for a game that loads loose archives from one folder, for example Cyberpunk 2077's .archive and .xl files.
+# [[deploy.move]]
+# extensions = [".archive", ".xl"]
+# to = "archive/pc/mod"
+
+# A folder where each mod gets a folder of its own, and the game loads every folder.
+[[deploy.slots]]
+dir = "Mods"
+# prefix = "mod"              # the start of the mod folder names in the game
+# marker = "ModInfo.xml"      # a file or folder that marks a mod root in an archive
+# extensions = [".pak"]       # only these files go into the slot
+# root_extensions = [".dll"]  # bare files at the archive root with these extensions go into the slot too
+# root_folder_extensions = [".dll"] # a folder at the archive root holding such a file is a mod: <Plugin>/<plugin>.dll
+# flat = true                 # the files go directly into dir, without a folder per mod
+
+# A game folder (or file) whose files keep their paths from the archive.
+# [[deploy.mirror]]
+# dir = "Data"
+# extensions = [".esp", ".bsa"]  # only these files
+# prefix = "dlc"                 # folders directly under dir get this prefix
+
+# Files in mod folders that the game reads from one mod only: two mods with the same path conflict.
+# [[deploy.shared]]
+# dir = "content"
+# extensions = [".ws", ".xml"]
+
+# The file the game reads its mod order from. Without this table the game orders its mods itself.
+# [load_order]
+# format = "mods_settings"
+# file = "{documents}/Example Game/mods.settings"
+# priority_min = 1
+# priority_max = 9999
+
+# A program run in the overlay before the game starts (or after it exits), when a mod asks for it in mod_steps.toml.
+# [[steps]]
+# id = "compile"
+# phase = "before_start"
+# program = "tools/compiler.exe"
+# args = ["{game}/scripts"]
+
+# Log files the game itself writes, shown in the console after a launch. A mod's `.log` files are discovered
+# automatically in the mod and overwrite layers and need no entry here. `path` is a file or a folder; a folder gives
+# its newest files whose names match `pattern`. `kind` is a universal label the frontend translates:
+# "script", "loader", "console", "crash", "mod" or "game".
+# [[logs]]
+# kind = "game"
+# path = "logs"
+# pattern = "*.log"
+# limit = 3
+# recursive = true

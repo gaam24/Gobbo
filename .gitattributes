@@ -1,0 +1,3 @@
+# The repository keeps LF everywhere, also in a Windows checkout: Biome and rustfmt check LF, and `core.autocrlf` would
+# otherwise turn the working copy into CRLF after a checkout or a stash. Git still detects binary files on its own.
+* text=auto eol=lf

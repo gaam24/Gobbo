@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-ungroup-mods"
+description = "Enables the ungroup_mods command without any pre-configured scope."
+commands.allow = ["ungroup_mods"]
+
+[[permission]]
+identifier = "deny-ungroup-mods"
+description = "Denies the ungroup_mods command without any pre-configured scope."
+commands.deny = ["ungroup_mods"]

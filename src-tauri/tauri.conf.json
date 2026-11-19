@@ -1,0 +1,66 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Gobbo Mods Organizer",
+  "version": "0.1.0",
+  "identifier": "dev.gobbo.modsorganizer",
+  "build": {
+    "beforeDevCommand": "bun run build:overlay-hook && bun run dev",
+    "devUrl": "http://localhost:1420",
+    "frontendDist": "../dist",
+    "removeUnusedCommands": true
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Gobbo Mods Organizer",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1024,
+        "minHeight": 640,
+        "backgroundColor": "#101311"
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: asset: http://asset.localhost; font-src 'self' data:; connect-src ipc: http://ipc.localhost; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
+      "devCsp": "default-src 'self' http://localhost:1420; script-src 'self' 'unsafe-inline' http://localhost:1420; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src ipc: http://ipc.localhost ws://localhost:1420 ws://localhost:1421 http://localhost:1420; object-src 'none'; base-uri 'self'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "category": "Utility",
+    "shortDescription": "Mod manager for PC games",
+    "longDescription": "Imports mod archives, keeps a mod list for each profile and deploys mods through an overlay layer. Windows and Linux.",
+    "homepage": "https://github.com/gaam24/Gobbo",
+    "targets": [
+      "nsis"
+    ],
+    "resources": {
+      "../games": "games",
+      "../loaders": "loaders"
+    },
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/gaam24/Gobbo/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEM5M0E3NzVDREM3MkRDNEEKUldSSzNITGNYSGM2eVczbEgvQTBFUWJrVGhiSzZQeU5INE1ZVUJnaWljd0p3RXEzRE9ncmFLSE8K"
+    },
+    "deep-link": {
+      "desktop": {
+        "schemes": [
+          "nxm",
+          "ror2mm",
+          "gobbo"
+        ]
+      }
+    }
+  }
+}

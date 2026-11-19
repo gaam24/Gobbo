@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-collection-resolve-prompt"
+description = "Enables the collection_resolve_prompt command without any pre-configured scope."
+commands.allow = ["collection_resolve_prompt"]
+
+[[permission]]
+identifier = "deny-collection-resolve-prompt"
+description = "Denies the collection_resolve_prompt command without any pre-configured scope."
+commands.deny = ["collection_resolve_prompt"]

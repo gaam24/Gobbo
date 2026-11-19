@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-fill-source-info"
+description = "Enables the fill_source_info command without any pre-configured scope."
+commands.allow = ["fill_source_info"]
+
+[[permission]]
+identifier = "deny-fill-source-info"
+description = "Denies the fill_source_info command without any pre-configured scope."
+commands.deny = ["fill_source_info"]

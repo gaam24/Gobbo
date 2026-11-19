@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-set-requirement-ignored"
+description = "Enables the set_requirement_ignored command without any pre-configured scope."
+commands.allow = ["set_requirement_ignored"]
+
+[[permission]]
+identifier = "deny-set-requirement-ignored"
+description = "Denies the set_requirement_ignored command without any pre-configured scope."
+commands.deny = ["set_requirement_ignored"]

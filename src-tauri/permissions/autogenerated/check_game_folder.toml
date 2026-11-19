@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-check-game-folder"
+description = "Enables the check_game_folder command without any pre-configured scope."
+commands.allow = ["check_game_folder"]
+
+[[permission]]
+identifier = "deny-check-game-folder"
+description = "Denies the check_game_folder command without any pre-configured scope."
+commands.deny = ["check_game_folder"]

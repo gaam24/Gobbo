@@ -1,0 +1,21 @@
+# Content Warning. A Unity game with BepInEx 5 plugins, like Lethal Company.
+#
+# BepInEx comes from an enabled mod. The shared layout is the `bepinex` loader preset in loaders/bepinex.toml: the
+# proxy and settings at the root, the plugin slot, the core/config/patchers/monomod mirrors and the archive aliases.
+# Some mods use MelonLoader instead; this definition covers BepInEx only. The game is Windows-only, so on Linux it runs
+# through Proton.
+
+schema = 1
+id = "content-warning"
+name = "Content Warning"
+providers = { nexus = { key = "contentwarning" }, thunderstore = { key = "content-warning" } }
+loader = "bepinex"
+
+[detect]
+steam_app_ids = [2881650]
+steam_install_dirs = ["Content Warning"]
+markers = ["Content Warning.exe"]
+
+[[executables]]
+name = "Content Warning"
+path = "Content Warning.exe"

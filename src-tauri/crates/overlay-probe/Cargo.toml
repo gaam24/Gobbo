@@ -1,0 +1,19 @@
+[package]
+name = "gobbo-overlay-probe"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "A small program that checks the Windows overlay hook end to end from inside a session."
+publish = false
+
+[[bin]]
+name = "overlay-probe"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[target.'cfg(windows)'.dependencies]
+gobbo-overlay-core.workspace = true
+serde_json = "1"

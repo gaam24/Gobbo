@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-open-collection-page"
+description = "Enables the open_collection_page command without any pre-configured scope."
+commands.allow = ["open_collection_page"]
+
+[[permission]]
+identifier = "deny-open-collection-page"
+description = "Denies the open_collection_page command without any pre-configured scope."
+commands.deny = ["open_collection_page"]

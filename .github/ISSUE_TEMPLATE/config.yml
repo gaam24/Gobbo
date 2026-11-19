@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Need help using Gobbo?
+    url: https://github.com/gaam24/Gobbo/blob/main/docs/user/troubleshooting.md
+    about: Start here for common problems and the support bundle.
+  - name: Security problem
+    url: https://github.com/gaam24/Gobbo/security/advisories/new
+    about: Report security problems privately, not in a public issue.
+  - name: Add a game
+    url: https://github.com/gaam24/Gobbo/blob/main/games/README.md
+    about: How game definitions are added and tested.

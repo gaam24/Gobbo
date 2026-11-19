@@ -1,0 +1,20 @@
+# R.E.P.O. A Unity game with BepInEx 5 plugins, like Lethal Company.
+#
+# BepInEx comes from an enabled mod. The shared layout is the `bepinex` loader preset in loaders/bepinex.toml: the
+# proxy and settings at the root, the plugin slot, the core/config/patchers/monomod mirrors and the archive aliases.
+# The game is Windows-only, so on Linux it runs through Proton.
+
+schema = 1
+id = "repo"
+name = "R.E.P.O."
+providers = { nexus = { key = "repo" }, thunderstore = { key = "repo" } }
+loader = "bepinex"
+
+[detect]
+steam_app_ids = [3241660]
+steam_install_dirs = ["R.E.P.O"]
+markers = ["REPO.exe"]
+
+[[executables]]
+name = "R.E.P.O."
+path = "REPO.exe"

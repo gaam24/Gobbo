@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-install-tool-prerequisites"
+description = "Enables the install_tool_prerequisites command without any pre-configured scope."
+commands.allow = ["install_tool_prerequisites"]
+
+[[permission]]
+identifier = "deny-install-tool-prerequisites"
+description = "Denies the install_tool_prerequisites command without any pre-configured scope."
+commands.deny = ["install_tool_prerequisites"]

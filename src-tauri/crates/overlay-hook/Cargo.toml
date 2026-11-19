@@ -1,0 +1,50 @@
+[package]
+name = "gobbo-overlay-hook"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "The Windows overlay hook: a DLL that Gobbo loads into a game. It redirects the game's file calls to the overlay layers. Windows only; empty elsewhere."
+publish = false
+
+[lib]
+name = "gobbo_overlay_hook"
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# A counting global allocator and its exported counters, used by `overlay-bench`. Never enable this in a release hook:
+# every allocation takes an atomic increment.
+bench-alloc = []
+# Probe, lock and file-I/O counters for `overlay-bench`. A release hook never enables it; the counters are atomics only
+# in this benchmark build.
+bench-stats = []
+
+[target.'cfg(windows)'.dependencies]
+gobbo-overlay-core.workspace = true
+gobbo-overlay-decisions.workspace = true
+gobbo-overlay-launch.workspace = true
+crash-handler = "0.8"
+detour = "0.10"
+minidumper = "0.11"
+rustc-hash.workspace = true
+serde_json = "1"
+windows-sys = { workspace = true, features = [
+    "Win32_Foundation",
+    "Win32_Globalization",
+    "Win32_Security",
+    "Win32_Storage_FileSystem",
+    "Wdk_Foundation",
+    "Wdk_Storage_FileSystem",
+    "Win32_System_Diagnostics_Debug",
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_System_Kernel",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Memory",
+    "Win32_System_SystemServices",
+    "Win32_System_Threading",
+] }
+
+# The overlay crates deliberately stay out of the workspace lint groups: the hook is Win32 code and the pedantic/nursery
+# group would flood them with warnings (see ../AGENTS.md). An empty table is Cargo's documented way to make that intent
+# explicit and silence the `missing_lints_inheritance` warning.
+[lints]

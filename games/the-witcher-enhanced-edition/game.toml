@@ -1,0 +1,101 @@
+# The Witcher: Enhanced Edition (CD PROJEKT RED, 2007).
+#
+# Established on a Steam installation: appmanifest_20900.acf (appid 20900, buildid 13143960), witcher.ini
+# (OVERRIDE=..\Data, MODULES=..\Data\Modules) and the game's 1.5.0.1304 layout. GOG product 1207658924.
+#
+# The engine loads the KEY/BIF archives first and then every loose file under Data, recursively. Data/Override is the
+# community convention (Vortex uses it), while the whole Data tree acts as one override (MO2 maps mods there). Loose
+# files are keyed by resource name, so two files with the same file name conflict even in different folders.
+#
+# This definition covers loose-file mods: textures, UI, 2DA, scripts, templates, models, music, movies and dialogue.
+# Custom adventures (.adv in {documents}/The Witcher), campaign modules (.mod/.mmd in Data/modules), language packs
+# (.tlk/.key) and installer-based overhauls (Rise of the White Wolf, Full Combat Rebalance) are not covered.
+
+schema = 1
+id = "the-witcher-enhanced-edition"
+name = "The Witcher: Enhanced Edition"
+providers = { nexus = { key = "witcher" } }
+
+# Saves and the bonus .adv adventures. Shared by default: a save is about 20 MB and a first isolated launch would
+# copy the whole folder. A profile can isolate it; the base then stays visible as a read-only layer.
+[[user_data]]
+id = "documents"
+kind = "user-data"
+path = "{documents}/The Witcher"
+mode = "redirect"
+default = "shared"
+inherit = true
+
+[detect]
+steam_app_ids = [20900]
+steam_install_dirs = ["The Witcher Enhanced Edition"]
+gog_ids = ["1207658924"]
+markers = ["System/witcher.exe", "Data/main.key"]
+
+[[executables]]
+name = "The Witcher"
+path = "System/witcher.exe"
+
+[deploy]
+# The game resolves loose files by resource name, not by the folder they sit in.
+resource_names = true
+# Data/Override is the only loose-file slot target. Anything else under Data or System is refused instead of being
+# skipped; path-sensitive folders below are the mirrors that take their files first.
+protected = ["Data", "System"]
+
+# One flat slot: every mod deploys into Data/Override by file name, so a file in a wrapper folder and a file at the
+# archive root still meet in one place. The empty extensions list takes every file a mod puts in Data/Override,
+# including its readme; the protected check must not reject such a file after the slot accepted it.
+# The root lists decide what makes a bare file or a wrapper folder a mod at the archive root.
+[[deploy.slots]]
+dir = "Data/Override"
+flat = true
+root_extensions = [
+  ".2da", ".dds", ".tga", ".bmp", ".ico", ".cur",
+  ".dlg", ".lua", ".nss", ".ncs", ".luc",
+  ".utc", ".uti", ".utm", ".utp", ".utt", ".uts", ".ute", ".utd", ".utw", ".uta", ".utx",
+  ".fac", ".wfx", ".cam", ".ndb", ".mdb", ".mdl",
+]
+root_folder_extensions = [
+  ".2da", ".dds", ".tga", ".bmp", ".ico", ".cur",
+  ".dlg", ".lua", ".nss", ".ncs", ".luc",
+  ".utc", ".uti", ".utm", ".utp", ".utt", ".uts", ".ute", ".utd", ".utw", ".uta", ".utx",
+  ".fac", ".wfx", ".cam", ".ndb", ".mdb", ".mdl",
+]
+
+# Path-sensitive folders that must keep their game path. MO2 maps the whole Data tree; these mirrors keep that layout
+# for files the game or its tools look up in a fixed folder. An empty extensions list takes every file in the folder.
+[[deploy.mirror]]
+dir = "Data/Music"
+
+[[deploy.mirror]]
+dir = "Data/Movies"
+
+[[deploy.mirror]]
+dir = "Data/Cutscenes"
+
+[[deploy.mirror]]
+dir = "Data/Dialogues"
+
+[[deploy.mirror]]
+dir = "Data/voices"
+
+[[deploy.mirror]]
+dir = "Data/Scripts"
+
+[[deploy.mirror]]
+dir = "Data/Templates"
+
+[[deploy.mirror]]
+dir = "Data/Meshes"
+
+# Root-level 2DA files that a few mods replace where the game reads them.
+[[deploy.mirror]]
+dir = "Data/attackeffects.2da"
+
+[[deploy.mirror]]
+dir = "Data/languages.2da"
+
+[deploy.aliases]
+# Archives that ship "Override/..." instead of "Data/Override/...".
+Override = "Data/Override"

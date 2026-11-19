@@ -1,0 +1,73 @@
+name: Security
+
+# Dependency checks that do not belong in every pull request. An advisory can land against an unchanged tree between
+# pushes, so the job runs weekly and on demand; a change to a lockfile or the policy is checked on its pull request too.
+# The report-only steps (unused dependencies and docs links) are allowed to fail without hiding the security result.
+
+on:
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - bun.lock
+      - package.json
+      - src-tauri/Cargo.lock
+      - src-tauri/Cargo.toml
+      - src-tauri/deny.toml
+      - .github/workflows/security.yml
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  BUN_VERSION: "1.4.4"
+  LEFTHOOK: "0" # skip git hooks installed by the `prepare` script
+
+jobs:
+  dependencies:
+    name: Dependencies
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+
+      - name: Install dependency tools
+        uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2
+        with:
+          tool: cargo-deny,cargo-machete
+
+      - name: Advisories, licenses and sources
+        working-directory: src-tauri
+        run: cargo deny check
+
+      - name: Unused dependencies (report)
+        working-directory: src-tauri
+        continue-on-error: true
+        run: cargo machete
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: JavaScript advisories (runtime)
+        run: bun audit --production --audit-level high
+
+      - name: Documentation links (report)
+        continue-on-error: true
+        run: bun run docs:check

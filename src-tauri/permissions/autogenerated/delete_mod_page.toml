@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-delete-mod-page"
+description = "Enables the delete_mod_page command without any pre-configured scope."
+commands.allow = ["delete_mod_page"]
+
+[[permission]]
+identifier = "deny-delete-mod-page"
+description = "Denies the delete_mod_page command without any pre-configured scope."
+commands.deny = ["delete_mod_page"]

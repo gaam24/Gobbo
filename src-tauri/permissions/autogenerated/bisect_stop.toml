@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-bisect-stop"
+description = "Enables the bisect_stop command without any pre-configured scope."
+commands.allow = ["bisect_stop"]
+
+[[permission]]
+identifier = "deny-bisect-stop"
+description = "Denies the bisect_stop command without any pre-configured scope."
+commands.deny = ["bisect_stop"]

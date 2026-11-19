@@ -1,0 +1,258 @@
+{
+	"$schema": "./node_modules/oxlint/configuration_schema.json",
+	"plugins": ["typescript", "unicorn", "react", "react-perf", "promise", "import", "node", "jsx-a11y"],
+	"options": {
+		"typeAware": true
+	},
+	"categories": {
+		"correctness": "error",
+		"suspicious": "error",
+		"perf": "error",
+		"restriction": "off",
+		"style": "off",
+		"pedantic": "off",
+		"nursery": "off"
+	},
+	"env": {
+		"builtin": true,
+		"browser": true
+	},
+	"ignorePatterns": ["dist", "node_modules", "src-tauri", "src/bindings.ts"],
+	"rules": {
+		"typescript/no-explicit-any": "error",
+		"typescript/no-unsafe-type-assertion": "error",
+		"typescript/no-non-null-assertion": "error",
+		"typescript/no-non-null-asserted-optional-chain": "error",
+		"typescript/no-unnecessary-type-assertion": "error",
+		"typescript/consistent-type-assertions": [
+			"error",
+			{
+				"assertionStyle": "as",
+				"objectLiteralTypeAssertions": "never"
+			}
+		],
+		"typescript/no-misused-promises": "error",
+		"typescript/no-floating-promises": "error",
+		"typescript/require-await": "error",
+		// React effects mix `return;` with a cleanup `return () => {}` by design.
+		"typescript/consistent-return": "off",
+		"typescript/await-thenable": "error",
+		"typescript/no-import-type-side-effects": "error",
+		"typescript/consistent-type-imports": ["error", { "prefer": "type-imports" }],
+		"typescript/consistent-type-exports": "error",
+		"typescript/consistent-type-definitions": ["error", "interface"],
+		"typescript/consistent-indexed-object-style": ["error", "record"],
+		"typescript/array-type": ["error", { "default": "array-simple" }],
+		"typescript/no-inferrable-types": "error",
+		"typescript/no-empty-object-type": "error",
+		"typescript/no-wrapper-object-types": "error",
+		"typescript/no-useless-empty-export": "error",
+		"typescript/no-unnecessary-condition": "error",
+		"typescript/no-unnecessary-type-parameters": "error",
+		"typescript/no-unnecessary-type-constraint": "error",
+		"typescript/no-confusing-non-null-assertion": "error",
+		"typescript/prefer-as-const": "error",
+		"typescript/prefer-optional-chain": "error",
+		"typescript/prefer-nullish-coalescing": "error",
+		"typescript/prefer-readonly": "error",
+		"typescript/prefer-find": "error",
+		"typescript/prefer-includes": "error",
+		"typescript/prefer-string-starts-ends-with": "error",
+		"typescript/prefer-literal-enum-member": "error",
+		"typescript/promise-function-async": "off",
+		"typescript/return-await": "off",
+		"typescript/restrict-template-expressions": ["error", { "allowNumber": true, "allowBoolean": true, "allowNullish": false }],
+		"typescript/restrict-plus-operands": "error",
+		"typescript/unbound-method": "error",
+		"typescript/switch-exhaustiveness-check": "error",
+		"typescript/no-base-to-string": "error",
+		"typescript/no-redundant-type-constituents": "error",
+		"typescript/no-meaningless-void-operator": "error",
+		"typescript/no-this-alias": "error",
+		"typescript/only-throw-error": "error",
+		"typescript/no-unnecessary-boolean-literal-compare": "error",
+		"typescript/no-unnecessary-template-expression": "error",
+		"typescript/no-unnecessary-type-arguments": "error",
+		"typescript/no-unnecessary-type-conversion": "error",
+		"typescript/no-unsafe-unary-minus": "error",
+		"typescript/no-mixed-enums": "error",
+		"typescript/no-duplicate-enum-values": "error",
+
+		"eslint/no-console": ["warn", { "allow": ["warn", "error"] }],
+		"eslint/no-underscore-dangle": ["error", { "allow": ["__TAURI__", "__GOBBO_E2E_DIALOGS__", "__GOBBO_E2E_THROW__"] }],
+		"eslint/eqeqeq": ["error", "always", { "null": "ignore" }],
+		"eslint/no-var": "error",
+		"eslint/prefer-const": "error",
+		"eslint/no-param-reassign": "error",
+		"eslint/no-shadow": "error",
+		"eslint/no-else-return": "error",
+		"eslint/no-lonely-if": "error",
+		"eslint/no-nested-ternary": "error",
+		"eslint/no-unneeded-ternary": "error",
+		"eslint/require-await": "off",
+		"eslint/default-case-last": "error",
+		"eslint/no-fallthrough": "error",
+		"eslint/no-self-compare": "error",
+		"eslint/no-promise-executor-return": "error",
+		"eslint/no-async-promise-executor": "error",
+		"eslint/no-await-in-loop": "off",
+		"eslint/array-callback-return": "error",
+		"eslint/no-constant-condition": "error",
+		"eslint/no-unreachable": "error",
+		"eslint/no-unused-vars": "off",
+		"eslint/no-use-before-define": ["error", { "functions": false }],
+		"eslint/no-throw-literal": "error",
+		"eslint/no-eval": "error",
+		"eslint/no-implied-eval": "error",
+		"eslint/no-new-func": "error",
+		"eslint/no-script-url": "error",
+		"eslint/no-return-assign": "error",
+		"eslint/no-sequences": "error",
+		"eslint/no-template-curly-in-string": "error",
+		"eslint/max-params": ["warn", { "max": 10 }],
+		"eslint/no-object-constructor": "error",
+		"eslint/no-loop-func": "error",
+
+		"unicorn/no-null": "off",
+		"unicorn/filename-case": "off",
+		"unicorn/no-array-for-each": "off",
+		"unicorn/no-negated-condition": "off",
+		"unicorn/no-useless-undefined": "error",
+		"unicorn/no-array-reduce": "off",
+		"unicorn/no-nested-ternary": "off",
+		"unicorn/prefer-top-level-await": "off",
+		"unicorn/throw-new-error": "error",
+		"unicorn/error-message": "error",
+		"unicorn/prefer-optional-catch-binding": "error",
+		"unicorn/no-instanceof-array": "error",
+		"unicorn/no-instanceof-builtins": "error",
+		"unicorn/no-new-array": "error",
+		"unicorn/no-thenable": "error",
+		"unicorn/prefer-array-flat-map": "error",
+		"unicorn/prefer-array-some": "error",
+		"unicorn/prefer-includes": "error",
+		"unicorn/prefer-string-slice": "error",
+		"unicorn/prefer-spread": "error",
+		"unicorn/prefer-number-properties": "error",
+		"unicorn/prefer-date-now": "error",
+		"unicorn/prefer-regexp-test": "error",
+		"unicorn/prefer-set-has": "error",
+		"unicorn/prefer-structured-clone": "error",
+		"unicorn/prefer-logical-operator-over-ternary": "error",
+		"unicorn/consistent-function-scoping": "warn",
+		"unicorn/no-object-as-default-parameter": "error",
+		"unicorn/no-unreadable-array-destructuring": "off",
+		"unicorn/require-array-join-separator": "error",
+		"unicorn/switch-case-braces": ["error", "avoid"],
+		"unicorn/no-useless-promise-resolve-reject": "error",
+		"unicorn/no-unnecessary-await": "error",
+		"unicorn/no-single-promise-in-promise-methods": "error",
+		"unicorn/no-await-in-promise-methods": "error",
+		"unicorn/no-array-callback-reference": "error",
+		"unicorn/consistent-assert": "error",
+		"unicorn/prefer-node-protocol": "error",
+		"unicorn/no-lonely-if": "off",
+		"unicorn/prefer-modern-math-apis": "error",
+		"unicorn/no-typeof-undefined": "error",
+
+		"promise/param-names": "error",
+		"promise/no-return-wrap": "error",
+		"promise/always-return": "off",
+		"promise/no-nesting": "warn",
+		"promise/prefer-await-to-then": "warn",
+		"promise/no-promise-in-callback": "off",
+		"promise/no-new-statics": "error",
+		"promise/valid-params": "error",
+		"promise/no-callback-in-promise": "warn",
+
+		"import/no-cycle": "error",
+		"import/no-self-import": "error",
+		"import/no-duplicates": "error",
+		"import/no-default-export": "off",
+		"import/first": "error",
+		"import/no-empty-named-blocks": "error",
+		"import/no-named-as-default-member": "error",
+		"import/no-mutable-exports": "error",
+		"import/no-unassigned-import": ["error", { "allow": ["**/*.css"] }],
+
+		"react/jsx-key": "error",
+		"react/react-in-jsx-scope": "off",
+		"react/jsx-no-duplicate-props": "error",
+		"react/jsx-boolean-value": ["error", "never"],
+		"react/no-danger": "error",
+		"react/no-array-index-key": "warn",
+		"react/self-closing-comp": "error",
+		"react/no-unstable-nested-components": "error",
+		"react/button-has-type": "error",
+		"react/no-children-prop": "error",
+		"react/jsx-no-literals": "error",
+		"react/jsx-no-constructed-context-values": "error",
+		// Inline arrows and object/array literals in JSX props are fine here: this app memoizes the hot list rows
+		// by hand (mod-table), not every prop. The React Compiler would be the other way; neither is in use now.
+		"react-perf/jsx-no-new-object-as-prop": "off",
+		"react-perf/jsx-no-new-array-as-prop": "off",
+		"react-perf/jsx-no-new-function-as-prop": "off",
+		"react-perf/jsx-no-jsx-as-prop": "off",
+
+		"node/no-process-env": "off",
+
+		// The virtual table and the shadcn primitives use ARIA roles on divs by design; a semantic tag would lose the
+		// virtualized layout. Autofocus is deliberate in a dialog or the palette, where focus must start in the field.
+		"jsx-a11y/prefer-tag-over-role": "off",
+		"jsx-a11y/no-autofocus": "off"
+	},
+	"overrides": [
+		{
+			// The generated shadcn layer keeps the registry's structure, assertions and English defaults; the app passes
+			// localized labels and semantic wrappers where they matter. Do not relax these rules outside this folder.
+			"files": ["src/components/ui/**"],
+			"rules": {
+				"react/jsx-no-literals": "off",
+				"react/jsx-no-constructed-context-values": "off",
+				"react/no-array-index-key": "off",
+				"typescript/consistent-type-assertions": "off",
+				"typescript/no-unsafe-type-assertion": "off",
+				"typescript/prefer-nullish-coalescing": "off",
+				"jsx-a11y/click-events-have-key-events": "off",
+				"jsx-a11y/no-noninteractive-element-interactions": "off"
+			}
+		},
+		{
+			// The dev-only gallery is a visual fixture, not product copy.
+			"files": ["src/dev/**"],
+			"rules": {
+				"react/jsx-no-literals": "off"
+			}
+		},
+		{
+			// Test doubles: `as unknown as` casts stand in for partial fixtures, and asserted-on labels are content, not UI copy.
+			"files": ["**/*.test.ts", "**/*.test.tsx"],
+			"rules": {
+				"typescript/no-unsafe-type-assertion": "off",
+				"react/jsx-no-literals": "off",
+				"unicorn/no-useless-undefined": "off"
+			}
+		},
+		{
+			// Tool configs export a default function and read the environment; that is their interface.
+			"files": ["vite.config.ts", "**/*.config.ts"],
+			"rules": {
+				"import/no-default-export": "off"
+			}
+		},
+		{
+			// The E2E harness crosses the WebDriver/JSON boundary, where answers are `unknown` and the driver's promise
+			// types are narrower than the runtime (a `ChainablePromiseElement` is thenable). The assertions are the boundary.
+			"files": ["e2e/**"],
+			"rules": {
+				"typescript/no-unsafe-type-assertion": "off",
+				"typescript/no-unnecessary-condition": "off",
+				"typescript/no-unnecessary-type-assertion": "off",
+				"typescript/no-unnecessary-type-parameters": "off",
+				"typescript/await-thenable": "off",
+				"typescript/unbound-method": "off",
+				"unicorn/prefer-add-event-listener": "off"
+			}
+		}
+	]
+}

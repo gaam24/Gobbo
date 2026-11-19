@@ -1,0 +1,20 @@
+# TCG Card Shop Simulator. A Unity game with BepInEx 5 plugins.
+#
+# BepInEx comes from an enabled mod. The shared layout is the `bepinex` loader preset in loaders/bepinex.toml: the
+# proxy and settings at the root, the plugin slot, the core/config/patchers/monomod mirrors and the archive aliases.
+# With overlay none of these files is written into the game folder.
+
+schema = 1
+id = "tcg-card-shop-simulator"
+name = "TCG Card Shop Simulator"
+providers = { nexus = { key = "tcgcardshopsimulator" }, thunderstore = { key = "tcg-card-shop-simulator" } }
+loader = "bepinex"
+
+[detect]
+steam_app_ids = [3070070]
+steam_install_dirs = ["TCG Card Shop Simulator"]
+markers = ["Card Shop Simulator.exe"]
+
+[[executables]]
+name = "TCG Card Shop Simulator"
+path = "Card Shop Simulator.exe"

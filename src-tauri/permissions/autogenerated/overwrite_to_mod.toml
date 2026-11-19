@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-overwrite-to-mod"
+description = "Enables the overwrite_to_mod command without any pre-configured scope."
+commands.allow = ["overwrite_to_mod"]
+
+[[permission]]
+identifier = "deny-overwrite-to-mod"
+description = "Denies the overwrite_to_mod command without any pre-configured scope."
+commands.deny = ["overwrite_to_mod"]

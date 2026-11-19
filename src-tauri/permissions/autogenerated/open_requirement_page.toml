@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-open-requirement-page"
+description = "Enables the open_requirement_page command without any pre-configured scope."
+commands.allow = ["open_requirement_page"]
+
+[[permission]]
+identifier = "deny-open-requirement-page"
+description = "Denies the open_requirement_page command without any pre-configured scope."
+commands.deny = ["open_requirement_page"]

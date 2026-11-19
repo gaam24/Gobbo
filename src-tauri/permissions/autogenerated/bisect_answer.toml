@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-bisect-answer"
+description = "Enables the bisect_answer command without any pre-configured scope."
+commands.allow = ["bisect_answer"]
+
+[[permission]]
+identifier = "deny-bisect-answer"
+description = "Denies the bisect_answer command without any pre-configured scope."
+commands.deny = ["bisect_answer"]

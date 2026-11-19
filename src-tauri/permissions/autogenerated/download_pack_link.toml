@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-download-pack-link"
+description = "Enables the download_pack_link command without any pre-configured scope."
+commands.allow = ["download_pack_link"]
+
+[[permission]]
+identifier = "deny-download-pack-link"
+description = "Denies the download_pack_link command without any pre-configured scope."
+commands.deny = ["download_pack_link"]

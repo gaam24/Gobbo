@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-collection-run-round"
+description = "Enables the collection_run_round command without any pre-configured scope."
+commands.allow = ["collection_run_round"]
+
+[[permission]]
+identifier = "deny-collection-run-round"
+description = "Denies the collection_run_round command without any pre-configured scope."
+commands.deny = ["collection_run_round"]

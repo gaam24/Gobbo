@@ -1,0 +1,329 @@
+{
+	"$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+	"root": true,
+	"vcs": {
+		"enabled": true,
+		"clientKind": "git",
+		"useIgnoreFile": true
+	},
+	"files": {
+		"ignoreUnknown": true,
+		"includes": ["**", "!node_modules", "!dist", "!public", "!src-tauri", "!src/bindings.ts", "!**/*.md"]
+	},
+	"assist": {
+		"enabled": true,
+		"actions": {
+			"source": {
+				"organizeImports": "on",
+				"useSortedKeys": "off"
+			}
+		}
+	},
+	"formatter": {
+		"enabled": true,
+		"indentStyle": "tab",
+		"lineWidth": 140,
+		"lineEnding": "lf",
+		"formatWithErrors": false
+	},
+	"javascript": {
+		"formatter": {
+			"quoteStyle": "double",
+			"jsxQuoteStyle": "double",
+			"arrowParentheses": "always",
+			"trailingCommas": "all",
+			"semicolons": "always",
+			"bracketSpacing": true
+		}
+	},
+	"json": {
+		"formatter": {
+			"trailingCommas": "none"
+		}
+	},
+	"css": {
+		"parser": {
+			"tailwindDirectives": true
+		}
+	},
+	"linter": {
+		"enabled": true,
+		"domains": {
+			"project": "recommended",
+			"react": "recommended",
+			"test": "recommended",
+			"types": "recommended"
+		},
+		"rules": {
+			"preset": "recommended",
+			"a11y": {
+				"useAltText": "error",
+				"useKeyWithClickEvents": "error",
+				"useButtonType": "error",
+				"useMediaCaption": "warn",
+				"useValidAriaProps": "error",
+				"useValidAriaRole": "error",
+				"noSvgWithoutTitle": "error"
+			},
+			"complexity": {
+				"noUselessStringConcat": "error",
+				"noUselessUndefinedInitialization": "error",
+				// `void promise` marks intentional fire-and-forget calls; oxlint's no-floating-promises catches the rest.
+				"noVoid": "off",
+				"useDateNow": "error",
+				"noImportantStyles": "error",
+				"noExcessiveCognitiveComplexity": {
+					"level": "warn",
+					"options": { "maxAllowedComplexity": 35 }
+				},
+				"noExcessiveNestedTestSuites": "warn",
+				"noForEach": "error",
+				"useSimplifiedLogicExpression": "error",
+				"noUselessTernary": "error",
+				"noUselessTypeConstraint": "error",
+				"noUselessSwitchCase": "error",
+				"noUselessLoneBlockStatements": "error",
+				"noUselessFragments": "error",
+				"noAdjacentSpacesInRegex": "error",
+				"noUnnecessaryTemplateExpression": "error",
+				"useArraySome": "error",
+				"noExcessiveNestedCallbacks": "warn"
+			},
+			"correctness": {
+				"noConstantMathMinMaxClamp": "error",
+				"noUndeclaredVariables": "error",
+				"noUnusedImports": {
+					"fix": "safe",
+					"level": "error"
+				},
+				"noUnusedFunctionParameters": "error",
+				"noUnusedPrivateClassMembers": "error",
+				"useExhaustiveDependencies": {
+					"level": "error",
+					"options": {
+						"reportUnnecessaryDependencies": false
+					}
+				},
+				"noUnusedVariables": "error",
+				"noUnreachable": "error",
+				"noUnreachableSuper": "error",
+				"noChildrenProp": "error",
+				"noNestedComponentDefinitions": "error",
+				"useIsNan": "error",
+				"useValidTypeof": "error",
+				"noInvalidConstructorSuper": "error",
+				"noInvalidUseBeforeDeclaration": "error",
+				"noSelfAssign": "error",
+				"noSwitchDeclarations": "error",
+				"noVoidTypeReturn": "error",
+				"useHookAtTopLevel": "error",
+				"useJsxKeyInIterable": "error",
+				"noConstAssign": "error",
+				"noPrecisionLoss": "error",
+				"noSetterReturn": "error",
+				"noGlobalObjectCalls": "error"
+			},
+			"security": {
+				"noGlobalEval": "error",
+				"noBlankTarget": "error",
+				"noDangerouslySetInnerHtml": "error",
+				"noDangerouslySetInnerHtmlWithChildren": "error"
+			},
+			"performance": {
+				"noAccumulatingSpread": "error",
+				"noBarrelFile": "warn",
+				"noReExportAll": "warn",
+				"noNamespaceImport": "warn",
+				"useTopLevelRegex": "error",
+				"noDelete": "error",
+				"noImgElement": "off"
+			},
+			"style": {
+				"noParameterProperties": "error",
+				"noYodaExpression": "error",
+				"useConsistentBuiltinInstantiation": "error",
+				"useFragmentSyntax": "error",
+				"useShorthandAssign": "error",
+				"useArrayLiterals": "error",
+				"useFilenamingConvention": {
+					"level": "error",
+					"options": {
+						"filenameCases": ["kebab-case"]
+					}
+				},
+				"noNonNullAssertion": "error",
+				"noParameterAssign": "error",
+				"useThrowOnlyError": "error",
+				"useThrowNewError": "error",
+				"useNodejsImportProtocol": "error",
+				"useImportType": "error",
+				"useExportType": "error",
+				"useConsistentTypeDefinitions": {
+					"level": "error",
+					"options": { "style": "interface" }
+				},
+				// The app entry (main.tsx) and i18next instance export defaults; converting them buys nothing.
+				"noDefaultExport": "off",
+				"noMagicNumbers": "off",
+				"useNamingConvention": "off",
+				"useSelfClosingElements": "error",
+				"useSingleVarDeclarator": "error",
+				"useConst": "error",
+				"useDefaultSwitchClause": "warn",
+				"useNumberNamespace": "error",
+				"useTemplate": "error",
+				"noInferrableTypes": "error",
+				"noUselessElse": "error",
+				"useExplicitLengthCheck": "error",
+				"useDefaultParameterLast": "error",
+				"noRestrictedTypes": {
+					"level": "error",
+					"options": {
+						"types": {
+							"object": "Use a specific interface or 'Record<string, unknown>' instead.",
+							"Function": "Use a specific function signature instead."
+						}
+					}
+				}
+			},
+			"suspicious": {
+				"useAwait": "error",
+				"noEvolvingTypes": "error",
+				"noDeprecatedImports": "error",
+				// Enforced by oxlint typescript/no-explicit-any (error); each rule has one source.
+				"noExplicitAny": "off",
+				"noConsole": {
+					"level": "warn",
+					"options": {
+						"allow": ["warn", "error"]
+					}
+				},
+				"noConstantBinaryExpressions": "error",
+				"noDoubleEquals": "error",
+				"noConfusingVoidType": "error",
+				"noReactForwardRef": "error",
+				"noDuplicatedSpreadProps": "error",
+				"noUnknownAttribute": "error",
+				"noArrayIndexKey": "warn",
+				"noAssignInExpressions": "error",
+				"noAsyncPromiseExecutor": "error",
+				"noCatchAssign": "error",
+				"noCommentText": "error",
+				"noCompareNegZero": "error",
+				"noControlCharactersInRegex": "error",
+				"noDebugger": "error",
+				"noDuplicateCase": "error",
+				"noDuplicateClassMembers": "error",
+				"noDuplicateObjectKeys": "error",
+				"noDuplicateParameters": "error",
+				"noEmptyBlockStatements": "warn",
+				"noFallthroughSwitchClause": "error",
+				"noFunctionAssign": "error",
+				"noGlobalAssign": "error",
+				"noImportAssign": "error",
+				"noLabelVar": "error",
+				"noMisleadingCharacterClass": "error",
+				"noMisleadingInstantiator": "error",
+				"noPrototypeBuiltins": "error",
+				"noSelfCompare": "error",
+				"noShadowRestrictedNames": "error",
+				"noSparseArray": "error",
+				"noThenProperty": "error",
+				"noUnsafeDeclarationMerging": "error",
+				"noUnsafeNegation": "error",
+				"useAdjacentOverloadSignatures": "error",
+				"useErrorMessage": "error",
+				"useGetterReturn": "error",
+				"useNamespaceKeyword": "error",
+				"useNumberToFixedDigitsArgument": "error",
+				"noVar": "error",
+				"noWith": "error",
+				"noOctalEscape": "error",
+				"noLoopFunc": "error",
+				"noJsxLeakedDollar": "error",
+				"noReactStringRefs": "error",
+				"noEmptyObjectKeys": "error"
+			},
+			"nursery": {
+				"useTailwindSortedClasses": {
+					"level": "warn",
+					"fix": "safe"
+				},
+				// Type-aware rules run once, in oxlint, which has the type information: no-floating-promises, no-misused-promises,
+				// await-thenable, no-unsafe-type-assertion, no-unsafe-plus-operands and no-base-to-string.
+				"noFloatingPromises": "off",
+				"noMisusedPromises": "off",
+				"useAwaitThenable": "off",
+				"noUnsafeTypeAssertion": "off",
+				"noUselessTypeConversion": "error",
+				"noUnsafePlusOperands": "off",
+				"noBaseToString": "off",
+				"noMisleadingReturnType": "error",
+				"noImpliedEval": "error",
+				"noExtendNative": "error",
+				"noUnmodifiedLoopCondition": "error",
+				"useExhaustiveSwitchCases": "error",
+				"useIncludes": "error",
+				"noThisOutsideOfClass": "error",
+				"noNegationInEqualityCheck": "error"
+			}
+		}
+	},
+	"overrides": [
+		{
+			// The generated shadcn layer keeps the registry's structure (role="group" on divs, namespace imports, index keys).
+			// Its accessibility is covered by the shadcn/Radix contract and the app's own tests, not by rewriting the registry.
+			"includes": ["src/components/ui/**"],
+			"linter": {
+				"rules": {
+					"a11y": {
+						"useSemanticElements": "off",
+						"useKeyWithClickEvents": "off"
+					},
+					"performance": {
+						"noNamespaceImport": "off"
+					},
+					"suspicious": {
+						"noArrayIndexKey": "off"
+					}
+				}
+			}
+		},
+		{
+			// CLI scripts print their report to stdout/stderr; the app uses the logger, not console.
+			"includes": ["scripts/**"],
+			"linter": {
+				"rules": {
+					"suspicious": {
+						"noConsole": "off"
+					}
+				}
+			}
+		},
+		{
+			// Fixture casts and partial doubles are smaller than fully typed fakes; literal labels are asserted-on content.
+			"includes": ["**/*.test.ts", "**/*.test.tsx", "src/locales/locales.test.ts"],
+			"linter": {
+				"rules": {
+					"suspicious": {
+						"noExplicitAny": "off"
+					},
+					"style": {
+						"noNonNullAssertion": "off"
+					}
+				}
+			}
+		},
+		{
+			// Vite and tool configs export a default function; that is their interface.
+			"includes": ["vite.config.ts", "**/*.config.ts", "knip.json"],
+			"linter": {
+				"rules": {
+					"style": {
+						"noDefaultExport": "off"
+					}
+				}
+			}
+		}
+	]
+}

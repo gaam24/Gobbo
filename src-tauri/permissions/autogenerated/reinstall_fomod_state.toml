@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-reinstall-fomod-state"
+description = "Enables the reinstall_fomod_state command without any pre-configured scope."
+commands.allow = ["reinstall_fomod_state"]
+
+[[permission]]
+identifier = "deny-reinstall-fomod-state"
+description = "Denies the reinstall_fomod_state command without any pre-configured scope."
+commands.deny = ["reinstall_fomod_state"]

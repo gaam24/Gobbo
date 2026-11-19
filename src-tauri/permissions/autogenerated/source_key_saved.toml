@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-source-key-saved"
+description = "Enables the source_key_saved command without any pre-configured scope."
+commands.allow = ["source_key_saved"]
+
+[[permission]]
+identifier = "deny-source-key-saved"
+description = "Denies the source_key_saved command without any pre-configured scope."
+commands.deny = ["source_key_saved"]

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-undo-list"
+description = "Enables the undo_list command without any pre-configured scope."
+commands.allow = ["undo_list"]
+
+[[permission]]
+identifier = "deny-undo-list"
+description = "Denies the undo_list command without any pre-configured scope."
+commands.deny = ["undo_list"]

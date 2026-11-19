@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-mod-extras"
+description = "Enables the mod_extras command without any pre-configured scope."
+commands.allow = ["mod_extras"]
+
+[[permission]]
+identifier = "deny-mod-extras"
+description = "Denies the mod_extras command without any pre-configured scope."
+commands.deny = ["mod_extras"]

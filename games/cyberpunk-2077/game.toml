@@ -1,0 +1,60 @@
+# Cyberpunk 2077. The reference for a game whose whole deployment root is the mod layout, with a game step.
+#
+# Confirmed on a Steam installation: appmanifest_1091500.acf (appid 1091500, installdir "Cyberpunk 2077")
+# and bin/x64/Cyberpunk2077.exe. Mod folders from the REDmod wiki (wiki.redmodding.org).
+# Every archive path is a game path. Not supported yet: the REDmod load order (modlist.txt) and the archive order;
+# REDmod files are deployed as game paths, but the game's own order file is not written.
+
+schema = 1
+id = "cyberpunk-2077"
+name = "Cyberpunk 2077"
+providers = { nexus = { key = "cyberpunk2077" } }
+
+[detect]
+steam_app_ids = [1091500]
+steam_install_dirs = ["Cyberpunk 2077"]
+markers = ["bin/x64/Cyberpunk2077.exe"]
+
+[[executables]]
+name = "Cyberpunk 2077"
+path = "bin/x64/Cyberpunk2077.exe"
+
+[deploy]
+# Every archive path is a game path. The overlay is the only deployment method, so a mod file wins over the game's
+# own file and the game folder stays untouched. New loaders and frameworks need no entry here.
+full_root = true
+
+# A loose archive shipped at the archive root belongs to `archive/pc/mod`, as in Mod Organizer 2. A file already in a
+# folder (including a REDmod's own `mods/` tree) keeps its path.
+[[deploy.move]]
+extensions = [".archive", ".xl"]
+to = "archive/pc/mod"
+
+# Redscript. The game's own compilation does not run inside the overlay, so the mod's compiler runs before the game
+# starts, when a mod asks for it in mod_steps.toml. It reads the scripts merged from the layers and writes the cache
+# into the upper layer; the old cache is removed first, so the compiler reads the game's base cache.
+[[steps]]
+id = "redscript"
+phase = "before_start"
+program = "engine/tools/scc.exe"
+args = ["-compile", "{game}/r6/scripts", "-outputCacheFile", "{game}/r6/cache/final.redscripts"]
+when_dir = "r6/scripts"
+clean = ["r6/cache/final.redscripts"]
+outputs = ["r6/cache/final.redscripts"]
+log = "r6/logs/redscript_rCURRENT.log"
+
+# Crash reports are written by the game itself; every `.log` from RED4ext, CET or a mod is found automatically in the
+# mod and overwrite layers. A definition only names logs the game writes outside those layers.
+[[logs]]
+kind = "crash"
+path = "."
+pattern = "Cyberpunk2077.exe-*.txt"
+limit = 1
+recursive = false
+
+[[logs]]
+kind = "crash"
+path = "."
+pattern = "REDEngineErrorReporter.exe-*.txt"
+limit = 1
+recursive = false

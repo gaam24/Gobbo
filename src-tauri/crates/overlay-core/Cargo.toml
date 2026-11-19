@@ -1,0 +1,25 @@
+[package]
+name = "gobbo-overlay-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "The layer rules of Gobbo's overlay: which file a game path means and how folders merge. Plain logic, shared by Gobbo and the Windows hook."
+publish = false
+
+[dependencies]
+rustc-hash.workspace = true
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+criterion = { version = "0.8", features = ["html_reports"] }
+proptest = "1"
+
+[[bench]]
+name = "core"
+harness = false
+
+# The overlay crates deliberately stay out of the workspace lint groups: the hook is Win32 code and the pedantic/nursery
+# group would flood them with warnings (see ../AGENTS.md). An empty table is Cargo's documented way to make that intent
+# explicit and silence the `missing_lints_inheritance` warning.
+[lints]

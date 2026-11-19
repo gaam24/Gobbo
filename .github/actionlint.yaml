@@ -1,0 +1,3 @@
+# No workflow-specific ignores. The release workflow uses the standard `./.github/workflows/ci.yml` reusable reference;
+# the old `$/` and `cache-mode` exceptions were removed with the actionlint update. zizmor prefers `$/`, but actionlint
+# rejects it, so the `self-repository` help there stays unfixed on purpose.

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-overwrite-files"
+description = "Enables the overwrite_files command without any pre-configured scope."
+commands.allow = ["overwrite_files"]
+
+[[permission]]
+identifier = "deny-overwrite-files"
+description = "Denies the overwrite_files command without any pre-configured scope."
+commands.deny = ["overwrite_files"]

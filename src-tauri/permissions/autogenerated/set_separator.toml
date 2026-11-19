@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-set-separator"
+description = "Enables the set_separator command without any pre-configured scope."
+commands.allow = ["set_separator"]
+
+[[permission]]
+identifier = "deny-set-separator"
+description = "Denies the set_separator command without any pre-configured scope."
+commands.deny = ["set_separator"]

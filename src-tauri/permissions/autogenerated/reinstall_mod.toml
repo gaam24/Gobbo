@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-reinstall-mod"
+description = "Enables the reinstall_mod command without any pre-configured scope."
+commands.allow = ["reinstall_mod"]
+
+[[permission]]
+identifier = "deny-reinstall-mod"
+description = "Denies the reinstall_mod command without any pre-configured scope."
+commands.deny = ["reinstall_mod"]

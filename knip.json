@@ -1,0 +1,20 @@
+{
+	"$schema": "https://unpkg.com/knip@5/schema.json",
+	"ignore": ["src/bindings.ts", "src/components/ui/**"],
+	"ignoreDependencies": [
+		"@fontsource-variable/schibsted-grotesk",
+		"@fontsource/ibm-plex-mono",
+		"tailwindcss",
+		"shadcn",
+		"tw-animate-css",
+		"@wdio/cli",
+		"@wdio/local-runner",
+		"@wdio/mocha-framework",
+		"@wdio/spec-reporter",
+		"@wdio/tauri-service"
+	],
+	"ignoreExportsUsedInFile": true,
+	"entry": ["e2e/wdio.conf.ts", "e2e/specs/**/*.e2e.ts", "scripts/*.ts"],
+	"project": ["src/**/*.{ts,tsx}", "e2e/**/*.ts", "scripts/**/*.ts"],
+	"ignoreBinaries": ["rustc"]
+}

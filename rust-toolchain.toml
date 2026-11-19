@@ -1,0 +1,7 @@
+# One stable toolchain for local work. rustup uses this file for cargo fmt, clippy and test; CI installs stable with
+# the dtolnay action and passes the same components explicitly in .github/workflows/ci.yml. The crate's MSRV is in
+# src-tauri/Cargo.toml — that is the minimum version, this file chooses the toolchain that formats and lints locally.
+[toolchain]
+channel = "stable"
+components = ["rustfmt", "clippy"]
+profile = "minimal"

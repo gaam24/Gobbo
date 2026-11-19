@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-sort-list-by-name"
+description = "Enables the sort_list_by_name command without any pre-configured scope."
+commands.allow = ["sort_list_by_name"]
+
+[[permission]]
+identifier = "deny-sort-list-by-name"
+description = "Denies the sort_list_by_name command without any pre-configured scope."
+commands.deny = ["sort_list_by_name"]

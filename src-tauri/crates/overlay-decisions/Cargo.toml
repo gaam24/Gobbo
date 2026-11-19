@@ -1,0 +1,14 @@
+[package]
+name = "gobbo-overlay-decisions"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "The file-backed ring of overlay decisions shared by the Windows hook and Gobbo."
+publish = false
+
+[lib]
+name = "gobbo_overlay_decisions"
+
+[lints]
+workspace = true

@@ -1,0 +1,91 @@
+# The Witcher 3: Wild Hunt. The reference for a game with a mod slot, mirrored game folders and an order file.
+#
+# Established on a Steam installation: appmanifest_292030.acf (Remastered edition, buildid 25773555),
+# launcher-configuration.json and the game's w3modmanager.py script.
+# Since the Remastered release (5.00) the text files (.ws, .xml, .csv) must be UTF-8; Gobbo does not convert them yet.
+
+schema = 1
+id = "the-witcher-3-wild-hunt"
+name = "The Witcher 3: Wild Hunt"
+providers = { nexus = { key = "witcher3" } }
+
+# The whole user folder: saves, gamesaves, input.settings, dx12user.settings and mods.settings. A profile can keep it
+# separate. The first isolated launch gives the profile its own copy of the folder (saves included), so the game no
+# longer reads the real one; later launches use only the profile's upper layer. The order file from [load_order] is
+# inside this folder, so Gobbo writes it to the profile's upper layer when the set is isolated.
+[[user_data]]
+id = "documents"
+kind = "user-data"
+path = "{documents}/The Witcher 3"
+mode = "redirect"
+default = "isolated"
+inherit = false
+
+[detect]
+steam_app_ids = [292030]
+steam_install_dirs = ["The Witcher 3"]
+markers = ["bin/x64_dx12/witcher3.exe", "content/content0"]
+
+[[executables]]
+name = "DirectX 12"
+path = "bin/x64_dx12/witcher3.exe"
+
+[deploy]
+# Overlay keeps the game folder untouched. A game started from Steam needs the launch option
+# `gobbo run the-witcher-3-wild-hunt -- %command%`.
+# bin/ holds the game's own files: only the mirrors below take files from it, and any other file there is refused.
+protected = ["bin"]
+
+# The game loads every folder in Mods/ (folder names start with "mod"; it also loads "~mod..."). A mod root is the
+# folder with content/, and a loose content/ makes the archive one mod named after it.
+[[deploy.slots]]
+dir = "Mods"
+prefix = "mod"
+marker = "content"
+
+# An archive often ships a DLC folder next to its Mods/ folder, and both are one mod (Shared Utils needs
+# DLC/dlcsharedutils and Mods/modzzz_sharedutils). DLC folder names start with "dlc".
+[[deploy.mirror]]
+dir = "DLC"
+prefix = "dlc"
+
+# Menu entries of mods (Progress on the Path, Mod Menu, Show Quests on Map ...).
+[[deploy.mirror]]
+dir = "bin/config"
+extensions = [".xml", ".ini"]
+
+# ASI plugins (Witcher Native Bridge, W3LoadFix ...), their loaders (dinput8.dll, dsound.dll) and data.
+[[deploy.mirror]]
+dir = "bin/x64_dx12"
+extensions = [".asi", ".addon64", ".dll", ".ini", ".bin"]
+
+# The game reads one copy of each script and XML file across all mods, so two mods with the same path conflict and the
+# list (or the user) picks the winner. Script Merger can merge scripts, not XML.
+[[deploy.shared]]
+dir = "content"
+extensions = [".ws", ".xml"]
+
+# A section per mod with Enabled=0/1 and Priority=N. Gobbo writes a section only for mods whose priority the user set;
+# a lower number wins (per w3modmanager.py).
+[load_order]
+format = "mods_settings"
+file = "{documents}/The Witcher 3/mods.settings"
+
+# Its Nexus mod is 8405. Its Mod Manager Download button sends the archive to Gobbo, which unpacks it into WitcherScriptMerger/.
+# The program is a .NET 8 app: on Linux the runtime must be in the Proton prefix, so Gobbo installs it from Microsoft.
+[[tools]]
+id = "script-merger"
+name = "Witcher Script Merger"
+detect = ["WitcherScriptMerger/WitcherScriptMerger.exe"]
+output = "generated-mod" # the result is a mod, for example mod0000_MergedFiles
+[tools.source]
+provider = "nexus"
+mod_id = "8405"
+[[tools.prerequisites]]
+name = ".NET Desktop Runtime 8.0.33 (x64)"
+url = "https://builds.dotnet.microsoft.com/dotnet/WindowsDesktop/8.0.33/windowsdesktop-runtime-8.0.33-win-x64.exe"
+sha512 = "b622106783dee5e1ce993ec849ecd43fa147c6230daecf910348f6adcd28f63abf39cf6db832a6a2684941c19a9321816e9cbc9dbe8c4a8bb2d7e46487ab3890"
+args = ["/install", "/quiet", "/norestart"]
+# Installed when the prefix holds a runtime of version 8, which the program accepts through roll-forward.
+check = "drive_c/Program Files/dotnet/shared/Microsoft.WindowsDesktop.App"
+check_starts_with = "8."

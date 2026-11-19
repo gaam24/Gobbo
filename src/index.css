@@ -1,0 +1,162 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/schibsted-grotesk";
+
+@custom-variant dark (&:is(.dark *));
+
+/* WOFF2 only: every browser Tauri runs on (WebView2, WebKit, WebKitGTK) supports it, so the WOFF fallback is not shipped. */
+@font-face {
+	font-family: "IBM Plex Mono";
+	font-style: normal;
+	font-display: swap;
+	font-weight: 400;
+	src: url("@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-400-normal.woff2") format("woff2");
+	unicode-range:
+		U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191,
+		U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+	font-family: "IBM Plex Mono";
+	font-style: normal;
+	font-display: swap;
+	font-weight: 400;
+	src: url("@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-ext-400-normal.woff2") format("woff2");
+	unicode-range:
+		U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+	font-family: "IBM Plex Mono";
+	font-style: normal;
+	font-display: swap;
+	font-weight: 500;
+	src: url("@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-500-normal.woff2") format("woff2");
+	unicode-range:
+		U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191,
+		U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+	font-family: "IBM Plex Mono";
+	font-style: normal;
+	font-display: swap;
+	font-weight: 500;
+	src: url("@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-ext-500-normal.woff2") format("woff2");
+	unicode-range:
+		U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@theme inline {
+	--font-sans: "Schibsted Grotesk Variable", system-ui, sans-serif;
+	--font-mono: "IBM Plex Mono", ui-monospace, monospace;
+	--color-border: var(--border);
+	--color-input: var(--input);
+	--color-ring: var(--ring);
+	--color-background: var(--background);
+	--color-foreground: var(--foreground);
+	--color-card: var(--card);
+	--color-card-foreground: var(--card-foreground);
+	--color-popover: var(--popover);
+	--color-popover-foreground: var(--popover-foreground);
+	--color-primary: var(--primary);
+	--color-primary-foreground: var(--primary-foreground);
+	--color-secondary: var(--secondary);
+	--color-secondary-foreground: var(--secondary-foreground);
+	--color-muted: var(--muted);
+	--color-muted-foreground: var(--muted-foreground);
+	--color-subtle-foreground: var(--subtle-foreground);
+	--color-accent: var(--accent);
+	--color-accent-foreground: var(--accent-foreground);
+	--color-destructive: var(--destructive);
+	--color-draft: var(--draft);
+	--color-applied: var(--applied);
+	--color-win: var(--win);
+	--color-lose: var(--lose);
+	--color-update: var(--update);
+	--color-idle: var(--idle);
+	--color-scrim: var(--scrim);
+	--radius-sm: calc(var(--radius) * 0.6);
+	--radius-md: calc(var(--radius) * 0.8);
+	--radius-lg: var(--radius);
+	--radius-xl: calc(var(--radius) * 1.4);
+	--radius-2xl: calc(var(--radius) * 1.8);
+	--radius-3xl: calc(var(--radius) * 2.2);
+	--radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* Colour tokens: one dark palette. The surfaces are the warm grays of Claude Dark (hue 106); the colour comes
+   from the goblin mark: primary is the face green #23c385, destructive is a light warm red. The shadcn names
+   are the source of truth; the status tokens are the only app-specific additions. */
+:root {
+	color-scheme: dark;
+	--background: oklch(0.2679 0.0036 106.6427);
+	--foreground: oklch(0.9576 0.0027 106.4494);
+	--card: oklch(0.2928 0.0018 106.5092);
+	--card-foreground: oklch(0.9818 0.0054 95.0986);
+	--popover: oklch(0.3085 0.0035 106.6039);
+	--popover-foreground: oklch(0.9211 0.004 106.4781);
+	--primary: oklch(0.725 0.155 160.6);
+	--primary-foreground: oklch(0.185 0.03 160.6);
+	--secondary: oklch(0.33 0.008 100);
+	--secondary-foreground: oklch(0.9576 0.0027 106.4494);
+	--muted: oklch(0.2213 0.0038 106.707);
+	--muted-foreground: oklch(0.8 0.014 99);
+	--subtle-foreground: oklch(0.76 0.01 100);
+	--accent: oklch(0.213 0.0078 95.4245);
+	--accent-foreground: oklch(0.9663 0.008 98.8792);
+	--destructive: oklch(0.82 0.15 25);
+	--border: oklch(0.3618 0.0101 106.8928);
+	--input: oklch(0.58 0.012 100);
+	--ring: oklch(0.82 0.05 174);
+	--scrim: oklch(0.1 0.002 100);
+
+	--draft: oklch(0.78 0.115 82);
+	--applied: oklch(0.725 0.155 160.6);
+	--win: oklch(0.76 0.09 195);
+	--lose: oklch(0.72 0.115 35);
+	--update: oklch(0.77 0.08 290);
+	--idle: oklch(0.68 0.01 160);
+
+	--radius: 0.625rem;
+}
+
+@layer base {
+	* {
+		@apply border-border outline-ring/50;
+	}
+	html,
+	body,
+	#root {
+		height: 100%;
+	}
+	#root {
+		overflow: hidden;
+	}
+	body {
+		@apply bg-background text-foreground antialiased;
+		overflow: hidden;
+	}
+	html {
+		@apply font-sans;
+	}
+	:where(button:not(:disabled), [role="button"]:not([aria-disabled="true"]), summary) {
+		cursor: pointer;
+	}
+	:where(button:disabled, [aria-disabled="true"]) {
+		cursor: not-allowed;
+	}
+}
+
+/* The app ships one theme, but overlays still animate. Respect the OS preference without !important. */
+@media (prefers-reduced-motion: reduce) {
+	*,
+	::before,
+	::after {
+		animation-duration: 0.01ms;
+		animation-iteration-count: 1;
+		transition-duration: 0.01ms;
+		scroll-behavior: auto;
+	}
+}

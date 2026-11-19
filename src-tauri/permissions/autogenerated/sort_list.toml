@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-sort-list"
+description = "Enables the sort_list command without any pre-configured scope."
+commands.allow = ["sort_list"]
+
+[[permission]]
+identifier = "deny-sort-list"
+description = "Denies the sort_list command without any pre-configured scope."
+commands.deny = ["sort_list"]

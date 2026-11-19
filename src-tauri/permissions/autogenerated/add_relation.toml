@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-add-relation"
+description = "Enables the add_relation command without any pre-configured scope."
+commands.allow = ["add_relation"]
+
+[[permission]]
+identifier = "deny-add-relation"
+description = "Denies the add_relation command without any pre-configured scope."
+commands.deny = ["add_relation"]

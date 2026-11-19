@@ -1,0 +1,21 @@
+[package]
+name = "gobbo-overlay-dump"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "The out-of-process minidumper used by Gobbo; the same server runs in the app and in the 32-bit helper."
+publish = false
+
+[lib]
+name = "gobbo_overlay_dump"
+
+[[bin]]
+name = "gobbo_overlay_dump32"
+path = "src/bin/dump32.rs"
+
+[lints]
+workspace = true
+
+[target.'cfg(windows)'.dependencies]
+minidumper = "0.11"

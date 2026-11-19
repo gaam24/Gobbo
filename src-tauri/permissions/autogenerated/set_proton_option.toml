@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-set-proton-option"
+description = "Enables the set_proton_option command without any pre-configured scope."
+commands.allow = ["set_proton_option"]
+
+[[permission]]
+identifier = "deny-set-proton-option"
+description = "Denies the set_proton_option command without any pre-configured scope."
+commands.deny = ["set_proton_option"]

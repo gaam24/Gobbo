@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-ensure-source-links"
+description = "Enables the ensure_source_links command without any pre-configured scope."
+commands.allow = ["ensure_source_links"]
+
+[[permission]]
+identifier = "deny-ensure-source-links"
+description = "Denies the ensure_source_links command without any pre-configured scope."
+commands.deny = ["ensure_source_links"]

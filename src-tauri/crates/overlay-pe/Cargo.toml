@@ -1,0 +1,17 @@
+[package]
+name = "gobbo-overlay-pe"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Reads the static import table and the bitness of a Windows executable from its bytes, for the overlay launcher. Plain logic, tested on every platform."
+publish = false
+
+[lib]
+name = "gobbo_overlay_pe"
+
+[dev-dependencies]
+proptest = "1"
+
+[lints]
+workspace = true

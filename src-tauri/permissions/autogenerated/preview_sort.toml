@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-preview-sort"
+description = "Enables the preview_sort command without any pre-configured scope."
+commands.allow = ["preview_sort"]
+
+[[permission]]
+identifier = "deny-preview-sort"
+description = "Denies the preview_sort command without any pre-configured scope."
+commands.deny = ["preview_sort"]

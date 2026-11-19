@@ -1,0 +1,71 @@
+//! The update commands. The window asks which channel this copy uses, then asks the channel's own path for a newer
+//! version. A portable update reports its download and then restarts the app; the installer path stays in the plugin.
+
+use serde::Serialize;
+use tauri::AppHandle;
+use tauri::ipc::Channel;
+
+use crate::error::AppError;
+use crate::infra::storage;
+use crate::update::portable;
+use crate::update::{UpdateChannel, channel};
+
+/// A newer portable version.
+#[derive(Debug, Clone, Serialize, specta::Type)]
+pub struct PortableUpdate {
+    /// The version the manifest names.
+    pub version: String,
+    /// The release notes of the version, when the manifest has them.
+    pub notes: String,
+}
+
+/// The steps of a portable update, in order.
+#[derive(Debug, Clone, Serialize, specta::Type)]
+#[serde(tag = "step", rename_all = "lowercase")]
+pub enum PortableUpdateStep {
+    /// The archive is downloading. `percent` is unknown when the server sends no length.
+    Downloading {
+        /// The share of the archive received, from 0 to 100.
+        percent: Option<u8>,
+    },
+    /// The archive is verified and its files are being swapped.
+    Installing,
+}
+
+/// The update path of this copy.
+#[tauri::command]
+#[specta::specta]
+pub fn update_channel() -> Result<UpdateChannel, AppError> {
+    let exe_dir = storage::exe_dir()?;
+    let marker = storage::portable_marker(&exe_dir).exists();
+    Ok(channel(
+        marker,
+        std::env::consts::OS,
+        std::env::consts::ARCH,
+    ))
+}
+
+/// Looks for a newer portable version. The manifest is read through the updater plugin, with its own key.
+#[tauri::command]
+#[specta::specta]
+pub async fn portable_update_check(app: AppHandle) -> Result<Option<PortableUpdate>, AppError> {
+    let update = portable::updater(&app)?
+        .check()
+        .await
+        .map_err(portable::update_error)?;
+    Ok(update.map(|update| PortableUpdate {
+        version: update.version,
+        notes: update.body.unwrap_or_default(),
+    }))
+}
+
+/// Downloads the newer portable version, checks its signature, replaces the program files and starts the new copy.
+/// The data folder is not touched. The command returns only when it fails: on success the app restarts.
+#[tauri::command]
+#[specta::specta]
+pub async fn portable_update_install(
+    app: AppHandle,
+    progress: Channel<PortableUpdateStep>,
+) -> Result<(), AppError> {
+    portable::install(&app, progress).await
+}

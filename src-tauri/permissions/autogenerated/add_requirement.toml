@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-add-requirement"
+description = "Enables the add_requirement command without any pre-configured scope."
+commands.allow = ["add_requirement"]
+
+[[permission]]
+identifier = "deny-add-requirement"
+description = "Denies the add_requirement command without any pre-configured scope."
+commands.deny = ["add_requirement"]

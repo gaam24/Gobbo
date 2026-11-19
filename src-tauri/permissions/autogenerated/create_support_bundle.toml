@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-create-support-bundle"
+description = "Enables the create_support_bundle command without any pre-configured scope."
+commands.allow = ["create_support_bundle"]
+
+[[permission]]
+identifier = "deny-create-support-bundle"
+description = "Denies the create_support_bundle command without any pre-configured scope."
+commands.deny = ["create_support_bundle"]

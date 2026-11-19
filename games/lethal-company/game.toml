@@ -1,0 +1,21 @@
+# Lethal Company. A Unity game (Mono) with BepInEx 5 plugins, like TCG Card Shop Simulator.
+#
+# BepInEx comes from an enabled mod. Its shared layout is the `bepinex` loader preset in loaders/bepinex.toml: the
+# proxy and settings at the root, the plugin slot, the core/config/patchers/monomod mirrors and the archive aliases
+# (`plugins/`, `core/`, `config/`, `patchers/`, `monomod/`). With overlay none of these files is written into the game
+# folder.
+
+schema = 1
+id = "lethal-company"
+name = "Lethal Company"
+providers = { nexus = { key = "lethalcompany" }, thunderstore = { key = "lethal-company" } }
+loader = "bepinex"
+
+[detect]
+steam_app_ids = [1966720]
+steam_install_dirs = ["Lethal Company"]
+markers = ["Lethal Company.exe", "Lethal Company_Data/Managed/Assembly-CSharp.dll"]
+
+[[executables]]
+name = "Lethal Company"
+path = "Lethal Company.exe"

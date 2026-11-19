@@ -1,0 +1,14 @@
+{
+  "bundle": {
+    "resources": {
+      "overlay-hook/gobbo_overlay_hook.dll": "gobbo_overlay_hook.dll",
+      "overlay-hook/gobbo_overlay_hook32.dll": "gobbo_overlay_hook32.dll",
+      "overlay-hook/gobbo_overlay_hook.pdb": "gobbo_overlay_hook.pdb",
+      "overlay-hook/gobbo_overlay_hook32.pdb": "gobbo_overlay_hook32.pdb",
+      "overlay-hook/gobbo_overlay_inject32.exe": "gobbo_overlay_inject32.exe",
+      "overlay-hook/gobbo_overlay_probe.exe": "gobbo_overlay_probe.exe",
+      "overlay-hook/gobbo_overlay_probe32.exe": "gobbo_overlay_probe32.exe",
+      "overlay-hook/gobbo_overlay_dump32.exe": "gobbo_overlay_dump32.exe"
+    }
+  }
+}

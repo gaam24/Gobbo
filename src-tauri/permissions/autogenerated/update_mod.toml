@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-update-mod"
+description = "Enables the update_mod command without any pre-configured scope."
+commands.allow = ["update_mod"]
+
+[[permission]]
+identifier = "deny-update-mod"
+description = "Denies the update_mod command without any pre-configured scope."
+commands.deny = ["update_mod"]

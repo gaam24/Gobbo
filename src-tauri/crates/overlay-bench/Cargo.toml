@@ -1,0 +1,26 @@
+[package]
+name = "gobbo-overlay-bench"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "A small file-operation benchmark with and without the Windows overlay hook."
+publish = false
+
+[[bin]]
+name = "overlay-bench"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[target.'cfg(windows)'.dependencies]
+gobbo-overlay-core.workspace = true
+gobbo-overlay-decisions.workspace = true
+gobbo-overlay-launch.workspace = true
+hdrhistogram = "7"
+windows-sys = { workspace = true, features = [
+    "Win32_Foundation",
+    "Win32_Storage_FileSystem",
+    "Win32_System_LibraryLoader",
+] }

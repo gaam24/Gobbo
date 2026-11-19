@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-last-run"
+description = "Enables the last_run command without any pre-configured scope."
+commands.allow = ["last_run"]
+
+[[permission]]
+identifier = "deny-last-run"
+description = "Denies the last_run command without any pre-configured scope."
+commands.deny = ["last_run"]

@@ -1,0 +1,47 @@
+/// The goblin mark: the logo in the game rail. Colours are fixed, because the mark keeps its own palette rather than the app's tokens.
+/// The viewBox hugs the drawing: the old square left transparent bands that made the mark look detached from the rail label.
+export function GobboMark({ className }: { className?: string }) {
+	return (
+		<svg viewBox="20 116 472 270" className={className} aria-hidden="true" focusable="false">
+			<path
+				d="M168 236C120 210 72 168 28 124C30 158 44 196 66 226C52 228 40 226 34 222C44 246 70 262 96 266C84 274 80 282 86 290C112 282 134 268 150 254Z M344 236C392 210 440 168 484 124C482 158 468 196 446 226C460 228 472 226 478 222C468 246 442 262 416 266C428 274 432 282 426 290C400 282 378 268 362 254Z"
+				fill="#0E6755"
+				stroke="#0B3B30"
+				strokeWidth="8"
+				strokeLinejoin="round"
+			/>
+			<path
+				d="M256 132C326 132 372 150 380 204C386 246 378 292 362 326C346 360 304 378 256 378C208 378 166 360 150 326C134 292 126 246 132 204C140 150 186 132 256 132Z"
+				fill="#23C385"
+				stroke="#0B3B30"
+				strokeWidth="8"
+				strokeLinejoin="round"
+			/>
+			<circle cx="236" cy="178" r="7" fill="#0E6755" />
+			<circle cx="266" cy="166" r="6" fill="#0E6755" />
+			<circle cx="256" cy="194" r="5" fill="#0E6755" />
+			<path d="M164 232L238 250M348 232L274 250" fill="none" stroke="#0B3B30" strokeWidth="12" strokeLinecap="round" />
+			<path
+				d="M170 266C184 240 220 236 240 262C222 284 186 290 170 266Z M342 266C328 240 292 236 272 262C290 284 326 290 342 266Z"
+				fill="#E63061"
+				stroke="#0B3B30"
+				strokeWidth="6"
+				strokeLinejoin="round"
+			/>
+			<circle cx="200" cy="262" r="4" fill="#FBFBFB" />
+			<circle cx="312" cy="262" r="4" fill="#FBFBFB" />
+			<path d="M158 296C200 320 230 330 256 330C282 330 312 320 354 296C350 344 310 362 256 362C202 362 162 344 158 296Z" fill="#0B3B30" />
+			<path
+				d="M164 298L176 330L188 300L200 332L212 302L224 334L236 304L248 336L256 306L264 336L276 304L288 334L300 302L312 332L324 300L336 330L348 298C320 318 290 326 256 326C222 326 192 318 164 298Z M196 360L206 338L216 360Z M236 362L248 340L258 362Z M262 362L274 340L286 362Z M300 360L310 338L320 360Z"
+				fill="#FBFBFB"
+			/>
+			<path
+				d="M158 296C200 320 230 330 256 330C282 330 312 320 354 296C350 344 310 362 256 362C202 362 162 344 158 296Z"
+				fill="none"
+				stroke="#0B3B30"
+				strokeWidth="8"
+				strokeLinejoin="round"
+			/>
+		</svg>
+	);
+}

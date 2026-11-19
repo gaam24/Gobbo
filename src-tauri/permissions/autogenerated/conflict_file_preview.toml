@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-conflict-file-preview"
+description = "Enables the conflict_file_preview command without any pre-configured scope."
+commands.allow = ["conflict_file_preview"]
+
+[[permission]]
+identifier = "deny-conflict-file-preview"
+description = "Denies the conflict_file_preview command without any pre-configured scope."
+commands.deny = ["conflict_file_preview"]

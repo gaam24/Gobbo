@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-fomod-selection-from-choices"
+description = "Enables the fomod_selection_from_choices command without any pre-configured scope."
+commands.allow = ["fomod_selection_from_choices"]
+
+[[permission]]
+identifier = "deny-fomod-selection-from-choices"
+description = "Denies the fomod_selection_from_choices command without any pre-configured scope."
+commands.deny = ["fomod_selection_from_choices"]

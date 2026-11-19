@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-check-collection-updates"
+description = "Enables the check_collection_updates command without any pre-configured scope."
+commands.allow = ["check_collection_updates"]
+
+[[permission]]
+identifier = "deny-check-collection-updates"
+description = "Denies the check_collection_updates command without any pre-configured scope."
+commands.deny = ["check_collection_updates"]

@@ -1,0 +1,51 @@
+name: Bug report
+description: Something in Gobbo did not work — tell us what happened.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. A short description is enough to start — you don't have to fill in every field.
+
+        Need help rather than a fix? The [troubleshooting guide](https://github.com/gaam24/Gobbo/blob/main/docs/user/troubleshooting.md) may already have the answer.
+  - type: textarea
+    id: what_happened
+    attributes:
+      label: What happened?
+      description: Tell us in your own words. What did you expect, and what did Gobbo do instead?
+      placeholder: I pressed Apply and...
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How can we make it happen again? (optional)
+      description: The steps you took, if you know them.
+      placeholder: |
+        1. Opened the game...
+        2. Chose...
+  - type: input
+    id: version
+    attributes:
+      label: Gobbo version (optional)
+      description: In Settings → About, or the name of the archive you downloaded.
+      placeholder: 0.1.0
+  - type: dropdown
+    id: os
+    attributes:
+      label: Windows or Linux? (optional)
+      options:
+        - Windows
+        - Linux
+  - type: input
+    id: game
+    attributes:
+      label: Game (optional)
+      description: Only if the problem is about a specific game. Write its name.
+      placeholder: "e.g. The Witcher 3: Wild Hunt"
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error message or log (optional)
+      description: Paste the message if you have one. Remove API keys and personal paths first.
+      render: text

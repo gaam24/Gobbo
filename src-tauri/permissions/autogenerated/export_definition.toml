@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-export-definition"
+description = "Enables the export_definition command without any pre-configured scope."
+commands.allow = ["export_definition"]
+
+[[permission]]
+identifier = "deny-export-definition"
+description = "Denies the export_definition command without any pre-configured scope."
+commands.deny = ["export_definition"]

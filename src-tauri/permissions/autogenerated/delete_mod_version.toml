@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-delete-mod-version"
+description = "Enables the delete_mod_version command without any pre-configured scope."
+commands.allow = ["delete_mod_version"]
+
+[[permission]]
+identifier = "deny-delete-mod-version"
+description = "Denies the delete_mod_version command without any pre-configured scope."
+commands.deny = ["delete_mod_version"]
