@@ -136,7 +136,7 @@ export function matchesFilter(item: CollectionItem_Serialize, status: Collection
 		case "all":
 			return true;
 		case "todo":
-			return needsWork(status) && status?.kind !== "skipped";
+			return needsWork(status);
 		case "done":
 			return isDone(status) && status?.kind !== "skipped";
 		case "optional":
