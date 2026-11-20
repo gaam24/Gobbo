@@ -3,10 +3,9 @@ import { existsSync, rmSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 
-// One release build for the current OS: the overlay hook (with its PDBs), the web bundle, the Tauri app and the two
-// archives in `dist-release/`. `bun run build:pgo` sets `RUSTFLAGS` before it calls this script; the hook build strips
-// those flags because its own profile does not describe the hook. The Windows symbols are checked before packaging: a
-// portable archive without them cannot explain a crash from a user.
+// One release build for the current OS: the overlay hook (with its PDBs), the web bundle, the Tauri bundle and the
+// portable archive in `dist-release/`. The Windows symbols are checked before packaging: a portable archive without them
+// cannot explain a crash from a user.
 
 const root = path.resolve(import.meta.dirname, "..");
 const srcTauri = path.join(root, "src-tauri");
