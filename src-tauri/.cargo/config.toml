@@ -1,0 +1,6 @@
+# The static MSVC runtime for every Windows build: the app then starts on a machine without the Visual C++
+# Redistributable, and the overlay hook keeps `VCRUNTIME140.dll` out of its import table, so a game or mod that ships
+# its own copy is not shadowed. One setting for every crate also means `cargo test` reuses the hook that
+# `scripts/build-overlay-hook.ts` built instead of rebuilding it with other flags.
+[target.'cfg(all(windows, target_env = "msvc"))']
+rustflags = ["-C", "target-feature=+crt-static"]
