@@ -89,7 +89,7 @@ function NoticeRow({ group, locale, onDismiss }: NoticeRowProps) {
 					{notice.detail && (
 						<Disclosure
 							className="text-muted-foreground text-xs"
-							title={<span className="text-xs font-normal">{t("notifications.details")}</span>}
+							title={<span className="text-xs font-normal">{t("common.details")}</span>}
 						>
 							<p className="font-mono break-all">{notice.detail}</p>
 						</Disclosure>

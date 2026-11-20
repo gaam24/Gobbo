@@ -118,7 +118,7 @@ function duringBusy(presentation: GamePresentation, busy: Exclude<GameRuntime["b
 function statusPresentation(status: Status): GamePresentation {
 	const blockedReason = blockerOf(status);
 	const deployedElsewhere = status.profiles.find((profile) => profile.deployed && !profile.active)?.name;
-	const primary = actionOf(status.next_action, status, blockedReason);
+	const primary = actionOf(status.next_action, blockedReason);
 	const nextStep = nextStepOf(status, primary);
 
 	switch (status.stage.kind) {
@@ -240,8 +240,8 @@ function statusPresentation(status: Status): GamePresentation {
 }
 
 /// The primary action for the backend's next action. Each action keeps the label and the handler it had before the
-/// backend decided it; `apply` depends on whether the game was deployed and whether an apply is blocked.
-function actionOf(next: NextAction, status: Status, blockedReason: TranslationKey | undefined): GameAction {
+/// backend decided it; `apply` depends on whether an apply is blocked.
+function actionOf(next: NextAction, blockedReason: TranslationKey | undefined): GameAction {
 	switch (next) {
 		case "set_game_folder":
 			return { id: "fix-setup", labelKey: "header.setGameFolder" };
@@ -259,7 +259,7 @@ function actionOf(next: NextAction, status: Status, blockedReason: TranslationKe
 		case "apply":
 			return {
 				id: "apply-and-play",
-				labelKey: status.deployed ? "header.applyAndLaunch" : "header.deployAndLaunch",
+				labelKey: "header.applyAndLaunch",
 				disabled: blockedReason !== undefined,
 				reasonKey: blockedReason,
 			};

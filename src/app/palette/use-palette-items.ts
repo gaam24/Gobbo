@@ -144,7 +144,7 @@ export function usePaletteItems(): () => PaletteItem[] {
 			{
 				id: "undo",
 				icon: Undo2,
-				label: t("palette.items.undo"),
+				label: t("shortcuts.items.undo"),
 				hint: shortcutHint("undo"),
 				disabled: !gameStatus.history.can_undo,
 				reason: reasonWhen(!gameStatus.history.can_undo, t("palette.reason.nothingToUndo")),

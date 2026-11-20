@@ -180,7 +180,7 @@ export function SourceSection({
 						)}
 						{shownFailure.kind !== "user_action" && shownFailure.kind !== "permanent" && (
 							<Button variant="outline" size="sm" className="justify-self-start" disabled={checking} onClick={() => void check()}>
-								{t("mods.sources.tryAgain")}
+								{t("common.retry")}
 							</Button>
 						)}
 					</AlertDescription>

@@ -91,7 +91,7 @@ test("a library with every mod off offers play and points at the switches", () =
 
 test("a ready list leads with apply and play", () => {
 	const presentation = gamePresentation(status({ kind: "ready", enabled: 2, total: 5 }));
-	expect(presentation.primary).toMatchObject({ id: "apply-and-play", labelKey: "header.deployAndLaunch" });
+	expect(presentation.primary).toMatchObject({ id: "apply-and-play", labelKey: "header.applyAndLaunch" });
 	expect(presentation.canApply).toBe(true);
 	expect(presentation.canPlay).toBe(true);
 	expect(presentation.menu.map((action) => action.id)).toEqual(["apply"]);
@@ -179,7 +179,7 @@ test("the primary action follows the backend next action, not the stage", () => 
 test("a ready list's next step is the deploy step with apply and play", () => {
 	const presentation = gamePresentation(status({ kind: "ready", enabled: 2, total: 5 }));
 	expect(presentation.nextStep?.titleKey).toBe("start.deploy.title");
-	expect(presentation.nextStep?.action).toMatchObject({ id: "apply-and-play", labelKey: "header.deployAndLaunch" });
+	expect(presentation.nextStep?.action).toMatchObject({ id: "apply-and-play", labelKey: "header.applyAndLaunch" });
 });
 
 test("a deployed list has no next step, because play is already the next action", () => {
@@ -191,7 +191,7 @@ test("a deployed list has no next step, because play is already the next action"
 test("a busy apply disables only the apply action and keeps a legible primary", () => {
 	const presentation = gamePresentation(status({ kind: "ready", enabled: 1, total: 1 }), { gameRunning: false, busy: "applying" });
 	expect(presentation.stateKey).toBe("header.busyApplying");
-	expect(presentation.primary).toMatchObject({ id: "apply-and-play", labelKey: "header.deployAndLaunch" });
+	expect(presentation.primary).toMatchObject({ id: "apply-and-play", labelKey: "header.applyAndLaunch" });
 	expect(presentation.primary.disabled).toBe(true);
 	expect(presentation.primary.reasonKey).toBe("header.busyApplying");
 	// The next step and the menu keep their real actions instead of going blank for the whole busy window.

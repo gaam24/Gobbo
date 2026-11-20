@@ -36,7 +36,7 @@ export function ModsStatusBar({
 			</Button>
 			{shown !== total && <span>{t("bar.showing", { shown, total })}</span>}
 			<Button variant="ghost" size="sm" className="ml-auto shrink-0" title={t("palette.hint")} onClick={onOpenPalette}>
-				<Command /> <span className="hidden @2xl:inline">{t("palette.open")}</span>
+				<Command /> <span className="hidden @2xl:inline">{t("palette.title")}</span>
 				<KbdGroup className="hidden @lg:inline-flex">
 					<Kbd>{t("bar.keys.ctrl")}</Kbd>
 					<Kbd>{"K"}</Kbd>

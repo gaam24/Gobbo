@@ -92,7 +92,7 @@ export function DeploymentSummary({
 					</ItemContent>
 					<ItemActions>
 						<Button size="sm" variant="outline" disabled={!presentation.canApply} onClick={() => void onDeploy()}>
-							{t("start.changes.action")}
+							{t("start.deploy.action")}
 						</Button>
 					</ItemActions>
 				</Item>

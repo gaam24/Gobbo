@@ -50,7 +50,7 @@ function ErrorFallback({ error, onReset }: { error: Error; onReset: () => void }
 				<p className="text-muted-foreground text-sm">{t("errorBoundary.body")}</p>
 			</div>
 			<details className="text-muted-foreground text-xs">
-				<summary className="cursor-pointer select-none">{t("errorBoundary.details")}</summary>
+				<summary className="cursor-pointer select-none">{t("common.details")}</summary>
 				<pre className="mt-2 overflow-x-auto rounded-md border p-2 font-mono whitespace-pre-wrap">{error.message}</pre>
 			</details>
 			<div className="flex flex-wrap gap-2">

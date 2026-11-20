@@ -225,7 +225,7 @@ function DownloadRow({ download, gameName, showMods, locale, onInstall, onRemove
 					)}
 					{state === "failed" && (
 						<Button size="sm" variant="outline" onClick={() => void onRetry(download.id)}>
-							<RotateCw /> {t("downloads.retry")}
+							<RotateCw /> {t("common.retry")}
 						</Button>
 					)}
 					{removeLabel && (

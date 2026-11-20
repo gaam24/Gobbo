@@ -143,7 +143,7 @@ export function OverviewTab({
 			<FactList facts={facts} />
 
 			{technicalFacts.some((item) => item !== null) && (
-				<Disclosure title={t("mods.technicalDetails")}>
+				<Disclosure title={t("common.details")}>
 					<FactList facts={technicalFacts} />
 				</Disclosure>
 			)}

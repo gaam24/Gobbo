@@ -159,7 +159,7 @@ function busyTasks(
 				{
 					id: "apply",
 					kind: "apply",
-					title: t("tasks.applying"),
+					title: t("tasks.kind.apply"),
 					detail: deployDetail(deployProgress, t) ?? gameName,
 					percent: deployProgress?.percent,
 					state: "running",
@@ -171,7 +171,7 @@ function busyTasks(
 				{
 					id: "launch",
 					kind: "launch",
-					title: t("tasks.launching"),
+					title: t("tasks.kind.launch"),
 					detail: gameName,
 					state: "running",
 					dedupeKey: `launch:${gameId ?? ""}`,
@@ -182,7 +182,7 @@ function busyTasks(
 				{
 					id: "stop",
 					kind: "stop",
-					title: t("tasks.stopping"),
+					title: t("tasks.kind.stop"),
 					detail: gameName,
 					state: "running",
 					dedupeKey: `stop:${gameId ?? ""}`,

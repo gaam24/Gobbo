@@ -145,7 +145,7 @@ export function QuickMods({ draft, onChange, inspection, presets, layout, onLayo
 							}}
 						/>
 					</EditorField>
-					<EditorField id="editor-slot-marker" label={t("editor.quick.slotMarker")} hint={t("editor.quick.slotMarkerHint")}>
+					<EditorField id="editor-slot-marker" label={t("editor.quick.slotMarker")} hint={t("editor.deploy.slotMarkerHint")}>
 						<Input
 							id="editor-slot-marker"
 							value={draft.deploy.slots?.[0]?.marker ?? ""}
