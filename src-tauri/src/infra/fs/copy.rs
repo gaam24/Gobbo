@@ -312,8 +312,14 @@ pub fn replace_with_staged(staging: &Path, target: &Path, keep_previous: bool) -
         fs::rename(target, &backup)?;
     }
     if let Err(error) = fs::rename(staging, target) {
-        if had_target {
-            let _ = fs::rename(&backup, target);
+        if had_target && let Err(restore) = fs::rename(&backup, target) {
+            return Err(io::Error::new(
+                restore.kind(),
+                format!(
+                    "{error}; the previous copy could not be restored and is kept at {}: {restore}",
+                    backup.display()
+                ),
+            ));
         }
         return Err(error);
     }
