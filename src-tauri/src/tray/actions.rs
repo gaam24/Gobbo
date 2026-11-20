@@ -36,6 +36,7 @@ fn log(error: &AppError) {
 fn blocking(app: AppHandle, work: impl FnOnce(&Data) -> Result<(), AppError> + Send + 'static) {
     drop(tauri::async_runtime::spawn_blocking(move || {
         let data = app.state::<Data>();
+
         if let Err(error) = work(&data) {
             log(&error);
         }
@@ -70,6 +71,7 @@ fn stop(app: &AppHandle, game: String) {
             crate::launch::report::mark_stopped(data, &game);
             let _ = handle.emit("game-exited", game.clone());
         }
+
         Ok(())
     });
 }
@@ -87,6 +89,7 @@ fn open_step(app: &AppHandle, action: NextAction) {
         NextAction::SetGameFolder | NextAction::SetSettingsFolder | NextAction::SetModsFolder => {
             open_view(app, "game-settings");
         }
+
         NextAction::FixProblems
         | NextAction::ImportMods
         | NextAction::EnableMods
@@ -99,10 +102,12 @@ fn quit(app: &AppHandle, snapshot: &Snapshot, labels: &TrayLabels) {
     let game = snapshot.game.as_ref();
     let running = game.is_some_and(|game| game.running);
     let busy_tasks = !snapshot.tasks.is_empty();
+
     if !running && !busy_tasks {
         app.exit(0);
         return;
     }
+
     let body = if running {
         labels.quit_game.clone()
     } else {
@@ -126,12 +131,14 @@ fn quit(app: &AppHandle, snapshot: &Snapshot, labels: &TrayLabels) {
             if !yes {
                 return;
             }
+
             match stop_game {
                 Some(game) => {
                     // Stop before exiting: leaving a game process behind would also leave the overlay mounted.
                     // When the stop fails, Gobbo stays open and says why, so the user can stop the game another way.
                     drop(tauri::async_runtime::spawn_blocking(move || {
                         let data = handle.state::<Data>();
+
                         match crate::launch::start::stop_game(&data, &game) {
                             Ok(_) => handle.exit(0),
                             Err(error) => {
@@ -152,12 +159,15 @@ fn notify_if_hidden(app: &AppHandle, task_state: &str, kind: &str, game: Option<
     if task_state != "waiting" && task_state != "failed" {
         return;
     }
+
     let hidden = app.get_webview_window("main").is_none_or(|window| {
         !window.is_visible().unwrap_or(true) || window.is_minimized().unwrap_or(false)
     });
+
     if !hidden {
         return;
     }
+
     let labels = app.state::<TrayState>().labels();
     let template = if task_state == "waiting" {
         &labels.notice_waiting
@@ -197,6 +207,7 @@ pub fn handle(app: &AppHandle, id: &str) {
         open_view(app, "working");
         return;
     }
+
     if let Some(profile) = id.strip_prefix("tray.profile:") {
         if let Some(game) = snapshot(app).ok().and_then(|snapshot| snapshot.game) {
             let id = profile.to_owned();
@@ -208,8 +219,10 @@ pub fn handle(app: &AppHandle, id: &str) {
                 Ok(())
             });
         }
+
         return;
     }
+
     if let Some(game_id) = id.strip_prefix("tray.game:") {
         let tray = app.state::<TrayState>();
         let (_, busy) = tray.context();
@@ -218,6 +231,7 @@ pub fn handle(app: &AppHandle, id: &str) {
         show_window(app);
         return;
     }
+
     match id {
         "tray.open" => show_window(app),
         "tray.settings" => open_view(app, "app-settings"),

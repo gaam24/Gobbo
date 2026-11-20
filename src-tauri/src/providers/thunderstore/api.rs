@@ -96,9 +96,11 @@ fn get_json<T: DeserializeOwned>(url: &str) -> Result<T, AppError> {
     if response.status == 404 {
         return Err(not_found());
     }
+
     if !(200..300).contains(&response.status) {
         return Err(http::status_error("thunderstore", response.status));
     }
+
     serde_json::from_str(&response.body).map_err(bad_response)
 }
 

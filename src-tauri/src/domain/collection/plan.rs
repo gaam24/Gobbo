@@ -75,6 +75,7 @@ impl CollectionPlan {
     pub fn ordered(&self) -> Vec<&CollectionItem> {
         let mut seen = BTreeSet::new();
         let mut ordered = Vec::with_capacity(self.items.len());
+
         for key in &self.order {
             if let Some(item) = self.item(key)
                 && seen.insert(key.as_str())
@@ -82,11 +83,13 @@ impl CollectionPlan {
                 ordered.push(item);
             }
         }
+
         for item in &self.items {
             if seen.insert(item.key.as_str()) {
                 ordered.push(item);
             }
         }
+
         ordered
     }
 
@@ -110,6 +113,7 @@ pub fn order_items(
         .collect();
     let mut ordered = Vec::with_capacity(items.len());
     let phases: BTreeSet<u32> = items.iter().map(|item| item.phase).collect();
+
     for phase in phases {
         let members: Vec<usize> = items
             .iter()
@@ -119,6 +123,7 @@ pub fn order_items(
             .collect();
         ordered.extend(order_phase(items, rules, &index, &members, &mut issues));
     }
+
     (ordered, issues)
 }
 
@@ -132,6 +137,7 @@ fn order_phase(
     let member_set: BTreeSet<usize> = members.iter().copied().collect();
     let mut edges: BTreeMap<usize, BTreeSet<usize>> = BTreeMap::new();
     let mut incoming: BTreeMap<usize, usize> = members.iter().map(|&at| (at, 0)).collect();
+
     for rule in rules {
         let (Some(&source), Some(&reference)) = (
             index.get(rule.source.as_str()),
@@ -139,28 +145,35 @@ fn order_phase(
         ) else {
             continue;
         };
+
         if !member_set.contains(&source) || !member_set.contains(&reference) {
             // Phase gating wins; an edge across phases would fight the order the curator chose.
             continue;
         }
+
         let (before, after) = match rule.kind {
             CollectionRuleKind::Before => (reference, source),
             CollectionRuleKind::After => (source, reference),
             _ => continue,
         };
+
         if before == after || !edges.entry(before).or_default().insert(after) {
             continue;
         }
+
         *incoming.entry(after).or_default() += 1;
     }
+
     let mut ready: BTreeSet<usize> = incoming
         .iter()
         .filter(|(_, count)| **count == 0)
         .map(|(&at, _)| at)
         .collect();
     let mut ordered = Vec::with_capacity(members.len());
+
     while let Some(at) = ready.pop_first() {
         ordered.push(items[at].key.clone());
+
         if let Some(next) = edges.get(&at) {
             for &after in next {
                 if let Some(count) = incoming.get_mut(&after) {
@@ -172,15 +185,18 @@ fn order_phase(
             }
         }
     }
+
     if ordered.len() != members.len() {
         issues.push(Message::new("collection.rule_cycle"));
         let emitted: BTreeSet<String> = ordered.iter().cloned().collect();
+
         for &at in members {
             if !emitted.contains(&items[at].key) {
                 ordered.push(items[at].key.clone());
             }
         }
     }
+
     ordered
 }
 

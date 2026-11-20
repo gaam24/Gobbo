@@ -28,9 +28,11 @@ pub fn report(root: &Data, game_id: &str, folder: &str) -> Result<ArchiveReport,
         .archive_file_of(&digest)
         .ok_or_else(|| archive_error(folder, "library.archive_missing"))?;
     let path = data.archives().join(&file);
+
     if !path.is_file() {
         return Err(archive_error(folder, "library.archive_missing"));
     }
+
     let archive =
         Archive::open(&path).map_err(|error| AppError::from(install::InstallError::from(error)))?;
     let selection = match record.installer_choices() {
@@ -97,9 +99,11 @@ pub fn report(root: &Data, game_id: &str, folder: &str) -> Result<ArchiveReport,
 /// is matched to the folder by the files it already has; the group name breaks a tie.
 fn expected_files(plan: &Plan, record: &ModVersion, archive: &Archive) -> BTreeMap<String, u64> {
     let mut groups: BTreeMap<&str, Vec<&install::Placed>> = BTreeMap::new();
+
     for item in &plan.placed {
         groups.entry(item.group.as_str()).or_default().push(item);
     }
+
     let present: BTreeSet<&str> = record.files.iter().map(String::as_str).collect();
     let folder = record.folder.to_lowercase();
     let chosen = groups

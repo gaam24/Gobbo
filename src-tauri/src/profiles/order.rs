@@ -47,13 +47,16 @@ pub fn preview_sort(root: &Data, game_id: &str) -> Result<SortPreview, AppError>
         .map(|(at, entry)| (entry.id.as_str(), at))
         .collect();
     let mut moves = Vec::new();
+
     for (to, entry) in sorted.iter().enumerate() {
         let Some(&from) = position.get(entry.id.as_str()) else {
             continue;
         };
+
         if from == to {
             continue;
         }
+
         moves.push(SortMove {
             id: entry.id.clone(),
             name: library
@@ -64,6 +67,7 @@ pub fn preview_sort(root: &Data, game_id: &str) -> Result<SortPreview, AppError>
             to: u32::try_from(to + 1).unwrap_or(u32::MAX),
         });
     }
+
     Ok(SortPreview {
         total: u32::try_from(current.len()).unwrap_or(u32::MAX),
         moves,
@@ -105,13 +109,16 @@ pub fn sorted_by_name(
     names: &BTreeMap<&str, String>,
 ) -> Vec<ProfileEntry> {
     let mut owner: BTreeMap<&str, usize> = BTreeMap::new();
+
     for (at, group) in groups.iter().enumerate() {
         for member in &group.members {
             owner.insert(member.as_str(), at);
         }
     }
+
     let mut used: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
     let mut blocks: Vec<((String, String), Vec<ProfileEntry>)> = Vec::new();
+
     for entry in &mods {
         if used.contains(&entry.id) {
             continue;
@@ -128,17 +135,22 @@ pub fn sorted_by_name(
         for member in &members {
             used.insert(member.id.clone());
         }
+
         let block_key = members.first().map(|first| key(first, names));
+
         if let Some(block_key) = block_key {
             blocks.push((block_key, members));
         }
     }
+
     for entry in &mods {
         if used.contains(&entry.id) {
             continue;
         }
+
         blocks.push((key(entry, names), vec![entry.clone()]));
     }
+
     blocks.sort_by(|(left, _), (right, _)| left.cmp(right));
     blocks.into_iter().flat_map(|(_, block)| block).collect()
 }
@@ -167,6 +179,7 @@ pub fn sorted_by_rules(
     // `below[a]` lists the mods that `a` overrides; `waiting[b]` counts the mods that must still go above `b`.
     let mut below: Vec<Vec<usize>> = vec![Vec::new(); mods.len()];
     let mut waiting = vec![0_usize; mods.len()];
+
     for (above, entry) in mods.iter().enumerate() {
         let overrides = library
             .families
@@ -182,20 +195,25 @@ pub fn sorted_by_rules(
             }
         }
     }
+
     let mut free: BinaryHeap<Reverse<usize>> = (0..mods.len())
         .filter(|&at| waiting[at] == 0)
         .map(Reverse)
         .collect();
     let mut order = Vec::with_capacity(mods.len());
+
     while let Some(Reverse(at)) = free.pop() {
         order.push(at);
+
         for &under in &below[at] {
             waiting[under] -= 1;
+
             if waiting[under] == 0 {
                 free.push(Reverse(under));
             }
         }
     }
+
     if order.len() < mods.len() {
         let names: Vec<String> = (0..mods.len())
             .filter(|&at| waiting[at] > 0)
@@ -208,6 +226,7 @@ pub fn sorted_by_rules(
             .collect();
         return Err(AppError::user("order.cycle").with("mods", names.join(", ")));
     }
+
     Ok(order.into_iter().map(|at| mods[at].clone()).collect())
 }
 
@@ -227,6 +246,7 @@ mod tests {
 
     fn library(rules: &[(&str, &[&str])]) -> Library {
         let mut library = Library::default();
+
         for (id, overrides) in rules {
             library.families.insert(
                 (*id).into(),
@@ -238,6 +258,7 @@ mod tests {
                 },
             );
         }
+
         library
     }
 

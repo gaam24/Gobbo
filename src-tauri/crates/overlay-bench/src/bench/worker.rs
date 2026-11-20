@@ -72,6 +72,7 @@ impl HookCounters {
         let name: Vec<u16> = "gobbo_overlay_hook.dll\0".encode_utf16().collect();
         // SAFETY: `name` is a NUL-terminated wide string.
         let module = unsafe { GetModuleHandleW(name.as_ptr()) };
+
         if module.is_null() {
             return None;
         }
@@ -139,6 +140,7 @@ pub(super) fn run(
     hooked: bool,
 ) -> Result<(), Box<dyn Error>> {
     let hook = HookCounters::find();
+
     if hooked && hook.is_none() {
         eprintln!(
             "overlay-bench: the hook has no allocation counters; build it with `--features \"bench-alloc bench-stats\"`"
@@ -233,14 +235,18 @@ pub(super) fn run(
         // The pass-through mode runs in the folder outside the game, so the row for the game folder is an active row only.
         let active = input.file_name().is_some_and(|name| name == "game");
         let mut rows = vec![("open_nt_relative_outside", &outside_folder)];
+
         if active {
             rows.push(("open_nt_relative_game", &game_folder));
         }
+
         for (operation, folder) in rows {
             let root = open_folder(folder);
+
             if root.is_null() {
                 return Err(format!("the benchmark could not open {}", folder.display()).into());
             }
+
             let name: Vec<u16> = r"read\a.bin".encode_utf16().collect();
             let stats = measure(iterations, warmup, hook, |_| {
                 let _ = nt_open_relative(create, root, &name);
@@ -405,51 +411,64 @@ fn measure(
     let mut probes_total = 0u64;
     let mut locks_total = 0u64;
     let mut io_total = 0u64;
+
     for _ in 0..warmup {
         operation(0);
     }
+
     for index in 0..iterations {
         WORKER_ALLOCATIONS.store(0, Ordering::Relaxed);
+
         if let Some(hook) = hook {
             // SAFETY: the exported reset takes no arguments.
             unsafe { (hook.reset)() };
+
             if let Some(reset) = hook.reset_stats {
                 // SAFETY: the exported stats reset takes no arguments.
                 unsafe { reset() };
             }
         }
+
         let start = Instant::now();
         operation(index);
         let elapsed = u64::try_from(start.elapsed().as_nanos()).unwrap_or(u64::MAX);
         worker_total = worker_total.saturating_add(WORKER_ALLOCATIONS.load(Ordering::Relaxed));
+
         if let Some(hook) = hook {
             // SAFETY: the exported counters take no arguments.
             hook_total = hook_total.saturating_add(unsafe { (hook.allocations)() });
+
             if let Some(read) = hook.bytes {
                 // SAFETY: the exported counter takes no arguments.
                 bytes_total = bytes_total.saturating_add(unsafe { read() });
             }
+
             if let Some(read) = hook.spelling {
                 // SAFETY: the exported counter takes no arguments.
                 spelling_total = spelling_total.saturating_add(unsafe { read() });
             }
+
             if let Some(read) = hook.probes {
                 // SAFETY: the exported counter takes no arguments.
                 probes_total = probes_total.saturating_add(unsafe { read() });
             }
+
             if let Some(read) = hook.locks {
                 // SAFETY: the exported counter takes no arguments.
                 locks_total = locks_total.saturating_add(unsafe { read() });
             }
+
             if let Some(read) = hook.io {
                 // SAFETY: the exported counter takes no arguments.
                 io_total = io_total.saturating_add(unsafe { read() });
             }
         }
+
         histogram
             .record(elapsed.max(1))
             .map_err(|error| error.to_string())?;
     }
+
     let count = iterations.max(1) as f64;
     Ok(Stats {
         p50: histogram.value_at_quantile(0.50),
@@ -524,6 +543,7 @@ fn nt_create_file() -> Option<NtCreateFileFn> {
     let name: Vec<u16> = "ntdll.dll\0".encode_utf16().collect();
     // SAFETY: `name` is NUL-terminated and ntdll is loaded in every process.
     let module = unsafe { GetModuleHandleW(name.as_ptr()) };
+
     if module.is_null() {
         return None;
     }
@@ -551,6 +571,7 @@ fn nt_query_directory_file() -> Option<NtQueryDirectoryFileFn> {
     let name: Vec<u16> = "ntdll.dll\0".encode_utf16().collect();
     // SAFETY: `name` is NUL-terminated and ntdll is loaded in every process.
     let module = unsafe { GetModuleHandleW(name.as_ptr()) };
+
     if module.is_null() {
         return None;
     }
@@ -568,6 +589,7 @@ fn nt_count(
 ) -> usize {
     let mut restart = 1u8;
     let mut total = 0usize;
+
     loop {
         // SAFETY: the handle is open for the measurement, the buffer is writable for its length, and every other
         // pointer is null, which the NT call accepts for a synchronous query.
@@ -587,14 +609,18 @@ fn nt_count(
             )
         };
         restart = 0;
+
         if nt_status < 0 {
             break;
         }
+
         let mut offset = 0usize;
+
         loop {
             if offset + 12 > entries.len() {
                 break;
             }
+
             let next = u32::from_ne_bytes(entries[offset..offset + 4].try_into().unwrap_or([0; 4]))
                 as usize;
             let name_length = u32::from_ne_bytes(
@@ -603,19 +629,25 @@ fn nt_count(
                     .unwrap_or([0; 4]),
             ) as usize;
             let start = offset + 12;
+
             if start + name_length > entries.len() {
                 break;
             }
+
             let name = &entries[start..start + name_length];
+
             if name != [46, 0] && name != [46, 0, 46, 0] {
                 total += 1;
             }
+
             if next == 0 {
                 break;
             }
+
             offset += next;
         }
     }
+
     total
 }
 
@@ -639,9 +671,11 @@ fn open_directory(folder: &Path) -> Result<*mut std::ffi::c_void, Box<dyn Error>
             std::ptr::null_mut(),
         )
     };
+
     if handle == INVALID_HANDLE_VALUE || handle.is_null() {
         return Err(format!("the benchmark could not open {}", folder.display()).into());
     }
+
     Ok(handle)
 }
 
@@ -705,10 +739,12 @@ fn nt_open_relative(create: NtCreateFileFn, root: *mut std::ffi::c_void, name: &
             0,
         )
     };
+
     if status >= 0 && !handle.is_null() {
         // SAFETY: the handle came from the successful open above and is closed once.
         unsafe { CloseHandle(handle) };
     }
+
     status
 }
 

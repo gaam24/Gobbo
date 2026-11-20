@@ -19,11 +19,14 @@ pub fn is_program_file(relative: &Path) -> bool {
 /// root of the archive.
 fn below_top_folder(entry: &Path) -> Option<PathBuf> {
     let mut parts = entry.components();
+
     match parts.next()? {
         Component::Normal(_) => {}
         _ => return None,
     }
+
     let rest: PathBuf = parts.collect();
+
     if rest.as_os_str().is_empty() {
         None
     } else {
@@ -35,6 +38,7 @@ fn below_top_folder(entry: &Path) -> Option<PathBuf> {
 /// file outside the top folder, refuses the whole archive.
 pub fn extract(bytes: &[u8], dest: &Path) -> Result<(), AppError> {
     let mut archive = zip::ZipArchive::new(Cursor::new(bytes)).map_err(invalid)?;
+
     for index in 0..archive.len() {
         let mut file = archive.by_index(index).map_err(invalid)?;
         let name = file
@@ -43,18 +47,23 @@ pub fn extract(bytes: &[u8], dest: &Path) -> Result<(), AppError> {
         if file.is_dir() {
             continue;
         }
+
         let rest = below_top_folder(&name)
             .ok_or_else(|| invalid("a file is not inside the top folder"))?;
         if !is_program_file(&rest) {
             continue;
         }
+
         let target = dest.join(&rest);
+
         if let Some(parent) = target.parent() {
             fs::create_dir_all(parent).map_err(io_at(parent))?;
         }
+
         let mut out = fs::File::create(&target).map_err(io_at(&target))?;
         io::copy(&mut file, &mut out).map_err(io_at(&target))?;
     }
+
     Ok(())
 }
 
@@ -72,14 +81,17 @@ mod tests {
         let mut buffer = Cursor::new(Vec::new());
         {
             let mut writer = zip::ZipWriter::new(&mut buffer);
+
             for (name, body) in entries {
                 writer
                     .start_file(*name, SimpleFileOptions::default())
                     .expect("start");
                 writer.write_all(body.as_bytes()).expect("write");
             }
+
             writer.finish().expect("finish");
         }
+
         buffer.into_inner()
     }
 

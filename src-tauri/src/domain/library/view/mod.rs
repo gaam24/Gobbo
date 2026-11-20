@@ -96,6 +96,7 @@ impl<'a> LibraryView<'a> {
 
         let mut by_family = FxHashMap::with_capacity_and_hasher(grouped.len(), FxBuildHasher);
         let mut default_version = FxHashMap::with_capacity_and_hasher(grouped.len(), FxBuildHasher);
+
         for (family, mut versions) in grouped {
             versions.sort_unstable_by(|(left, left_key), (right, right_key)| {
                 version::compare_display(
@@ -107,9 +108,11 @@ impl<'a> LibraryView<'a> {
                     &right.folder,
                 )
             });
+
             if let Some((first, _)) = versions.first() {
                 default_version.insert(family, *first);
             }
+
             by_family.insert(
                 family,
                 versions.into_iter().map(|(version, _)| version).collect(),
@@ -142,6 +145,7 @@ impl<'a> LibraryView<'a> {
                 );
             }
         }
+
         for version in self.library.versions.values() {
             for (provider, mod_id) in &version.parsed_sources {
                 let part = version.parsed_parts.get(provider).map(String::as_str);
@@ -195,6 +199,7 @@ impl<'a> LibraryView<'a> {
                     *families = built.finish();
                 }
             }
+
             map
         })
     }
@@ -336,6 +341,7 @@ impl<'a> LibraryView<'a> {
                 for (id, known) in &self.library.families {
                     map.entry(known.name.as_str()).or_insert(id.as_str());
                 }
+
                 map
             })
             .get(name)
@@ -354,11 +360,13 @@ impl<'a> LibraryView<'a> {
     pub fn versions_from_archive(&self, sha256: &str) -> &[&'a ModVersion] {
         let by_archive = self.by_archive.get_or_init(|| {
             let mut map: FxHashMap<&'a str, Vec<&'a ModVersion>> = FxHashMap::default();
+
             for version in self.library.versions.values() {
                 if let Some(sha256) = version.archive.as_deref() {
                     map.entry(sha256).or_default().push(version);
                 }
             }
+
             map
         });
         by_archive.get(sha256).map_or(&[], Vec::as_slice)
@@ -553,6 +561,7 @@ mod tests {
         second_part.archive = Some("second-sha".into());
         library.versions.insert("first-part".into(), first_part);
         library.versions.insert("second-part".into(), second_part);
+
         for (sha, file_id) in [("first-sha", "101"), ("second-sha", "202")] {
             library.archives.insert(
                 sha.into(),
@@ -570,6 +579,7 @@ mod tests {
                 },
             );
         }
+
         for (id, name) in [("test:7#1", "First part"), ("test:7#2", "Second part")] {
             library.families.insert(
                 id.into(),
@@ -590,6 +600,7 @@ mod tests {
                 },
             );
         }
+
         let view = LibraryView::new(&library);
         assert_eq!(
             view.version_of_file(&provider, "7", "101")

@@ -71,29 +71,36 @@ pub fn fill<'a>(
     if start >= count {
         return Fill::End;
     }
+
     let Some(layout) = layout(class) else {
         return Fill::UnknownClass;
     };
     let mut offset = 0;
     let mut index = start;
     let mut previous: Option<(usize, usize)> = None;
+
     while index < count {
         let data = entry(index);
         let size = layout.name + 2 * data.name.len();
+
         if offset + size > buffer.len() {
             break;
         }
+
         if let Some((at, _)) = previous {
             write_u32(buffer, at, (offset - at) as u32);
         }
+
         write_entry(&layout, &data, &mut buffer[offset..offset + size]);
         previous = Some((offset, size));
         offset += align8(size);
         index += 1;
+
         if single {
             break;
         }
     }
+
     if index == start {
         return Fill::Overflow;
     }
@@ -128,6 +135,7 @@ fn layout(class: u32) -> Option<Layout> {
         short_name_length: None,
         file_id: None,
     };
+
     match class {
         DIRECTORY => Some(common),
         FULL_DIRECTORY => Some(Layout {
@@ -182,20 +190,25 @@ fn write_entry(layout: &Layout, data: &Entry<'_>, out: &mut [u8]) {
         write_u64(out, 40, data.size);
         write_u32(out, 56, data.attributes);
     }
+
     if let Some(at) = layout.ea {
         write_u32(out, at, 0);
     }
+
     if let (Some(at), Some(length_at)) = (layout.short_name, layout.short_name_length) {
         let length = data.short_name.len().min(SHORT_NAME_UNITS);
         // `ShortNameLength` is in bytes, like every length in the NT structures.
         out[length_at] = (length * 2) as u8;
+
         for (slot, unit) in data.short_name.iter().take(length).enumerate() {
             write_u16(out, at + slot * 2, *unit);
         }
     }
+
     if let Some(at) = layout.file_id {
         write_u64(out, at, 0);
     }
+
     for (slot, unit) in data.name.iter().enumerate() {
         write_u16(out, layout.name + slot * 2, *unit);
     }
@@ -261,6 +274,7 @@ mod tests {
         ] {
             assert!(knows(class));
         }
+
         assert!(!knows(0));
         assert!(!knows(4));
         assert!(!knows(39));
@@ -406,6 +420,7 @@ mod tests {
                 (104, 60, Some(64), Some(70), Some(68), Some(96)),
             ),
         ];
+
         for (class, fields) in expected {
             let layout = layout(class).expect("a known class");
             assert_eq!(

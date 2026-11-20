@@ -14,11 +14,14 @@ pub(crate) unsafe fn text(ptr: *const u16) -> Option<String> {
     if ptr.is_null() {
         return None;
     }
+
     let mut len = 0;
+
     unsafe {
         while *ptr.add(len) != 0 {
             len += 1;
         }
+
         Some(
             OsString::from_wide(std::slice::from_raw_parts(ptr, len))
                 .to_string_lossy()

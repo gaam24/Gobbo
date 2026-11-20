@@ -40,6 +40,7 @@ impl Downloads {
                     .as_ref()
                     .is_some_and(|known| known.same_file(source))
         });
+
         if duplicate {
             let adopted_wait = if let Some(existing) = queue.iter_mut().find(|queued| {
                 queued.view.id != id
@@ -58,19 +59,24 @@ impl Downloads {
             };
             queue.retain(|queued| queued.view.id != id);
             drop(queue);
+
             if let Some((game, Some(path))) = adopted_wait {
                 self.clear_pending(&game, &path);
             }
+
             return true;
         }
+
         if let Some(queued) = queue.iter_mut().find(|queued| queued.view.id == id) {
             queued.view.game = game.to_string();
             queued.view.source = Some(source.clone());
+
             if let Some(owner) = owner {
                 queued.view.owner = Some(owner.to_string());
                 queued.view.auto_install = false;
             }
         }
+
         drop(queue);
         false
     }

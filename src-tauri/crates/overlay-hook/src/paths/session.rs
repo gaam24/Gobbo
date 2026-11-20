@@ -67,12 +67,15 @@ pub(crate) fn root_units(root: &Path) -> Option<Vec<u16>> {
     units.pop();
     let stripped = super::names::strip_verbatim(&units)?;
     let mut units = stripped.to_vec();
+
     if units.contains(&u16::from(b'/')) {
         return None;
     }
+
     while units.len() > 2 && units.last() == Some(&u16::from(b'\\')) {
         units.pop();
     }
+
     Some(units)
 }
 
@@ -89,6 +92,7 @@ fn long_name(path: &Path) -> Option<PathBuf> {
     let mut buffer = [0u16; 1024];
     let mut missing: Vec<PathBuf> = Vec::new();
     let mut current = path;
+
     loop {
         let name = wide(current.as_os_str());
         // SAFETY: `name` is NUL-terminated, and the buffer holds 1024 writable units.
@@ -96,11 +100,14 @@ fn long_name(path: &Path) -> Option<PathBuf> {
             unsafe { GetLongPathNameW(name.as_ptr(), buffer.as_mut_ptr(), buffer.len() as u32) };
         if length > 0 && (length as usize) < buffer.len() {
             let mut result = PathBuf::from(OsString::from_wide(&buffer[..length as usize]));
+
             for part in missing.iter().rev() {
                 result.push(part);
             }
+
             return Some(result);
         }
+
         missing.push(PathBuf::from(current.file_name()?));
         current = current.parent()?;
     }
@@ -117,6 +124,7 @@ fn short_path_units(root: &Path) -> Option<Vec<u16>> {
     if length == 0 || length as usize >= buffer.len() {
         return None;
     }
+
     let path = PathBuf::from(OsString::from_wide(&buffer[..length as usize]));
     let short = root_units(&path)?;
     (short != root_units(root)?).then_some(short)

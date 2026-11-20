@@ -138,9 +138,11 @@ fn game_fixture(name: &str, game_id: &str, folders: &[&str]) -> Fixture {
     test_games::install();
     let base = scratch!(name);
     let game_root = base.join("game");
+
     for folder in folders {
         fs::create_dir_all(game_root.join(folder)).unwrap();
     }
+
     let fixture = Fixture {
         data: Data::new(base.join("data")),
         game_root,
@@ -180,6 +182,7 @@ fn apply_nexus_page(
     if entry.mod_id.is_empty() {
         entry.mod_id = nexus_id.to_string();
     }
+
     entry.meta = Some(meta);
 }
 

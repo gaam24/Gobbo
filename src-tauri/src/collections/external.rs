@@ -43,11 +43,13 @@ pub fn download(
         PartError::Body(BodyProblem::Empty) => AppError::user("collection.external_empty"),
         PartError::Body(BodyProblem::Html) => AppError::user("collection.external_html"),
     })?;
+
     if part.info.bytes > MAX_EXTERNAL_BYTES {
         return Err(
             AppError::user("collection.external_too_large").with("limit", MAX_EXTERNAL_BYTES)
         );
     }
+
     let name = target_name(&part.info, url, "", "external");
     let name = if crate::domain::archive::extension_of(&name).is_some() {
         name
@@ -65,12 +67,14 @@ pub fn download(
             .saturating_div(1024),
     )
     .unwrap_or(u32::MAX);
+
     if expected_kb > 0 && actual_kb.saturating_add(1) < expected_kb {
         let _ = fs::remove_file(&target);
         return Err(AppError::user("collection.external_size")
             .with("expected", expected_kb)
             .with("found", actual_kb));
     }
+
     if let Some(expected) = md5.filter(|text| !text.trim().is_empty()) {
         let actual =
             crate::infra::io::digest_file::<Md5>(&target, &mut |_| {}).map_err(io_at(&target))?;
@@ -81,6 +85,7 @@ pub fn download(
                 .with("found", actual));
         }
     }
+
     let is_archive = target
         .file_name()
         .and_then(|name| name.to_str())
@@ -98,6 +103,7 @@ pub fn validate_url(url: &str) -> Result<Url, AppError> {
     if parsed.scheme() != "https" {
         return Err(AppError::user("collection.external_url").with("url", url));
     }
+
     let host = parsed
         .host_str()
         .ok_or_else(|| AppError::user("collection.external_url").with("url", url))?;
@@ -108,7 +114,9 @@ pub fn validate_url(url: &str) -> Result<Url, AppError> {
     {
         return Err(AppError::user("collection.external_url").with("url", url));
     }
+
     let address_host = host.trim_start_matches('[').trim_end_matches(']');
+
     if let Ok(address) = address_host.parse::<IpAddr>() {
         let private = match address {
             IpAddr::V4(address) => {
@@ -121,10 +129,12 @@ pub fn validate_url(url: &str) -> Result<Url, AppError> {
                 address.is_loopback() || address.is_unspecified() || address.is_unique_local()
             }
         };
+
         if private {
             return Err(AppError::user("collection.external_url").with("url", url));
         }
     }
+
     Ok(parsed)
 }
 

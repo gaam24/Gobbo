@@ -60,6 +60,7 @@ impl Pending {
     /// Waits for the helper's socket. A failure leaves the 32-bit hook with the in-process `DbgHelp` fallback.
     pub(super) fn wait(mut self) -> Option<Monitor> {
         let deadline = Instant::now() + READY_TIMEOUT;
+
         while Instant::now() < deadline {
             if self.ready.is_file() {
                 let child = self.child.take()?;
@@ -69,11 +70,14 @@ impl Pending {
                     ready: std::mem::take(&mut self.ready),
                 });
             }
+
             let child = self.child.as_mut()?;
+
             if child.try_wait().ok()?.is_some() {
                 self.child.take();
                 return None;
             }
+
             thread::sleep(Duration::from_millis(10));
         }
         // The `Drop` stops a helper that never became ready.
@@ -87,6 +91,7 @@ impl Drop for Pending {
             let _ = child.kill();
             let _ = child.wait();
         }
+
         let _ = fs::remove_file(&self.ready);
         let _ = fs::remove_file(&self.path);
     }

@@ -29,6 +29,7 @@ impl Context {
     /// Resolves a template to an absolute path. Unknown variables and `..` are errors.
     pub fn resolve(&self, template: &str) -> Result<PathBuf, AppError> {
         let mut path = PathBuf::new();
+
         for part in template
             .split(['/', '\\'])
             .filter(|part| !part.is_empty() && *part != ".")
@@ -36,6 +37,7 @@ impl Context {
             if part == ".." {
                 return Err(unsafe_template(template));
             }
+
             let value = match part {
                 "{game}" => Some(self.game_root.clone()),
                 "{home}" => Some(self.home_path()?.to_path_buf()),
@@ -58,6 +60,7 @@ impl Context {
                 }
                 _ => None,
             };
+
             match value {
                 Some(value) => {
                     if value.is_absolute() && !path.as_os_str().is_empty() {
@@ -77,9 +80,11 @@ impl Context {
                 None => path.push(part),
             }
         }
+
         if path.as_os_str().is_empty() {
             return Err(unsafe_template(template));
         }
+
         Ok(path)
     }
 
@@ -102,9 +107,11 @@ impl Context {
         if let Some(prefix) = &self.prefix {
             return Ok(proton_user(prefix).join("AppData/LocalLow"));
         }
+
         if cfg!(windows) {
             return Ok(self.home_path()?.join("AppData/LocalLow"));
         }
+
         Err(AppError::user("settings.local_low_unavailable"))
     }
 
@@ -119,9 +126,11 @@ impl Context {
         if let Some(prefix) = &self.prefix {
             return Ok(proton_user(prefix).join(proton));
         }
+
         if cfg!(windows) {
             return env_path(windows_env).ok_or_else(missing_appdata);
         }
+
         let home = self.home_path()?;
         Ok(env_path(xdg_env).unwrap_or_else(|| home.join(xdg_fallback)))
     }
@@ -137,9 +146,11 @@ impl Context {
         {
             return Ok(documents);
         }
+
         if cfg!(windows) {
             return Ok(self.home_path()?.join("Documents"));
         }
+
         let home = self.home_path()?;
         Ok(env_path("XDG_DOCUMENTS_DIR").unwrap_or_else(|| home.join("Documents")))
     }
@@ -157,19 +168,23 @@ impl Context {
 /// differently, so the first real user folder is used instead of creating an empty `steamuser`.
 fn proton_user(prefix: &Path) -> PathBuf {
     let users = prefix.join("drive_c/users");
+
     if users.join("steamuser").is_dir() {
         return users.join("steamuser");
     }
+
     if let Ok(entries) = fs::read_dir(&users) {
         for entry in entries.flatten() {
             let name = entry.file_name();
             let name = name.to_string_lossy();
+
             if entry.path().is_dir() && name != "Public" && name != "Default" && name != "All Users"
             {
                 return entry.path();
             }
         }
     }
+
     users.join("steamuser")
 }
 
@@ -186,9 +201,11 @@ pub fn home() -> PathBuf {
 /// The user's home folder. Steam and Proton paths are built from it.
 pub fn home_dir() -> Result<PathBuf, AppError> {
     let home = home();
+
     if home.as_os_str().is_empty() {
         return Err(AppError::user("system.no_home").kind(ErrorKind::Permanent));
     }
+
     Ok(home)
 }
 

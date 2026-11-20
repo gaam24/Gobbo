@@ -29,9 +29,11 @@ pub(crate) unsafe extern "system" fn final_path(
     // stack, or the GUID form, takes the allocating path below.
     if matches!(volume, VOLUME_NAME_DOS | VOLUME_NAME_NONE | VOLUME_NAME_NT) {
         let mut actual = [0u16; 520];
+
         if let Some(length) = original_path_units(handle, VOLUME_NAME_DOS, &mut actual) {
             let last_error = PreserveLastError::capture();
             let mut mapped = [0u16; 520];
+
             if let Some(length) = map_layer_path_units(&actual[..length], &mut mapped) {
                 let mut answer = [0u16; 520];
                 let translated = match volume {
@@ -43,6 +45,7 @@ pub(crate) unsafe extern "system" fn final_path(
                         .map(|n| &answer[..n]),
                     _ => None,
                 };
+
                 if let Some(path) = translated {
                     drop(last_error);
                     return write_units(buffer, size, path);
@@ -55,6 +58,7 @@ pub(crate) unsafe extern "system" fn final_path(
                     }
                     _ => None,
                 };
+
                 if let Some(path) = translated {
                     drop(last_error);
                     return write_units(buffer, size, path);
@@ -62,6 +66,7 @@ pub(crate) unsafe extern "system" fn final_path(
             }
         }
     }
+
     let Some(actual) = original_path(handle, flags) else {
         let original = original!(get_final_path, 0);
         // SAFETY: the caller's buffer holds `size` units, and the call writes at most that many.
@@ -77,6 +82,7 @@ pub(crate) unsafe extern "system" fn final_path(
 /// without the terminator, or the size needed when the buffer is too small.
 fn write_units(buffer: *mut u16, size: u32, path: &[u16]) -> u32 {
     let needed = path.len() as u32 + 1;
+
     if size < needed {
         return needed;
     }
@@ -85,6 +91,7 @@ fn write_units(buffer: *mut u16, size: u32, path: &[u16]) -> u32 {
         std::ptr::copy_nonoverlapping(path.as_ptr(), buffer, path.len());
         *buffer.add(path.len()) = 0;
     }
+
     path.len() as u32
 }
 
@@ -112,6 +119,7 @@ fn translate(handle: *mut c_void, actual: &str, flags: u32) -> Option<String> {
 fn write_path(buffer: *mut u16, size: u32, path: &str) -> u32 {
     let units: Vec<u16> = path.encode_utf16().collect();
     let needed = units.len() as u32 + 1;
+
     if size < needed {
         return needed;
     }
@@ -120,6 +128,7 @@ fn write_path(buffer: *mut u16, size: u32, path: &str) -> u32 {
         std::ptr::copy_nonoverlapping(units.as_ptr(), buffer, units.len());
         *buffer.add(units.len()) = 0;
     }
+
     units.len() as u32
 }
 

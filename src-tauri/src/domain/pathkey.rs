@@ -31,20 +31,25 @@ fn key_with_into(path: &str, separator: char, key: &mut String) {
     let bytes = path.as_bytes();
     let mut start = 0;
     let mut first = true;
+
     loop {
         let end =
             memchr::memchr2(b'/', b'\\', &bytes[start..]).map_or(bytes.len(), |at| start + at);
         let segment = &path[start..end];
+
         if !segment.is_empty() && segment != "." {
             if !first {
                 key.push(separator);
             }
+
             first = false;
             push_lower(key, segment);
         }
+
         if end == bytes.len() {
             break;
         }
+
         start = end + 1;
     }
 }
@@ -55,6 +60,7 @@ fn push_lower(key: &mut String, segment: &str) {
     if segment.is_ascii() {
         if segment.bytes().any(|byte| byte.is_ascii_uppercase()) {
             key.reserve(segment.len());
+
             for byte in segment.bytes() {
                 key.push(byte.to_ascii_lowercase() as char);
             }
@@ -85,6 +91,7 @@ pub fn is_inside(root: &Path, path: &Path) -> bool {
     if root.as_os_str().is_empty() {
         return false;
     }
+
     if cfg!(windows) {
         let root = windows_key(&root.to_string_lossy());
         let path = windows_key(&path.to_string_lossy());
@@ -116,9 +123,11 @@ pub fn relative_to(base: &Path, path: &Path) -> Option<PathBuf> {
         let base_key = windows_key(&base.to_string_lossy());
         let path_key = windows_key(&path.to_string_lossy());
         let rest = path_key.strip_prefix(&base_key)?;
+
         if !rest.is_empty() && !rest.starts_with('\\') {
             return None;
         }
+
         Some(path.components().skip(base.components().count()).collect())
     } else {
         path.strip_prefix(base).ok().map(Path::to_path_buf)

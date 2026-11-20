@@ -115,6 +115,7 @@ pub(crate) fn write(
         return;
     };
     let report = report(config, statuses, install_ms, steps);
+
     if let Err(error) = write_file(path, &report.to_string()) {
         crate::trace::log(&format!("could not write the session report: {error}"));
     }

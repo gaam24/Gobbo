@@ -20,6 +20,7 @@ pub async fn install(
     if crate::context::running::any_started_here_and_running() {
         return Err(crate::error::game_running());
     }
+
     let update = updater(app)?
         .check()
         .await

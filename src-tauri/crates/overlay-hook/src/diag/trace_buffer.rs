@@ -40,20 +40,24 @@ pub(crate) fn trace_line(line: &str) {
     if cfg!(debug_assertions) && FLUSHER_ALLOWED.load(Ordering::Acquire) {
         FLUSHER.call_once(start_flusher);
     }
+
     let sequence = SEQUENCE.fetch_add(1, Ordering::Relaxed);
     let millis = START.get_or_init(Instant::now).elapsed().as_millis();
     // SAFETY: `GetCurrentThreadId` takes no arguments and only reads the id of the calling thread.
     let thread = unsafe { GetCurrentThreadId() };
     let stamped = stamp(sequence, millis, thread, line);
+
     if cfg!(debug_assertions) {
         let mut recent = RECENT.lock().unwrap_or_else(PoisonError::into_inner);
         keep_last(&mut recent, stamped.clone(), RECENT_LINES);
     }
+
     let full = {
         let mut buffer = TRACE.lock().unwrap_or_else(PoisonError::into_inner);
         buffer.push(stamped);
         buffer.len() >= TRACE_BATCH
     };
+
     if full {
         flush_trace();
     }
@@ -67,6 +71,7 @@ fn stamp(sequence: u64, millis: u128, thread: u32, line: &str) -> String {
 /// Adds `line` as the newest of `lines`, and drops the oldest lines beyond `capacity`.
 fn keep_last(lines: &mut VecDeque<String>, line: String, capacity: usize) {
     lines.push_back(line);
+
     while lines.len() > capacity {
         lines.pop_front();
     }
@@ -87,6 +92,7 @@ pub(crate) fn allow_flusher() {
     FLUSHER_ALLOWED.store(true, Ordering::Release);
     // The lines of the install are written now: a short run can end before the trace thread has its first turn.
     flush_trace();
+
     if cfg!(debug_assertions) {
         FLUSHER.call_once(start_flusher);
     }
@@ -134,9 +140,11 @@ mod tests {
     #[test]
     fn the_oldest_lines_leave_the_ring_first() {
         let mut lines = VecDeque::new();
+
         for number in 0..5 {
             keep_last(&mut lines, number.to_string(), 3);
         }
+
         let kept: Vec<&str> = lines.iter().map(String::as_str).collect();
         assert_eq!(kept, ["2", "3", "4"]);
     }

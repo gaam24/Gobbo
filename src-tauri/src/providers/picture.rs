@@ -30,14 +30,19 @@ pub fn save_picture(
     if !url.starts_with("https://") {
         return None;
     }
+
     let name = format!("{stem}.{}", extension_of(url));
+
     if !is_picture_name(&name) {
         return None;
     }
+
     let target = images.join(&name);
+
     if saved_url == Some(url) && target.is_file() {
         return Some(name);
     }
+
     let part = crate::infra::http::download_part(
         images,
         url,
@@ -122,6 +127,7 @@ mod tests {
         let url = read_picture(&dir, "thunderstore-a-b.png").unwrap().unwrap();
         assert!(url.starts_with("data:image/png;base64,"), "{url}");
         assert_eq!(read_picture(&dir, "missing-x.png").unwrap(), None);
+
         for bad in ["../library.json", "nexus-107.exe", "", "a/b.png"] {
             assert_eq!(
                 read_picture(&dir, bad).unwrap_err().code,

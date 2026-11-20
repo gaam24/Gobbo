@@ -82,20 +82,26 @@ pub const fn blocker_of(input: &StageInput<'_>) -> Option<BlockerKey> {
         if input.needs_settings_dir {
             return Some(BlockerKey::GameAndSettings);
         }
+
         return Some(BlockerKey::GameFolder);
     }
+
     if input.needs_settings_dir && !input.settings_ready {
         return Some(BlockerKey::GameAndSettings);
     }
+
     if input.needs_mods_root && !input.mods_ready {
         return Some(BlockerKey::ModsFolder);
     }
+
     if !input.problems.is_empty() {
         return Some(BlockerKey::Problems);
     }
+
     if input.total == 0 || input.enabled == 0 {
         return Some(BlockerKey::NoMods);
     }
+
     None
 }
 
@@ -126,6 +132,7 @@ pub fn game_stage(input: StageInput<'_>) -> (GameStage, NextAction) {
             NextAction::SetGameFolder,
         );
     }
+
     if input.needs_settings_dir && !input.settings_ready {
         return (
             GameStage::Setup {
@@ -134,6 +141,7 @@ pub fn game_stage(input: StageInput<'_>) -> (GameStage, NextAction) {
             NextAction::SetSettingsFolder,
         );
     }
+
     if input.needs_mods_root && !input.mods_ready {
         return (
             GameStage::Setup {
@@ -142,6 +150,7 @@ pub fn game_stage(input: StageInput<'_>) -> (GameStage, NextAction) {
             NextAction::SetModsFolder,
         );
     }
+
     if !input.problems.is_empty() {
         return (
             GameStage::Blocked {
@@ -150,15 +159,18 @@ pub fn game_stage(input: StageInput<'_>) -> (GameStage, NextAction) {
             NextAction::FixProblems,
         );
     }
+
     if input.total == 0 {
         return (GameStage::Empty, NextAction::ImportMods);
     }
+
     if input.enabled == 0 {
         return (
             GameStage::NoEnabled { total: input.total },
             NextAction::EnableMods,
         );
     }
+
     if input.deployed && input.draft_changes > 0 {
         return (
             GameStage::Draft {
@@ -169,6 +181,7 @@ pub fn game_stage(input: StageInput<'_>) -> (GameStage, NextAction) {
             NextAction::Apply,
         );
     }
+
     if input.deployed {
         return (
             GameStage::Applied {
@@ -179,6 +192,7 @@ pub fn game_stage(input: StageInput<'_>) -> (GameStage, NextAction) {
             NextAction::Play,
         );
     }
+
     (
         GameStage::Ready {
             enabled: input.enabled,

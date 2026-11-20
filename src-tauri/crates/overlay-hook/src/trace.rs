@@ -11,6 +11,7 @@ pub(crate) fn call_with(operation: &str, detail: impl FnOnce() -> String) {
     if !diag::settings().calls {
         return;
     }
+
     let detail = detail();
     diag::count(operation, || detail.clone());
     trace(|| format!("call {operation} {detail} from {}", diag::caller()));
@@ -38,6 +39,7 @@ pub(crate) unsafe fn pass_through(
     if !diag::settings().pass_writes {
         return;
     }
+
     let name = unsafe { display_name(name) };
     log(&format!("pass-through {operation} {name} {}", detail()));
 }
@@ -47,6 +49,7 @@ pub(crate) fn trace_status(operation: &str, status: i32) {
     if !diag::settings().calls {
         return;
     }
+
     trace(|| format!("status {operation} 0x{:08x}", status as u32));
 }
 
@@ -56,6 +59,7 @@ pub(crate) fn trace_status_named(operation: &str, status: i32) {
     if !diag::settings().calls {
         return;
     }
+
     trace(|| format!("status {operation} 0x{:08x}", status as u32));
 }
 
@@ -65,6 +69,7 @@ pub(crate) fn trace_result(operation: &str, succeeded: bool, error: u32) {
     if !diag::settings().calls {
         return;
     }
+
     trace(|| format!("result {operation} succeeded={succeeded} error={error}"));
 }
 
@@ -73,6 +78,7 @@ pub(crate) fn trace(message: impl FnOnce() -> String) {
     if diag::settings().log.is_none() {
         return;
     }
+
     diag::trace_line(&message());
 }
 

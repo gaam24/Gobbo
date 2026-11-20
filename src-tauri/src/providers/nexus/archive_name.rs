@@ -31,10 +31,13 @@ pub fn parse_spaced(file_name: &str) -> Option<ArchiveName> {
     if at < 3 || words.len() - at > 2 {
         return None;
     }
+
     let id = words[at - 2];
+
     if id.is_empty() || !id.bytes().all(|b| b.is_ascii_digit()) {
         return None;
     }
+
     Some(ArchiveName {
         name: words[..at - 2].join(" "),
         mod_id: id.parse().ok()?,
@@ -58,16 +61,20 @@ fn is_timestamp(word: &str) -> bool {
 pub fn parse_dashed(file_name: &str) -> Option<ArchiveName> {
     let mut parts: Vec<&str> = strip_extension(file_name).split('-').collect();
     let stamp = parts.pop()?;
+
     if !(9..=11).contains(&stamp.len()) || !stamp.bytes().all(|b| b.is_ascii_digit()) {
         return None;
     }
+
     let at = (1..parts.len().saturating_sub(1)).find(|&i| {
         is_number(parts[i]) && parts[i + 1..].iter().all(|part| is_version_part(part))
     })?;
     let name = parts[..at].join("-").trim().to_string();
+
     if name.is_empty() {
         return None;
     }
+
     Some(ArchiveName {
         name,
         mod_id: parts[at].parse().ok()?,

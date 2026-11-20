@@ -16,6 +16,7 @@ pub fn newest_match(files: &[ModFile], archives: &[(String, String)]) -> Option<
         .map(|(_, name)| normalized_stem(name))
         .collect();
     let mut best: Option<((u8, usize, u32), usize, String)> = None;
+
     for (at, (file, file_norm)) in files.iter().zip(&file_names).enumerate() {
         for ((digest, name), archive_norm) in archives.iter().zip(&archive_names) {
             let Some((rank, length)) = archive_rank(&file.file_name, name, file_norm, archive_norm)
@@ -23,11 +24,13 @@ pub fn newest_match(files: &[ModFile], archives: &[(String, String)]) -> Option<
                 continue;
             };
             let key = (rank, length, file.file_id);
+
             if best.as_ref().is_none_or(|(known, _, _)| key > *known) {
                 best = Some((key, at, digest.clone()));
             }
         }
     }
+
     best.and_then(|(_, at, digest)| files.get(at).cloned().map(|file| (digest, file)))
 }
 
@@ -57,12 +60,15 @@ fn archive_rank(
     if file_norm.is_empty() || archive_norm.is_empty() {
         return None;
     }
+
     if file_name.eq_ignore_ascii_case(archive_name) {
         return Some((2, file_norm.len()));
     }
+
     if archive_norm == file_norm {
         return Some((1, file_norm.len()));
     }
+
     archive_norm
         .starts_with(file_norm)
         .then_some((0, file_norm.len()))

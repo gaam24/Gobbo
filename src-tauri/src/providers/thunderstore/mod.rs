@@ -57,9 +57,11 @@ impl SourceProvider for ThunderstoreProvider {
 
     fn page_url(&self, game_key: &str, mod_id: &str, _tab: Option<&str>) -> Option<String> {
         let (owner, name) = link::split_full_name(mod_id)?;
+
         if !is_slug(game_key, true) {
             return None;
         }
+
         Some(format!(
             "https://thunderstore.io/c/{game_key}/p/{owner}/{name}/"
         ))
@@ -120,9 +122,11 @@ impl SourceProvider for ThunderstoreProvider {
             Some(version) => version,
             None => read_newest(&request.source.mod_id)?.1.version_number,
         };
+
         if !link::is_version(&version) {
             return Err(api::bad_response("the version is not a version number"));
         }
+
         let path = download::download_into(request.directory, owner, name, &version, progress)?;
         Ok(SourceDownloaded {
             path,
@@ -154,6 +158,7 @@ impl SourceProvider for ThunderstoreProvider {
 /// whole check's.
 fn check_one(request: &SourceUpdateRequest) -> SourceUpdate {
     let mut update = SourceUpdate::new(request);
+
     match read_newest(&request.source.mod_id) {
         Ok((package, version)) => {
             update.state = update_state(
@@ -183,6 +188,7 @@ fn check_one(request: &SourceUpdateRequest) -> SourceUpdate {
         }
         Err(error) => update.error = Some(error),
     }
+
     update
 }
 

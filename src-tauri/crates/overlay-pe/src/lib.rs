@@ -68,7 +68,9 @@ fn imports_from(bytes: &[u8], import_rva: u32, import_size: u32) -> Result<Vec<I
     if import_rva == 0 || import_size == 0 {
         return Ok(Vec::new());
     }
+
     let mut result = Vec::new();
+
     for index in 0..=MAX_IMPORTS {
         let descriptor_rva = import_rva
             .checked_add(index.checked_mul(DESCRIPTOR_SIZE as u32).ok_or(Malformed)?)
@@ -82,18 +84,22 @@ fn imports_from(bytes: &[u8], import_rva: u32, import_size: u32) -> Result<Vec<I
             descriptor[14],
             descriptor[15],
         ]);
+
         if name_rva == 0 {
             break;
         }
+
         let name = read_name(bytes, name_rva).unwrap_or_default();
         result.push(Import {
             name,
             descriptor_rva,
         });
     }
+
     if result.len() > MAX_IMPORTS as usize {
         return Err(Malformed);
     }
+
     Ok(result)
 }
 
@@ -144,6 +150,7 @@ fn file_offset(bytes: &[u8], rva: u32) -> Option<usize> {
     let sections = usize::from(u16_at(bytes, file_header.checked_add(2)?).ok()?);
     let optional_size = usize::from(u16_at(bytes, file_header.checked_add(16)?).ok()?);
     let table = file_header.checked_add(20)?.checked_add(optional_size)?;
+
     for index in 0..sections {
         let section = table.checked_add(index.checked_mul(SECTION_SIZE)?)?;
         let virtual_size = u32_at(bytes, section.checked_add(8)?).ok()?;
@@ -151,12 +158,14 @@ fn file_offset(bytes: &[u8], rva: u32) -> Option<usize> {
         let raw_size = u32_at(bytes, section.checked_add(16)?).ok()?;
         let raw = u32_at(bytes, section.checked_add(20)?).ok()?;
         let size = virtual_size.max(raw_size);
+
         if rva >= virtual_address && rva < virtual_address.checked_add(size)? {
             return usize::try_from(raw)
                 .ok()?
                 .checked_add(usize::try_from(rva - virtual_address).ok()?);
         }
     }
+
     None
 }
 
@@ -224,6 +233,7 @@ mod tests {
         let section = optional + optional_size;
         let mut table = vec![0u8; descriptors];
         let mut tail = Vec::new();
+
         for (index, name) in names.iter().enumerate() {
             let name_rva = SECTION_RVA + (descriptors + tail.len()) as u32;
             tail.extend_from_slice(name.as_bytes());
@@ -231,6 +241,7 @@ mod tests {
             let at = index * DESCRIPTOR_SIZE;
             table[at + 12..at + 16].copy_from_slice(&name_rva.to_le_bytes());
         }
+
         let mut raw = table;
         raw.extend_from_slice(&tail);
         bytes[section..section + 8].copy_from_slice(b".idata\0\0");
@@ -396,9 +407,11 @@ mod tests {
             ) {
                 let mut bytes = image(pe32, &["kernel32.dll", "ntdll.dll"]);
                 let length = bytes.len();
+
                 for (at, value) in damage {
                     bytes[at % length] = value;
                 }
+
                 let _ = imports(&bytes);
                 let _ = is_pe32(&bytes);
             }

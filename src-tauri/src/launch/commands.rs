@@ -88,6 +88,7 @@ fn tool_exit_notice(
             let tasks = app.state::<TaskFlags>();
             tasks.finish(&key, tool_task_state(exit_code, cancelled));
         }
+
         let _ = app.emit(
             TOOL_EXITED_EVENT,
             tool_exit_payload(game.clone(), tool.clone(), exit_code, cancelled),
@@ -206,9 +207,11 @@ pub async fn stop_game(
 ) -> Result<bool, crate::error::AppError> {
     crate::commands::for_game(data, game, |root, game| {
         let stopped = crate::launch::start::stop_game(root, game)?;
+
         if stopped {
             super::report::mark_stopped(root, game);
         }
+
         Ok(stopped)
     })
     .await

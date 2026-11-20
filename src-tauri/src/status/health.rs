@@ -54,6 +54,7 @@ pub struct HealthReport {
 pub fn health(root: &Data, game_id: &str) -> Result<HealthReport, AppError> {
     let status = crate::status::status(root, game_id)?;
     let mut items = Vec::new();
+
     for (at, problem) in status.problems.iter().enumerate() {
         items.push(HealthItem {
             id: format!("problem:{at}:{}", problem.code),
@@ -62,6 +63,7 @@ pub fn health(root: &Data, game_id: &str) -> Result<HealthReport, AppError> {
             action: Some(action(HealthActionKind::ShowMods)),
         });
     }
+
     for (at, warning) in status.warnings.iter().enumerate() {
         items.push(HealthItem {
             id: format!("warning:{at}:{}", warning.code),
@@ -107,6 +109,7 @@ pub fn health(root: &Data, game_id: &str) -> Result<HealthReport, AppError> {
             action: Some(action(HealthActionKind::ShowMods)),
         });
     }
+
     if status.has_overwrite {
         items.push(HealthItem {
             id: "overwrite".to_string(),
@@ -115,6 +118,7 @@ pub fn health(root: &Data, game_id: &str) -> Result<HealthReport, AppError> {
             action: Some(action(HealthActionKind::OpenOverwrite)),
         });
     }
+
     if status.bisect.is_some() {
         items.push(HealthItem {
             id: "bisect".to_string(),
@@ -123,6 +127,7 @@ pub fn health(root: &Data, game_id: &str) -> Result<HealthReport, AppError> {
             action: Some(action(HealthActionKind::ShowMods)),
         });
     }
+
     let requirements: u32 = status
         .mods
         .iter()

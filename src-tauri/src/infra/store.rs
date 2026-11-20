@@ -45,11 +45,14 @@ pub fn remove_temp_files(dir: &Path) {
     let Ok(entries) = fs::read_dir(dir) else {
         return;
     };
+
     for entry in entries.flatten() {
         let path = entry.path();
+
         if path.extension().is_none_or(|ext| ext != "tmp") || !path.is_file() {
             continue;
         }
+
         if is_older_than(&entry, stale) {
             let _ = fs::remove_file(&path);
         }
@@ -94,9 +97,11 @@ pub(super) fn write_temp_atomic<E>(
         sync_parent(path).map_err(|e| error(path, e))?;
         Ok(())
     })();
+
     if result.is_err() {
         let _ = fs::remove_file(&tmp);
     }
+
     result
 }
 
@@ -131,6 +136,7 @@ pub fn replace_file_clean(from: &Path, to: &Path) -> Result<(), AppError> {
         let _ = fs::remove_file(from);
         return Err(io_at(to)(error));
     }
+
     Ok(())
 }
 
@@ -152,16 +158,19 @@ fn rename_replacing(from: &Path, to: &Path) -> io::Result<()> {
                 let _guard = RENAME_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
                 fs::rename(from, to)
             };
+
             match result {
                 Ok(()) => return Ok(()),
                 Err(error) => {
                     last = Some(error);
+
                     if attempt < 7 {
                         std::thread::sleep(std::time::Duration::from_millis(1 << attempt));
                     }
                 }
             }
         }
+
         Err(last.unwrap_or_else(|| io::Error::other("could not replace the file")))
     }
 }
@@ -226,10 +235,12 @@ pub fn clean_archives(archives: &Path, keep: &BTreeSet<String>) -> Result<(), Ap
         let entry = entry.map_err(io_at(archives))?;
         let path = entry.path();
         let name = entry.file_name().to_string_lossy().into_owned();
+
         if !keep.contains(&name) && !held.contains(&name) && path.is_file() {
             fs::remove_file(&path).map_err(io_at(&path))?;
         }
     }
+
     Ok(())
 }
 
@@ -314,6 +325,7 @@ mod tests {
         let dir = scratch!("clean");
         let archives = dir.join(ARCHIVES_DIR);
         fs::create_dir_all(&archives).unwrap();
+
         for name in ["keep.zip", "unused.zip", "orphan.zip", "half.zip.tmp"] {
             fs::write(archives.join(name), "zip bytes").unwrap();
         }

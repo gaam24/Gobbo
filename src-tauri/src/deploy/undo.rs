@@ -18,6 +18,7 @@ use crate::context::data::JOURNAL_FILE;
 pub fn undo(roots: &JournalRoots) -> Result<Vec<Message>, DeployError> {
     let journal = Journal::new(roots.state.join(JOURNAL_FILE));
     let entries = journal.read()?;
+
     if entries.is_empty() {
         return Err(DeployError::NothingToUndo);
     }
@@ -32,6 +33,7 @@ pub fn undo(roots: &JournalRoots) -> Result<Vec<Message>, DeployError> {
     // matches (a file replaced by a folder, a locked file) must not leave the whole deployment stuck: record it, keep
     // going, and retire the journal so the next apply can start clean.
     let mut warnings = Vec::new();
+
     for entry in entries.iter().rev() {
         match entry {
             Entry::FileDeployed { path } => {
@@ -48,9 +50,11 @@ pub fn undo(roots: &JournalRoots) -> Result<Vec<Message>, DeployError> {
             Entry::SettingsSections { .. } => {}
         }
     }
+
     if let Err(error) = undo_settings(&entries) {
         warnings.push(Message::new("undo.settings_failed").with("detail", error));
     }
+
     journal.remove()?;
     Ok(warnings)
 }
@@ -71,9 +75,11 @@ fn undo_settings(entries: &[Entry]) -> Result<(), DeployError> {
         } => Some((path, *existed, touched)),
         _ => None,
     });
+
     if let Some((path, existed, touched)) = sections {
         revert_sections(path, existed, touched)?;
     }
+
     Ok(())
 }
 
@@ -87,17 +93,22 @@ fn revert_sections(
     let Some(now) = settings::read(path)? else {
         return Ok(());
     };
+
     if touched.is_empty() {
         return Ok(());
     }
+
     let text = settings::revert(&now, touched);
+
     if !existed && text.is_empty() {
         return crate::infra::fs::remove_file_if_exists(path)
             .map_err(|error| FileError::new(path, error).into());
     }
+
     if text == now {
         return Ok(());
     }
+
     settings::write(path, &text)
 }
 

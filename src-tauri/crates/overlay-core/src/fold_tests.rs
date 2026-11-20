@@ -65,6 +65,7 @@ mod tests {
         let name = copy_temp_name(4242, 7);
         assert_eq!(name, ".gobbo-copy-4242-7.tmp");
         assert!(is_copy_temp_name(&name));
+
         for other in [
             ".gobbo-copy-x-7.tmp",
             ".gobbo-copy-4242-.tmp",

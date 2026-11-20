@@ -45,6 +45,7 @@ pub fn lock_state(root: &Path) -> Result<StateLock, AppError> {
         depth.set(held + 1);
         held > 0
     });
+
     if nested {
         return Ok(StateLock { _file: None });
     }
@@ -65,11 +66,13 @@ pub fn lock_state(root: &Path) -> Result<StateLock, AppError> {
     };
     let mut result = file.try_lock();
     let mut attempt = 1;
+
     while attempt < RETRIES && matches!(&result, Err(std::fs::TryLockError::WouldBlock)) {
         std::thread::sleep(RETRY_DELAY);
         result = file.try_lock();
         attempt += 1;
     }
+
     match result {
         Ok(()) => Ok(StateLock { _file: Some(file) }),
         Err(std::fs::TryLockError::WouldBlock) => {

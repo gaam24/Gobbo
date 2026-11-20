@@ -48,9 +48,11 @@ fn checked_family(checked_at: Option<u32>) -> Family {
 
 fn library_with(versions: Vec<ModVersion>, family: Family) -> Library {
     let mut library = Library::default();
+
     for version in versions {
         library.versions.insert(version.folder.clone(), version);
     }
+
     library.families.insert(family.id.clone(), family);
     library
 }

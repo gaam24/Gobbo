@@ -213,9 +213,11 @@ pub fn bad_archive(detail: impl ToString) -> AppError {
 impl std::fmt::Display for AppError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.code)?;
+
         for (key, value) in &self.params {
             write!(f, " {key}={value:?}")?;
         }
+
         Ok(())
     }
 }

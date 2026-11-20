@@ -265,6 +265,7 @@ pub fn resolve(
     env_override: Option<PathBuf>,
 ) -> Resolved {
     let marker = portable_marker(exe_dir).is_file();
+
     if let Some(root) = env_override {
         return Resolved::Known(StorageLocation {
             mode: StorageMode::Custom,
@@ -275,6 +276,7 @@ pub fn resolve(
     }
 
     let local_file = local_decision_file(exe_dir);
+
     if let Some(mode) = read_decision(&local_file) {
         match mode {
             DecisionMode::Portable => {
@@ -291,10 +293,12 @@ pub fn resolve(
 
     if let Some(global) = global_root {
         let global_file = global_decision_file(global);
+
         if let Some(mode) = read_decision(&global_file) {
             if mode == DecisionMode::Global {
                 return Resolved::Known(global_location(global, &global_file, marker));
             }
+
             eprintln!(
                 "gobbo: {} asks for the portable folder; only the decision next to the program can do that",
                 global_file.display()
@@ -326,6 +330,7 @@ fn commit_portable(context: &PromptContext) -> Result<StorageLocation, AppError>
         return Err(AppError::new("storage.portable_unavailable")
             .with("path", context.portable_root.display()));
     }
+
     fs::create_dir_all(&context.portable_root).map_err(io_at(&context.portable_root))?;
     write_decision(&context.local_decision_file, DecisionMode::Portable)?;
     Ok(portable_location(
@@ -349,6 +354,7 @@ fn commit_global(context: &PromptContext) -> Result<StorageLocation, AppError> {
             context.portable_marker,
         ));
     }
+
     let Some(global_file) = &context.global_decision_file else {
         return Err(AppError::user("storage.global_unavailable"));
     };
@@ -366,12 +372,15 @@ pub fn default_root(context: &PromptContext) -> Result<PathBuf, AppError> {
     if context.default_mode == StorageMode::Portable && context.portable_available {
         return Ok(context.portable_root.clone());
     }
+
     if let Some(global) = &context.global_root {
         return Ok(global.clone());
     }
+
     if context.portable_available {
         return Ok(context.portable_root.clone());
     }
+
     Err(AppError::user("settings.appdata_missing"))
 }
 
@@ -379,6 +388,7 @@ pub fn default_root(context: &PromptContext) -> Result<PathBuf, AppError> {
 pub fn root_for_cli() -> Result<PathBuf, AppError> {
     let exe_dir = exe_dir()?;
     let global = global_root().ok();
+
     match resolve(&exe_dir, global.as_deref(), env_override()) {
         Resolved::Known(location) => Ok(location.root),
         Resolved::Choice(context) => default_root(&context),

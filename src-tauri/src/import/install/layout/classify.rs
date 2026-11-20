@@ -5,6 +5,7 @@ use super::plan::MirrorRule;
 /// The game path of a file under `rule`, in the definition's spelling.
 pub(super) fn mirror_path(rule: &MirrorRule<'_>, parts: &[&str]) -> String {
     let mut rel = vec![rule.mirror.dir.clone()];
+
     match &parts[rule.dir.len()..] {
         [folder, inner @ ..] if !inner.is_empty() => {
             let prefixed = starts_with_ignore_case(folder, &rule.mirror.prefix);
@@ -17,6 +18,7 @@ pub(super) fn mirror_path(rule: &MirrorRule<'_>, parts: &[&str]) -> String {
         }
         rest => rel.extend(rest.iter().map(|part| (*part).to_string())),
     }
+
     rel.join("/")
 }
 
@@ -26,6 +28,7 @@ pub(super) fn extension_allowed(parts: &[&str], extensions: &[String]) -> bool {
     if extensions.is_empty() {
         return true;
     }
+
     let Some(name) = parts.last() else {
         return false;
     };

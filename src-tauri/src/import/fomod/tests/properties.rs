@@ -68,14 +68,17 @@ proptest! {
         damage in proptest::collection::vec((any::<usize>(), any::<char>()), 1..16),
     ) {
         let mut chars: Vec<char> = CONFIG.chars().collect();
+
         for (at, value) in damage {
             let at = at % (chars.len() + 1);
+
             if at == chars.len() {
                 chars.push(value);
             } else {
                 chars[at] = value;
             }
         }
+
         let text: String = chars.into_iter().collect();
         let _ = parse(&text);
     }

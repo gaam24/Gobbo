@@ -51,9 +51,11 @@ pub fn game_paths(game: &GameDef, settings: &Settings) -> Vec<String> {
     if game.profile_data.is_empty() {
         return Vec::new();
     }
+
     if settings.game_root.trim().is_empty() {
         return Vec::new();
     }
+
     let context = path_context(game, settings);
     game.profile_data
         .iter()
@@ -77,8 +79,10 @@ pub fn paths(game: &GameDef, settings: &Settings) -> Vec<String> {
             .map(|path| path.trim().to_string())
             .filter(|path| !path.is_empty()),
     );
+
     if let Some(file) = settings_file(game, settings) {
         let path = file.display().to_string();
+
         if !path.is_empty() {
             paths.push(path);
         }
@@ -105,6 +109,7 @@ fn inside_user_data(game: &GameDef, settings: &Settings, path: &Path) -> bool {
     if game.user_data.is_empty() {
         return false;
     }
+
     let context = path_context(game, settings);
     game.user_data.iter().any(|set| {
         context
@@ -140,13 +145,17 @@ pub fn capture_settings(
     let Some(file) = settings_file(game, settings) else {
         return Ok(());
     };
+
     if inside_user_data(game, settings, &file) {
         return Ok(());
     }
+
     let path = file.display().to_string();
+
     if path.is_empty() {
         return Ok(());
     }
+
     store::capture(&[Entry {
         store: store_path(data, profile, &path),
         real: file,

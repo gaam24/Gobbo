@@ -136,6 +136,7 @@ pub(in crate::status) fn mod_view(
 fn requirement_groups(family: &Family) -> Vec<Vec<String>> {
     let mut groups: Vec<Vec<String>> = Vec::new();
     let mut keys: Vec<Option<(String, u32)>> = Vec::new();
+
     for requirement in &family.requirements {
         let key = requirement
             .group
@@ -147,9 +148,11 @@ fn requirement_groups(family: &Family) -> Vec<Vec<String>> {
             groups[index].push(requirement.name.clone());
             continue;
         }
+
         keys.push(key);
         groups.push(vec![requirement.name.clone()]);
     }
+
     groups
 }
 

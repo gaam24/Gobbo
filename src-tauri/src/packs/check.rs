@@ -33,12 +33,15 @@ pub fn check_pack(
     let steps = crate::launch::steps::load_mod_steps(&data)?;
     let mut issues = Vec::new();
     let issue = |error: bool, message: Message| PackIssue { error, message };
+
     if options.info.name.trim().is_empty() || options.info.version.trim().is_empty() {
         issues.push(issue(true, Message::new("pack.check.info")));
     }
+
     for id in &options.profiles {
         let profile = profiles.get(id)?;
         let listed = crate::library::mods_of(profile, &library, &game);
+
         for entry in &profile.mods {
             let name = library
                 .families
@@ -54,6 +57,7 @@ pub fn check_pack(
                 .get(&entry.id)
                 .is_some_and(|family| !family.sources.is_empty());
             let travels = archive.is_some() && options.archives != PackArchives::None;
+
             if !has_source && !travels {
                 issues.push(issue(
                     true,
@@ -68,19 +72,23 @@ pub fn check_pack(
         }
         // Check the pack form too: a group whose members fall outside the mod list cannot be rebuilt.
         let pack = super::export::pack_profile(&data, &library, &steps, profile);
+
         for problem in group_issues(&pack) {
             issues.push(issue(
                 problem.error,
                 problem.message.with("profile", &profile.name),
             ));
         }
+
         issues.extend(
             relation_warnings(&library, &view, &listed)
                 .into_iter()
                 .map(|message| issue(false, message.with("profile", &profile.name))),
         );
+
         if is_ready(&game, &settings, profile, &data.profile_state(&profile.id)) {
             let inputs = library.inputs(&listed);
+
             if let Ok(plan) = build_plan_with_mode(
                 &data,
                 &game,
@@ -110,6 +118,7 @@ pub fn check_pack(
             }
         }
     }
+
     Ok(issues)
 }
 

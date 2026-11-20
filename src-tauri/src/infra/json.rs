@@ -67,9 +67,11 @@ pub fn keep_broken(path: &Path, error: &impl std::fmt::Display) {
 /// name; later ones get a suffix, so a second broken file cannot overwrite the first.
 pub fn broken_path(path: &Path) -> PathBuf {
     let first = path.with_extension("json.broken");
+
     if !first.exists() {
         return first;
     }
+
     sibling_named(path, |name| {
         format!("{name}.broken-{}", super::store::unique_suffix())
     })
@@ -82,6 +84,7 @@ pub fn write_json<T: Serialize>(path: &Path, value: &T) -> Result<(), AppError> 
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(io_at(parent))?;
     }
+
     write_temp_atomic(
         path,
         |file, tmp| {

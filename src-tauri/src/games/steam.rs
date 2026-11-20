@@ -77,11 +77,13 @@ pub fn compat_tool(config: &str, app_id: &str) -> Option<String> {
     let mut tools: HashMap<String, String> = HashMap::new();
     let mut depth = 0usize;
     let mut app: Option<String> = None;
+
     for line in lines {
         match line {
             "{" => depth += 1,
             "}" => {
                 depth = depth.saturating_sub(1);
+
                 if depth == 0 {
                     break;
                 }
@@ -97,5 +99,6 @@ pub fn compat_tool(config: &str, app_id: &str) -> Option<String> {
             },
         }
     }
+
     tools.get(app_id).or_else(|| tools.get("0")).cloned()
 }

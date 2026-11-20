@@ -58,13 +58,17 @@ impl Profiles {
                 .with("supported", crate::domain::STATE_SCHEMA)
                 .kind(ErrorKind::Permanent));
         }
+
         self.schema_version = crate::domain::STATE_SCHEMA;
+
         if self.profiles.is_empty() {
             return Err(AppError::new("profiles.no_profiles").kind(ErrorKind::Permanent));
         }
+
         if !self.profiles.iter().any(|p| p.id == self.active) {
             self.active = self.profiles[0].id.clone();
         }
+
         Ok(self)
     }
 
@@ -131,13 +135,17 @@ impl Profiles {
             .unwrap_or_default();
         let id = self.next_id();
         let mut profile = Profile::new(id.clone(), name, Vec::new());
+
         if let Some(state) = list {
             profile.restore_list(state);
         }
+
         profile.collections = collections;
+
         if let Some(user_data) = user_data {
             profile.user_data = user_data;
         }
+
         profile.pack = pack;
         self.profiles.push(profile);
         Ok(id)
@@ -147,22 +155,28 @@ impl Profiles {
     pub fn rename(&mut self, id: &str, name: &str) -> Result<(), AppError> {
         self.get(id)?;
         let name = self.checked_name(name, Some(id))?;
+
         if let Some(profile) = self.profiles.iter_mut().find(|p| p.id == id) {
             profile.name = name;
         }
+
         Ok(())
     }
 
     /// Deletes a profile. The last one cannot be deleted. When the active one goes, the first one becomes active.
     pub fn delete(&mut self, id: &str) -> Result<(), AppError> {
         self.get(id)?;
+
         if self.profiles.len() == 1 {
             return Err(AppError::user("profiles.last_profile"));
         }
+
         self.profiles.retain(|p| p.id != id);
+
         if self.active == id {
             self.active = self.profiles[0].id.clone();
         }
+
         Ok(())
     }
 
@@ -212,6 +226,7 @@ impl Profiles {
 
     fn remap_entries(&mut self, mut map: impl FnMut(&Entry) -> Option<String>) -> bool {
         let mut changed = false;
+
         for profile in &mut self.profiles {
             for entries in [&mut profile.mods, &mut profile.deployed_mods] {
                 for entry in entries.iter_mut() {
@@ -222,17 +237,20 @@ impl Profiles {
                         changed = true;
                     }
                 }
+
                 let mut seen = std::collections::BTreeSet::new();
                 let before = entries.len();
                 entries.retain(|entry| seen.insert(entry.id.clone()));
                 changed |= entries.len() != before;
             }
         }
+
         changed
     }
 
     fn remap_winners(&mut self, mut map: impl FnMut(&str) -> Option<String>) -> bool {
         let mut changed = false;
+
         for profile in &mut self.profiles {
             for winners in [&mut profile.winners, &mut profile.deployed_winners] {
                 for family in winners.values_mut() {
@@ -245,6 +263,7 @@ impl Profiles {
                 }
             }
         }
+
         changed
     }
 
@@ -252,15 +271,19 @@ impl Profiles {
     /// `except` is the profile that is being renamed, so it may keep its own name.
     fn checked_name(&self, name: &str, except: Option<&str>) -> Result<String, AppError> {
         let name = name.trim();
+
         if name.is_empty() {
             return Err(AppError::user("profiles.name_empty"));
         }
+
         if name.chars().count() > MAX_NAME_CHARS {
             return Err(AppError::user("profiles.name_too_long").with("max", MAX_NAME_CHARS));
         }
+
         if self.name_taken(name, except) {
             return Err(AppError::user("profiles.name_taken").with("name", name));
         }
+
         Ok(name.to_string())
     }
 

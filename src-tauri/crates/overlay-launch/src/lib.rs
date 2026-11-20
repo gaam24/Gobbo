@@ -121,10 +121,13 @@ impl Hooked {
             if WaitForSingleObject(self.process, INFINITE) == u32::MAX {
                 return Err(io::Error::last_os_error());
             }
+
             let mut code = 0;
+
             if GetExitCodeProcess(self.process, &mut code) == FALSE {
                 return Err(io::Error::last_os_error());
             }
+
             Ok(code)
         }
     }
@@ -162,10 +165,12 @@ pub fn spawn_hooked(launch: &Launch) -> io::Result<Hooked> {
     // of Gobbo would reach the game.
     let inherited: Vec<HANDLE> = output.into_iter().chain(input).collect();
     let _inheritable = Inheritable::new(&inherited)?;
+
     unsafe {
         let mut startup: STARTUPINFOW = std::mem::zeroed();
         startup.cb = size_of::<STARTUPINFOW>() as u32;
         let mut list = None;
+
         if output.is_some() {
             startup.dwFlags = STARTF_USESTDHANDLES;
             startup.hStdOutput = output.unwrap_or_default();
@@ -173,6 +178,7 @@ pub fn spawn_hooked(launch: &Launch) -> io::Result<Hooked> {
             startup.hStdInput = input.unwrap_or_default();
             list = Some(HandleList::new(&inherited)?);
         }
+
         let mut extended: STARTUPINFOEXW = std::mem::zeroed();
         extended.StartupInfo = startup;
         extended.StartupInfo.cb = size_of::<STARTUPINFOEXW>() as u32;
@@ -208,6 +214,7 @@ pub fn spawn_hooked(launch: &Launch) -> io::Result<Hooked> {
         timings.create_process_us = micros(started);
         // Read before anything else runs, so the error is the one the start left.
         let start_error = io::Error::last_os_error();
+
         if created == FALSE {
             return Err(start_error);
         }
@@ -247,6 +254,7 @@ pub fn spawn_hooked(launch: &Launch) -> io::Result<Hooked> {
         // The early redirect is patched before the loader runs, so the loader's first file calls already see the layer.
         // A 32-bit program takes the x86 DLL and its own stub shape.
         let started = Instant::now();
+
         if let Some(early) = launch.early.as_ref() {
             let bits = if wow64 {
                 stage0::Bits::X86
@@ -260,11 +268,13 @@ pub fn spawn_hooked(launch: &Launch) -> io::Result<Hooked> {
                 );
                 stop_suspended(&info, error)
             })?;
+
             if let Err(error) = std::fs::write(early.handover, patched.handover()) {
                 eprintln!("gobbo: cannot write the early redirect handover: {error}");
                 return Err(stop_suspended(&info, error));
             }
         }
+
         timings.stage0_us = micros(started);
         // The event is created before the hook can signal it. The hook signals after its hooks are installed.
         let started = Instant::now();
@@ -282,6 +292,7 @@ pub fn spawn_hooked(launch: &Launch) -> io::Result<Hooked> {
             // `info` is the process and thread `CreateProcessW` returned; the thread is suspended.
             inject_early(info.hProcess, info.hThread, hook)
         };
+
         if let Err(error) = injected {
             eprintln!(
                 "gobbo: the hook failed in pid {}, stopping the game: {error}",
@@ -289,11 +300,13 @@ pub fn spawn_hooked(launch: &Launch) -> io::Result<Hooked> {
             );
             return Err(stop_suspended(&info, error));
         }
+
         timings.inject_us = micros(started);
         // The loader resolves the program's static imports after this function resumes the thread. Point the descriptors
         // whose DLL is in the mod layer at the layer path, so the loader does not look for a file in the game folder.
         // `info` is the suspended process `CreateProcessW` returned.
         let started = Instant::now();
+
         if let Err(error) = static_imports::rewrite(info.hProcess, launch.program, launch.imports) {
             eprintln!(
                 "gobbo: the static imports of pid {} could not be redirected: {error}",
@@ -301,19 +314,23 @@ pub fn spawn_hooked(launch: &Launch) -> io::Result<Hooked> {
             );
             return Err(stop_suspended(&info, error));
         }
+
         eprintln!(
             "gobbo: hook stub in pid {}, resuming the game",
             info.dwProcessId
         );
         timings.imports_us = micros(started);
         let started = Instant::now();
+
         if ResumeThread(info.hThread) == u32::MAX {
             // A game that stays suspended would never show a window: it is stopped with the error instead.
             let error = io::Error::last_os_error();
             return Err(stop_suspended(&info, error));
         }
+
         timings.resume_us = micros(started);
         let started = Instant::now();
+
         if let Err(error) = ready.wait(info.hProcess) {
             eprintln!(
                 "gobbo: the hook did not become ready in pid {}, stopping the game: {error}",
@@ -321,6 +338,7 @@ pub fn spawn_hooked(launch: &Launch) -> io::Result<Hooked> {
             );
             return Err(stop_suspended(&info, error));
         }
+
         timings.ready_wait_us = micros(started);
         CloseHandle(info.hThread);
         Ok(Hooked {
@@ -337,6 +355,7 @@ struct Inheritable(Vec<HANDLE>);
 impl Inheritable {
     fn new(handles: &[HANDLE]) -> io::Result<Self> {
         let mut marked = Self(Vec::new());
+
         for &handle in handles {
             // SAFETY: the handle is one Gobbo opened; `SetHandleInformation` only changes its inheritance flag.
             if unsafe { SetHandleInformation(handle, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT) }
@@ -344,8 +363,10 @@ impl Inheritable {
             {
                 return Err(io::Error::last_os_error());
             }
+
             marked.0.push(handle);
         }
+
         Ok(marked)
     }
 }
@@ -386,9 +407,11 @@ impl HandleList {
                 null_mut(),
             )
         };
+
         if updated == FALSE {
             return Err(io::Error::last_os_error());
         }
+
         Ok(list)
     }
 
@@ -409,6 +432,7 @@ impl Drop for HandleList {
 /// sets the context and exits; the caller resumes the thread and waits for the hook's readiness event.
 pub fn inject32(pid: u32, tid: u32, hook: &Path) -> io::Result<()> {
     let helper = hook.with_file_name("gobbo_overlay_inject32.exe");
+
     if !helper.is_file() {
         return Err(io::Error::new(
             io::ErrorKind::NotFound,
@@ -418,6 +442,7 @@ pub fn inject32(pid: u32, tid: u32, hook: &Path) -> io::Result<()> {
             ),
         ));
     }
+
     let status = std::process::Command::new(&helper)
         .arg(pid.to_string())
         .arg(tid.to_string())
@@ -428,6 +453,7 @@ pub fn inject32(pid: u32, tid: u32, hook: &Path) -> io::Result<()> {
             "the 32-bit overlay injector failed in pid {pid} ({status})"
         )));
     }
+
     Ok(())
 }
 
@@ -441,6 +467,7 @@ pub unsafe fn is_wow64(process: HANDLE) -> io::Result<bool> {
     if unsafe { IsWow64Process(process, &mut wow64) } == FALSE {
         return Err(io::Error::last_os_error());
     }
+
     Ok(wow64 != FALSE)
 }
 
@@ -452,6 +479,7 @@ fn stop_suspended(info: &PROCESS_INFORMATION, error: io::Error) -> io::Error {
         CloseHandle(info.hThread);
         CloseHandle(info.hProcess);
     }
+
     error
 }
 
@@ -464,12 +492,15 @@ impl ReadyEvent {
     fn create(process: HANDLE) -> io::Result<Self> {
         // SAFETY: `GetProcessId` only reads the id of the process handle.
         let pid = unsafe { GetProcessId(process) };
+
         if pid == 0 {
             return Err(io::Error::last_os_error());
         }
+
         let name = ready_event_name(pid);
         // SAFETY: `name` is a NUL-terminated name and the event is ours; it is closed by `Drop`.
         let event = unsafe { CreateEventW(null(), TRUE, FALSE, name.as_ptr()) };
+
         if event.is_null() {
             return Err(io::Error::last_os_error());
         }
@@ -522,10 +553,12 @@ pub fn ready_event_name(pid: u32) -> Vec<u16> {
 /// The command line: the program and each argument, quoted so that spaces and quotes survive.
 fn command_line(program: &Path, args: &[String]) -> Vec<u16> {
     let mut line = quote(&program.display().to_string());
+
     for arg in args {
         line.push(' ');
         line.push_str(&quote_argument(arg));
     }
+
     wide(OsStr::new(&line))
 }
 
@@ -544,6 +577,7 @@ fn quote_argument(arg: &str) -> String {
 fn quote(arg: &str) -> String {
     let mut out = String::from("\"");
     let mut backslashes = 0;
+
     for character in arg.chars() {
         match character {
             '\\' => backslashes += 1,
@@ -559,6 +593,7 @@ fn quote(arg: &str) -> String {
             }
         }
     }
+
     out.extend(std::iter::repeat_n('\\', backslashes * 2));
     out.push('"');
     out
@@ -584,6 +619,7 @@ fn environment_block(extra: &[(String, String)]) -> Vec<u16> {
         block.extend(value.encode_wide());
         block.push(0);
     }
+
     block.push(0);
     block
 }

@@ -88,14 +88,17 @@ pub fn conflicts(root: &Data, game_id: &str) -> Result<ConflictExplorer, AppErro
         .collect();
     let mut sizes: HashMap<&str, u32> = HashMap::new();
     let library_root = data.library();
+
     if !conflicts.is_empty() {
         for file in &plan.files {
             let Some(conflict) = suffix_match(&conflicts, &file.dest) else {
                 continue;
             };
+
             if plan.family(file) != conflict.winner {
                 continue;
             }
+
             let source = library_root
                 .join(plan.folder(file))
                 .join(plan.rel_path(file));
@@ -137,6 +140,7 @@ fn suffix_match<'a>(
     if let Some(conflict) = conflicts.get(&path_key(destination)) {
         return Some(conflict);
     }
+
     destination
         .match_indices('/')
         .find_map(|(at, _)| conflicts.get(&path_key(&destination[at + 1..])).copied())
@@ -176,9 +180,11 @@ pub fn preview(
         .collect();
     let source = plan.files.iter().find_map(|file| {
         let conflict = suffix_match(&conflicts, &file.dest)?;
+
         if path_key(&conflict.path) != wanted || plan.family(file) != family {
             return None;
         }
+
         Some(
             data.library()
                 .join(plan.folder(file))

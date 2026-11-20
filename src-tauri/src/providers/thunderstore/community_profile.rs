@@ -16,21 +16,26 @@ pub struct CommunityMod {
 pub fn parse_mods(text: &str) -> Vec<CommunityMod> {
     let mut mods = Vec::new();
     let mut current: Option<Pending> = None;
+
     for line in text.lines() {
         let trimmed = line.trim();
+
         if trimmed.is_empty() || trimmed.starts_with('#') {
             continue;
         }
+
         if let Some(name) = trimmed.strip_prefix("- name:") {
             if let Some(pending) = current.take() {
                 mods.push(pending.finish());
             }
+
             current = Some(Pending {
                 name: unquote(name),
                 ..Pending::default()
             });
             continue;
         }
+
         let Some(pending) = current.as_mut() else {
             continue;
         };
@@ -38,6 +43,7 @@ pub fn parse_mods(text: &str) -> Vec<CommunityMod> {
             continue;
         };
         let value = unquote(value);
+
         match key.trim() {
             "major" => pending.major = Some(value),
             "minor" => pending.minor = Some(value),
@@ -47,9 +53,11 @@ pub fn parse_mods(text: &str) -> Vec<CommunityMod> {
             _ => {}
         }
     }
+
     if let Some(pending) = current {
         mods.push(pending.finish());
     }
+
     mods.retain(|item| !item.name.is_empty());
     mods
 }

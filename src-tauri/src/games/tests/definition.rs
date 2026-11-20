@@ -16,11 +16,14 @@ fn a_game_id_never_becomes_a_path_outside_the_definitions() {
 #[test]
 fn every_game_folder_holds_a_valid_definition_with_its_own_id() {
     let dir = Path::new(DEV_GAMES_DIR);
+
     for entry in std::fs::read_dir(dir).unwrap() {
         let path = entry.unwrap().path();
+
         if !path.is_dir() {
             continue;
         }
+
         let game = read_definition(&path.join("game.toml"), Path::new(DEV_LOADERS_DIR))
             .unwrap_or_else(|e| panic!("{}: {e}", path.display()));
         assert!(
@@ -41,6 +44,7 @@ fn every_game_folder_holds_a_valid_definition_with_its_own_id() {
 #[test]
 fn load_dir_reads_every_game_folder_and_skips_the_template() {
     let base = scratch!("load-dir");
+
     for (folder, id) in [
         ("zeta", "zeta"),
         ("alpha", "alpha"),
@@ -70,6 +74,7 @@ fn cyberpunk_2077_accepts_new_loader_files_and_framework_folders() {
     ));
     let game = read_definition(path, Path::new(DEV_LOADERS_DIR)).expect("the shipped definition");
     assert!(game.deploy.full_root);
+
     for file in [
         "bin/x64/global.ini",
         "bin/x64/version.dll",
@@ -82,6 +87,7 @@ fn cyberpunk_2077_accepts_new_loader_files_and_framework_folders() {
             "{file} must keep its game path"
         );
     }
+
     assert_eq!(
         game.deploy.move_destination("loose.archive").as_deref(),
         Some("archive/pc/mod/loose.archive")

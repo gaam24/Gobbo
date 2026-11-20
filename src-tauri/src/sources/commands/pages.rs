@@ -14,9 +14,11 @@ fn open_source_page_now(
     tab: Option<&str>,
 ) -> Result<(), AppError> {
     let provider = providers::require(provider_id)?;
+
     if !provider.capabilities().deep_link {
         return Err(providers::unsupported_by(provider_id));
     }
+
     let url = provider
         .page_url(game_key, mod_id, tab)
         .ok_or_else(|| providers::bad_link().with("provider", provider_id))?;

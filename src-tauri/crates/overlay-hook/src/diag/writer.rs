@@ -21,6 +21,7 @@ pub(super) fn write_file(path: &Path, text: &str) -> std::io::Result<()> {
     if let Some(folder) = path.parent() {
         fs::create_dir_all(folder)?;
     }
+
     fs::write(path, text)
 }
 
@@ -29,16 +30,20 @@ pub(super) fn write_lines(path: &Path, lines: &[String]) {
     if lines.is_empty() {
         return;
     }
+
     let mut text = String::new();
+
     for line in lines {
         text.push_str(line);
         text.push('\n');
     }
+
     let written = if cfg!(debug_assertions) {
         write_kept_open(path, &text)
     } else {
         append_file(path, &text)
     };
+
     if written.is_err() {
         DROPPED_LINES.fetch_add(lines.len() as u64, Ordering::Relaxed);
     }
@@ -62,9 +67,11 @@ fn write_kept_open(path: &Path, text: &str) -> std::io::Result<()> {
         *file = None;
         let _ = fs::rename(path, rotated_name(path));
     }
+
     if file.is_none() {
         *file = Some(open_append(path)?);
     }
+
     match file.as_mut() {
         Some(file) => file.write_all(text.as_bytes()),
         None => Ok(()),
@@ -81,6 +88,7 @@ fn open_append(path: &Path) -> std::io::Result<fs::File> {
     if let Some(folder) = path.parent() {
         fs::create_dir_all(folder)?;
     }
+
     fs::OpenOptions::new().create(true).append(true).open(path)
 }
 

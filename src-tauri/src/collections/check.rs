@@ -17,6 +17,7 @@ pub fn check(root: &Data, game_id: &str, profile_id: &str) -> Result<(), AppErro
     // the write, so a list edit made while the providers answered is not overwritten.
     let origins = load_profiles(&data)?.get(profile_id)?.collections.clone();
     let mut answers = Vec::with_capacity(origins.len());
+
     for origin in &origins {
         match read_latest(origin) {
             Ok(latest) => answers.push((origin.key(), latest)),
@@ -27,12 +28,15 @@ pub fn check(root: &Data, game_id: &str, profile_id: &str) -> Result<(), AppErro
             )),
         }
     }
+
     let _guard = lock_profiles();
     let mut profiles = load_profiles(&data)?;
     let changed = record_latest(&mut profiles.get_mut(profile_id)?.collections, &answers);
+
     if changed {
         save_profiles(&data, &profiles)?;
     }
+
     Ok(())
 }
 
@@ -55,6 +59,7 @@ fn read_latest(origin: &CollectionOrigin) -> Result<u32, AppError> {
 /// installed revision, the exclusions or the records of what the collection added.
 fn record_latest(origins: &mut [CollectionOrigin], answers: &[(String, u32)]) -> bool {
     let mut changed = false;
+
     for (key, latest) in answers {
         if let Some(origin) = origins.iter_mut().find(|origin| &origin.key() == key)
             && origin.latest_revision != *latest
@@ -63,6 +68,7 @@ fn record_latest(origins: &mut [CollectionOrigin], answers: &[(String, u32)]) ->
             changed = true;
         }
     }
+
     changed
 }
 

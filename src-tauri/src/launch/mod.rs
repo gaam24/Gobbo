@@ -59,6 +59,7 @@ fn finish_launch(data: &Data, game: &GameDef, settings: &Settings, state_root: &
     if let Err(error) = saved {
         crate::infra::log::error(format!("could not save the profile state: {error}"));
     }
+
     report::update(data, |report| report.finished_at = Some(now_seconds()));
 }
 

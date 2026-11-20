@@ -21,13 +21,17 @@ pub fn adjacent(name: &str) -> Option<PathBuf> {
 /// the search can be tested against a synthetic Cargo layout without depending on where the test runner lives.
 fn find_from(dir: &Path, name: &str) -> Option<PathBuf> {
     let mut dir = Some(dir);
+
     for _ in 0..=MAX_PARENTS {
         let candidate = dir?.join(name);
+
         if candidate.is_file() {
             return Some(candidate);
         }
+
         dir = dir?.parent();
     }
+
     None
 }
 

@@ -39,6 +39,7 @@ fn dependencies_view(dependencies: &Dependencies) -> FomodDependencies {
             children.iter().map(convert).collect()
         }
     };
+
     match dependencies {
         Dependencies::All(_) => FomodDependencies::All(children),
         Dependencies::Any(_) => FomodDependencies::Any(children),

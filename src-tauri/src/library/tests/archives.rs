@@ -26,6 +26,7 @@ fn archives_that_no_version_uses_are_forgotten() {
     let base = scratch("forget");
     let mut library = load_mods(&base, &["modA"]);
     library.versions.get_mut("modA").unwrap().archive = Some("sha-a".to_string());
+
     for sha256 in ["sha-a", "sha-old"] {
         library.archives.insert(
             sha256.to_string(),

@@ -22,9 +22,11 @@ use crate::profiles::actions::switch_profile;
 fn prepared_state(state: &Path, entries: &[Entry]) -> PathBuf {
     fs::create_dir_all(state).unwrap();
     let journal = Journal::new(state.join(JOURNAL_FILE));
+
     for entry in entries {
         journal.append(entry).unwrap();
     }
+
     journal
         .complete(&DeploymentRecord {
             schema_version: crate::domain::STATE_SCHEMA,
@@ -171,11 +173,13 @@ fn deleting_a_mod_cleans_its_overlay_layer_but_keeps_game_writes() {
 #[test]
 fn two_overlay_profiles_keep_their_own_layers() {
     let f = mirror_fixture("multi-layer");
+
     for (name, folder) in [("Foo-1.zip", "Foo"), ("Bar-2.zip", "Bar")] {
         let entry = format!("r6/scripts/{folder}/a.reds");
         let zip = f.zip(name, &[(entry.as_str(), folder)]);
         import(&f.data, MIRROR_GAME, &zip, None, &mut |_, _| {}).unwrap();
     }
+
     f.enable_all(MIRROR_GAME);
     let first = f.active_id(MIRROR_GAME);
     apply_deployment(&f.data, MIRROR_GAME).unwrap();

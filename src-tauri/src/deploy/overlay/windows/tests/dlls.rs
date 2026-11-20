@@ -302,6 +302,7 @@ fn a_32_bit_program_statically_imports_a_dll_from_a_layer() {
         return;
     };
     assert!(dll.is_file());
+
     if adjacent_binary("gobbo_overlay_hook32.dll").is_none()
         || adjacent_binary("gobbo_overlay_inject32.exe").is_none()
     {
@@ -310,6 +311,7 @@ fn a_32_bit_program_statically_imports_a_dll_from_a_layer() {
         );
         return;
     }
+
     let session = deploy_mod_a(&library, &target);
     let code = run(
         &session,
@@ -468,9 +470,11 @@ fn compile(source: &Path, output: &Path, target: &str, native: &Path, dll: bool)
     let rustc = std::env::var_os("RUSTC").unwrap_or_else(|| "rustc".into());
     let mut command = Command::new(&rustc);
     command.args(["--edition=2021", "-O", "--target", target]);
+
     if dll {
         command.args(["--crate-type", "cdylib"]);
     }
+
     let status = command
         .arg("-L")
         .arg(format!("native={}", native.display()))
@@ -564,6 +568,7 @@ fn lib_exe() -> Option<PathBuf> {
         let path = PathBuf::from(path);
         return path.is_file().then_some(path);
     }
+
     let vswhere =
         Path::new(r"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe");
     let output = Command::new(vswhere)
@@ -581,12 +586,15 @@ fn lib_exe() -> Option<PathBuf> {
     let root = String::from_utf8(output.stdout).ok()?;
     let root = Path::new(root.trim());
     let tools = root.join("VC/Tools/MSVC");
+
     for entry in fs::read_dir(tools).ok()? {
         let entry = entry.ok()?;
         let candidate = entry.path().join("bin/Hostx64/x64/lib.exe");
+
         if candidate.is_file() {
             return Some(candidate);
         }
     }
+
     None
 }

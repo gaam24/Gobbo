@@ -40,6 +40,7 @@ pub fn mod_usage(root: &Data, game_id: &str, id: &str) -> Result<ModUsage, AppEr
         prepared: false,
         running: false,
     };
+
     for profile in &profiles.profiles {
         let Some(entry) = profile.mods.iter().find(|entry| entry.id == id) else {
             continue;
@@ -58,10 +59,12 @@ pub fn mod_usage(root: &Data, game_id: &str, id: &str) -> Result<ModUsage, AppEr
             .iter()
             .any(|deployed| deployed.id == id || deployed.folder == entry.folder);
         let is_running = running && is_prepared && last_launched == Some(profile.id.as_str());
+
         if deployed {
             usage.prepared = usage.prepared || is_prepared;
             usage.running = usage.running || is_running;
         }
+
         usage.profiles.push(ModUsageProfile {
             id: profile.id.clone(),
             name: profile.name.clone(),
@@ -72,6 +75,7 @@ pub fn mod_usage(root: &Data, game_id: &str, id: &str) -> Result<ModUsage, AppEr
             running: is_running && deployed,
         });
     }
+
     Ok(usage)
 }
 
@@ -241,6 +245,7 @@ pub fn mod_extras(
     let lookup = SourceLookup::new(&view, &listed);
     let mod_steps = crate::launch::steps::load_mod_steps(&data)?;
     let mut extras = Vec::with_capacity(folders.len());
+
     for folder in folders {
         let Some(record) = library.versions.get(folder) else {
             continue;
@@ -255,5 +260,6 @@ pub fn mod_extras(
             &mod_steps,
         ));
     }
+
     Ok(extras)
 }

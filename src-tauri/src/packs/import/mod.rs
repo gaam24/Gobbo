@@ -98,6 +98,7 @@ pub fn import_pack_with_progress(
     let mut steps = load_mod_steps(&data)?;
     let mut profiles = load_profiles(&data)?;
     let mut seen_missing: rustc_hash::FxHashSet<&str> = rustc_hash::FxHashSet::default();
+
     for pack in &manifest.profiles {
         // One set of indexes per profile: the data adopted below changes them, and the next profile must see it.
         let indexes = LibraryView::new(&library);
@@ -114,8 +115,10 @@ pub fn import_pack_with_progress(
         // every waiting mod was quadratic.
         let mut next_found: Vec<Option<&str>> = vec![None; resolved.len()];
         let mut next: Option<&str> = None;
+
         for (at, found) in resolved.iter().enumerate().rev() {
             next_found[at] = next;
+
             if let Some((family, _)) = found {
                 next = Some(family.as_str());
             }
@@ -137,6 +140,7 @@ pub fn import_pack_with_progress(
         // The families already in this list. A linear lookup for each mod of the pack was quadratic.
         let mut kept: rustc_hash::FxHashSet<&str> = rustc_hash::FxHashSet::default();
         let mut waiting: rustc_hash::FxHashSet<&str> = rustc_hash::FxHashSet::default();
+
         for (at, (entry, found)) in pack.mods.iter().zip(&resolved).enumerate() {
             let Some((family, folder)) = found else {
                 if seen_missing.insert(entry.family.as_str()) {
@@ -150,11 +154,14 @@ pub fn import_pack_with_progress(
                         entry: entry.clone(),
                     });
                 }
+
                 continue;
             };
+
             if !kept.insert(family.as_str()) {
                 continue;
             }
+
             state.mods.push(ProfileEntry {
                 id: family.clone(),
                 folder: folder.clone(),
@@ -162,6 +169,7 @@ pub fn import_pack_with_progress(
                 priority: entry.priority,
             });
             adopt_family_data(&mut library, family, entry, &families);
+
             if let Some(phases) = &entry.steps {
                 steps
                     .mods
@@ -211,6 +219,7 @@ pub fn import_pack_with_progress(
                 if members.len() < 2 {
                     return None;
                 }
+
                 Some(ModGroup {
                     id: format!("grp{}", number + 1),
                     name: group.name.clone(),
@@ -242,11 +251,13 @@ pub fn import_pack_with_progress(
         // longer defines are ignored, so a changed definition cannot restore a stale choice.
         if !pack.user_data.is_empty() {
             let mut choices = game.user_data_defaults();
+
             for (set, isolation) in &pack.user_data {
                 if choices.contains_key(set) {
                     choices.insert(set.clone(), *isolation);
                 }
             }
+
             profile.user_data = choices;
         } else if is_new {
             profile.user_data = game.user_data_defaults();
@@ -255,6 +266,7 @@ pub fn import_pack_with_progress(
         profile.collections.clear();
         profile.pack = Some(origin);
     }
+
     data.save_library(library)?;
     save_mod_steps(&data, &steps)?;
     save_profiles(&data, &profiles)?;

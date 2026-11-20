@@ -27,11 +27,13 @@ pub fn fail_after(files: usize, kind: io::ErrorKind) {
 fn injected_failure() -> Option<io::ErrorKind> {
     FAIL_AFTER.with(|cell| {
         let (left, kind) = cell.get()?;
+
         if left == 1 {
             cell.set(None);
         } else {
             cell.set(Some((left - 1, kind)));
         }
+
         Some(kind)
     })
 }
@@ -56,6 +58,7 @@ impl<'a> ProgressMeter<'a> {
     /// Counts one finished file, where `done` runs from 1 to `total`.
     pub(super) fn step(&mut self, done: usize) {
         let step = DeployProgress::at(DeployStage::Writing, done, self.total);
+
         if step.percent != self.last_percent || done == self.total {
             (self.progress)(step);
             self.last_percent = step.percent;
@@ -72,15 +75,18 @@ pub(super) fn write_jobs(
     mut write: impl FnMut(&Job) -> Result<(), DeployError>,
 ) -> Result<(), DeployError> {
     let mut meter = ProgressMeter::new(jobs.len(), progress);
+
     for (index, job) in jobs.iter().enumerate() {
         before(job)?;
         #[cfg(test)]
         if let Some(kind) = injected_failure() {
             return Err(FileError::new(&job.dst, io::Error::from(kind)).into());
         }
+
         write(job)?;
         meter.step(index + 1);
     }
+
     Ok(())
 }
 
@@ -103,6 +109,7 @@ mod tests {
             meter.step(2);
             meter.step(3);
         }
+
         assert_eq!(seen, [33, 66, 100]);
     }
 
@@ -117,6 +124,7 @@ mod tests {
             meter.step(3);
             meter.step(200);
         }
+
         assert_eq!(seen, [1, 100]);
     }
 

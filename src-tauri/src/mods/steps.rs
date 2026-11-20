@@ -23,6 +23,7 @@ pub fn set_mod_steps(
     let after = checked(&game, after_end, games::Phase::AfterEnd)?;
 
     let mut steps = crate::launch::steps::load_mod_steps(&data)?;
+
     if before.is_empty() && after.is_empty() {
         steps.mods.remove(folder);
     } else {
@@ -34,20 +35,24 @@ pub fn set_mod_steps(
             },
         );
     }
+
     crate::launch::steps::save_mod_steps(&data, &steps)
 }
 
 /// The ids that the game defines for `phase`, without repeats, in the order given.
 fn checked(game: &GameDef, ids: &[String], phase: games::Phase) -> Result<Vec<String>, AppError> {
     let mut kept: Vec<String> = Vec::new();
+
     for id in ids {
         if game.step(id, phase).is_none() {
             return Err(AppError::user("steps.unknown").with("step", id));
         }
+
         if !kept.contains(id) {
             kept.push(id.clone());
         }
     }
+
     Ok(kept)
 }
 

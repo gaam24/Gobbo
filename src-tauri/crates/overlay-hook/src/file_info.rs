@@ -33,6 +33,7 @@ pub(crate) unsafe extern "system" fn get_file_information(
     let original = original!(get_file_information, 0);
     let succeeded = unsafe { original.call(handle, info) };
     let last_error = PreserveLastError::capture();
+
     if !nested && diag::settings().calls {
         trace(|| match unsafe { info.as_ref() } {
             Some(info) if succeeded != 0 => format!(
@@ -52,6 +53,7 @@ pub(crate) unsafe extern "system" fn get_file_information(
             ),
         });
     }
+
     succeeded
 }
 
@@ -71,6 +73,7 @@ pub(crate) unsafe extern "system" fn nt_query_information_file(
     let original = original!(nt_query_information_file, STATUS_UNSUCCESSFUL);
     let status = unsafe { original.call(handle, status_block, info, length, class) };
     let _last_error = PreserveLastError::capture();
+
     if !nested {
         // SAFETY: `info` is the caller's buffer of `length` bytes, as `NtQueryInformationFile` requires.
         unsafe { map_file_name(status, info, length, class) };
@@ -84,6 +87,7 @@ pub(crate) unsafe extern "system" fn nt_query_information_file(
             )
         });
     }
+
     status
 }
 
@@ -111,10 +115,13 @@ unsafe fn map_file_name(status: i32, info: *mut c_void, length: u32, class: u32)
     }
     // SAFETY: the original call succeeded and filled the length word of the structure.
     let file_name_length = unsafe { std::ptr::read_unaligned(info.cast::<u32>()) } as usize;
+
     if file_name_length == 0 || !file_name_length.is_multiple_of(2) {
         return;
     }
+
     let capacity = (length as usize).saturating_sub(FILE_NAME_OFFSET);
+
     if file_name_length > capacity {
         return;
     }
@@ -130,6 +137,7 @@ unsafe fn map_file_name(status: i32, info: *mut c_void, length: u32, class: u32)
         return;
     };
     let mapped_bytes = mapped.len().saturating_mul(2);
+
     if mapped_bytes > capacity {
         return;
     }
@@ -142,6 +150,7 @@ unsafe fn map_file_name(status: i32, info: *mut c_void, length: u32, class: u32)
             mapped.len(),
         );
         std::ptr::write_unaligned(info.cast::<u32>(), mapped_bytes as u32);
+
         if mapped_bytes + 2 <= capacity {
             *info
                 .cast::<u8>()

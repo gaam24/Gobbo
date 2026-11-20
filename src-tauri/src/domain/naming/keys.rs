@@ -20,6 +20,7 @@ pub fn clean(name: &str) -> String {
 pub fn slug(name: &str) -> String {
     let mut out = String::new();
     let mut last_dash = false;
+
     for c in name.chars().flat_map(char::to_lowercase) {
         if c.is_alphanumeric() {
             out.push(c);
@@ -29,9 +30,11 @@ pub fn slug(name: &str) -> String {
             last_dash = true;
         }
     }
+
     while out.ends_with('-') {
         out.pop();
     }
+
     if out.is_empty() {
         "mod".to_string()
     } else {
@@ -53,6 +56,7 @@ pub fn match_key(name: &str) -> String {
 /// orphans the cached plans and archives of existing collections.
 pub fn compact_component(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
+
     for byte in text.bytes() {
         if byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_' {
             out.push(char::from(byte));
@@ -60,6 +64,7 @@ pub fn compact_component(text: &str) -> String {
             out.push('_');
         }
     }
+
     if out.is_empty() {
         "unknown".to_string()
     } else {
@@ -74,6 +79,7 @@ pub fn deploy_name(prefix: &str, display_name: &str, folder: &str) -> String {
     } else {
         display_name
     };
+
     if prefix.is_empty() || starts_with_ignore_ascii_case(base, prefix) {
         clean(base)
     } else {
@@ -107,6 +113,7 @@ mod tests {
             ("...", "mod"),
             ("", "mod"),
         ];
+
         for (name, expected) in cases {
             assert_eq!(slug(name), expected, "name={name}");
         }
@@ -121,9 +128,11 @@ mod tests {
             ("Mod A", "moda"),
             ("Mod B", "modb"),
         ];
+
         for (name, expected) in cases {
             assert_eq!(match_key(name), expected, "name={name}");
         }
+
         assert_eq!(match_key("Mod Name (v1.2)"), match_key("modname v12"));
         assert_ne!(match_key("Mod A"), match_key("Mod B"));
     }
@@ -139,6 +148,7 @@ mod tests {
             ("Ünïcode", "__n__code"),
             ("", "unknown"),
         ];
+
         for (text, expected) in cases {
             assert_eq!(compact_component(text), expected, "text={text}");
         }

@@ -32,7 +32,9 @@ pub(crate) fn has_visible_entries(mount: &Mount, rel: &str) -> bool {
     if any_entry(&join(&mount.upper, rel)) {
         return true;
     }
+
     let whiteouts = mount.whiteouts_snapshot();
+
     if whiteouts.is_empty() {
         // Without whiteouts every entry of every lower layer is visible; there is no name to inspect.
         return mount
@@ -40,9 +42,11 @@ pub(crate) fn has_visible_entries(mount: &Mount, rel: &str) -> bool {
             .filter(|(layer, _)| *layer != Layer::Upper)
             .any(|(_, base)| any_entry(&join(base, rel)));
     }
+
     if whiteouts.hides(rel) {
         return false;
     }
+
     mount
         .layer_paths()
         .filter(|(layer, _)| *layer != Layer::Upper)
@@ -53,13 +57,16 @@ pub(crate) fn has_visible_entries(mount: &Mount, rel: &str) -> bool {
                     let name = entry.file_name();
                     let mut units = [0u16; 260];
                     let mut length = 0;
+
                     for unit in name.encode_wide() {
                         if length == units.len() {
                             break;
                         }
+
                         units[length] = unit;
                         length += 1;
                     }
+
                     !whiteouts.hides_child_units_in_visible_folder(rel, &units[..length])
                 })
             })
@@ -118,9 +125,11 @@ pub(crate) fn has_entry(
         return false;
     };
     let (handle, mut data) = find_first(base, rel, mask, level, search, flags);
+
     if handle == INVALID_HANDLE_VALUE {
         return false;
     }
+
     loop {
         if !is_dot_name(crate::win32::find_data_name(&data)) {
             // SAFETY: the handle came from `find_first` and is closed once.
@@ -178,11 +187,13 @@ impl Taken {
     fn push_layer(&mut self, data: WIN32_FIND_DATAW, layer: Layer) {
         let hash = name_hash(crate::win32::find_data_name(&data));
         let position = self.entries.len();
+
         if let Some(previous) = self.index.insert(hash, position) {
             // The new position stays in the index; the older one moves to the collision list, so `find` can still reach
             // it after a hash collision.
             self.collisions.push((hash, previous));
         }
+
         self.entries.push(data);
         self.layers.push(layer);
     }
@@ -193,11 +204,13 @@ impl Taken {
         let same = |position: usize| {
             same_folded_wide(crate::win32::find_data_name(&self.entries[position]), name)
         };
+
         if let Some(&position) = self.index.get(&hash)
             && same(position)
         {
             return Some(position);
         }
+
         self.collisions
             .iter()
             .find(|&&(other, position)| other == hash && same(position))
@@ -255,9 +268,11 @@ impl BatchReader {
                 null_mut(),
             )
         };
+
         if handle == INVALID_HANDLE_VALUE {
             return None;
         }
+
         let mut reader = Self {
             handle,
             buffer: vec![0u64; BATCH_BYTES / 8],
@@ -267,12 +282,14 @@ impl BatchReader {
             mask: mask.to_string(),
             with_short_names: level == FindExInfoStandard,
         };
+
         if !reader.fill() {
             // An empty folder or a volume that does not answer the batch: the find stream is the fallback.
             // SAFETY: the handle was opened above and is not stored anywhere else.
             unsafe { CloseHandle(handle) };
             return None;
         }
+
         Some(reader)
     }
 
@@ -281,6 +298,7 @@ impl BatchReader {
         if self.done {
             return false;
         }
+
         let class = if self.started {
             FileIdBothDirectoryInfo
         } else {
@@ -299,10 +317,12 @@ impl BatchReader {
             )
         };
         self.started = true;
+
         if filled == 0 {
             self.done = true;
             return false;
         }
+
         self.offset = 0;
         true
     }
@@ -342,14 +362,17 @@ impl BatchReader {
         data.ftLastWriteTime = filetime(info.LastWriteTime as u64);
         data.nFileSizeHigh = (info.EndOfFile as u64 >> 32) as u32;
         data.nFileSizeLow = info.EndOfFile as u32;
+
         for (slot, unit) in data.cFileName.iter_mut().zip(name) {
             *slot = *unit;
         }
+
         if self.with_short_names {
             let short_length = (info.ShortNameLength.max(0) as usize / 2).min(info.ShortName.len());
             data.cAlternateFileName[..short_length]
                 .copy_from_slice(&info.ShortName[..short_length]);
         }
+
         Some(data)
     }
 
@@ -357,6 +380,7 @@ impl BatchReader {
     fn next(&mut self) -> Option<WIN32_FIND_DATAW> {
         loop {
             let data = self.next_raw()?;
+
             if wildcard_match_units(&self.mask, crate::win32::find_data_name(&data)) {
                 return Some(data);
             }
@@ -394,9 +418,11 @@ impl RootStream {
     /// Whether the root entry is one a listing shows, before the upper and staging entries are considered.
     fn accepts(&self, data: &WIN32_FIND_DATAW) -> bool {
         let directory = data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY != 0;
+
         if self.directories_only && !directory {
             return false;
         }
+
         let name = crate::win32::find_data_name(data);
         !is_dot_name(name)
             && !is_copy_temp(name)
@@ -409,6 +435,7 @@ impl RootStream {
     /// The next root entry that a listing shows, or `None` at the end. `taken` holds the upper and staging entries.
     pub(crate) fn next_visible(&mut self, taken: &Taken) -> Option<WIN32_FIND_DATAW> {
         let mut data: WIN32_FIND_DATAW = unsafe { std::mem::zeroed() };
+
         unsafe { self.next_visible_into(taken, &raw mut data) }.then_some(data)
     }
 
@@ -429,6 +456,7 @@ impl RootStream {
                 if self.done {
                     return false;
                 }
+
                 crate::stat_io();
                 // SAFETY: the handle came from the system listing of this folder and is still open; `out` is writable.
                 if unsafe { FindNextFileW(self.handle, out) } == 0 {
@@ -438,6 +466,7 @@ impl RootStream {
             }
             // SAFETY: the branch above wrote one entry into `out`.
             let data = unsafe { &*out };
+
             if self.accepts(data) && !taken.shows(crate::win32::find_data_name(data)) {
                 return true;
             }
@@ -492,10 +521,12 @@ pub(crate) fn find_layers(
     let hidden_folder = whiteouts.hides(rel);
     let directories_only = search == FindExSearchLimitToDirectories;
     let mut taken = Taken::leading(leading);
+
     for (layer, base) in mount.layer_paths() {
         if layer != Layer::Upper && hidden_folder {
             break;
         }
+
         if layer == Layer::Root {
             // With no whiteout and no upper/staging entry, the merged view is the game folder itself. Returning the
             // real handle lets the program's FindNextFileW/FindClose calls pass through without a synthetic listing.
@@ -504,6 +535,7 @@ pub(crate) fn find_layers(
                 && taken.layers.iter().all(|layer| *layer == Layer::Root)
                 && !whiteouts.affects_listing(rel);
             let (handle, data) = find_first(base, rel, mask, level, search, flags);
+
             if handle == INVALID_HANDLE_VALUE {
                 apply_spellings(
                     &mut taken,
@@ -522,6 +554,7 @@ pub(crate) fn find_layers(
                     direct: None,
                 };
             }
+
             apply_spellings(
                 &mut taken,
                 mount,
@@ -533,6 +566,7 @@ pub(crate) fn find_layers(
                 search,
                 flags,
             );
+
             if direct {
                 return Layers {
                     taken,
@@ -540,6 +574,7 @@ pub(crate) fn find_layers(
                     direct: Some((handle, data)),
                 };
             }
+
             return Layers {
                 taken,
                 root: Some(RootStream {
@@ -553,10 +588,13 @@ pub(crate) fn find_layers(
                 direct: None,
             };
         }
+
         let (handle, mut data) = find_first(base, rel, mask, level, search, flags);
+
         if handle == INVALID_HANDLE_VALUE {
             continue;
         }
+
         loop {
             let name = crate::win32::find_data_name(&data);
             let directory = data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY != 0;
@@ -571,6 +609,7 @@ pub(crate) fn find_layers(
             }
             // SAFETY: the handle came from the listing above, and `data` is writable.
             crate::stat_io();
+
             if unsafe { FindNextFileW(handle, &raw mut data) } == 0 {
                 break;
             }
@@ -578,6 +617,7 @@ pub(crate) fn find_layers(
         // SAFETY: the handle came from the listing above and is closed once.
         unsafe { FindClose(handle) };
     }
+
     apply_spellings(
         &mut taken,
         mount,
@@ -622,7 +662,9 @@ fn apply_spellings(
     if taken.entries.is_empty() || hidden_folder {
         return;
     }
+
     let count = taken.entries.len();
+
     if count > SPELLING_LOOKUP_LIMIT {
         // The root pass writes its spelling straight into the entries, so a large merged folder does not keep a second
         // copy of every `WIN32_FIND_DATAW` (about 600 bytes each) just to publish it afterwards.
@@ -632,6 +674,7 @@ fn apply_spellings(
             if *from_root || taken.layers[index] != Layer::Upper {
                 continue;
             }
+
             let name = crate::win32::find_data_name(&taken.entries[index]);
             let Some(lower) = staging_spelling(mount, rel, name, whiteouts) else {
                 continue;
@@ -639,13 +682,17 @@ fn apply_spellings(
             taken.entries[index].cFileName = lower.cFileName;
             taken.entries[index].cAlternateFileName = lower.cAlternateFileName;
         }
+
         return;
     }
+
     for index in 0..count {
         let layer = taken.layers[index];
+
         if layer == Layer::Root {
             continue;
         }
+
         let name = crate::win32::find_data_name(&taken.entries[index]);
         let Some(lower) = lower_spelling(mount, rel, layer, name, whiteouts, hidden_folder) else {
             continue;
@@ -686,21 +733,28 @@ fn apply_root_spellings(
     if let Some(mut batch) = BatchReader::open(base, rel, mask, level, flags) {
         while let Some(data) = batch.next() {
             spell_entry(taken, rel, whiteouts, &data, &mut found, &mut remaining);
+
             if remaining == 0 {
                 break;
             }
         }
+
         return found;
     }
+
     let (handle, mut data) = find_first(base, rel, mask, level, search, flags);
+
     if handle == INVALID_HANDLE_VALUE {
         return found;
     }
+
     loop {
         spell_entry(taken, rel, whiteouts, &data, &mut found, &mut remaining);
+
         if remaining == 0 {
             break;
         }
+
         crate::stat_io();
         // SAFETY: the handle came from the listing above, and `data` is writable.
         if unsafe { FindNextFileW(handle, &raw mut data) } == 0 {
@@ -723,6 +777,7 @@ fn spell_entry(
     remaining: &mut usize,
 ) {
     let name = crate::win32::find_data_name(data);
+
     if let Some(index) = taken.find(name)
         && taken.layers[index] != Layer::Root
         && !found[index]
@@ -747,9 +802,11 @@ fn staging_spelling(
         .layer_paths()
         .find(|(layer, _)| *layer == Layer::Staging)?;
     let data = find_exact(base, rel, name)?;
+
     if whiteouts.hides_child_units_in_visible_folder(rel, crate::win32::find_data_name(&data)) {
         return None;
     }
+
     Some(data)
 }
 
@@ -769,9 +826,11 @@ fn lower_spelling(
         Layer::Staging => &[Layer::Root],
         Layer::Root => return None,
     };
+
     if hidden_folder {
         return None;
     }
+
     for wanted in order {
         let Some((_, base)) = mount.layer_paths().find(|(found, _)| found == wanted) else {
             continue;
@@ -783,8 +842,10 @@ fn lower_spelling(
         if whiteouts.hides_child_units_in_visible_folder(rel, crate::win32::find_data_name(&data)) {
             continue;
         }
+
         return Some(data);
     }
+
     None
 }
 
@@ -814,6 +875,7 @@ pub(crate) fn dot_entries(
         visible(mount, parent_rel).map(|(_, path)| path)
     };
     let mut entries = Vec::with_capacity(2);
+
     for (dot, source) in [(".", own), ("..", above)] {
         if let Some(source) = source
             && wildcard_match(mask, dot)
@@ -822,6 +884,7 @@ pub(crate) fn dot_entries(
             entries.push(find_data(dot, &meta));
         }
     }
+
     entries
 }
 
@@ -834,10 +897,12 @@ fn is_dot_name(name: &[u16]) -> bool {
 /// A hash of a name with each unit folded as `fold_unit` folds it, so it agrees with `same_folded_wide`. No `String` is built.
 fn name_hash(name: &[u16]) -> u64 {
     let mut hash = 0xcbf2_9ce4_8422_2325u64;
+
     for unit in name {
         hash ^= u64::from(fold_unit(*unit));
         hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
     }
+
     hash
 }
 
@@ -857,6 +922,7 @@ pub(super) fn find_data(name: &str, meta: &fs::Metadata) -> WIN32_FIND_DATAW {
     for (slot, unit) in data.cFileName.iter_mut().zip(name.encode_utf16().take(259)) {
         *slot = unit;
     }
+
     data
 }
 
@@ -877,9 +943,11 @@ mod tests {
     fn entry(name: &str) -> WIN32_FIND_DATAW {
         // SAFETY: `WIN32_FIND_DATAW` is plain data; all zeros is a valid value.
         let mut data: WIN32_FIND_DATAW = unsafe { std::mem::zeroed() };
+
         for (slot, unit) in data.cFileName.iter_mut().zip(name.encode_utf16()) {
             *slot = unit;
         }
+
         data
     }
 
@@ -891,12 +959,15 @@ mod tests {
         let root = base.join("game");
         let mods = base.join("mods");
         let upper = base.join("upper");
+
         for dir in [&root, &mods, &upper] {
             fs::create_dir_all(dir.join("archive")).unwrap();
         }
+
         for name in ["a.archive", "b.archive", "c.archive"] {
             fs::write(root.join("archive").join(name), b"game").unwrap();
         }
+
         let mount = Mount::new(
             "game".to_string(),
             root.clone(),
@@ -918,11 +989,13 @@ mod tests {
         assert!(layers.root.is_none());
         let mut names = vec![String::from_utf16(crate::win32::find_data_name(&first)).unwrap()];
         let mut data: WIN32_FIND_DATAW = unsafe { std::mem::zeroed() };
+
         while unsafe { FindNextFileW(handle, &raw mut data) } != 0 {
             names.push(String::from_utf16(crate::win32::find_data_name(&data)).unwrap());
         }
         // SAFETY: the handle came from `find_layers` and is closed once.
         unsafe { FindClose(handle) };
+
         for name in ["a.archive", "b.archive", "c.archive"] {
             assert_eq!(
                 names.iter().filter(|found| *found == name).count(),
@@ -930,6 +1003,7 @@ mod tests {
                 "{names:?}"
             );
         }
+
         fs::remove_dir_all(&base).unwrap();
     }
 
@@ -938,16 +1012,20 @@ mod tests {
         let base = std::env::temp_dir().join(format!("gobbo-listing-batch-{}", std::process::id()));
         let _ = fs::remove_dir_all(&base);
         fs::create_dir_all(&base).unwrap();
+
         for number in 0..40 {
             fs::write(base.join(format!("file{number:02}.txt")), b"x").unwrap();
         }
+
         fs::write(base.join("note.bin"), b"x").unwrap();
 
         let mut reader = BatchReader::open(&base, "", "*.txt", FindExInfoStandard, 0).unwrap();
         let mut names = Vec::new();
+
         while let Some(data) = reader.next() {
             names.push(String::from_utf16(crate::win32::find_data_name(&data)).unwrap());
         }
+
         drop(reader);
         assert_eq!(names.len(), 40, "{names:?}");
         assert!(names.iter().any(|name| name == "file00.txt"), "{names:?}");
@@ -961,9 +1039,11 @@ mod tests {
             std::env::temp_dir().join(format!("gobbo-listing-batch-eq-{}", std::process::id()));
         let _ = fs::remove_dir_all(&base);
         fs::create_dir_all(&base).unwrap();
+
         for number in 0..250 {
             fs::write(base.join(format!("file{number:03}.txt")), b"x").unwrap();
         }
+
         for number in 0..50 {
             fs::write(base.join(format!("other{number:02}.bin")), b"x").unwrap();
         }
@@ -976,9 +1056,11 @@ mod tests {
         ] {
             let mut batch = BatchReader::open(&base, "", mask, level, 0).unwrap();
             let mut batch_names = Vec::new();
+
             while let Some(data) = batch.next() {
                 batch_names.push(String::from_utf16(crate::win32::find_data_name(&data)).unwrap());
             }
+
             drop(batch);
 
             let (handle, first) = find_first(&base, "", mask, level, FindExSearchNameMatch, 0);
@@ -986,6 +1068,7 @@ mod tests {
             let mut find_names =
                 vec![String::from_utf16(crate::win32::find_data_name(&first)).unwrap()];
             let mut data: WIN32_FIND_DATAW = unsafe { std::mem::zeroed() };
+
             while unsafe { FindNextFileW(handle, &raw mut data) } != 0 {
                 find_names.push(String::from_utf16(crate::win32::find_data_name(&data)).unwrap());
             }
@@ -996,6 +1079,7 @@ mod tests {
             find_names.sort_unstable();
             assert_eq!(batch_names, find_names, "{mask} / {level}");
         }
+
         fs::remove_dir_all(&base).unwrap();
     }
 
@@ -1007,9 +1091,11 @@ mod tests {
         let mods = base.join("mods");
         let upper = base.join("upper");
         let folder = "archive";
+
         for dir in [&root, &mods, &upper] {
             fs::create_dir_all(dir.join(folder)).unwrap();
         }
+
         for number in 0..50 {
             fs::write(
                 root.join(folder).join(format!("g{number:02}.archive")),
@@ -1017,6 +1103,7 @@ mod tests {
             )
             .unwrap();
         }
+
         fs::write(mods.join(folder).join("g03.archive"), b"mod").unwrap();
         fs::write(mods.join(folder).join("new.archive"), b"mod").unwrap();
         let mount = Mount::new(
@@ -1039,12 +1126,14 @@ mod tests {
         );
         let mut names = Vec::new();
         let mut next = 0;
+
         loop {
             if let Some(data) = layers.taken.entries.get(next) {
                 names.push(String::from_utf16(crate::win32::find_data_name(data)).unwrap());
                 next += 1;
                 continue;
             }
+
             let Some(data) = layers
                 .root
                 .as_mut()
@@ -1055,6 +1144,7 @@ mod tests {
             names.push(String::from_utf16(crate::win32::find_data_name(&data)).unwrap());
             next += 1;
         }
+
         drop(layers);
         let unique: std::collections::HashSet<&String> = names.iter().collect();
         assert_eq!(
@@ -1098,6 +1188,7 @@ mod tests {
     fn only_the_copy_prefix_reaches_the_allocating_shape_check() {
         let temp: Vec<u16> = ".gobbo-copy-7-9.tmp".encode_utf16().collect();
         assert!(is_copy_temp(&temp));
+
         for other in [
             ".gitignore",
             ".gobbo-copy-x.tmp",
@@ -1121,11 +1212,13 @@ mod tests {
         let upper = base.join("upper");
         fs::create_dir_all(&root).unwrap();
         fs::create_dir_all(&upper).unwrap();
+
         for number in 0..40 {
             fs::write(root.join(format!("Root{number:02}.bin")), b"root").unwrap();
             // The upper copy is spelled differently; the listing keeps the spelling of the file the game folder has.
             fs::write(upper.join(format!("root{number:02}.BIN")), b"upper").unwrap();
         }
+
         let mount = Mount::new(
             "game".to_string(),
             root.clone(),

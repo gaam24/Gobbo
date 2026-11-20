@@ -132,6 +132,7 @@ impl Ring {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
         }
+
         let mut file = OpenOptions::new()
             .read(true)
             .write(true)
@@ -140,10 +141,12 @@ impl Ring {
             .open(path)?;
         let length = file.metadata()?.len();
         let mut magic = [0u8; 8];
+
         if length >= HEADER as u64 {
             file.seek(SeekFrom::Start(0))?;
             file.read_exact(&mut magic)?;
         }
+
         if length != ring_length() || &magic != MAGIC {
             file.set_len(ring_length())?;
             file.seek(SeekFrom::Start(0))?;
@@ -154,6 +157,7 @@ impl Ring {
                 pid: std::process::id(),
             });
         }
+
         file.seek(SeekFrom::Start(WRITE_AT as u64))?;
         let mut bytes = [0u8; 8];
         file.read_exact(&mut bytes)?;
@@ -191,6 +195,7 @@ impl Ring {
         while length > 0 && !path.is_char_boundary(length) {
             length -= 1;
         }
+
         record[26..28].copy_from_slice(&(length as u16).to_le_bytes());
         record[PATH_AT..PATH_AT + length].copy_from_slice(&bytes[..length]);
         write_at(&self.file, &record, record_offset(slot))?;
@@ -219,6 +224,7 @@ pub fn read_base(base: &Path, limit: usize) -> io::Result<(Vec<Decision>, u64)> 
     };
     let mut all = Vec::new();
     let mut total = 0u64;
+
     for path in ring_files(dir, &prefix)? {
         let Ok((mut decisions, written)) = read_last(&path, limit) else {
             continue;
@@ -226,10 +232,13 @@ pub fn read_base(base: &Path, limit: usize) -> io::Result<(Vec<Decision>, u64)> 
         total = total.saturating_add(written);
         all.append(&mut decisions);
     }
+
     all.sort_by_key(|decision| (decision.time_ms, decision.pid, decision.seq));
+
     if all.len() > limit {
         all.drain(..all.len() - limit);
     }
+
     Ok((all, total))
 }
 
@@ -238,6 +247,7 @@ pub fn clear(base: &Path) -> io::Result<()> {
     let Some((dir, prefix)) = split_base(base) else {
         return Ok(());
     };
+
     for path in ring_files(dir, &prefix)? {
         match std::fs::remove_file(path) {
             Ok(()) => {}
@@ -245,6 +255,7 @@ pub fn clear(base: &Path) -> io::Result<()> {
             Err(error) => return Err(error),
         }
     }
+
     Ok(())
 }
 
@@ -256,16 +267,20 @@ fn ring_files(dir: &Path, prefix: &str) -> io::Result<Vec<PathBuf>> {
         Err(error) => return Err(error),
     };
     let mut files = Vec::new();
+
     for entry in entries.flatten() {
         let name = entry.file_name();
         let Some(name) = name.to_str() else {
             continue;
         };
+
         if !matches_ring(name, prefix) {
             continue;
         }
+
         files.push(entry.path());
     }
+
     Ok(files)
 }
 
@@ -278,19 +293,24 @@ pub fn read_last(path: &Path, limit: usize) -> io::Result<(Vec<Decision>, u64)> 
         Err(error) => return Err(error),
     };
     let length = file.metadata()?.len();
+
     if length != ring_length() {
         return Ok((Vec::new(), 0));
     }
+
     let mut header = [0u8; HEADER];
     file.seek(SeekFrom::Start(0))?;
     file.read_exact(&mut header)?;
+
     if &header[..8] != MAGIC {
         return Ok((Vec::new(), 0));
     }
+
     let write = u64::from_le_bytes(header[WRITE_AT..WRITE_AT + 8].try_into().unwrap_or([0; 8]));
     let oldest = write.saturating_sub(u64::from(CAPACITY));
     let start = write.saturating_sub(limit as u64).max(oldest);
     let count = usize::try_from(write - start).unwrap_or(0);
+
     if count == 0 {
         return Ok((Vec::new(), write));
     }
@@ -301,18 +321,23 @@ pub fn read_last(path: &Path, limit: usize) -> io::Result<(Vec<Decision>, u64)> 
     let first_count = count.min(CAPACITY as usize - first_slot);
     file.seek(SeekFrom::Start(record_offset(first_slot)))?;
     file.read_exact(&mut raw[..first_count * RECORD])?;
+
     if first_count < count {
         file.seek(SeekFrom::Start(record_offset(0)))?;
         file.read_exact(&mut raw[first_count * RECORD..])?;
     }
+
     let mut decisions = Vec::with_capacity(count);
+
     for index in 0..count {
         let record = &raw[index * RECORD..(index + 1) * RECORD];
         let seq = start + index as u64;
+
         if u64::from_le_bytes(record[..8].try_into().unwrap_or([0; 8])) != seq {
             // The writer overwrote this slot while we read it; skip that decision.
             continue;
         }
+
         let Some(kind) = Kind::from_u8(record[24]) else {
             continue;
         };
@@ -332,6 +357,7 @@ pub fn read_last(path: &Path, limit: usize) -> io::Result<(Vec<Decision>, u64)> 
             path,
         });
     }
+
     Ok((decisions, write))
 }
 
@@ -383,13 +409,17 @@ fn write_at(file: &File, buffer: &[u8], offset: u64) -> io::Result<()> {
     #[cfg(any(windows, unix))]
     {
         let mut written = 0;
+
         while written < buffer.len() {
             let count = file.write_at_offset(&buffer[written..], offset + written as u64)?;
+
             if count == 0 {
                 return Err(io::ErrorKind::WriteZero.into());
             }
+
             written += count;
         }
+
         Ok(())
     }
     #[cfg(not(any(windows, unix)))]
@@ -473,10 +503,12 @@ mod tests {
         let dir = scratch("newest");
         let path = dir.join("ring");
         let mut ring = Ring::open(&path).unwrap();
+
         for number in 0..3 {
             ring.record(Kind::Write, Layer::Upper, 0, &number.to_string(), 1)
                 .unwrap();
         }
+
         let (decisions, total) = read_last(&path, 2).unwrap();
         assert_eq!(total, 3);
         assert_eq!(
@@ -494,10 +526,12 @@ mod tests {
         let dir = scratch("wrap");
         let path = dir.join("ring");
         let mut ring = Ring::open(&path).unwrap();
+
         for number in 0..CAPACITY + 3 {
             ring.record(Kind::Write, Layer::Upper, 0, &number.to_string(), 1)
                 .unwrap();
         }
+
         let (decisions, total) = read_last(&path, usize::MAX).unwrap();
         assert_eq!(total, u64::from(CAPACITY) + 3);
         assert_eq!(decisions.len(), CAPACITY as usize);
@@ -553,9 +587,11 @@ mod tests {
         let ring = dir.join("overlay-decisions.111.ring");
         let other = dir.join("other.111.ring");
         let not_a_ring = dir.join("overlay-decisions.notes.txt");
+
         for path in [&ring, &other, &not_a_ring] {
             std::fs::write(path, b"x").unwrap();
         }
+
         clear(&base).unwrap();
         assert!(!ring.exists());
         assert!(other.exists());

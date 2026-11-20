@@ -308,6 +308,7 @@ fn a_download_cancelled_mid_transfer_leaves_no_files_and_no_row() {
     let on_chunk = Box::new(move || {
         for_chunks.fetch_add(1, Ordering::Relaxed);
         let id = for_id.load(Ordering::Relaxed);
+
         if id != 0 {
             // On a downloading row this sets the queue's in-flight stop flag, which `fetch` answers with
             // `download.cancelled` and a sweep of the partial file.
@@ -328,6 +329,7 @@ fn a_download_cancelled_mid_transfer_leaves_no_files_and_no_row() {
         {
             id.store(queue[0].id, Ordering::Relaxed);
         }
+
         seen.borrow_mut().push(event);
     };
     downloads.download_link(

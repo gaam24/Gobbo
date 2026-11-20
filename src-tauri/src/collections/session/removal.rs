@@ -62,6 +62,7 @@ pub fn remove(
         if removed.contains(&waiting.entry.family) {
             return false;
         }
+
         !wanted.iter().any(|item| item.is_same_mod(&waiting.entry))
     });
     save_profiles(&data, &profiles)?;

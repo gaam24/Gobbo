@@ -28,8 +28,10 @@ impl<A, B, V> Memo<A, B, V> {
         if let Some(value) = self.kept(a, b) {
             return value;
         }
+
         let value = Arc::new(compute());
         let mut entry = self.entry.lock().unwrap_or_else(PoisonError::into_inner);
+
         if let Some((kept_a, kept_b, kept)) = entry.as_ref()
             && kept_a.as_ptr() == Arc::as_ptr(a)
             && kept_b.as_ptr() == Arc::as_ptr(b)
@@ -37,6 +39,7 @@ impl<A, B, V> Memo<A, B, V> {
             // Another caller computed the same inputs while this one was unlocked. Its value is the first one.
             return Arc::clone(kept);
         }
+
         *entry = Some((Arc::downgrade(a), Arc::downgrade(b), Arc::clone(&value)));
         value
     }
@@ -126,6 +129,7 @@ mod tests {
                 );
             });
         }
+
         assert_eq!(computed.load(Ordering::SeqCst), 2);
     }
 

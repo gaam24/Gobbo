@@ -28,6 +28,7 @@ pub(super) fn manifest_rules(
 ) -> Vec<CollectionRule> {
     let matcher = ReferenceMatcher::new(items);
     let mut out = Vec::new();
+
     for rule in rules {
         let Some(kind) = rule_kind(&rule.kind) else {
             issues.push(issue(
@@ -55,6 +56,7 @@ pub(super) fn manifest_rules(
             reference: reference.to_string(),
         });
     }
+
     out
 }
 
@@ -83,20 +85,24 @@ impl<'a> ReferenceMatcher<'a> {
         let mut by_md5 = BTreeMap::new();
         let mut by_logical = BTreeMap::new();
         let mut by_name = BTreeMap::new();
+
         for item in items {
             if let Some((_, mod_id, file_id)) = item.provider_file() {
                 by_file.insert((mod_id.to_string(), file_id.to_string()), item.key.as_str());
             }
+
             if let Some(md5) = &item.md5 {
                 by_md5
                     .entry(md5.to_ascii_lowercase())
                     .or_insert(item.key.as_str());
             }
+
             if let Some(name) = &item.file_name {
                 by_logical
                     .entry(name.to_ascii_lowercase())
                     .or_insert(item.key.as_str());
             }
+
             by_name
                 .entry(item.name.to_ascii_lowercase())
                 .or_insert(item.key.as_str());
@@ -106,6 +112,7 @@ impl<'a> ReferenceMatcher<'a> {
                     .or_insert(item.key.as_str());
             }
         }
+
         Self {
             by_file,
             by_md5,
@@ -123,31 +130,37 @@ impl<'a> ReferenceMatcher<'a> {
         {
             return Some(*key);
         }
+
         if let Some(md5) = &reference.file_md5
             && let Some(key) = self.by_md5.get(&md5.to_ascii_lowercase())
         {
             return Some(*key);
         }
+
         if let Some(name) = &reference.logical_file_name
             && let Some(key) = self.by_logical.get(&name.to_ascii_lowercase())
         {
             return Some(*key);
         }
+
         if let Some(expression) = &reference.file_expression
             && let Some(key) = self.by_logical.get(&expression.to_ascii_lowercase())
         {
             return Some(*key);
         }
+
         if let Some(description) = &reference.description
             && let Some(key) = self.by_name.get(&description.to_ascii_lowercase())
         {
             return Some(*key);
         }
+
         if let Some(tag) = &reference.tag
             && let Some(key) = self.by_name.get(&tag.to_ascii_lowercase())
         {
             return Some(*key);
         }
+
         None
     }
 }

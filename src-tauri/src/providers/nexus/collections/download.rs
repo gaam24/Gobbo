@@ -30,6 +30,7 @@ pub(super) fn download_archive(
     if !archive_link.starts_with("/v2/collections/") || archive_link.contains("..") {
         return Err(AppError::user("collection.bad_link").with("url", archive_link));
     }
+
     let client = NexusClient::new(key);
     let text = client.get_v2(archive_link)?;
     let links: ArchiveLinks = serde_json::from_str(&text).map_err(bad_response)?;

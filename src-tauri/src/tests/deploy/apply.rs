@@ -279,9 +279,11 @@ fn an_edit_made_during_apply_survives_and_becomes_a_draft() {
             let data = f.data.game(SLOT_GAME);
             let mut profiles = crate::context::load_profiles(&data).unwrap();
             profiles.active_mut().name = "Edited during apply".to_string();
+
             if let Some(entry) = profiles.active_mut().mods.first_mut() {
                 entry.enabled = false;
             }
+
             data.save_profiles(&profiles).unwrap();
         }
     })
@@ -345,6 +347,7 @@ fn an_external_root_deploys_to_the_overlay_layer() {
     let zip = base.join("GoodModlet.zip");
     let mut writer = zip::ZipWriter::new(fs::File::create(&zip).unwrap());
     let options = zip::write::SimpleFileOptions::default();
+
     for (name, text) in [
         ("GoodModlet/ModInfo.xml", "<xml/>"),
         ("GoodModlet/Config/items.xml", "<items/>"),
@@ -353,6 +356,7 @@ fn an_external_root_deploys_to_the_overlay_layer() {
         writer.start_file(name, options).unwrap();
         Write::write_all(&mut writer, text.as_bytes()).unwrap();
     }
+
     writer.finish().unwrap();
     import(&data, EXTERNAL_GAME, &zip, None, &mut |_, _| {}).unwrap();
 

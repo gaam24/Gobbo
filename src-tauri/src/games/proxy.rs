@@ -37,6 +37,7 @@ pub fn native_dlls(
 ) -> Vec<String> {
     let mut candidates: Vec<String> = Vec::new();
     let listed = LOADER_DLLS.iter().map(|name| (*name).to_string());
+
     for name in listed.chain(game.deploy.proxy_dlls()) {
         if !candidates
             .iter()
@@ -45,6 +46,7 @@ pub fn native_dlls(
             candidates.push(name);
         }
     }
+
     candidates
         .into_iter()
         .filter(|name| {

@@ -45,6 +45,7 @@ pub(super) fn open_pack(game_id: &str, path: &Path) -> Result<Opened, AppError> 
         if entry.size() > MAX_MANIFEST_BYTES {
             return Err(AppError::user("pack.invalid").with("detail", "the manifest is too large"));
         }
+
         let mut text = String::new();
         entry
             .take(MAX_MANIFEST_BYTES + 1)
@@ -53,14 +54,18 @@ pub(super) fn open_pack(game_id: &str, path: &Path) -> Result<Opened, AppError> 
         if text.len() as u64 > MAX_MANIFEST_BYTES {
             return Err(AppError::user("pack.invalid").with("detail", "the manifest is too large"));
         }
+
         serde_json::from_str(&text).map_err(|e| AppError::user("pack.invalid").with("detail", e))?
     };
+
     if !SUPPORTED_FORMATS.contains(&manifest.format) {
         return Err(AppError::user("pack.format").with("format", manifest.format));
     }
+
     if manifest.game != game_id {
         return Err(AppError::user("pack.other_game").with("game", &manifest.game));
     }
+
     let archives = (0..zip.len())
         .filter_map(|index| {
             let name = zip.name_for_index(index)?.ok()?.to_string();
@@ -112,12 +117,15 @@ pub fn inspect_pack(root: &Data, game_id: &str, path: &Path) -> Result<PackPrevi
     let (mut total, mut have, mut bundled) = (0, 0, 0);
     let mut missing_mods = Vec::new();
     let mut updates = Vec::new();
+
     for profile in &manifest.profiles {
         for entry in &profile.mods {
             if !seen.insert(entry.family.as_str()) {
                 continue;
             }
+
             total += 1;
+
             if find_version(&view, entry).is_some() {
                 have += 1;
             } else if entry
@@ -130,10 +138,12 @@ pub fn inspect_pack(root: &Data, game_id: &str, path: &Path) -> Result<PackPrevi
                 missing_mods.push(missing(entry));
             }
         }
+
         if let Some(existing) = made_from(&profiles, &manifest.info, &profile.name) {
             updates.push(pack_update(&view, existing, profile));
         }
     }
+
     Ok(PackPreview {
         info: manifest.info.clone(),
         profiles: manifest
@@ -170,6 +180,7 @@ pub(super) fn pack_update(
     for entry in &existing.mods {
         existing_by_family.entry(entry.id.as_str()).or_insert(entry);
     }
+
     let mut update = PackUpdate {
         profile: existing.name.clone(),
         from: existing
@@ -181,6 +192,7 @@ pub(super) fn pack_update(
         removed: Vec::new(),
         updated: Vec::new(),
     };
+
     for (entry, found) in &resolved {
         let old = found
             .as_ref()
@@ -193,6 +205,7 @@ pub(super) fn pack_update(
             _ => {}
         }
     }
+
     let kept: BTreeSet<&str> = resolved
         .iter()
         .filter_map(|(_, found)| found.as_ref().map(|(family, _)| family.as_str()))
@@ -226,9 +239,11 @@ pub mod bench {
         /// Nexus id, as a pack from another library does.
         pub fn new(families: usize, versions: usize, entries: usize) -> Self {
             let mut library = Library::default();
+
             for family in 0..families {
                 let id = format!("nexus:{family}");
                 let nexus = u32::try_from(family).unwrap_or(u32::MAX) + 1;
+
                 for version in 0..versions {
                     let folder = format!("mod{family}_{version}");
                     library.versions.insert(
@@ -258,6 +273,7 @@ pub mod bench {
                         },
                     );
                 }
+
                 library.families.insert(
                     id.clone(),
                     Family {
@@ -267,6 +283,7 @@ pub mod bench {
                     },
                 );
             }
+
             let entries = (0..entries)
                 .map(|entry| {
                     let family = entry % families;

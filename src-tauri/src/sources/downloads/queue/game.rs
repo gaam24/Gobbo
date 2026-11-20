@@ -29,9 +29,11 @@ pub(super) fn game_for_link(
 ) -> Result<(String, String), AppError> {
     let id = provider.id();
     let provider_id = id.as_str();
+
     if let Some(key) = &link.game_key {
         return Ok((game_of(root, provider_id, key)?, key.clone()));
     }
+
     let keys = provider.listed_games(&link.source)?;
     first_game(&keys, |key| game_of(root, provider_id, key).ok()).ok_or_else(|| {
         AppError::user("source.game_not_added")

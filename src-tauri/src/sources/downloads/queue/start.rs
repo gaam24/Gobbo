@@ -30,9 +30,11 @@ impl Downloads {
         let view = DownloadView::new(name, DownloadState::Downloading);
         let (id, stop) = self.push(view, Some(link.to_string()));
         changed(DownloadEvent::Queue(self.list()));
+
         match self.fetch_link(root, id, link, &stop, changed) {
             Ok(()) => {
                 let owned = self.view(id).is_some_and(|view| view.owner.is_some());
+
                 if !self.unpack_tool_download(root, id) && !owned {
                     self.import_download(root, id, changed);
                 }
@@ -48,6 +50,7 @@ impl Downloads {
                 });
             }
         }
+
         changed(DownloadEvent::Queue(self.list()));
     }
 
@@ -69,6 +72,7 @@ impl Downloads {
         if self.start_link(id, &game, &source, owner.as_deref()) {
             return Ok(());
         }
+
         let download_key = parsed.download_key.as_deref().zip(parsed.expires);
         let mut meter = Meter::new();
         let downloaded = fetch_with_progress(
@@ -87,6 +91,7 @@ impl Downloads {
                         view.total_kb = size_kb(total);
                         view.speed_kb = speed;
                     });
+
                     if let Some(view) = self.view(id) {
                         changed(DownloadEvent::Progress(Box::new(view)));
                     }
@@ -108,6 +113,7 @@ impl Downloads {
                 || queued.view.path.as_deref() != Some(path.as_str())
                 || queued.view.state == DownloadState::Installing
         });
+
         if let Some(queued) = queue.iter_mut().find(|queued| queued.view.id == id) {
             let view = &mut queued.view;
             view.state = DownloadState::Ready;
@@ -121,6 +127,7 @@ impl Downloads {
             view.path = Some(path.clone());
             view.source = Some(resolved);
         }
+
         drop(queue);
         // A fresh download of a previously pending archive has no wait: the new import fetches its own choices.
         self.clear_pending_for_path(&path);

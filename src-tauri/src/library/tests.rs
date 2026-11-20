@@ -34,9 +34,11 @@ fn listed(folder: &str, enabled: bool) -> ProfileMod {
 /// Writes one file into each mod folder of `mods`, and loads the library of `base` from a new index.
 fn load_mods(base: &Path, mods: &[&str]) -> Library {
     let library_dir = base.join("library");
+
     for folder in mods {
         write(&library_dir.join(format!("{folder}/content/x.ws")), folder);
     }
+
     Library::load(&base.join(INDEX_FILE), &library_dir, &game()).unwrap()
 }
 

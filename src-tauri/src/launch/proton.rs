@@ -59,9 +59,11 @@ pub(super) fn proton_command(
     let mut env = game_env(settings, true, &native, inherited.as_deref())?;
     env.extend(steam_env(&prefix, &steam, game_root));
     let mut launch = Launch::new(program, args, env, session);
+
     if let Launch::Plain(command) = &mut launch {
         command.current_dir(game_root);
     }
+
     Ok((launch, with_mods, "launch.proton_failed"))
 }
 
@@ -98,6 +100,7 @@ pub(super) fn step_launcher(
     if game.detect.steam_app_ids.is_empty() {
         return Ok(None);
     }
+
     let (prefix, steam, proton) = proton_setup(game, settings, game_root, home)?;
     Ok(Some(Launcher {
         program: proton.display().to_string(),
@@ -114,9 +117,11 @@ fn proton_setup(
     home: &Path,
 ) -> Result<(steam::SteamPrefix, PathBuf, PathBuf), AppError> {
     let prefix = steam_prefix(game, game_root)?;
+
     if !prefix.wine().is_dir() {
         return Err(crate::games::paths::prefix_missing());
     }
+
     let steam = crate::platform::steam_root(home, &prefix.library);
     let proton = proton_for(settings, &steam, &prefix.library, &prefix.app_id)?;
     Ok((prefix, steam, proton))
@@ -150,11 +155,13 @@ fn proton_for(
     app_id: &str,
 ) -> Result<PathBuf, AppError> {
     let chosen = settings.proton_dir.trim();
+
     if chosen.is_empty() {
         return steam_proton(steam, library, app_id)
             .or_else(|| crate::platform::find_proton(steam, library))
             .ok_or_else(|| AppError::user("launch.proton_not_found"));
     }
+
     crate::platform::proton_at(Path::new(chosen))
         .ok_or_else(|| AppError::user("launch.proton_file_missing").with("folder", chosen))
 }

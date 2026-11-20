@@ -41,14 +41,18 @@ where
     Fut: Future<Output = Result<T, AppError>>,
 {
     let from_queue = downloads.importing(path);
+
     if from_queue {
         publish(app, downloads);
     }
+
     let result = import(from_queue).await;
+
     if from_queue {
         downloads.imported(path, queue_outcome(&result));
         publish(app, downloads);
     }
+
     result
 }
 

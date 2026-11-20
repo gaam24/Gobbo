@@ -55,6 +55,7 @@ fn switch_to_default_2(f: &Fixture) {
 fn rewrite_pack(pack: &Path, mut change: impl FnMut(&str, &[u8]) -> Option<Vec<u8>>) {
     let mut reader = zip::ZipArchive::new(fs::File::open(pack).unwrap()).unwrap();
     let mut entries = Vec::new();
+
     for index in 0..reader.len() {
         let mut entry = reader.by_index(index).unwrap();
         let name = entry.name().unwrap().to_string();
@@ -62,17 +63,20 @@ fn rewrite_pack(pack: &Path, mut change: impl FnMut(&str, &[u8]) -> Option<Vec<u
         entry.read_to_end(&mut bytes).unwrap();
         entries.push((name, bytes));
     }
+
     drop(reader);
 
     let temp = pack.with_extension("rewritten");
     let mut writer = zip::ZipWriter::new(fs::File::create(&temp).unwrap());
     let options = zip::write::SimpleFileOptions::default();
+
     for (name, bytes) in entries {
         writer.start_file(&name, options).unwrap();
         writer
             .write_all(&change(&name, &bytes).unwrap_or(bytes))
             .unwrap();
     }
+
     writer.finish().unwrap();
     fs::rename(&temp, pack).unwrap();
 }
@@ -83,6 +87,7 @@ fn set_archive_size(pack: &Path, size: u64) {
         if name != "pack.json" {
             return None;
         }
+
         let mut manifest: serde_json::Value = serde_json::from_slice(bytes).unwrap();
         let mods = manifest["profiles"][0]["mods"].as_array_mut().unwrap();
         let archive = mods
@@ -100,6 +105,7 @@ fn tamper_bundled_archives(pack: &Path) {
         if !name.starts_with("archives/") {
             return None;
         }
+
         let mut changed = bytes.to_vec();
         changed.extend_from_slice(b"tampered");
         Some(changed)
@@ -123,9 +129,11 @@ fn source_with_nexus_sources(name: &str) -> Fixture {
     let game = test_games::slot();
     let mut library = load_library(&data, &game).unwrap();
     let rows = status(&source.data, SLOT_GAME).unwrap().mods;
+
     for (row, nexus) in rows.iter().zip([101, 102]) {
         set_nexus_source(library.families.get_mut(&row.id).unwrap(), nexus, None);
     }
+
     library.save(&data.index()).unwrap();
     save_profile(
         &source.data,
@@ -711,6 +719,7 @@ fn a_group_with_an_out_of_range_member_does_not_break_an_import() {
         if name != "pack.json" {
             return None;
         }
+
         let mut manifest: serde_json::Value = serde_json::from_slice(bytes).unwrap();
         let kind = serde_json::to_value(GroupKind::Bundle).unwrap();
         manifest["profiles"][0]["groups"] =

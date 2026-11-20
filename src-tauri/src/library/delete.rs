@@ -113,15 +113,19 @@ fn delete_locked(
     if !known && folders.is_empty() && !listed {
         return Err(not_in_library(ids.first().map_or("", String::as_str)));
     }
+
     undo_deployments(data, &mut profiles)?;
+
     for folder in &folders {
         remove_version_folder(data, folder)?;
         library.versions.remove(folder);
     }
+
     for id in ids {
         library.families.remove(id);
         profiles.remove_mod(id);
     }
+
     data.save_profiles(&profiles)
 }
 
@@ -160,18 +164,23 @@ pub fn delete_mod_version(
             None
         };
         undo_deployments(data, &mut profiles)?;
+
         if let Some(next) = replacement {
             profiles.replace_version(folder, next);
         }
+
         remove_version_folder(data, folder)?;
         library.versions.remove(folder);
+
         if last {
             library.families.remove(&family);
             profiles.remove_mod(&family);
         }
+
         if used || last {
             data.save_profiles(&profiles)?;
         }
+
         Ok(())
     })
 }
@@ -200,12 +209,15 @@ pub fn delete_unused_versions(
             .collect();
         if !unused.is_empty() {
             undo_deployments(data, &mut profiles, &unused)?;
+
             for folder in &unused {
                 remove_version_folder(data, folder)?;
                 library.versions.remove(folder);
             }
+
             data.save_profiles(&profiles)?;
         }
+
         library.retain_families_of_versions();
         Ok(u32::try_from(unused.len()).unwrap_or(u32::MAX))
     })

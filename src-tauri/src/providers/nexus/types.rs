@@ -94,6 +94,7 @@ impl SourceRef {
         if self.provider.as_str() != "nexus" {
             return None;
         }
+
         Some(NexusSource {
             mod_id: self.mod_id.parse().ok()?,
             file_id: self.file_id.as_deref().and_then(|id| id.parse().ok()),
@@ -207,6 +208,7 @@ impl TryFrom<SourceRequirement> for NexusRequirement {
         if requirement.source.provider.as_str() != "nexus" {
             return Err(AppError::unexpected("the requirement is not a Nexus mod"));
         }
+
         Ok(Self {
             mod_id,
             name: requirement.name,

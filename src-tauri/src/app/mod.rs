@@ -120,6 +120,7 @@ pub fn run() {
             if let Ok(exe_dir) = crate::infra::storage::exe_dir() {
                 crate::update::swap::cleanup_leftovers(&exe_dir);
             }
+
             if let Ok(resources) = app.path().resource_dir()
                 && let Some(games) = bundled_resource(&resources, "games")
             {
@@ -127,6 +128,7 @@ pub fn run() {
                     .unwrap_or_else(|| resources.join("loaders"));
                 games::set_definition_dirs(games, loaders);
             }
+
             let dir = app.path().app_data_dir()?;
             let data = match crate::context::open(dir.clone(), &crate::providers::archive_name_from)
             {
@@ -147,11 +149,13 @@ pub fn run() {
             app.manage(crate::packs::commands::PackLinkPending::default());
             app.manage(crate::sources::update::manual::ManualUpdateSessions::default());
             let settings = crate::settings::config::load_app_settings(&app.state::<Data>());
+
             if settings.remember_window
                 && let Some(window) = app.get_webview_window("main")
             {
                 let _ = window.restore_state(StateFlags::all());
             }
+
             if let Some(window) = app.get_webview_window("main") {
                 crate::settings::config::apply_efficiency(
                     settings.efficiency_mode,
@@ -159,9 +163,11 @@ pub fn run() {
                     window.is_minimized().unwrap_or(false),
                 );
             }
+
             if let Err(error) = crate::tray::init(app.handle()) {
                 crate::infra::log::warn(format!("could not start the system tray: {error}"));
             }
+
             commands::watch_links(app);
             Ok(())
         })
@@ -170,10 +176,12 @@ pub fn run() {
     // Portable and custom mode put every Tauri app directory in one folder: `app_data_dir`, the window state file and
     // the default webview profile all follow it. Global mode keeps today's layout and needs no override.
     let mut context = tauri::generate_context!();
+
     if let Some(root) = storage.tauri_root() {
         context.config_mut().app.app_directories_override =
             Some(AppDirectoriesOverride::Root(root));
     }
+
     if let Err(error) = app.run(context) {
         crate::infra::log::error(format!("could not run the window: {error}"));
         std::process::exit(1);
@@ -184,6 +192,7 @@ pub fn run() {
 /// platform, so both layouts are accepted.
 fn bundled_resource(resources: &Path, name: &str) -> Option<PathBuf> {
     let bundled = resources.join(name);
+
     if bundled.join(name).is_dir() {
         Some(bundled.join(name))
     } else if bundled.is_dir() {
@@ -266,6 +275,7 @@ mod tests {
                 "the provider scheme {scheme} is not configured"
             );
         }
+
         assert!(
             configured.contains(&"gobbo"),
             "the pack scheme is not configured"

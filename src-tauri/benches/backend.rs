@@ -72,6 +72,7 @@ fn tail(c: &mut Criterion) {
     if std::fs::write(&path, body).is_err() {
         return;
     }
+
     c.bench_function("tail/500 of 20k lines", |b| {
         b.iter(|| tail_lines(black_box(&path), 500));
     });
@@ -108,9 +109,11 @@ fn plan(c: &mut Criterion) {
     let winners = BTreeMap::new();
 
     let mut group = c.benchmark_group("plan");
+
     for (mods, files) in [(1_000, 100), (1_000, 20)] {
         let (library, profile) = synthetic_library(mods, files);
         let inputs = library.inputs(&profile);
+
         for (name, mode) in [("full", PlanMode::Full), ("summary", PlanMode::Summary)] {
             group.bench_with_input(
                 BenchmarkId::new(name, format!("{mods} x {files}")),
@@ -128,6 +131,7 @@ fn plan(c: &mut Criterion) {
             );
         }
     }
+
     group.finish();
 }
 
@@ -269,6 +273,7 @@ fn watch(c: &mut Criterion) {
     if std::env::var_os("GOBBO_BENCH_WATCH").is_none() {
         return;
     }
+
     let fixture = WatchFixture::new(50_000);
     c.bench_function("watch/take 50k", |b| {
         b.iter(|| black_box(fixture.take()));

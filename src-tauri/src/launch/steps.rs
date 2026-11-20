@@ -46,6 +46,7 @@ pub fn run_steps(
             state,
         )
     });
+
     if let Some((session, _)) = &session {
         for step in game
             .steps
@@ -55,16 +56,20 @@ pub fn run_steps(
             overlay::clear_outputs(session, step)?;
         }
     }
+
     if planned.is_empty() {
         return Ok(());
     }
+
     let Some((session, state)) = session else {
         for id in &planned {
             record_step_skipped(data, id, phase);
         }
+
         return Ok(());
     };
     let launcher = launcher_of(game, settings, home)?;
+
     for id in planned {
         record_step_running(data, &id, phase);
         let Some(step) = game.step(&id, phase) else {
@@ -75,6 +80,7 @@ pub fn run_steps(
             );
             return Err(error);
         };
+
         match overlay::run_step(&state, &session, step, launcher.as_ref()) {
             Ok(ran) => {
                 let (status, code) = if ran {
@@ -93,6 +99,7 @@ pub fn run_steps(
             }
         }
     }
+
     Ok(())
 }
 
@@ -218,6 +225,7 @@ fn log_tail(session: &Session, step: &games::Step) -> Vec<String> {
 /// `mod_steps.toml` from the game's data folder. Without the file no mod asks for steps.
 pub fn load_mod_steps(data: &Data) -> Result<ModSteps, AppError> {
     let path = data.dir.join(MOD_STEPS_FILE);
+
     match std::fs::read_to_string(&path) {
         Ok(text) => ModSteps::parse(&text).map_err(|e| {
             AppError::user("steps.file_invalid")

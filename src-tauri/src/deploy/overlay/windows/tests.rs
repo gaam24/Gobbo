@@ -69,10 +69,12 @@ fn deploy_mod_a(library: &Path, target: &Target) -> Session {
 fn run_batch(session: &Session, dir: &Path, lines: &[String]) -> i32 {
     let script = dir.join("probe.cmd");
     let mut body = String::from("@echo off\r\n");
+
     for line in lines {
         body.push_str(line);
         body.push_str("\r\n");
     }
+
     fs::write(&script, body).unwrap();
     run(
         session,

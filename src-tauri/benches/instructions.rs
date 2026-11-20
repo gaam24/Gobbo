@@ -36,9 +36,11 @@ fn path_key_2() -> String {
         "Content/scripts/gameplay/items/definitions/appearances.xml",
     ];
     let mut key = String::new();
+
     for path in paths {
         key = path_key(black_box(path));
     }
+
     black_box(key)
 }
 

@@ -72,10 +72,12 @@ impl<'a> LayoutPlan<'a> {
             })
             .collect();
         let mut mirrors_by_first: Vec<(&str, Vec<usize>)> = Vec::new();
+
         for (at, rule) in mirrors.iter().enumerate() {
             let Some(&first) = rule.dir.first() else {
                 continue;
             };
+
             if let Some((_, indices)) = mirrors_by_first
                 .iter_mut()
                 .find(|(known, _)| known.eq_ignore_ascii_case(first))
@@ -85,6 +87,7 @@ impl<'a> LayoutPlan<'a> {
                 mirrors_by_first.push((first, vec![at]));
             }
         }
+
         let protected: Vec<Vec<&str>> = deploy.protected.iter().map(|dir| split_dir(dir)).collect();
         let aliases: Vec<(&str, Vec<&str>)> = deploy
             .aliases
@@ -107,6 +110,7 @@ impl<'a> LayoutPlan<'a> {
                 place_folders.push(first);
             }
         }
+
         for root in base_roots {
             if !place_folders
                 .iter()
@@ -115,7 +119,9 @@ impl<'a> LayoutPlan<'a> {
                 place_folders.push(root.as_str());
             }
         }
+
         let mut game_folders = place_folders.clone();
+
         for first in deploy
             .aliases
             .keys()
@@ -128,6 +134,7 @@ impl<'a> LayoutPlan<'a> {
                 game_folders.push(first);
             }
         }
+
         Self {
             deploy,
             slots,
@@ -149,9 +156,11 @@ impl<'a> LayoutPlan<'a> {
         let [first, rest @ ..] = parts.as_slice() else {
             return;
         };
+
         if rest.is_empty() {
             return;
         }
+
         let Some((_, target)) = self
             .aliases
             .iter()
@@ -168,21 +177,25 @@ impl<'a> LayoutPlan<'a> {
         let mut top: Option<&str> = None;
         let mut inside = false;
         let mut repeated = false;
+
         for (_, parts) in files {
             let [first, second, ..] = parts.as_slice() else {
                 continue;
             };
+
             match top {
                 None => top = Some(first),
                 Some(known) if !known.eq_ignore_ascii_case(first) => return 0,
                 Some(_) => {}
             }
+
             inside |= self
                 .game_folders
                 .iter()
                 .any(|known| known.eq_ignore_ascii_case(second));
             repeated |= first.eq_ignore_ascii_case(second);
         }
+
         let Some(top) = top else {
             return 0;
         };
@@ -206,9 +219,11 @@ impl<'a> LayoutPlan<'a> {
         let same_name = files.iter().any(|(_, parts)| {
             parts.len() > 1 && parts[1..].iter().any(|part| stem_eq_ignore_case(part, top))
         });
+
         if same_name {
             return 0;
         }
+
         usize::from(inside)
     }
 
@@ -222,6 +237,7 @@ impl<'a> LayoutPlan<'a> {
         archive_name: &str,
     ) -> Result<Option<(String, String, String)>, InstallError> {
         let whole = || archive_name.to_string();
+
         if let Some(rel) = self.mirrored(parts) {
             return Ok(Some((whole(), String::new(), rel)));
         }
@@ -239,6 +255,7 @@ impl<'a> LayoutPlan<'a> {
         {
             return Ok(Some((whole(), String::new(), rel)));
         }
+
         let in_unit = |unit: &Unit<'_>| -> Option<(String, String, String)> {
             if parts.len() <= unit.root.len()
                 || !starts_with_path(parts, &unit.root)
@@ -246,6 +263,7 @@ impl<'a> LayoutPlan<'a> {
             {
                 return None;
             }
+
             let group = unit
                 .root
                 .last()
@@ -258,6 +276,7 @@ impl<'a> LayoutPlan<'a> {
         if let Some(found) = index.candidates(parts).flatten().copied().find_map(in_unit) {
             return Ok(Some(found));
         }
+
         for rule in &self.slots {
             if parts.len() <= rule.dir.len()
                 || !starts_with_path(parts, &rule.dir)
@@ -274,6 +293,7 @@ impl<'a> LayoutPlan<'a> {
             };
             return Ok(Some((group, rule.slot.dir.clone(), rel)));
         }
+
         for dir in &self.protected {
             if parts.len() > dir.len() && starts_with_path(parts, dir) {
                 return Err(InstallError::UnsupportedRoot {
@@ -281,6 +301,7 @@ impl<'a> LayoutPlan<'a> {
                 });
             }
         }
+
         if let [file] = parts
             && let Some(rule) = self.slots.iter().find(|rule| {
                 !rule.slot.root_extensions.is_empty()
@@ -295,9 +316,11 @@ impl<'a> LayoutPlan<'a> {
         {
             return Ok(Some((whole(), String::new(), rel)));
         }
+
         if self.deploy.full_root && parts.len() > 1 {
             return Ok(Some((whole(), String::new(), parts.join("/"))));
         }
+
         Ok(None)
     }
 
@@ -311,12 +334,14 @@ impl<'a> LayoutPlan<'a> {
             .find(|(known, _)| first.eq_ignore_ascii_case(known))?;
         for &at in indices {
             let rule = &self.mirrors[at];
+
             if starts_with_path(parts, &rule.dir)
                 && extension_allowed(parts, &rule.mirror.extensions)
             {
                 return Some(mirror_path(rule, parts));
             }
         }
+
         None
     }
 }

@@ -39,18 +39,22 @@ impl<'a> LayoutRules<'a> {
     /// The files of `files` a summary must materialize under the prepared rules.
     pub fn profile(&self, files: &[String]) -> LayoutProfile {
         let mirrored_only = self.deploy.mirrored_only(files);
+
         if mirrored_only {
             return LayoutProfile {
                 materialized: Materialized::All,
                 mirrored_only: true,
             };
         }
+
         let mut indices = Vec::new();
+
         for (index, rel) in files.iter().enumerate() {
             if self.deploy.keeps_game_path(rel) || self.shared.matches(rel) {
                 indices.push(u32::try_from(index).unwrap_or(u32::MAX));
             }
         }
+
         let materialized = if files.is_empty() || indices.is_empty() {
             Materialized::None
         } else if indices.len() == files.len() {
@@ -100,6 +104,7 @@ pub fn plan_with_mode(
             });
             continue;
         }
+
         let slot = deploy.slot(&m.slot);
         // A mod whose files all mirror game paths has no folder of its own. The library's profile already answered
         // this; a library built in memory still scans its list.
@@ -114,6 +119,7 @@ pub fn plan_with_mode(
             }
             _ => None,
         };
+
         if let (Some(priority), Some(folder)) = (m.priority, &own_folder) {
             plan.settings.push(SettingsRow {
                 folder: folder.clone(),
@@ -121,6 +127,7 @@ pub fn plan_with_mode(
                 priority,
             });
         }
+
         if !m.enabled {
             continue;
         }
@@ -165,12 +172,14 @@ pub fn plan_with_mode(
             // When every file of the mod mirrors a game path, the per-file check is already known to be true.
             let mirrored = mirrored_only || (may_keep_path && deploy.keeps_game_path(rel));
             let shared_rule = !mirrored && !flat && may_share && shared.matches(rel);
+
             if !full && !mirrored && !flat && !shared_rule {
                 // The file stays in the mod's own folder and cannot meet another mod. It still counts, but it does
                 // not need a destination string or a `PlannedFile`.
                 not_materialized = not_materialized.saturating_add(1);
                 return;
             }
+
             let (dest, game_path) = destination(slot, own_folder.as_deref(), rel, mirrored);
             let source = *source_at.get_or_insert_with(|| {
                 let at = u32::try_from(plan.sources.len()).unwrap_or(u32::MAX);
@@ -225,6 +234,7 @@ pub fn plan_with_mode(
                 contest.entries.push(planned);
             }
         };
+
         if let Some(indices) = selected {
             for &index in indices {
                 if let Some(rel) = m.files.get(index as usize) {
@@ -238,6 +248,7 @@ pub fn plan_with_mode(
         } else {
             let mut files: Vec<(usize, &String)> = m.files.iter().enumerate().collect();
             files.sort_unstable_by_key(|(_, left)| *left);
+
             for (index, rel) in files {
                 place(index, rel);
             }
@@ -245,9 +256,11 @@ pub fn plan_with_mode(
     }
 
     settle_contests(contests, winners, &mut plan);
+
     if full {
         check_file_folder_collisions(&mut plan);
     }
+
     plan.file_count = u32::try_from(plan.files.len())
         .unwrap_or(u32::MAX)
         .saturating_add(not_materialized);
@@ -262,15 +275,20 @@ fn check_file_folder_collisions(plan: &mut DeployPlan) {
     let capacity: usize = plan.files.iter().map(|file| file.dest.len() + 1).sum();
     let mut arena = String::with_capacity(capacity);
     let mut ranges: Vec<std::ops::Range<usize>> = Vec::with_capacity(plan.files.len());
+
     for file in &plan.files {
         ranges.push(path_key_into(&file.dest, &mut arena));
     }
+
     let destinations: FxHashSet<&str> = ranges.iter().map(|range| &arena[range.clone()]).collect();
+
     for (file, range) in plan.files.iter().zip(&ranges) {
         let key = &arena[range.clone()];
         let mut at = key.len();
+
         while let Some(slash) = key[..at].rfind('/') {
             at = slash;
+
             if destinations.contains(&key[..at]) {
                 plan.problems.push(Problem::FileFolderCollision {
                     path: file.dest.clone(),
@@ -334,6 +352,7 @@ fn settle_contests(
             })
         });
         let winner = entries.remove(chosen.unwrap_or(0));
+
         if !entries.is_empty() {
             let winner_id = plan.family(&winner).to_string();
             let losers: Vec<String> = entries
@@ -346,6 +365,7 @@ fn settle_contests(
                 losers,
             });
         }
+
         plan.files.push(winner);
     }
 }

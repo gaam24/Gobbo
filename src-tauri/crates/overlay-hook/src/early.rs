@@ -24,8 +24,10 @@ pub(crate) fn restore() {
         return;
     };
     let mut stubs = 0;
+
     for line in text.lines() {
         let mut parts = line.split_whitespace();
+
         match (parts.next(), parts.next(), parts.next()) {
             (Some("config"), Some(address), None) => match parse_address(address) {
                 Some(address) => write(address, &0u32.to_le_bytes()),
@@ -43,6 +45,7 @@ pub(crate) fn restore() {
             _ => {}
         }
     }
+
     log(&format!(
         "early redirect: {stubs} stubs handed back to the hook"
     ));
@@ -57,6 +60,7 @@ fn parse_hex(text: &str) -> Option<Vec<u8>> {
     if !text.len().is_multiple_of(2) {
         return None;
     }
+
     (0..text.len())
         .step_by(2)
         .map(|at| u8::from_str_radix(text.get(at..at + 2)?, 16).ok())
@@ -77,6 +81,7 @@ fn write(address: usize, bytes: &[u8]) {
             &mut old,
         )
     };
+
     if protected == FALSE {
         log("early redirect: a page could not be made writable");
         return;
@@ -115,6 +120,7 @@ mod tests {
         // other test reads this variable.
         unsafe { std::env::set_var(ENV_EARLY, &path) };
         restore();
+
         unsafe { std::env::remove_var(ENV_EARLY) };
         assert_eq!(&stub[..4], &[0x4C, 0x8B, 0xD1, 0xB8]);
         assert_eq!(config, [0, 0, 0, 0]);

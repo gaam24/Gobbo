@@ -43,12 +43,14 @@ pub fn statuses(
 ) -> StatusSet {
     let view = LibraryView::new(library);
     let mut statuses = BTreeMap::new();
+
     for item in &plan.items {
         statuses.insert(
             item.key.clone(),
             status(item, library, &view, profile, origin),
         );
     }
+
     let counts = CollectionCounts::of(plan, &statuses);
     StatusSet { statuses, counts }
 }
@@ -63,9 +65,11 @@ fn status(
     if origin.is_some_and(|origin| origin.excluded.iter().any(|key| key == &item.key)) {
         return CollectionItemStatus::Skipped;
     }
+
     if origin.is_some_and(|origin| origin.manual.iter().any(|key| key == &item.key)) {
         return CollectionItemStatus::Manual;
     }
+
     let provider = match &item.source {
         CollectionSource::Provider { .. } => true,
         CollectionSource::Bundle { .. } | CollectionSource::Direct { .. } => false,
@@ -75,6 +79,7 @@ fn status(
         CollectionSource::Unsupported { .. } => return CollectionItemStatus::Unsupported,
     };
     let wanted = item.wanted();
+
     if profile
         .waiting
         .iter()
@@ -82,10 +87,12 @@ fn status(
     {
         return CollectionItemStatus::Queued;
     }
+
     let Some(found) = view.find(&wanted, None) else {
         return CollectionItemStatus::Missing;
     };
     let listed = profile.mods.iter().any(|entry| entry.id == found.family);
+
     match found.by {
         // A provider member names its page: a local mod that only shares its name is not it.
         FoundBy::Name if provider => CollectionItemStatus::Missing,

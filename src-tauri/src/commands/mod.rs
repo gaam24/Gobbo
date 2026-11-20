@@ -101,9 +101,11 @@ pub async fn start_detached_task<T: Send + 'static>(
         start(root, game, flag, handle)
     })
     .await;
+
     if let Err(ref error) = result {
         tasks.finish(&key, task_state_for_failure(error));
     }
+
     result
 }
 
@@ -134,9 +136,11 @@ pub async fn start_task<T: Send + 'static>(
 ) -> Result<T, AppError> {
     let done_key = key.clone();
     let result = start_detached_task(data, tasks, key, game, kind, work).await;
+
     if result.is_ok() {
         tasks.finish(&done_key, task_commands::state::DONE);
     }
+
     result
 }
 
@@ -229,6 +233,7 @@ macro_rules! game_commands {
         ) -> Result<$out, $crate::error::AppError> {
             $crate::commands::for_game(data, game, move |$root, $game| $body).await
         }
+
         $crate::commands::game_commands!($($rest)*);
     };
     ($(#[$doc:meta])* query $name:ident() -> $out:ty = $work:path; $($rest:tt)*) => {
@@ -241,6 +246,7 @@ macro_rules! game_commands {
         ) -> Result<$out, $crate::error::AppError> {
             $crate::commands::for_game(data, game, $work).await
         }
+
         $crate::commands::game_commands!($($rest)*);
     };
     (
@@ -258,6 +264,7 @@ macro_rules! game_commands {
         ) -> Result<$crate::status::views::Status, $crate::error::AppError> {
             $crate::commands::change(data, game, move |$root, $game| $body).await
         }
+
         $crate::commands::game_commands!($($rest)*);
     };
     ($(#[$doc:meta])* change $name:ident() = $work:path; $($rest:tt)*) => {
@@ -270,9 +277,11 @@ macro_rules! game_commands {
         ) -> Result<$crate::status::views::Status, $crate::error::AppError> {
             $crate::commands::change(data, game, $work).await
         }
+
         $crate::commands::game_commands!($($rest)*);
     };
 }
+
 pub(crate) use game_commands;
 
 /// Commands that the frontend sees. The `collect_commands!` invocation is generated at build time from `commands.txt`,

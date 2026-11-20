@@ -52,6 +52,7 @@ pub(crate) unsafe extern "system" fn nt_create_file(
         );
         return STATUS_OBJECT_NAME_COLLISION;
     }
+
     let writing = writes_requested(access) || (disposition != FILE_OPEN);
     let keeps_contents = !matches!(
         disposition,
@@ -89,6 +90,7 @@ pub(crate) unsafe extern "system" fn nt_create_file(
     let _last_error = PreserveLastError::capture();
     trace_status("NtCreateFile result", result);
     drop(guard);
+
     unsafe { after_open(attributes, result, options) };
     result
 }
@@ -128,6 +130,7 @@ pub(crate) unsafe extern "system" fn nt_open_file(
     let _last_error = PreserveLastError::capture();
     trace_status("NtOpenFile result", result);
     drop(guard);
+
     unsafe { after_open(attributes, result, options) };
     result
 }
@@ -149,6 +152,7 @@ unsafe fn redirect_open(
         Some(_guard) => unsafe { redirect_nt(attributes, writing, keeps_contents) },
         None => None,
     };
+
     if let Some(Err(failure)) = &redirected {
         record_decision(
             Kind::Refuse,
@@ -157,6 +161,7 @@ unsafe fn redirect_open(
             || unsafe { object_name(attributes) },
         );
     }
+
     if guard.is_some() && redirected.is_none() && writing && crate::diag::settings().pass_writes {
         let name = unsafe { object_name(attributes) };
         let extra = disposition.map_or_else(String::new, |d| format!(" disposition={d}"));
@@ -165,6 +170,7 @@ unsafe fn redirect_open(
         ));
         record_decision(Kind::PassThrough, Layer::None, 0, || name);
     }
+
     redirected
 }
 
@@ -177,6 +183,7 @@ unsafe fn after_open(attributes: *const ObjectAttributes, status: i32, options: 
     if status < 0 || options & FILE_DELETE_ON_CLOSE == 0 {
         return;
     }
+
     let Some(_guard) = enter_session() else {
         return;
     };

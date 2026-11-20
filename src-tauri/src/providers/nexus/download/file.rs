@@ -126,6 +126,7 @@ pub(super) fn download_error(error: AppError) -> AppError {
     if error.code != "http.status" {
         return error;
     }
+
     match error.params.get("code").map(String::as_str) {
         Some("410") => AppError::user("nexus.link_expired"),
         Some("403" | "404") => AppError::user(crate::error::DOWNLOAD_UNAVAILABLE),

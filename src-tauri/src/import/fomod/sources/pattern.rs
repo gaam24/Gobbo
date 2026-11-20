@@ -40,11 +40,13 @@ impl SourcePattern {
         if self.source.is_empty() {
             return false;
         }
+
         if let Some((head, tail)) = &self.around {
             return entry.len() >= head.len() + tail.len()
                 && entry.starts_with(head.as_str())
                 && entry.ends_with(tail.as_str());
         }
+
         if self.wildcard {
             wildcard(&self.source, entry)
         } else {
@@ -105,17 +107,23 @@ pub fn normalize_path_into(path: &str, normalized: &mut String) {
             }
         }
     }
+
     let mut start = usize::from(normalized.starts_with("./")) * 2;
+
     while normalized.as_bytes().get(start) == Some(&b'/') {
         start += 1;
     }
+
     let mut end = normalized.len();
+
     while end > start && normalized.as_bytes().get(end - 1) == Some(&b'/') {
         end -= 1;
     }
+
     if start > 0 {
         normalized.drain(..start);
     }
+
     normalized.truncate(end.saturating_sub(start));
 }
 
@@ -127,6 +135,7 @@ const fn wildcard(pattern: &str, text: &str) -> bool {
     let (mut pattern_at, mut text_at) = (0, 0);
     let mut star = None;
     let mut star_text_at = 0;
+
     while text_at < text.len() {
         if pattern_at < pattern.len() && pattern[pattern_at] == text[text_at] {
             pattern_at += 1;
@@ -143,9 +152,11 @@ const fn wildcard(pattern: &str, text: &str) -> bool {
             return false;
         }
     }
+
     while pattern_at < pattern.len() && pattern[pattern_at] == b'*' {
         pattern_at += 1;
     }
+
     pattern_at == pattern.len()
 }
 

@@ -54,13 +54,17 @@ impl<T> FileCache<T> {
         parse: impl FnOnce() -> Result<T, AppError>,
     ) -> Result<Arc<T>, AppError> {
         let key = Key::of(path);
+
         if let Some(hit) = key.as_ref().and_then(|key| self.hit(key)) {
             return Ok(hit);
         }
+
         let value = Arc::new(parse()?);
+
         if let Some(key) = key {
             self.put(key, Arc::clone(&value));
         }
+
         Ok(value)
     }
 
@@ -181,6 +185,7 @@ mod tests {
         let dir = scratch!("file-cache-missing");
         let cache = FileCache::default();
         let mut parses = 0;
+
         for _ in 0..2 {
             cache
                 .load(&dir.join("library.json"), || {
@@ -189,6 +194,7 @@ mod tests {
                 })
                 .unwrap();
         }
+
         assert_eq!(parses, 2);
     }
 }

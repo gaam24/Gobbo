@@ -39,6 +39,7 @@ pub fn apply_with_progress(
     progress: &mut dyn FnMut(DeployProgress),
 ) -> Result<ApplyReport, DeployError> {
     let journal = Journal::new(target.state.join(JOURNAL_FILE));
+
     if journal.exists() {
         if journal.is_complete() {
             return Err(DeployError::AlreadyApplied);
@@ -53,14 +54,17 @@ pub fn apply_with_progress(
             Err(error) => return Err(error),
         }
     }
+
     if !plan.problems.is_empty() {
         return Err(DeployError::Blocked(plan.problems.clone()));
     }
+
     if let Some(settings) = &target.settings
         && !settings.parent().is_some_and(Path::is_dir)
     {
         return Err(FileError::new(settings, io::Error::from(io::ErrorKind::NotFound)).into());
     }
+
     fs::create_dir_all(&target.state).map_err(|e| FileError::new(&target.state, e))?;
 
     let report = overlay::prepare_with_progress(plan, library, target, &journal, progress)?;
@@ -86,16 +90,19 @@ fn mark_complete(
 /// list that produced it.
 fn plan_fingerprint(plan: &DeployPlan) -> String {
     let mut hasher = FxHasher::default();
+
     for file in &plan.files {
         file.dest.hash(&mut hasher);
         file.source.hash(&mut hasher);
         file.file.hash(&mut hasher);
     }
+
     for row in &plan.settings {
         row.folder.hash(&mut hasher);
         row.enabled.hash(&mut hasher);
         row.priority.hash(&mut hasher);
     }
+
     format!("{:016x}", hasher.finish())
 }
 
@@ -105,6 +112,7 @@ fn settings_source(target: &Target, path: &Path) -> PathBuf {
     if path.is_file() {
         return path.to_path_buf();
     }
+
     target
         .user_data
         .iter()
@@ -112,6 +120,7 @@ fn settings_source(target: &Target, path: &Path) -> PathBuf {
             if !set.redirects() {
                 return None;
             }
+
             let relative = path.strip_prefix(&set.upper).ok()?;
             let lower = set.base.join(relative);
             lower.is_file().then_some(lower)
@@ -139,9 +148,11 @@ pub fn write_settings(
         existed: before.is_some(),
         touched,
     })?;
+
     if !changed {
         return Ok(());
     }
+
     settings::write(path, &text)
 }
 
@@ -158,15 +169,19 @@ pub(super) fn layer_jobs(
     base: &Path,
 ) -> Result<Vec<Job>, DeployError> {
     let mut jobs = Vec::with_capacity(plan.files.len());
+
     for file in &plan.files {
         let src = library.join(plan.folder(file)).join(plan.rel_path(file));
+
         if !src.is_file() {
             return Err(DeployError::MissingFile { path: src });
         }
+
         let dst = base.join(&file.dest);
         let dir = dst.parent().unwrap_or(base).to_path_buf();
         jobs.push(Job { src, dst, dir });
     }
+
     Ok(jobs)
 }
 

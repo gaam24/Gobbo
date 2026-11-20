@@ -84,9 +84,11 @@ pub fn overwrite_to_mod(root: &Data, game_id: &str, name: &str) -> Result<(), Ap
     let _profiles = lock_profiles();
     let (game, data, settings) = load_stopped(root, game_id)?;
     let name = name.trim();
+
     if name.is_empty() {
         return Err(AppError::user("overwrite.name_empty"));
     }
+
     let inner = deployment_root(&game, &settings)
         .ok()
         .and_then(|root| {
@@ -101,6 +103,7 @@ pub fn overwrite_to_mod(root: &Data, game_id: &str, name: &str) -> Result<(), Ap
     } else {
         Vec::new()
     };
+
     if files.is_empty() {
         return Err(AppError::user("overwrite.empty"));
     }
@@ -108,14 +111,18 @@ pub fn overwrite_to_mod(root: &Data, game_id: &str, name: &str) -> Result<(), Ap
     let library_dir = data.library();
     let folder = free_library_folder(&library_dir, name);
     let target = library_dir.join(&folder);
+
     for file in &files {
         let to = target.join(file);
+
         if let Some(parent) = to.parent() {
             fs::create_dir_all(parent).map_err(io_at(parent))?;
         }
+
         let from = source.join(file);
         fs::rename(&from, &to).map_err(io_at(&from))?;
     }
+
     remove_empty_dirs(&overwrite_dir(&data));
 
     let mut library = load_library(&data, &game)?;
@@ -150,9 +157,11 @@ pub fn clear_overwrite(root: &Data, game_id: &str) -> Result<(), AppError> {
     let _state = crate::context::lock_state(&root.dir)?;
     games::load(game_id)?;
     let data = root.game(game_id);
+
     if game_running(root, game_id)? {
         return Err(game_is_running_error());
     }
+
     let folder = overwrite_dir(&data);
     crate::infra::fs::remove_dir_if_exists(&folder).map_err(io_at(&folder))
 }
@@ -171,8 +180,10 @@ fn remove_empty_dirs(dir: &Path) {
     let Ok(entries) = fs::read_dir(dir) else {
         return;
     };
+
     for entry in entries.filter_map(Result::ok) {
         let path = entry.path();
+
         if path.is_dir() {
             remove_empty_dirs(&path);
             let _ = fs::remove_dir(&path);

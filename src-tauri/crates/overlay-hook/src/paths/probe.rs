@@ -58,9 +58,11 @@ pub(crate) fn probe(path: &Path) -> Probe {
     // The common path fits in one stack buffer. A long path takes the allocating `verbatim_wide` fallback, because it
     // needs the `\\?\` prefix that the plain Win32 call does not add itself.
     let mut stack = [0u16; MAX_PATH_UNITS];
+
     if let Some(length) = encode_units(path.as_os_str(), &mut stack) {
         return probe_units(&stack[..=length]);
     }
+
     let wide = verbatim_wide(path);
     probe_units(&wide)
 }
@@ -69,9 +71,11 @@ pub(crate) fn probe(path: &Path) -> Probe {
 /// back to the allocating `join` and `probe`.
 pub(crate) fn probe_child(base: &Path, rel: &str) -> Probe {
     let mut units = [0u16; CHILD_PATH_UNITS];
+
     if let Some(length) = encode_child(base.as_os_str(), rel, &mut units) {
         return probe_units(&units[..=length]);
     }
+
     probe(&join(base, rel))
 }
 
@@ -80,6 +84,7 @@ pub(crate) fn probe_units(units: &[u16]) -> Probe {
     crate::stat_probe();
     // SAFETY: `units` is NUL-terminated and lives until the call returns.
     let attributes = unsafe { GetFileAttributesW(units.as_ptr()) };
+
     if attributes != INVALID_FILE_ATTRIBUTES {
         return Probe::Found { attributes };
     }
@@ -90,13 +95,16 @@ pub(crate) fn probe_units(units: &[u16]) -> Probe {
 /// Writes `text` and its terminator into `buffer`, or returns `None` when it does not fit.
 fn encode_units(text: &OsStr, buffer: &mut [u16]) -> Option<usize> {
     let mut length = 0;
+
     for unit in text.encode_wide() {
         if length >= buffer.len() - 1 {
             return None;
         }
+
         buffer[length] = unit;
         length += 1;
     }
+
     buffer[length] = 0;
     Some(length)
 }
@@ -105,29 +113,36 @@ fn encode_units(text: &OsStr, buffer: &mut [u16]) -> Option<usize> {
 /// trailing separator, and an empty `rel` leaves `base` as it is.
 fn encode_child(base: &OsStr, rel: &str, buffer: &mut [u16]) -> Option<usize> {
     let mut length = 0;
+
     for unit in base.encode_wide() {
         if length >= buffer.len() - 2 {
             return None;
         }
+
         buffer[length] = unit;
         length += 1;
     }
+
     if !rel.is_empty() {
         if length > 0 && buffer[length - 1] != u16::from(b'\\') {
             if length >= buffer.len() - 2 {
                 return None;
             }
+
             buffer[length] = u16::from(b'\\');
             length += 1;
         }
+
         for unit in rel.encode_utf16() {
             if length >= buffer.len() - 1 {
                 return None;
             }
+
             buffer[length] = unit;
             length += 1;
         }
     }
+
     buffer[length] = 0;
     Some(length)
 }
@@ -138,6 +153,7 @@ fn classify(attributes: u32, error: u32) -> Probe {
     if attributes != INVALID_FILE_ATTRIBUTES {
         return Probe::Found { attributes };
     }
+
     match error {
         ERROR_FILE_NOT_FOUND => Probe::Missing(Missing::File),
         ERROR_PATH_NOT_FOUND => Probe::Missing(Missing::Folder),
@@ -155,13 +171,17 @@ const CHILD_PATH_UNITS: usize = MAX_PATH_UNITS * 2;
 /// `\\?\` prefix itself, so a long absolute path gets it here (`\\?\UNC\` for a server), as `Path::exists` gets it.
 fn verbatim_wide(path: &Path) -> Vec<u16> {
     let plain = wide(path.as_os_str());
+
     if plain.len() <= MAX_PATH_UNITS || !path.is_absolute() {
         return plain;
     }
+
     let text = path.to_string_lossy();
+
     if text.starts_with(r"\\?\") || text.starts_with(r"\\.\") {
         return plain;
     }
+
     let verbatim = match text.strip_prefix(r"\\") {
         Some(server) => format!(r"\\?\UNC\{server}"),
         None => format!(r"\\?\{text}"),

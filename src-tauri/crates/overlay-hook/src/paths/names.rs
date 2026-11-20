@@ -34,26 +34,32 @@ pub(crate) fn absolute(name: &str) -> Option<String> {
     // paths and verbatim (`\\?\`) paths that `GetFullPathNameW` would refuse without a prefix.
     let bytes = name.as_bytes();
     let drive_absolute = bytes.get(1) == Some(&b':') && matches!(bytes.get(2), Some(b'\\' | b'/'));
+
     if name.starts_with("\\\\") || drive_absolute {
         return Some(name.to_string());
     }
+
     let name = wide(OsStr::new(name));
     let mut size = 260;
+
     loop {
         let mut buffer = vec![0u16; size];
         // SAFETY: `name` is a NUL-terminated path and `buffer` holds `size` units. The call writes at most that many.
         let length = unsafe {
             GetFullPathNameW(name.as_ptr(), size as u32, buffer.as_mut_ptr(), null_mut())
         };
+
         if length == 0 {
             return None;
         }
+
         if (length as usize) < size {
             buffer.truncate(length as usize);
             return Some(String::from_utf16_lossy(&buffer));
         }
         // The call returns the size needed, including the terminator, when the buffer is too small.
         size = length as usize;
+
         if size > 32_768 {
             return None;
         }
@@ -86,6 +92,7 @@ pub(crate) fn place_units(units: &[u16]) -> Option<Place> {
     let mounts = mounts()?;
     let paths = session::paths()?;
     let mut fallback = false;
+
     for (mount, path) in mounts.all().zip(paths.all()) {
         match fast_relative(&path.guest_utf16, &path.short_guest_utf16, units) {
             Fast::Inside(rel) => return Some(Place { mount, rel }),
@@ -93,6 +100,7 @@ pub(crate) fn place_units(units: &[u16]) -> Option<Place> {
             Fast::Fallback => fallback = true,
         }
     }
+
     if !fallback {
         return None;
     }
@@ -108,6 +116,7 @@ pub(crate) fn place_units(units: &[u16]) -> Option<Place> {
     } else {
         None
     };
+
     if let Some(full) = full {
         for (mount, path) in mounts.all().zip(paths.all()) {
             match fast_relative(&path.guest_utf16, &path.short_guest_utf16, full) {
@@ -115,22 +124,26 @@ pub(crate) fn place_units(units: &[u16]) -> Option<Place> {
                 Fast::Outside => {}
                 Fast::Fallback => {
                     let text = String::from_utf16_lossy(full);
+
                     if let Some(rel) = relative_to(&path.guest_text, &text) {
                         return Some(Place { mount, rel });
                     }
                 }
             }
         }
+
         return None;
     }
     // A name too long for the stack buffers keeps the old allocating path.
     let text = String::from_utf16_lossy(units);
     let path = absolute(&text)?;
+
     for (mount, paths) in mounts.all().zip(paths.all()) {
         if let Some(rel) = relative_to(&paths.guest_text, &path) {
             return Some(Place { mount, rel });
         }
     }
+
     None
 }
 
@@ -146,9 +159,11 @@ fn full_path_units<'a>(name: &[u16], output: &'a mut [u16]) -> Option<&'a [u16]>
             null_mut(),
         )
     };
+
     if length == 0 || length as usize >= output.len() {
         return None;
     }
+
     Some(&output[..length as usize])
 }
 
@@ -178,11 +193,13 @@ pub(crate) fn unsafe_units(units: &[u16]) -> bool {
     } else {
         return false;
     };
+
     if word_ci(rest, b"globalroot") {
         let tail = &rest[10..];
         let tail = tail.strip_prefix(&[92]).unwrap_or(tail);
         return !is_named_device(tail);
     }
+
     starts_ci(rest, b"volume{")
 }
 
@@ -239,13 +256,17 @@ unsafe fn units<'a>(name: *const u16) -> Option<&'a [u16]> {
     if name.is_null() {
         return None;
     }
+
     let mut length = 0;
+
     while unsafe { *name.add(length) } != 0 {
         length += 1;
+
         if length > 32_768 {
             return None;
         }
     }
+
     Some(unsafe { slice::from_raw_parts(name, length) })
 }
 
@@ -259,21 +280,26 @@ fn fast_relative(root: &[u16], short: &[u16], units: &[u16]) -> Fast {
     if units.contains(&u16::from(b'/')) {
         return Fast::Fallback;
     }
+
     let units = match strip_verbatim(units) {
         Some(units) => units,
         None => return Fast::Fallback,
     };
+
     if !is_drive_absolute(units) && !is_unc_absolute(units) {
         return Fast::Fallback;
     }
+
     if let Some(rel) = under_root(root, units) {
         return relative_fast(rel);
     }
+
     if !short.is_empty()
         && let Some(rel) = under_root(short, units)
     {
         return relative_fast(rel);
     }
+
     Fast::Outside
 }
 
@@ -282,10 +308,13 @@ fn under_root<'a>(root: &[u16], units: &'a [u16]) -> Option<&'a [u16]> {
     if units.len() < root.len() || !same_folded_wide(&units[..root.len()], root) {
         return None;
     }
+
     let rest = &units[root.len()..];
+
     if rest.is_empty() {
         return Some(&[]);
     }
+
     (rest[0] == u16::from(b'\\')).then(|| &rest[1..])
 }
 
@@ -299,6 +328,7 @@ fn relative_fast(rel: &[u16]) -> Fast {
     if !is_plain(rel) {
         return Fast::Fallback;
     }
+
     Fast::Inside(String::from_utf16_lossy(rel))
 }
 
@@ -313,8 +343,10 @@ pub(super) fn strip_verbatim(units: &[u16]) -> Option<&[u16]> {
         if is_unc_verbatim(units) {
             return None;
         }
+
         return Some(&units[4..]);
     }
+
     Some(units)
 }
 
@@ -341,18 +373,22 @@ fn is_unc_absolute(units: &[u16]) -> bool {
 /// separator. Such a path can be compared and returned as it is.
 fn is_plain(rel: &[u16]) -> bool {
     let mut start = 0;
+
     for index in 0..=rel.len() {
         if index == rel.len() || rel[index] == u16::from(b'\\') {
             let component = &rel[start..index];
+
             if component.is_empty()
                 || component == [u16::from(b'.')]
                 || component == [u16::from(b'.'), u16::from(b'.')]
             {
                 return false;
             }
+
             start = index + 1;
         }
     }
+
     true
 }
 
@@ -458,6 +494,7 @@ mod tests {
         ] {
             assert!(unsafe_units(&units(name)), "{name}");
         }
+
         for name in [
             r"C:\Game\a.txt",
             r"\\server\share\a.txt",
@@ -489,6 +526,7 @@ mod tests {
     fn a_dotted_verbatim_unc_or_unplain_path_uses_the_slow_path() {
         let root = root();
         let short = short();
+
         for name in [
             r"C:\Game\..\Other\a.txt",
             r"C:\Game\.\a.txt",

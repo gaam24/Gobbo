@@ -170,6 +170,7 @@ fn run_batch(
     };
     let mut results = Vec::with_capacity(requests.len());
     let mut pending = requests;
+
     while !pending.is_empty() {
         // A stop keeps the groups already committed; the running group commits nothing.
         stop_if(cancel, IMPORT_CANCELLED)?;
@@ -179,6 +180,7 @@ fn run_batch(
             &data, &game, group, &mut taken, inside, progress,
         )?);
     }
+
     Ok(results)
 }
 
@@ -198,6 +200,7 @@ fn import_group(
 
     // Copy and hash every archive outside the index lock. A large pack spends most of its time here.
     let mut copies = Vec::with_capacity(requests.len());
+
     for (index, request) in requests.into_iter().enumerate() {
         let ImportRequest {
             zip,
@@ -205,11 +208,13 @@ fn import_group(
             source,
             staged,
         } = request;
+
         match copy_and_hash(data, &zip, source, staged, cancel, progress) {
             Ok(copy) => copies.push((index, choices, copy)),
             Err(error) => results[index] = Some(Err(error)),
         }
     }
+
     stop_if(cancel, IMPORT_CANCELLED)?;
 
     // Reserve the archive names under one lock and one library read.
@@ -222,11 +227,13 @@ fn import_group(
             .map(|(_, _, copy)| copy.digest.as_str())
             .collect();
         let by_archive = archive_folders(&library, &wanted);
+
         for (index, choices, copy) in copies {
             if let Some(folder) = by_archive.get(copy.digest.as_str()) {
                 results[index] = Some(Err(already_in_library(folder)));
                 continue;
             }
+
             match reserve_name(data, &copy, taken) {
                 Ok((file, claim)) => reserved.push((index, choices, copy, claim, file)),
                 Err(error) => results[index] = Some(Err(error)),
@@ -236,6 +243,7 @@ fn import_group(
 
     // Extract outside the lock, as a single import does.
     let mut ready = Vec::with_capacity(reserved.len());
+
     for (index, choices, copy, claim, file) in reserved {
         match extract_copy(
             copy,
@@ -266,11 +274,13 @@ fn import_group(
             .map(|(_, prepared)| prepared.copy.digest.as_str())
             .collect();
         let by_archive = archive_folders(&library, &wanted);
+
         for (index, mut prepared) in ready {
             if let Some(folder) = by_archive.get(prepared.copy.digest.as_str()) {
                 results[index] = Some(Err(already_in_library(folder)));
                 continue;
             }
+
             match commit_prepared(data, game, &mut library, &mut prepared) {
                 Ok(done) => {
                     folders.extend(done.folders.iter().cloned());
@@ -279,6 +289,7 @@ fn import_group(
                 Err(error) => results[index] = Some(Err(error)),
             }
         }
+
         if let Err(error) = data.save_library(library) {
             remove_folders(&data.library(), &folders);
             return Err(error);
@@ -296,6 +307,7 @@ fn import_group(
             mods: done.mods,
         }));
     }
+
     Ok(results
         .into_iter()
         .map(|result| {

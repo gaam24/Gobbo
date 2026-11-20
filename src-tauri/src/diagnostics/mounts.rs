@@ -57,6 +57,7 @@ pub fn diagnose(root: &Data, game_id: &str) -> Result<MountDiagnostics, AppError
     let active = overlay::in_use(&game_root);
 
     let mut mounts = Vec::new();
+
     for (profile_id, state) in data.deployment_states().prepared {
         let Some(profile) = profiles
             .profiles
@@ -71,6 +72,7 @@ pub fn diagnose(root: &Data, game_id: &str) -> Result<MountDiagnostics, AppError
             upper: state.join("overwrite").display().to_string(),
             active,
         });
+
         for set in user_data::sets(&game, &settings, profile, &state)?
             .into_iter()
             .filter(|set| set.isolated)
@@ -83,9 +85,11 @@ pub fn diagnose(root: &Data, game_id: &str) -> Result<MountDiagnostics, AppError
             });
         }
     }
+
     mounts.sort_by(|left, right| left.id.cmp(&right.id));
 
     let mut warnings = Vec::new();
+
     if let Some(report) = crate::launch::report::last_run(root, game_id)
         && report.game_changes_total > 0
     {
@@ -108,14 +112,18 @@ pub fn clean(root: &Data, game_id: &str, paths: &[String]) -> Result<(), AppErro
     let _state = lock_state(&root.dir)?;
     let game = crate::games::load(game_id)?;
     let data = root.game(game_id);
+
     if crate::context::running::game_running(root, game_id)? {
         return Err(crate::error::game_running());
     }
+
     let settings = load_settings(&data);
     let game_root = PathBuf::from(settings.game_root.trim());
+
     if overlay::in_use(&game_root) {
         return Err(AppError::user("deploy.overlay_in_use").with("path", game_root.display()));
     }
+
     let profiles = load_profiles(&data)?;
     let allowed: BTreeSet<String> = orphans(&data, &game, &profiles)
         .into_iter()
@@ -126,10 +134,12 @@ pub fn clean(root: &Data, game_id: &str, paths: &[String]) -> Result<(), AppErro
             return Err(AppError::user("diagnostics.orphan_invalid").with("path", path));
         }
     }
+
     for path in paths {
         let path = Path::new(path);
         files::remove_path(path).map_err(io_at(path))?;
     }
+
     Ok(())
 }
 
@@ -145,12 +155,16 @@ fn orphans(
         return found;
     };
     let defined: BTreeSet<&str> = game.user_data.iter().map(|set| set.id.as_str()).collect();
+
     for entry in entries.flatten() {
         let path = entry.path();
+
         if !path.is_dir() {
             continue;
         }
+
         let profile_id = entry.file_name().to_string_lossy().into_owned();
+
         if !profiles
             .profiles
             .iter()
@@ -159,15 +173,20 @@ fn orphans(
             push(&mut found, &path, "profile");
             continue;
         }
+
         let Ok(sets) = fs::read_dir(path.join("userdata")) else {
             continue;
         };
+
         for set in sets.flatten() {
             let set_path = set.path();
+
             if !set_path.is_dir() {
                 continue;
             }
+
             let id = set.file_name().to_string_lossy().into_owned();
+
             if !defined.contains(id.as_str()) {
                 push(&mut found, &set_path, "set");
                 continue;
@@ -176,12 +195,14 @@ fn orphans(
             // automatic orphans, but the user can clear them from here once they are no longer needed.
             for child in fs::read_dir(&set_path).into_iter().flatten().flatten() {
                 let name = child.file_name().to_string_lossy().into_owned();
+
                 if name.starts_with("upper.moved-") || name == "removed" {
                     push(&mut found, &child.path(), "recovery");
                 }
             }
         }
     }
+
     found.sort_by(|left, right| left.path.cmp(&right.path));
     found
 }

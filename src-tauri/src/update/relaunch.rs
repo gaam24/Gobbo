@@ -38,13 +38,16 @@ pub fn wait_for_parent() {
 /// Waits until the process `pid` is gone, or `limit` has passed. Returns whether it is gone.
 pub fn wait_until_gone(pid: u32, limit: Duration) -> bool {
     let deadline = Instant::now() + limit;
+
     loop {
         if !process_exists(pid) {
             return true;
         }
+
         if Instant::now() >= deadline {
             return false;
         }
+
         std::thread::sleep(Duration::from_millis(100));
     }
 }

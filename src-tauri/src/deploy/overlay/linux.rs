@@ -61,12 +61,15 @@ pub fn check(session: &Session) -> Result<(), DeployError> {
     check_mount_path(&session.root)?;
     check_mount_path(&session.state)?;
     let lowerdir_len = session.lowerdir().len();
+
     if lowerdir_len > MAX_LOWERDIR_LEN {
         return Err(DeployError::PathTooLong { len: lowerdir_len });
     }
+
     if !cfg!(test) {
         probe().map_err(|detail| DeployError::OverlayUnavailable { detail })?;
     }
+
     Ok(())
 }
 
@@ -89,9 +92,11 @@ fn probe_with(program: &str) -> Result<(), String> {
     let upper = base.join("upper");
     let work = base.join("work");
     let merged = base.join("merged");
+
     for dir in [&lower, &upper, &work, &merged] {
         fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     }
+
     let script =
         r#"mount -t overlay overlay -o "lowerdir=$1,upperdir=$2,workdir=$3" "$4" && umount "$4""#;
     let status = Command::new(program)
@@ -113,6 +118,7 @@ fn probe_with(program: &str) -> Result<(), String> {
         .arg(&merged)
         .status();
     let _ = fs::remove_dir_all(&base);
+
     match status {
         Ok(status) if status.success() => Ok(()),
         Ok(status) => Err(probe_failure(program, status)),
@@ -185,8 +191,10 @@ pub fn start(
     for dir in [&session.overwrite, &session.work] {
         fs::create_dir_all(dir).map_err(|e| FileError::new(dir, e))?;
     }
+
     let mut command = command(session, program, args);
     command.envs(env.iter().map(|(name, value)| (name, value)));
+
     if let Some(writer) = output {
         let stderr = writer
             .try_clone()
@@ -195,6 +203,7 @@ pub fn start(
             .stdout(Stdio::from(writer))
             .stderr(Stdio::from(stderr));
     }
+
     let child = command
         .spawn()
         .map_err(|e| FileError::new(Path::new("unshare"), e))?;
@@ -204,11 +213,13 @@ pub fn start(
 /// The paths go into the `mount` options, where `,` and `:` are separators.
 fn check_mount_path(path: &Path) -> Result<(), DeployError> {
     let text = path.to_string_lossy();
+
     if text.contains(',') || text.contains(':') {
         return Err(DeployError::UnsafePath {
             path: path.to_path_buf(),
         });
     }
+
     Ok(())
 }
 

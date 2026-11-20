@@ -30,6 +30,7 @@ pub fn replace_program_files(program_dir: &Path, staged: &Path) -> Result<usize,
     let mut moved: Vec<PathBuf> = Vec::new();
     let mut written: Vec<PathBuf> = Vec::new();
     let result = swap(program_dir, staged, &files, &mut moved, &mut written);
+
     match result {
         Ok(()) => Ok(files.len()),
         Err(error) => {
@@ -45,6 +46,7 @@ pub fn replace_program_files(program_dir: &Path, staged: &Path) -> Result<usize,
                     ));
                 }
             }
+
             Err(error)
         }
     }
@@ -59,23 +61,30 @@ fn swap(
 ) -> Result<(), AppError> {
     for relative in files {
         let target = program_dir.join(relative);
+
         if target.exists() {
             let old = aside(&target);
+
             if old.exists() {
                 fs::remove_file(&old).map_err(io_at(&old))?;
             }
+
             fs::rename(&target, &old).map_err(io_at(&target))?;
             moved.push(target);
         }
     }
+
     for relative in files {
         let target = program_dir.join(relative);
+
         if let Some(parent) = target.parent() {
             fs::create_dir_all(parent).map_err(io_at(parent))?;
         }
+
         fs::copy(staged.join(relative), &target).map_err(io_at(&target))?;
         written.push(target);
     }
+
     Ok(())
 }
 
@@ -83,9 +92,11 @@ fn swap(
 fn relative_files(root: &Path) -> Result<Vec<PathBuf>, AppError> {
     let mut found = Vec::new();
     let mut pending = vec![root.to_path_buf()];
+
     while let Some(dir) = pending.pop() {
         for entry in fs::read_dir(&dir).map_err(io_at(&dir))? {
             let path = entry.map_err(io_at(&dir))?.path();
+
             if path.is_dir() {
                 pending.push(path);
             } else if let Ok(relative) = path.strip_prefix(root) {
@@ -93,6 +104,7 @@ fn relative_files(root: &Path) -> Result<Vec<PathBuf>, AppError> {
             }
         }
     }
+
     Ok(found)
 }
 
@@ -102,11 +114,14 @@ pub fn cleanup_leftovers(program_dir: &Path) {
     let Ok(entries) = fs::read_dir(program_dir) else {
         return;
     };
+
     for entry in entries.flatten() {
         let path = entry.path();
+
         if path.file_name().is_some_and(|name| name == "data") {
             continue;
         }
+
         if path.is_dir() {
             cleanup_under(&path);
         } else if is_leftover(&path) {
@@ -119,8 +134,10 @@ fn cleanup_under(dir: &Path) {
     let Ok(entries) = fs::read_dir(dir) else {
         return;
     };
+
     for entry in entries.flatten() {
         let path = entry.path();
+
         if path.is_dir() {
             cleanup_under(&path);
         } else if is_leftover(&path) {
@@ -138,6 +155,7 @@ fn settle_leftover(path: &Path) {
             .and_then(|name| name.strip_suffix(OLD_SUFFIX))
             .unwrap_or_default(),
     );
+
     if original.exists() {
         let _ = fs::remove_file(path);
     } else {

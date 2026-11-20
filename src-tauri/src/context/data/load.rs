@@ -31,6 +31,7 @@ fn name_archives(root: &Data, archive_names: ArchiveLabels<'_>) {
             return;
         }
     };
+
     for id in ids {
         let named = root
             .definition(&id)
@@ -51,11 +52,14 @@ pub fn name_game_archives(
     if !data.index().is_file() {
         return Ok(false);
     }
+
     let _index = lock_index();
     let mut library = load_library(data, game)?;
+
     if !library.name_archives(archive_names) {
         return Ok(false);
     }
+
     data.save_library(library)?;
     Ok(true)
 }
@@ -90,9 +94,11 @@ pub fn load_game(root: &Data, game_id: &str) -> Result<Loaded, AppError> {
 pub fn load_stopped(root: &Data, game_id: &str) -> Result<(GameDef, Data, Settings), AppError> {
     let game = root.definition(game_id)?;
     let data = root.game(game_id);
+
     if crate::context::running::game_running(root, game_id)? {
         return Err(crate::error::game_running());
     }
+
     let settings = load_settings(&data);
     Ok((game, data, settings))
 }

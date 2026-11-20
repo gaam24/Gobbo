@@ -118,6 +118,7 @@ fn a_second_import_of_the_same_archive_names_the_first_folder() {
         Acquired::Existing { folder: existing } => assert_eq!(existing, folder),
         _ => panic!("a duplicate must answer with the folder that holds it"),
     }
+
     assert!(zip.is_file(), "a duplicate picked from a file is kept");
     assert_eq!(status(&f.data, SLOT_GAME).unwrap().mods.len(), 1);
 }
@@ -206,6 +207,7 @@ fn an_installer_without_choices_asks_for_them_and_imports_nothing() {
         Acquired::NeedsChoice { path, .. } => assert_eq!(path, zip),
         _ => panic!("an installer with no choices must ask for them"),
     }
+
     assert!(status(&f.data, SLOT_GAME).unwrap().mods.is_empty());
 }
 
@@ -231,6 +233,7 @@ fn an_installer_download_that_asks_for_choices_is_kept_for_the_wizard() {
         Acquired::NeedsChoice { path, .. } => assert_eq!(path, copy),
         _ => panic!("an installer with no choices must ask for them"),
     }
+
     assert!(
         copy.is_file(),
         "an installer download that needs choices stays for the wizard"

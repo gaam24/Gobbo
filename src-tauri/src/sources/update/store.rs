@@ -21,6 +21,7 @@ pub(super) fn store_updates(
     let mut library = crate::context::load_library(data, game)?;
     let mut changed = false;
     let checked_at = now_seconds();
+
     for update in updates {
         if let Some((digest, file_id)) = &update.matched {
             changed |= set_archive_id(
@@ -31,6 +32,7 @@ pub(super) fn store_updates(
                 ArchiveId::File,
             );
         }
+
         if let Some((digest, part_id)) = &update.matched_part {
             changed |= set_archive_id(
                 &mut library,
@@ -40,9 +42,11 @@ pub(super) fn store_updates(
                 ArchiveId::Part,
             );
         }
+
         let Some(family) = library.families.get_mut(&update.family) else {
             continue;
         };
+
         if let Some((_, part_id)) = &update.matched_part
             && let Some(entry) = family.sources.get_mut(&update.source.provider)
             && entry.part_id.is_none()
@@ -50,17 +54,21 @@ pub(super) fn store_updates(
             entry.part_id = Some(part_id.clone());
             changed = true;
         }
+
         if let Some(read) = &update.meta
             && apply_meta(family, &update.source, read, checked_at)
         {
             changed = true;
         }
+
         if apply_latest(family, update) {
             changed = true;
         }
+
         if drop_stale_ignore(family, update) {
             changed = true;
         }
+
         if let Some(requirements) = &update.requirements {
             apply_requirements(
                 family,
@@ -72,9 +80,11 @@ pub(super) fn store_updates(
             changed = true;
         }
     }
+
     if changed {
         return data.save_library(library);
     }
+
     Ok(std::sync::Arc::new(library))
 }
 
@@ -101,9 +111,11 @@ fn set_archive_id(
         ArchiveId::File => &mut archive.source_files,
         ArchiveId::Part => &mut archive.source_parts,
     };
+
     if ids.get(provider).map(String::as_str) == Some(id) {
         return false;
     }
+
     ids.insert(provider.clone(), id.to_string());
     true
 }
@@ -127,18 +139,22 @@ pub fn apply_meta(
             ..SourceMod::default()
         });
     let mut changed = entry.mod_id.is_empty();
+
     if changed {
         entry.mod_id.clone_from(&source.mod_id);
     }
+
     changed |= entry.fill_missing_part(
         source.part_id.as_deref(),
         source.part_name.as_deref(),
         source.part_category.as_deref(),
     );
+
     if entry.meta.as_ref() != Some(&meta) {
         entry.meta = Some(meta);
         changed = true;
     }
+
     changed
 }
 
@@ -147,6 +163,7 @@ fn latest_of(update: &SourceUpdate) -> Option<&str> {
     if update.error.is_some() {
         return None;
     }
+
     update.latest.as_deref()
 }
 
@@ -163,6 +180,7 @@ fn apply_latest(family: &mut Family, update: &SourceUpdate) -> bool {
         family.latest.insert(provider.clone(), latest.to_string());
         true
     };
+
     match &update.latest_file_id {
         Some(file) => {
             if family.latest_file_ids.get(&provider) != Some(file) {
@@ -174,6 +192,7 @@ fn apply_latest(family: &mut Family, update: &SourceUpdate) -> bool {
         }
         None => changed |= family.latest_file_ids.remove(&provider).is_some(),
     }
+
     changed
 }
 
@@ -187,9 +206,11 @@ fn drop_stale_ignore(family: &mut Family, update: &SourceUpdate) -> bool {
     let Some(ignored) = family.ignored_versions.get(provider) else {
         return false;
     };
+
     if ignored.matches(Some(latest), update.latest_file_id.as_deref()) {
         return false;
     }
+
     family.ignored_versions.remove(provider);
     true
 }
@@ -230,16 +251,21 @@ fn apply_requirements(
         if requirement.source.provider != *provider || !known.insert(requirement.source.clone()) {
             continue;
         }
+
         let mut requirement = requirement.clone();
+
         if ignored.contains(&(
             requirement.source.provider.clone(),
             requirement.source.mod_id.clone(),
         )) {
             requirement.ignored = true;
         }
+
         family.requirements.push(requirement);
     }
+
     family.source_dlcs.insert(provider.clone(), dlcs.to_vec());
+
     match sync {
         Some(sync) => {
             family.source_sync.insert(provider.clone(), sync.clone());

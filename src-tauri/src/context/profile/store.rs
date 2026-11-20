@@ -102,9 +102,11 @@ pub(super) fn switch(store: &impl Store, data: &Data, target: &str) -> Result<()
     if !store.active() {
         return Ok(());
     }
+
     recover(store, data)?;
     store.prepare(data, target)?;
     let owner_file = store.owner();
+
     match owner_file.read(data)? {
         Some(current) if current == target => Ok(()),
         Some(current) if !store.exists(data, &current)? => {
@@ -135,9 +137,11 @@ fn switch_owner(store: &impl Store, data: &Data, from: &str, to: &str) -> Result
         phase: Phase::Restoring,
     };
     write_journal(data, owner_file, &journal)?;
+
     if let Err(error) = restore(&to_entries, true) {
         return rollback(data, owner_file, &from_entries, &journal, error);
     }
+
     if let Err(error) = owner_file.write(data, to) {
         if owner_file.read(data)?.as_deref() == Some(to) {
             // The atomic replace went through and only the durability step failed. The owner is the last write, so
@@ -149,8 +153,10 @@ fn switch_owner(store: &impl Store, data: &Data, from: &str, to: &str) -> Result
             complete_journal(data, owner_file, &mut journal);
             return Ok(());
         }
+
         return rollback(data, owner_file, &from_entries, &journal, error);
     }
+
     complete_journal(data, owner_file, &mut journal);
     Ok(())
 }
@@ -167,6 +173,7 @@ fn rollback(
     let name = owner_file.name;
     let from = &journal.from;
     let to = &journal.to;
+
     match restore(from_entries, true) {
         Ok(()) => {
             if let Err(cleanup) = remove_journal(data, owner_file) {
@@ -181,6 +188,7 @@ fn rollback(
             ));
         }
     }
+
     Err(error)
 }
 
@@ -190,11 +198,13 @@ fn complete_journal(data: &Data, owner_file: OwnerFile, journal: &mut SwitchJour
     journal.phase = Phase::Owned;
     let name = owner_file.name;
     let to = &journal.to;
+
     if let Err(error) = write_journal(data, owner_file, journal) {
         crate::infra::log::warn(format!(
             "{name} switched to {to} but its journal could not record the phase ({error})"
         ));
     }
+
     if let Err(error) = remove_journal(data, owner_file) {
         crate::infra::log::warn(format!(
             "{name} switched to {to} but its journal was left behind ({error})"
@@ -217,11 +227,14 @@ fn recover(store: &impl Store, data: &Data) -> Result<(), AppError> {
             return Ok(());
         }
     };
+
     if journal.store != owner_file.name {
         json::keep_broken(&path, &journal.store);
         return Ok(());
     }
+
     let current = owner_file.read(data)?;
+
     if current.as_deref() == Some(journal.to.as_str()) {
         return remove_journal(data, owner_file);
     }
@@ -237,12 +250,15 @@ fn recover(store: &impl Store, data: &Data) -> Result<(), AppError> {
                 "{name} lost its owner write to {to}; restoring {from}"
             ));
         }
+
         let entries = store.entries(data, &journal.from)?;
         restore(&entries, true)?;
+
         if current.as_deref() != Some(journal.from.as_str()) {
             owner_file.write(data, &journal.from)?;
         }
     }
+
     remove_journal(data, owner_file)
 }
 
@@ -279,13 +295,16 @@ pub(super) fn capture_current(store: &impl Store, data: &Data) -> Result<(), App
     if !store.active() {
         return Ok(());
     }
+
     recover(store, data)?;
     let Some(current) = store.owner().read(data)? else {
         return Ok(());
     };
+
     if !store.exists(data, &current).unwrap_or(false) {
         return Ok(());
     }
+
     capture(&store.entries(data, &current)?)
 }
 
@@ -299,6 +318,7 @@ pub(super) fn restore_profile(
     if !store.active() {
         return Ok(());
     }
+
     recover(store, data)?;
     restore(&store.entries(data, profile)?, remove_missing)
 }
@@ -308,6 +328,7 @@ pub(super) fn capture(entries: &[Entry]) -> Result<(), AppError> {
     for entry in entries {
         copy::capture(&entry.real, &entry.store)?;
     }
+
     Ok(())
 }
 
@@ -316,6 +337,7 @@ pub(super) fn restore(entries: &[Entry], remove_missing: bool) -> Result<(), App
     for entry in entries {
         copy::restore(&entry.store, &entry.real, remove_missing)?;
     }
+
     Ok(())
 }
 

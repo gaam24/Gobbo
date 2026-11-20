@@ -14,9 +14,11 @@ use crate::domain::deploy::Deploy;
 /// hiding the rest, so the window can name the file the user needs to fix.
 pub fn loader_presets() -> Vec<LoaderPresetView> {
     let mut dirs = Vec::with_capacity(2);
+
     if let Some(user) = user_loaders_dir() {
         dirs.push((user, GameOrigin::User));
     }
+
     dirs.push((loaders_dir().to_path_buf(), GameOrigin::Bundled));
     presets_from(&dirs)
 }
@@ -24,18 +26,22 @@ pub fn loader_presets() -> Vec<LoaderPresetView> {
 pub(super) fn presets_from(dirs: &[(PathBuf, GameOrigin)]) -> Vec<LoaderPresetView> {
     let mut seen = BTreeSet::new();
     let mut presets = Vec::new();
+
     for (dir, origin) in dirs {
         let Ok(entries) = fs::read_dir(dir) else {
             continue;
         };
+
         for entry in entries.flatten() {
             let file = entry.file_name().to_string_lossy().into_owned();
             let Some(id) = file.strip_suffix(".toml") else {
                 continue;
             };
+
             if !seen.insert(id.to_string()) {
                 continue;
             }
+
             let path = entry.path();
             let text = match fs::read_to_string(&path) {
                 Ok(text) => text,
@@ -52,9 +58,11 @@ pub(super) fn presets_from(dirs: &[(PathBuf, GameOrigin)]) -> Vec<LoaderPresetVi
                 }
             };
             let mut problems = loader.validate();
+
             if loader.id != id {
                 problems.push(format!("id {:?} does not match the file name", loader.id));
             }
+
             if !problems.is_empty() {
                 presets.push(LoaderPresetView {
                     id: id.to_string(),
@@ -69,7 +77,9 @@ pub(super) fn presets_from(dirs: &[(PathBuf, GameOrigin)]) -> Vec<LoaderPresetVi
                 });
                 continue;
             }
+
             let mut variants = Vec::new();
+
             for name in loader.variants.keys() {
                 match loader.rules(Some(name)) {
                     Ok(rules) => variants.push(variant_view(name, &rules)),
@@ -78,6 +88,7 @@ pub(super) fn presets_from(dirs: &[(PathBuf, GameOrigin)]) -> Vec<LoaderPresetVi
                     }
                 }
             }
+
             presets.push(LoaderPresetView {
                 id: loader.id,
                 name: loader.name,
@@ -91,6 +102,7 @@ pub(super) fn presets_from(dirs: &[(PathBuf, GameOrigin)]) -> Vec<LoaderPresetVi
             });
         }
     }
+
     presets.sort_by(|left, right| left.id.cmp(&right.id));
     presets
 }

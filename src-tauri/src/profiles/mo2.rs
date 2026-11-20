@@ -30,22 +30,27 @@ pub enum Mo2Entry {
 pub fn parse_modlist(text: &str) -> Vec<Mo2Entry> {
     let mut seen = BTreeSet::new();
     let mut entries = Vec::new();
+
     for line in text.lines() {
         let line = line.trim();
+
         if line.is_empty() || line.starts_with('#') || line.starts_with('*') {
             continue;
         }
         // A line without a sign is a mod that is on.
         let enabled = !line.starts_with('-');
         let name = line.strip_prefix(['+', '-']).unwrap_or(line).trim();
+
         if name.is_empty()
             || name.eq_ignore_ascii_case("overwrite")
             || !seen.insert(name.to_lowercase())
         {
             continue;
         }
+
         if let Some(title) = name.strip_suffix(SEPARATOR_SUFFIX) {
             let title: String = title.trim().chars().take(SEPARATOR_NAME_MAX).collect();
+
             if !title.is_empty() {
                 entries.push(Mo2Entry::Separator { name: title });
             }
@@ -56,6 +61,7 @@ pub fn parse_modlist(text: &str) -> Vec<Mo2Entry> {
             });
         }
     }
+
     entries
 }
 
@@ -85,6 +91,7 @@ pub fn import_mo2_list(root: &Data, game_id: &str, text: &str) -> Result<Mo2Impo
             .entry(crate::domain::naming::match_key(folder))
             .or_insert((folder, record));
     }
+
     let mut rows = Vec::new();
     let mut families = BTreeSet::new();
     let mut report = Mo2Import {
@@ -92,6 +99,7 @@ pub fn import_mo2_list(root: &Data, game_id: &str, text: &str) -> Result<Mo2Impo
         separators: 0,
         missing: Vec::new(),
     };
+
     for entry in parse_modlist(text) {
         match entry {
             Mo2Entry::Separator { name } => {
@@ -104,6 +112,7 @@ pub fn import_mo2_list(root: &Data, game_id: &str, text: &str) -> Result<Mo2Impo
             }
             Mo2Entry::Mod { name, enabled } => {
                 let wanted = crate::domain::naming::match_key(&name);
+
                 match by_key.get(&wanted) {
                     None => report.missing.push(name),
                     // Another version of a mod already in the list keeps the place of the first one.
@@ -121,6 +130,7 @@ pub fn import_mo2_list(root: &Data, game_id: &str, text: &str) -> Result<Mo2Impo
             }
         }
     }
+
     save_profile(root, game_id, &rows)?;
     Ok(report)
 }

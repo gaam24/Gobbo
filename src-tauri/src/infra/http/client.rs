@@ -110,6 +110,7 @@ impl Client {
         retry: bool,
     ) -> Result<Response, ClientError> {
         let mut attempt = 0_u32;
+
         loop {
             let started = Instant::now();
             // Each outcome says whether a retry may help and how long the server asked to wait.
@@ -118,6 +119,7 @@ impl Client {
                     let status = response.status().as_u16();
                     let retry_after = retry_after(response.headers());
                     let budget = rate_limit(response.headers());
+
                     match response.into_body().read_to_string() {
                         Ok(text) => {
                             trace_response(
@@ -154,11 +156,13 @@ impl Client {
                     (Err(ClientError::Transport(error)), true, None)
                 }
             };
+
             if retry && retryable && attempt + 1 < self.attempts {
                 std::thread::sleep(backoff(attempt, wait));
                 attempt += 1;
                 continue;
             }
+
             return outcome;
         }
     }
@@ -172,22 +176,28 @@ impl Client {
         body.map_or_else(
             || {
                 let mut request = agent().get(url).header("User-Agent", USER_AGENT);
+
                 for (name, value) in &self.headers {
                     request = request.header(name, value);
                 }
+
                 if !query.is_empty() {
                     request = request.query_pairs(query.iter().copied());
                 }
+
                 request.call()
             },
             |body| {
                 let mut request = agent().post(url).header("User-Agent", USER_AGENT);
+
                 for (name, value) in &self.headers {
                     request = request.header(name, value);
                 }
+
                 if !query.is_empty() {
                     request = request.query_pairs(query.iter().copied());
                 }
+
                 request
                     .header("Content-Type", "application/json")
                     .send(body)

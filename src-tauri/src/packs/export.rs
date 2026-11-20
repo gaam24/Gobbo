@@ -42,16 +42,21 @@ pub fn export_pack(
         ..
     } = load_game(root, game_id)?;
     let steps = load_mod_steps(&data)?;
+
     if options.info.name.trim().is_empty() || options.info.version.trim().is_empty() {
         return Err(AppError::user("pack.info_missing"));
     }
+
     if options.profiles.is_empty() {
         return Err(AppError::user("pack.no_profiles"));
     }
+
     let mut info = options.info.clone();
+
     if info.id.trim().is_empty() {
         info.id = crate::domain::naming::slug(&info.name);
     }
+
     let mut manifest = Manifest {
         format: FORMAT,
         game: game_id.to_string(),
@@ -60,9 +65,11 @@ pub fn export_pack(
     };
     let mut bundled: BTreeMap<String, (String, String)> = BTreeMap::new();
     let mut mods = 0;
+
     for id in &options.profiles {
         let profile = profiles.get(id)?;
         let mut pack = pack_profile(&data, &library, &steps, profile);
+
         for entry in &mut pack.mods {
             let has_source = entry.has_source();
             let Some(archive) = &mut entry.archive else {
@@ -76,6 +83,7 @@ pub fn export_pack(
                 PackArchives::All => true,
             };
             let file = library.archive_file_of(&archive.sha256);
+
             if let (true, Some(file)) = (wanted, file)
                 && data.archives().join(&file).is_file()
             {
@@ -83,6 +91,7 @@ pub fn export_pack(
                 bundled.insert(archive.sha256.clone(), (archive.name.clone(), file));
             }
         }
+
         mods += pack.mods.len();
         manifest.profiles.push(pack);
     }
@@ -106,6 +115,7 @@ pub fn export_pack(
         let mut input = fs::File::open(&source).map_err(io_at(&source))?;
         io::copy(&mut input, &mut writer).map_err(io_at(path))?;
     }
+
     writer.finish().map_err(pack_error)?;
     Ok(PackExportView {
         mods: u32::try_from(mods).unwrap_or(u32::MAX),
@@ -154,6 +164,7 @@ pub(super) fn pack_profile(
                     meta.checked_at = None;
                 }
             }
+
             let requirements = family
                 .map(|family| family.requirements.clone())
                 .unwrap_or_default();
@@ -225,6 +236,7 @@ pub(super) fn pack_profile(
         .map(|(at, (key, _))| (key.as_str(), at))
         .collect();
     let mut waiting_before: Vec<Vec<(String, PackMod)>> = vec![Vec::new(); count + 1];
+
     for waiting in &profile.waiting {
         let at = waiting
             .before
@@ -233,13 +245,17 @@ pub(super) fn pack_profile(
             .unwrap_or(count);
         waiting_before[at].push((waiting.entry.family.clone(), waiting.entry.clone()));
     }
+
     let mut ordered = Vec::with_capacity(count + profile.waiting.len());
+
     for (at, entry) in listed.into_iter().enumerate() {
         for waiting in std::mem::take(&mut waiting_before[at]) {
             ordered.push(waiting);
         }
+
         ordered.push(entry);
     }
+
     ordered.append(&mut waiting_before[count]);
     let listed = ordered;
     let index_of: BTreeMap<&str, usize> = listed

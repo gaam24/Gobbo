@@ -44,9 +44,11 @@ impl Search {
             self.next += 1;
             return true;
         }
+
         let Some(root) = self.root.as_mut() else {
             return false;
         };
+
         if unsafe { root.next_visible_into(&self.taken, out) } {
             self.next += 1;
             true
@@ -94,6 +96,7 @@ pub(crate) unsafe extern "system" fn find_first(
     // Keep the guard across the original call: `FindFirstFileW` reaches the NT layer, where a second hooked call would
     // classify the same path again.
     let guard = Guard::enter();
+
     if guard.is_some()
         && let Some(handle) =
             unsafe { start_search(name, data, FindExInfoStandard, FindExSearchNameMatch, 0) }
@@ -101,6 +104,7 @@ pub(crate) unsafe extern "system" fn find_first(
         trace(|| format!("result FindFirstFileW listed handle={handle:?}"));
         return handle;
     }
+
     let original = original!(find_first, {
         fail(ERROR_INVALID_FUNCTION);
         INVALID_HANDLE_VALUE
@@ -126,6 +130,7 @@ pub(crate) unsafe extern "system" fn find_first_ex(
     unsafe { trace_call("FindFirstFileExW", name) };
     trace(|| format!("args FindFirstFileExW level={level} search={search} flags=0x{flags:x}"));
     let guard = Guard::enter();
+
     if guard.is_some()
         && supported_ex(level, search, filter, flags)
         && let Some(handle) = unsafe { start_search(name, data.cast(), level, search, flags) }
@@ -133,6 +138,7 @@ pub(crate) unsafe extern "system" fn find_first_ex(
         trace(|| format!("result FindFirstFileExW listed handle={handle:?}"));
         return handle;
     }
+
     let original = original!(find_first_ex, {
         fail(ERROR_INVALID_FUNCTION);
         INVALID_HANDLE_VALUE
@@ -178,6 +184,7 @@ pub(crate) unsafe extern "system" fn find_next(
 pub(crate) unsafe extern "system" fn find_close(handle: *mut c_void) -> i32 {
     if ours(handle) {
         crate::stat_lock();
+
         if SEARCHES
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
@@ -226,18 +233,22 @@ unsafe fn start_search(
     };
     let leading = dot_entries(mount, rel, mask, Some(&own));
     let layers = find_layers(mount, rel, mask, level, search, flags, true, leading);
+
     if let Some((handle, first)) = layers.direct {
         unsafe { *data = first };
         return Some(handle);
     }
+
     let mut listing = Search {
         taken: layers.taken,
         next: 0,
         root: layers.root,
     };
+
     if !unsafe { listing.advance_into(data) } {
         return Some(no_entries(ERROR_FILE_NOT_FOUND));
     }
+
     let key = NEXT_SEARCH.fetch_add(1, Ordering::Relaxed);
     crate::stat_lock();
     SEARCHES
@@ -265,6 +276,7 @@ unsafe fn next_entry(handle: *mut c_void, data: *mut WIN32_FIND_DATAW) -> Option
         .get(&(handle as usize))
         .cloned()?;
     let mut search = search.lock().unwrap_or_else(PoisonError::into_inner);
+
     if unsafe { search.advance_into(data) } {
         Some(1)
     } else {

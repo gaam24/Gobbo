@@ -28,17 +28,21 @@ pub(super) fn run(root: &Path, _known_game_ids: &[String]) -> Result<(), AppErro
         Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
         Err(error) => return Err(io_at(&games)(error)),
     };
+
     for entry in entries {
         let entry = entry.map_err(io_at(&games))?;
         let game_id = entry.file_name().to_string_lossy().into_owned();
+
         if !entry.path().is_dir()
             || !naming::is_plain_folder(&game_id)
             || game_id.ends_with(super::REMOVED_SUFFIX)
         {
             continue;
         }
+
         move_game(root, &game_id)?;
     }
+
     Ok(())
 }
 
@@ -55,16 +59,21 @@ fn move_game(root: &Path, game_id: &str) -> Result<(), AppError> {
         Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
         Err(error) => return Err(io_at(&old)(error)),
     };
+
     for entry in entries {
         let entry = entry.map_err(io_at(&old))?;
         let id = entry.file_name().to_string_lossy().into_owned();
+
         if !entry.path().is_dir() || !naming::is_plain_folder(&id) {
             continue;
         }
+
         if !matches(&entry.path(), game_id, &id) {
             continue;
         }
+
         let to = destination(root, game_id, &id);
+
         if !move_if_absent(&entry.path(), &to)? {
             crate::infra::log::warn(format!(
                 "{} already exists; {} is left as it is",
@@ -73,6 +82,7 @@ fn move_game(root: &Path, game_id: &str) -> Result<(), AppError> {
             ));
         }
     }
+
     Ok(())
 }
 
@@ -142,6 +152,7 @@ mod tests {
         run(&root, &[]).unwrap();
 
         assert!(!root.join(SNAPSHOTS_DIR).join("slot").exists());
+
         for id in ["1-a", "2-b", "3-c"] {
             assert!(old_dir(&root, "slot", id).is_dir(), "{id} moved");
         }

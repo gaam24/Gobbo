@@ -92,6 +92,7 @@ fn remove_version_folder(data: &Data, folder: &str) -> Result<(), AppError> {
     if !is_plain_folder(folder) {
         return Err(AppError::user("library.invalid_folder").with("folder", folder));
     }
+
     let path = data.library().join(folder);
     crate::infra::fs::remove_dir_if_exists(&path).map_err(io_at(&path))
 }

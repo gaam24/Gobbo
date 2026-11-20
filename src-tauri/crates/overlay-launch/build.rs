@@ -29,6 +29,7 @@ fn main() {
     let on_windows = env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows");
     let architecture = env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default();
     let rustc = env::var_os("RUSTC").expect("cargo sets RUSTC");
+
     for (arch, triple, name) in TARGETS {
         let dll = out.join(name);
         // The launcher's own target decides which DLL it can use. A build for another target gets an empty file.

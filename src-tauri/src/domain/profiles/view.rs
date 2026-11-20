@@ -36,6 +36,7 @@ fn one_or_many<'a, 'b>(
             &[]
         };
     }
+
     list.get(key).map_or(&[], Vec::as_slice)
 }
 
@@ -44,6 +45,7 @@ impl<'a> ProfilesView<'a> {
     /// its list contains the family twice, matching the old `with_mod` lookup.
     pub fn new(profiles: &'a Profiles) -> Self {
         let mut collections: FxHashMap<&'a str, Vec<&'a str>> = FxHashMap::default();
+
         if let Some(active) = profiles
             .profiles
             .iter()
@@ -58,15 +60,18 @@ impl<'a> ProfilesView<'a> {
                 }
             }
         }
+
         if let [profile] = profiles.profiles.as_slice() {
             let mut families = FxHashSet::default();
             let mut versions = FxHashSet::default();
             families.reserve(profile.mods.len());
             versions.reserve(profile.mods.len());
+
             for entry in &profile.mods {
                 families.insert(entry.id.as_str());
                 versions.insert(entry.folder.as_str());
             }
+
             return Self {
                 by_family: FxHashMap::default(),
                 by_version: FxHashMap::default(),
@@ -78,11 +83,14 @@ impl<'a> ProfilesView<'a> {
                 collections,
             };
         }
+
         let mut by_family: FxHashMap<&'a str, Vec<&'a Profile>> = FxHashMap::default();
         let mut by_version: FxHashMap<&'a str, Vec<&'a Profile>> = FxHashMap::default();
+
         for profile in &profiles.profiles {
             let mut seen_families = FxHashSet::default();
             let mut seen_versions = FxHashSet::default();
+
             for entry in &profile.mods {
                 if seen_families.insert(entry.id.as_str()) {
                     by_family
@@ -90,6 +98,7 @@ impl<'a> ProfilesView<'a> {
                         .or_default()
                         .push(profile);
                 }
+
                 if seen_versions.insert(entry.folder.as_str()) {
                     by_version
                         .entry(entry.folder.as_str())
@@ -98,6 +107,7 @@ impl<'a> ProfilesView<'a> {
                 }
             }
         }
+
         Self {
             by_family,
             by_version,

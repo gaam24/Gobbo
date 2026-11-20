@@ -53,15 +53,19 @@ pub(crate) fn remember_hook(path: PathBuf) {
 /// from `target/debug/deps` but the 32-bit DLL is staged in `target/debug`.
 fn sibling_or_parent(dll: &std::path::Path, name: &str) -> PathBuf {
     let sibling = dll.with_file_name(name);
+
     if sibling.is_file() {
         return sibling;
     }
+
     if let Some(folder) = dll.parent().and_then(std::path::Path::parent) {
         let above = folder.join(name);
+
         if above.is_file() {
             return above;
         }
     }
+
     sibling
 }
 
@@ -102,6 +106,7 @@ pub(crate) unsafe extern "system" fn create_process(
     let original = original!(create_process, {
         crate::win32::fail(ERROR_INVALID_FUNCTION)
     });
+
     unsafe {
         start_child_or_call(false, application, command, flags, information, |flags| {
             original.call(
@@ -142,6 +147,7 @@ pub(crate) unsafe extern "system" fn create_process_w(
     let original = original!(create_process_w, {
         crate::win32::fail(ERROR_INVALID_FUNCTION)
     });
+
     unsafe {
         start_child_or_call(
             internal_present(),
@@ -187,6 +193,7 @@ pub(crate) unsafe extern "system" fn create_process_as_user(
     let original = original!(create_process_as_user, {
         crate::win32::fail(ERROR_INVALID_FUNCTION)
     });
+
     unsafe {
         start_child_or_call(
             internal_present(),
@@ -229,9 +236,11 @@ unsafe fn start_child(
     };
     let wants_suspended = flags & CREATE_SUSPENDED != 0;
     let started = start(flags | CREATE_SUSPENDED, information);
+
     if started == 0 {
         return started;
     }
+
     let _last_error = PreserveLastError::capture();
     // SAFETY: the call succeeded, so the structure the caller passed is filled in.
     let child = unsafe { &*(information as *const ProcessInformation) };
@@ -259,14 +268,17 @@ unsafe fn start_child(
             drop(_last_error);
             return stop_unhooked(child);
         }
+
         log(&format!(
             "child process {} could not be hooked; running it unhooked by request",
             child.process_id
         ));
     }
+
     if !wants_suspended {
         // SAFETY: the thread handle is the one `CreateProcessW` returned for the child.
         unsafe { ResumeThread(child.thread) };
+
         if hooked
             && let Some(ready) = &ready
             && !ready.wait()
@@ -275,12 +287,14 @@ unsafe fn start_child(
                 "child process {} did not report its hook ready",
                 child.process_id
             ));
+
             if !crate::diag::settings().allow_unhooked_children {
                 drop(_last_error);
                 return stop_unhooked(child);
             }
         }
     }
+
     started
 }
 
@@ -317,6 +331,7 @@ impl ChildReady {
         let name = gobbo_overlay_launch::ready_event_name(pid);
         // SAFETY: `name` is a NUL-terminated name; the event is owned by this value and closed in `Drop`.
         let event = unsafe { CreateEventW(null(), TRUE, FALSE, name.as_ptr()) };
+
         if event.is_null() {
             log(&format!(
                 "could not create the readiness event of child process {pid}: {}",
@@ -362,6 +377,7 @@ fn inject_child(
             return false;
         }
     };
+
     if cfg!(target_pointer_width = "32") && !wow64 {
         // A 32-bit hook cannot create a remote thread with a 64-bit start address in a 64-bit child.
         log("a 32-bit hook cannot load into a 64-bit child");
@@ -371,6 +387,7 @@ fn inject_child(
     // descriptors can be pointed at the layer before it runs, exactly as for the game itself.
     if let Some(program) = child_program(application, command) {
         let imports = child_imports(&program);
+
         if !imports.is_empty() {
             // SAFETY: `child.process` is the suspended process `CreateProcess` returned.
             if let Err(error) = unsafe {
@@ -383,6 +400,7 @@ fn inject_child(
             }
         }
     }
+
     if wow64 && cfg!(target_pointer_width = "64") {
         // A 64-bit hook cannot set the context of a 32-bit thread. The 32-bit helper does it. The guard keeps the
         // helper's own process start out of this hook.
@@ -398,6 +416,7 @@ fn inject_child(
             }
         };
     }
+
     let hook = if wow64 { &paths.wow64 } else { &paths.native };
     // SAFETY: the process and thread handles are the ones `CreateProcess` returned, and the thread is suspended.
     match unsafe { gobbo_overlay_launch::inject_early(child.process, child.thread, hook) } {
@@ -414,9 +433,11 @@ fn inject_child(
 /// The program a child starts: the application name, or the first token of the command line.
 fn child_program(application: *const u16, command: *const u16) -> Option<PathBuf> {
     let application = unsafe { display_name(application) };
+
     if application != "<none>" && !application.is_empty() {
         return Some(PathBuf::from(application));
     }
+
     let command = unsafe { crate::text::text(command) }?;
     let command = command.trim_start();
     let program = if let Some(rest) = command.strip_prefix('"') {
@@ -444,20 +465,24 @@ fn child_imports(program: &std::path::Path) -> Vec<(String, PathBuf)> {
     };
     let whiteouts = crate::state::whiteouts_snapshot();
     let mut imports = Vec::new();
+
     for import in gobbo_overlay_launch::imports(program).unwrap_or_default() {
         if import.name.is_empty() {
             continue;
         }
+
         let game_rel = join_rel(&relative, &import.name.replace('\\', "/"));
         let Some((layer, path)) =
             layers.resolve_visible(&game_rel, std::path::Path::is_file, &whiteouts)
         else {
             continue;
         };
+
         if layer != Layer::Root {
             imports.push((import.name, path));
         }
     }
+
     imports
 }
 
@@ -470,6 +495,7 @@ fn stop_unhooked(child: &ProcessInformation) -> i32 {
         CloseHandle(child.thread);
         CloseHandle(child.process);
     }
+
     crate::win32::set_error(ERROR_DLL_INIT_FAILED);
     0
 }

@@ -176,7 +176,9 @@ pub fn relative_under<'a>(path: &'a [u16], folder: &[u16]) -> Option<&'a [u16]> 
     if !starts_with_ascii_ignore_case(path, folder) {
         return None;
     }
+
     let rest = &path[folder.len()..];
+
     match rest.first() {
         None => Some(rest),
         Some(&unit) if unit == b'\\' as u16 => Some(rest),
@@ -187,9 +189,11 @@ pub fn relative_under<'a>(path: &'a [u16], folder: &[u16]) -> Option<&'a [u16]> 
 /// Writes `layer` + `rel` into `out` and returns the number of units. `None` when it does not fit.
 pub fn candidate(layer: &[u16], rel: &[u16], out: &mut [u16]) -> Option<usize> {
     let total = layer.len().checked_add(rel.len())?;
+
     if total > out.len() {
         return None;
     }
+
     out[..layer.len()].copy_from_slice(layer);
     out[layer.len()..total].copy_from_slice(rel);
     Some(total)
@@ -218,20 +222,24 @@ pub unsafe fn redirect(
     query: QueryAttributes,
 ) -> Option<usize> {
     let kind = Kind::from_code(work.kind)?;
+
     if config.enabled == 0 || attributes == 0 {
         return None;
     }
     // SAFETY: the caller guarantees the attributes are valid; they are read, not written.
     let original = unsafe { *(attributes as *const ObjectAttributes) };
+
     if original.root != 0 || original.name == 0 {
         return None;
     }
+
     if !reads_only(kind, work.access, work.disposition) {
         return None;
     }
     // SAFETY: `name` is a valid `UNICODE_STRING` of the caller, and its buffer holds `length` bytes.
     let name = unsafe { *(original.name as *const UnicodeString) };
     let units = usize::from(name.length) / 2;
+
     if name.buffer == 0 || units == 0 {
         return None;
     }
@@ -239,9 +247,11 @@ pub unsafe fn redirect(
     let path = unsafe { core::slice::from_raw_parts(name.buffer as *const u16, units) };
     let game = &config.game[..config.game_units as usize];
     let layer = &config.layer[..config.layer_units as usize];
+
     if !starts_with_ascii_ignore_case(path, &NT_PREFIX) {
         return None;
     }
+
     let under = &path[NT_PREFIX.len()..];
     let rel = relative_under(under, &game[NT_PREFIX.len()..])?;
     // The candidate: the layer's prefix (`\??\` and the layer folder) and the relative path.
@@ -264,14 +274,17 @@ pub unsafe fn redirect(
     let information_address = work.information.as_mut_ptr() as usize;
     // SAFETY: the probe and the information buffer are valid for the call; `query` is the loader's own stub.
     let status = unsafe { query(probe_address, information_address) };
+
     if status != 0 {
         return None;
     }
     // A folder is not redirected: the game keeps its own listing.
     let file_attributes = (work.information[4] & 0xFFFF_FFFF) as u32;
+
     if file_attributes & FILE_ATTRIBUTE_DIRECTORY != 0 {
         return None;
     }
+
     work.redirected = ObjectAttributes {
         length: original.length,
         root: 0,
@@ -349,6 +362,7 @@ mod tests {
         for kind in [Kind::Open, Kind::Create, Kind::Query] {
             assert_eq!(Kind::from_code(kind.code()), Some(kind));
         }
+
         assert_eq!(Kind::from_code(9), None);
     }
 

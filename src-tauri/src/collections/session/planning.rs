@@ -40,9 +40,11 @@ pub(in crate::collections) fn start_with_plan(
     let library = load_library(&data, &game)?;
     let view = LibraryView::new(&library);
     let selected = selected_keys(&plan, &request.selected);
+
     if selected.is_empty() {
         return Err(AppError::user("collection.nothing_selected"));
     }
+
     let excluded: Vec<String> = plan
         .items
         .iter()
@@ -54,9 +56,11 @@ pub(in crate::collections) fn start_with_plan(
     let (profile_id, is_new) = if let Some(id) = &request.profile {
         {
             let profile = profiles.get(id)?;
+
             if profile.pack.is_some() {
                 return Err(AppError::user("collection.profile_pack").with("profile", id));
             }
+
             (id.clone(), false)
         }
     } else {
@@ -66,15 +70,19 @@ pub(in crate::collections) fn start_with_plan(
             request.profile_name.trim().to_string()
         };
         let id = profiles.create_unique(&wanted)?;
+
         if request.activate {
             profiles.switch(&id)?;
         }
+
         (id, true)
     };
     let profile = profiles.get_mut(&profile_id)?;
+
     if is_new {
         profile.user_data = game.user_data_defaults();
     }
+
     let origin_index = profile.collections.iter().position(|origin| {
         origin.provider == plan.info.provider
             && origin.game_key == plan.info.game_key
@@ -127,12 +135,15 @@ pub(in crate::collections) fn start_with_plan(
             .collect();
         let shared: BTreeSet<&str> = shared.iter().map(String::as_str).collect();
         let mut new_members: BTreeSet<String> = BTreeSet::new();
+
         for item in &plan.items {
             new_members.insert(item.predicted_family());
+
             if let Some((family, _)) = find_version(&view, &item.wanted()) {
                 new_members.insert(family);
             }
         }
+
         let members: BTreeSet<&str> = new_members.iter().map(String::as_str).collect();
         let change = crate::domain::collection::reconcile_disabled(
             &previous_added,
@@ -140,6 +151,7 @@ pub(in crate::collections) fn start_with_plan(
             &members,
             &shared,
         );
+
         for family in &change.disable {
             if let Some(entry) = profile
                 .mods
@@ -149,6 +161,7 @@ pub(in crate::collections) fn start_with_plan(
                 entry.enabled = false;
             }
         }
+
         for family in &change.enable {
             if let Some(entry) = profile
                 .mods
@@ -158,11 +171,13 @@ pub(in crate::collections) fn start_with_plan(
                 entry.enabled = true;
             }
         }
+
         origin.disabled = change.next.into_iter().collect();
         profile
             .waiting
             .retain(|waiting| !change.disable.contains(&waiting.entry.family));
     }
+
     let origin_for_status = origin.clone();
     let existing = profile.clone();
     let before_status = status::statuses(&plan, &library, &existing, Some(&origin_for_status));
@@ -177,6 +192,7 @@ pub(in crate::collections) fn start_with_plan(
         .filter(|item| selected.contains(&item.key))
         .collect();
     let mut added = origin.added.clone();
+
     for (index, item) in ordered.iter().enumerate() {
         let item_status = before_status
             .statuses
@@ -196,6 +212,7 @@ pub(in crate::collections) fn start_with_plan(
         ) {
             continue;
         }
+
         let source = item.wanted();
         let accepted = item_status == CollectionItemStatus::InLibrary
             || (matches!(
@@ -205,11 +222,14 @@ pub(in crate::collections) fn start_with_plan(
                 != crate::domain::collection::CollectionUpdatePolicy::Exact);
         if accepted && let Some((family, folder)) = find_version(&view, &source) {
             profile.add_mod(&family, &folder);
+
             if !added.contains(&family) {
                 added.push(family);
             }
+
             continue;
         }
+
         if profile
             .waiting
             .iter()
@@ -217,6 +237,7 @@ pub(in crate::collections) fn start_with_plan(
         {
             continue;
         }
+
         let next = ordered[index + 1..]
             .iter()
             .map(|next| next.predicted_family())
@@ -228,26 +249,31 @@ pub(in crate::collections) fn start_with_plan(
         });
         anchor = None;
     }
+
     if request.position == CollectionPosition::Top {
         // The waiting chain starts above the old first mod. The final reorder pulls the whole block together.
         if let Some(first) = waiting.first_mut() {
             first.before = profile.mods.first().map(|entry| entry.id.clone());
         }
     }
+
     profile.waiting.extend(waiting);
     origin.added = added;
     origin.families = member_families(&plan, &view, profile, &origin);
     origin.installed_at = crate::infra::clock::now_seconds();
+
     if let Some(index) = origin_index {
         profile.collections[index] = origin.clone();
     } else {
         profile.collections.push(origin.clone());
     }
+
     save_profiles(&data, &profiles)?;
     let profile = profiles.get(&profile_id)?;
     let current = status::statuses(&plan, &library, profile, Some(&origin));
     Ok(session_view(profile_id, origin, plan, current))
 }
+
 pub(super) fn selected_keys(plan: &CollectionPlan, selected: &[String]) -> BTreeSet<String> {
     if selected.is_empty() {
         return plan
@@ -257,6 +283,7 @@ pub(super) fn selected_keys(plan: &CollectionPlan, selected: &[String]) -> BTree
             .map(|item| item.key.clone())
             .collect();
     }
+
     let known: BTreeSet<&str> = plan.items.iter().map(|item| item.key.as_str()).collect();
     selected
         .iter()

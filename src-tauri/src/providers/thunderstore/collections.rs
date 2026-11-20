@@ -77,9 +77,11 @@ impl CollectionSource for ThunderstoreCollections {
 pub fn parse_pack_link(text: &str) -> Result<CollectionLink, AppError> {
     let bad = || AppError::user("collection.bad_link").with("url", text);
     let url = Url::parse(text.trim()).map_err(|_| bad())?;
+
     if url.scheme() != "https" || url.port().is_some() {
         return Err(bad());
     }
+
     let host = url.host_str().unwrap_or_default().to_ascii_lowercase();
     let parts: Vec<&str> = url
         .path()
@@ -105,9 +107,11 @@ pub fn parse_pack_link(text: &str) -> Result<CollectionLink, AppError> {
         }
         _ => return Err(bad()),
     };
+
     if !is_slug(community, true) || !is_part(owner) || !is_part(name) {
         return Err(bad());
     }
+
     Ok(CollectionLink {
         provider: ProviderId::new(super::ID),
         game_key: community.to_string(),

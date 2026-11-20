@@ -45,6 +45,7 @@ impl ModSteps {
 /// step that several mods ask for runs once, at its first place.
 pub fn plan(steps: &ModSteps, enabled_mods: &[String], phase: Phase) -> Vec<String> {
     let mut planned: Vec<String> = Vec::new();
+
     for folder in enabled_mods {
         let Some(phases) = steps.mods.get(folder) else {
             continue;
@@ -53,12 +54,14 @@ pub fn plan(steps: &ModSteps, enabled_mods: &[String], phase: Phase) -> Vec<Stri
             Phase::BeforeStart => &phases.before_start,
             Phase::AfterEnd => &phases.after_end,
         };
+
         for id in ids {
             if !planned.contains(id) {
                 planned.push(id.clone());
             }
         }
     }
+
     planned
 }
 

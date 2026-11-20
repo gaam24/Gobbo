@@ -25,6 +25,7 @@ pub fn verify(root: &Data, game_id: &str, folder: &str) -> Result<IntegrityStatu
     if !is_plain_folder(folder) {
         return Err(AppError::user("library.invalid_folder").with("folder", folder));
     }
+
     let game = root.definition(game_id)?;
     let data = root.game(game_id);
     let path = data.library().join(folder);
@@ -40,6 +41,7 @@ pub fn verify(root: &Data, game_id: &str, folder: &str) -> Result<IntegrityStatu
     let Some(version) = library.versions.get_mut(folder) else {
         return Err(not_in_library(folder));
     };
+
     match &version.integrity {
         Some(baseline) if *baseline == current => Ok(IntegrityStatus::Matches),
         Some(_) => Ok(IntegrityStatus::Changed),

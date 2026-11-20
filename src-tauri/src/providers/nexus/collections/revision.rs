@@ -56,6 +56,7 @@ fn parse_revision_response(
         if detail.contains("NOT_FOUND") || detail.contains("not found") {
             return Err(collection_not_found(&link.slug));
         }
+
         return Err(bad_response(detail));
     };
     let Some(collection) = data.collection else {
@@ -132,6 +133,7 @@ fn parse_revision_response(
     info.game_versions = game_versions;
 
     let mut mods = Vec::with_capacity(revision.mod_files.len());
+
     for entry in revision.mod_files {
         let (Some(mod_id), Some(file_id), Some(file)) = (
             entry
@@ -164,6 +166,7 @@ fn parse_revision_response(
             size_kb,
         });
     }
+
     let external = revision
         .external_resources
         .into_iter()
@@ -174,10 +177,12 @@ fn parse_revision_response(
         })
         .collect();
     let mut revisions = Vec::new();
+
     for revision in collection.revisions {
         let Some(number) = revision.revision_number.and_then(Id::u32) else {
             continue;
         };
+
         if revision
             .revision_status
             .as_deref()
@@ -186,6 +191,7 @@ fn parse_revision_response(
         {
             continue;
         }
+
         revisions.push(CollectionRevisionSummary {
             revision: number,
             created_at: revision
@@ -197,6 +203,7 @@ fn parse_revision_response(
             total_size_kb: revision.total_size.map_or(0, Id::kb),
         });
     }
+
     revisions.sort_by_key(|revision| revision.revision);
     revisions.dedup_by_key(|revision| revision.revision);
     Ok(CollectionRevision {

@@ -111,12 +111,14 @@ pub fn import(
     if rows.is_empty() {
         return Err(AppError::user("profiles.community.no_mods"));
     }
+
     let profile = crate::context::edit_profiles(root, game_id, |_, game, profiles| {
         let id = profiles.create(name, None)?;
         profiles.get_mut(&id)?.user_data = game.user_data_defaults();
         profiles.switch(&id)?;
         Ok(id)
     })?;
+
     if let Err(error) = actions::save_profile(root, game_id, &rows) {
         // The profile was created but has no list; remove it rather than leave an empty one behind.
         if let Err(cleanup) = actions::delete_profile(root, game_id, &profile) {
@@ -124,8 +126,10 @@ pub fn import(
                 "could not remove the empty profile {profile} after a failed save: {cleanup}"
             ));
         }
+
         return Err(error);
     }
+
     let missing = preview
         .mods
         .iter()
@@ -171,14 +175,18 @@ fn read_profile(path: &Path) -> Result<(String, Vec<CommunityMod>, bool), AppErr
         )
     };
     let size = fs::metadata(&file).map_err(io_at(&file))?.len();
+
     if size > MAX_BYTES {
         return Err(AppError::user("profiles.community.too_large").with("path", file.display()));
     }
+
     let text = fs::read_to_string(&file).map_err(io_at(&file))?;
     let mods = parse_mods(&text);
+
     if mods.is_empty() {
         return Err(AppError::user("profiles.community.empty").with("path", file.display()));
     }
+
     let has_configs = dir.join("BepInEx").join("config").is_dir() || dir.join("config").is_dir();
     Ok((profile, mods, has_configs))
 }

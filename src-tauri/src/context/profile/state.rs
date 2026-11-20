@@ -72,9 +72,11 @@ fn switch_stores(
     stores: Stores,
 ) -> Result<(), AppError> {
     let previous = data::owner(data)?;
+
     if stores.data {
         data::switch(data, game, settings, &profile.id)?;
     }
+
     if stores.user_data
         && let Err(error) = user_data::switch(data, game, settings, profile)
     {
@@ -87,8 +89,10 @@ fn switch_stores(
                 "could not return the data store to {previous} after switching to {target} failed: {rollback}"
             ));
         }
+
         return Err(error);
     }
+
     Ok(())
 }
 
@@ -109,6 +113,7 @@ pub fn capture_settings(
     if !user_data::capture_settings(data, game, settings, profile)? {
         data::capture_settings(data, game, settings, &profile.id)?;
     }
+
     Ok(())
 }
 
@@ -188,12 +193,14 @@ default = "isolated"
         };
         let mut profiles = Profiles::with_default(Vec::new());
         let second = profiles.create("Second", None).unwrap();
+
         for id in ["p1", second.as_str()] {
             profiles
                 .get_mut(id)
                 .unwrap()
                 .set_user_data_isolation("saves", Isolation::Isolated);
         }
+
         let data = Data::new(base.join("data-root"));
         data.save_profiles(&profiles).unwrap();
         Fixture {

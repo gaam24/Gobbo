@@ -65,6 +65,7 @@ pub fn managed_ids(root: &Data) -> Result<Vec<String>, AppError> {
         let _state = lock_state(root)?;
         migrate_with(root, &games);
     }
+
     Ok(games
         .into_iter()
         .map(|game| game.id)
@@ -79,9 +80,12 @@ pub fn data_usage(root: &Data) -> Result<Vec<GameDataUsage>, AppError> {
         let _state = lock_state(root)?;
         migrate_with(root, &games);
     }
+
     let mut usage = Vec::with_capacity(games.len());
+
     for game in games {
         let active = root.game(&game.id);
+
         if active.dir.is_dir() {
             usage.push(GameDataUsage {
                 id: game.id.clone(),
@@ -90,7 +94,9 @@ pub fn data_usage(root: &Data) -> Result<Vec<GameDataUsage>, AppError> {
                 size_kb: crate::context::size_kb(crate::infra::fs::folder_size(&active.dir)),
             });
         }
+
         let removed = crate::migrations::removed_path(&root.dir, &game.id);
+
         if removed.is_dir() {
             usage.push(GameDataUsage {
                 id: game.id,
@@ -100,6 +106,7 @@ pub fn data_usage(root: &Data) -> Result<Vec<GameDataUsage>, AppError> {
             });
         }
     }
+
     Ok(usage)
 }
 
@@ -107,13 +114,17 @@ pub fn data_usage(root: &Data) -> Result<Vec<GameDataUsage>, AppError> {
 /// folder exists.
 pub fn restore_removed(root: &Data, game_id: &str) -> Result<(), AppError> {
     let active = root.game(game_id);
+
     if active.dir.is_dir() {
         return Ok(());
     }
+
     let removed = crate::migrations::removed_path(&root.dir, game_id);
+
     if !removed.is_dir() {
         return Ok(());
     }
+
     fs::rename(&removed, &active.dir).map_err(io_at(&removed))
 }
 

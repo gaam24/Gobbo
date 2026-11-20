@@ -66,9 +66,11 @@ fn cases() -> Vec<Case> {
 /// Checks every case, then that no registered provider is left without one.
 pub fn check_all() {
     let cases = cases();
+
     for case in &cases {
         check(case);
     }
+
     let covered: Vec<String> = cases
         .iter()
         .map(|case| case.provider.id().as_str().to_string())
@@ -148,6 +150,7 @@ pub fn check(case: &Case) {
         "{}",
         named("the deep-link capability and the link schemes disagree")
     );
+
     for &scheme in adapter.schemes() {
         assert!(
             !scheme.is_empty()
@@ -164,6 +167,7 @@ pub fn check(case: &Case) {
             named("a scheme does not find this provider")
         );
     }
+
     if let Some(page) = adapter.key_page() {
         assert!(
             page.starts_with("https://"),
@@ -393,14 +397,17 @@ impl SourceProvider for FakeProvider {
         crate::test_support::make_zip(request.directory, &self.archive, &entries);
         let path = request.directory.join(&self.archive);
         crate::infra::sidecar::write_source(&path, request.source.clone());
+
         for &(received, total) in &self.chunks {
             if let Some(on_chunk) = &self.on_chunk {
                 on_chunk();
             }
+
             if !progress(received, total) {
                 break;
             }
         }
+
         Ok(SourceDownloaded {
             path,
             source: request.source,

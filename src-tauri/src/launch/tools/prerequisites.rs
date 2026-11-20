@@ -81,10 +81,12 @@ pub fn install_prerequisites(
     let tool = tool_of(&game, tool_id)?;
     let game_root = PathBuf::from(settings.game_root.trim());
     let wine = steam_prefix(&game, &game_root)?.wine();
+
     for prerequisite in &tool.prerequisites {
         if is_installed(&wine, prerequisite) {
             continue;
         }
+
         let installer = fetch_installer(&data, prerequisite)?;
         let code = run_in_prefix(
             &game,
@@ -94,6 +96,7 @@ pub fn install_prerequisites(
             &prerequisite.args,
             home,
         )?;
+
         if !matches!(code, 0 | 3010) || !is_installed(&wine, prerequisite) {
             return Err(AppError::new("tools.prerequisite_failed")
                 .with("name", &prerequisite.name)
@@ -101,6 +104,7 @@ pub fn install_prerequisites(
                 .kind(ErrorKind::Permanent));
         }
     }
+
     Ok(())
 }
 
@@ -124,16 +128,19 @@ fn fetch_installer(data: &Data, prerequisite: &Prerequisite) -> Result<PathBuf, 
     fs::create_dir_all(&dir).map_err(io_at(&dir))?;
     let file_name = prerequisite.url.rsplit('/').next().unwrap_or_default();
     let target = dir.join(naming::safe_limited_file_name(file_name));
+
     if target.is_file()
         && crate::infra::io::digest_file::<Sha512>(&target, &mut |_| {}).map_err(io_at(&target))?
             == prerequisite.sha512
     {
         return Ok(target);
     }
+
     let mut part = target.clone().into_os_string();
     part.push(crate::infra::http::PART_SUFFIX);
     let part = PathBuf::from(part);
     crate::infra::http::download(&prerequisite.url, &part, &mut |_, _| true)?;
+
     if crate::infra::io::digest_file::<Sha512>(&part, &mut |_| {}).map_err(io_at(&part))?
         != prerequisite.sha512
     {
@@ -142,6 +149,7 @@ fn fetch_installer(data: &Data, prerequisite: &Prerequisite) -> Result<PathBuf, 
             .with("name", &prerequisite.name)
             .kind(ErrorKind::Permanent));
     }
+
     fs::rename(&part, &target).map_err(io_at(&target))?;
     Ok(target)
 }

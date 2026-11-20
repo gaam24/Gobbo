@@ -22,6 +22,7 @@ pub fn launch_hint(game_id: &str) -> String {
     if !crate::platform::supports_overlay() {
         return String::new();
     }
+
     let exe = std::env::current_exe()
         .map_or_else(|_| "gobbo".to_string(), |path| path.display().to_string());
     format!("\"{exe}\" run {game_id} -- %command%")
@@ -33,6 +34,7 @@ pub fn patch(mut status: views::Status, known: &views::KnownRows) -> views::Stat
     if known.ids.len() != known.revisions.len() {
         return status;
     }
+
     let held: FxHashMap<&str, &str> = known
         .ids
         .iter()
@@ -44,13 +46,16 @@ pub fn patch(mut status: views::Status, known: &views::KnownRows) -> views::Stat
     let mut ids = Vec::with_capacity(mods.len());
     let mut changed = Vec::new();
     let mut changed_revisions = Vec::new();
+
     for (view, revision) in mods.into_iter().zip(revisions) {
         ids.push(view.id.clone());
+
         if held.get(view.id.as_str()) != Some(&revision.as_str()) {
             changed.push(view);
             changed_revisions.push(revision);
         }
     }
+
     let current: FxHashSet<&str> = ids.iter().map(String::as_str).collect();
     let removed: Vec<String> = known
         .ids

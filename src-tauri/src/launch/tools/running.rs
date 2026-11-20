@@ -106,9 +106,11 @@ pub fn run_tool(
     check_start(&settings)?;
     let tool = tool_of(&game, tool_id)?;
     let missing = missing_prerequisites(&game, tool, &settings.game_root);
+
     if !missing.is_empty() {
         return Err(AppError::user("tools.prerequisites_missing").with("names", missing.join(", ")));
     }
+
     let Some(state) = overlay_session_state(&data)? else {
         return Err(AppError::user("tools.needs_overlay"));
     };
@@ -169,23 +171,29 @@ fn watch_tool_cancel(cancel: Arc<AtomicBool>, program: std::path::PathBuf) {
     // A program may need a moment to appear in the process list after it was spawned.
     let deadline = Instant::now() + Duration::from_secs(2);
     let mut process = None;
+
     while process.is_none() && Instant::now() < deadline {
         process = Process::by_program(&program);
+
         if process.is_none() {
             std::thread::sleep(Duration::from_millis(25));
         }
     }
+
     let Some(process) = process else {
         return;
     };
+
     loop {
         if !process.exists() {
             return;
         }
+
         if crate::infra::tasks::cancelled(Some(cancel.as_ref())) {
             process.stop();
             return;
         }
+
         std::thread::sleep(Duration::from_millis(50));
     }
 }

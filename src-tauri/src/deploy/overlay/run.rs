@@ -63,9 +63,11 @@ pub fn start_with_env(
     if !crate::platform::supports_overlay() {
         return Err(DeployError::OverlayUnsupported);
     }
+
     if !session.mods.is_dir() {
         return Err(DeployError::NoOverlaySession);
     }
+
     start(session, program, args, env, output)
 }
 
@@ -74,12 +76,15 @@ pub fn start_with_env(
 /// are disabled now is such an output.
 pub fn clear_outputs(session: &Session, step: &Step) -> Result<(), DeployError> {
     let layers = session.layers();
+
     for rel in &step.clean {
         let path = join(&layers.upper, rel);
+
         if path.is_file() {
             fs::remove_file(&path).map_err(|e| FileError::new(&path, e))?;
         }
     }
+
     Ok(())
 }
 
@@ -108,17 +113,21 @@ pub fn run_step(
 ) -> Result<bool, DeployError> {
     let layers = session.layers();
     clear_outputs(session, step)?;
+
     if let Some(dir) = &step.when_dir
         && layers.resolve(dir, Path::is_dir).is_none()
     {
         return Ok(false);
     }
+
     let journal = Journal::new(state.join(JOURNAL_FILE));
+
     for rel in &step.outputs {
         journal.append(&Entry::FileDeployed {
             path: join(&layers.upper, rel),
         })?;
     }
+
     let Some((_, program)) = layers.resolve(&step.program, Path::is_file) else {
         return Err(DeployError::StepFailed {
             detail: format!("{} is missing for step {}", step.program, step.id),
@@ -140,10 +149,12 @@ pub fn run_step(
         None => (program.display().to_string(), args, Vec::new()),
     };
     let code = execute(session, &program, &args, &env)?;
+
     if code != 0 {
         return Err(DeployError::StepFailed {
             detail: format!("step {} stopped with code {code}", step.id),
         });
     }
+
     Ok(true)
 }

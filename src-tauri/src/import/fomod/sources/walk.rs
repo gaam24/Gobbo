@@ -45,15 +45,18 @@ fn final_group_kinds(
     let mut flags = flags.clone();
     let mut destinations = destinations.clone();
     let mut kinds = Vec::with_capacity(group.options.len());
+
     for (option, named) in group.options.iter().zip(named) {
         let kind = effective_kind(option, &flags, &destinations);
         let usable = kind != OptionKind::NotUsable;
         let installs = group.kind == GroupKind::SelectAll || kind == OptionKind::Required || *named;
+
         if installs && usable {
             for flag in &option.flags {
                 flags.insert(flag.0.clone(), flag.1.clone());
             }
         }
+
         for pattern in &option.files {
             let include = (installs && usable)
                 || pattern.always_install
@@ -62,8 +65,10 @@ fn final_group_kinds(
                 destinations.insert(normalize_path(&pattern.destination));
             }
         }
+
         kinds.push(kind);
     }
+
     kinds
 }
 
@@ -88,10 +93,12 @@ pub(in crate::import::fomod) fn run_installer(
     }
 
     let mut steps = Vec::with_capacity(config.steps.len());
+
     for (step_index, step) in config.steps.iter().enumerate() {
         // `<visible>` is evaluated from the state the earlier steps leave: nothing this step sets is seen by it.
         let visible = step_visible(step.visible.as_ref(), &flags, &destinations);
         let mut groups = Vec::with_capacity(step.groups.len());
+
         for (group_index, group) in step.groups.iter().enumerate() {
             let named = if visible {
                 let start_kinds: Vec<OptionKind> = group
@@ -113,6 +120,7 @@ pub(in crate::import::fomod) fn run_installer(
             let mut kinds = Vec::with_capacity(group.options.len());
             let mut picked = Vec::with_capacity(group.options.len());
             let mut chosen = Vec::with_capacity(group.options.len());
+
             for (option, named) in group.options.iter().zip(&named) {
                 let kind = effective_kind(option, &flags, &destinations);
                 let usable = kind != OptionKind::NotUsable;
@@ -123,6 +131,7 @@ pub(in crate::import::fomod) fn run_installer(
                         || *named);
                 // A required option is not a choice, and an unusable one cannot be chosen: neither counts toward the rule.
                 chosen.push(*named && visible && kind != OptionKind::Required && usable);
+
                 if visible {
                     // Only a usable, picked option sets flags. An option the user did not pick still contributes its
                     // always-install and install-if-usable files.
@@ -131,6 +140,7 @@ pub(in crate::import::fomod) fn run_installer(
                             flags.insert(flag.0.clone(), flag.1.clone());
                         }
                     }
+
                     for pattern in &option.files {
                         let include = (installs && usable)
                             || pattern.always_install
@@ -138,10 +148,12 @@ pub(in crate::import::fomod) fn run_installer(
                         if !include {
                             continue;
                         }
+
                         destinations.insert(normalize_path(&pattern.destination));
                         sources.push(pattern.clone());
                     }
                 }
+
                 kinds.push(kind);
                 // An unusable option is never installed, whatever the group or the selection says.
                 picked.push(installs && usable);
@@ -165,6 +177,7 @@ pub(in crate::import::fomod) fn run_installer(
                 chosen,
             });
         }
+
         steps.push(StepRun { visible, groups });
     }
 
@@ -178,5 +191,6 @@ pub(in crate::import::fomod) fn run_installer(
             }
         }
     }
+
     InstallerRun { sources, steps }
 }

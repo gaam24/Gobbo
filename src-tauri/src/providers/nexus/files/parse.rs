@@ -41,12 +41,14 @@ pub(super) fn parse_file_version(text: &str, requested: u32) -> Result<FileVersi
         #[serde(default)]
         file: Option<Named>,
     }
+
     let version: Version = serde_json::from_str::<Envelope<Version>>(text)
         .map_err(bad_response)?
         .data;
     if !is_number(&version.id) {
         return Err(bad_response("version id"));
     }
+
     let file_id = version
         .game_scoped_id
         .as_deref()
@@ -79,6 +81,7 @@ pub(super) fn parse_mod_file_groups(text: &str) -> Result<Vec<ModFileGroup>, App
         #[serde(default)]
         mod_files: Vec<ModFileGroup>,
     }
+
     Ok(serde_json::from_str::<Envelope<Files>>(text)
         .map_err(bad_response)?
         .data
@@ -107,6 +110,7 @@ pub(super) fn parse_file_versions(text: &str, group: &ModFileGroup) -> Vec<ModFi
         #[serde(default, alias = "file_category")]
         category: Option<String>,
     }
+
     let Ok(response) = serde_json::from_str::<Envelope<Versions>>(text) else {
         return Vec::new();
     };
@@ -163,6 +167,7 @@ pub(super) fn parse_download_links(text: &str) -> Result<DownloadLinks, AppError
         #[serde(default)]
         url: Option<String>,
     }
+
     let data = serde_json::from_str::<Envelope<Data>>(text)
         .map_err(bad_response)?
         .data;
@@ -181,6 +186,7 @@ pub(super) fn parse_download_links(text: &str) -> Result<DownloadLinks, AppError
     if links.is_empty() {
         return Err(bad_response("no download link"));
     }
+
     Ok(DownloadLinks {
         links,
         expires_at: data.expires_at,

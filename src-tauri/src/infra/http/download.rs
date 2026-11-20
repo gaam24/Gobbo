@@ -171,6 +171,7 @@ pub fn download_with_info(
     let status = response.status().as_u16();
     let content_type = header(&response, "content-type");
     let content_disposition = header(&response, "content-disposition");
+
     if status == 429 {
         let retry_after = response
             .headers()
@@ -184,16 +185,20 @@ pub fn download_with_info(
             .kind(ErrorKind::Retryable)
             .with("retry_after", retry_after));
     }
+
     if !(200..300).contains(&status) {
         trace_response("http", "GET", &url, status, None, started);
         return Err(request_error("http", ureq::Error::StatusCode(status)));
     }
+
     let body = response.into_body();
     let total = body.content_length().unwrap_or(0);
+
     if let Err(error) = save_body(body.into_reader(), target, total, progress) {
         let _ = std::fs::remove_file(target);
         return Err(error);
     }
+
     let bytes = std::fs::metadata(target).map_or(total, |meta| meta.len());
     trace_response("http", "GET", &url, status, Some(bytes), started);
     Ok(DownloadInfo {
@@ -223,17 +228,22 @@ fn save_body(
     let mut file = std::fs::File::create(target).map_err(io_failed)?;
     let mut buffer = vec![0_u8; 256 * 1024];
     let mut done = 0_u64;
+
     loop {
         let read = reader.read(&mut buffer).map_err(|e| network("http", e))?;
+
         if read == 0 {
             break;
         }
+
         std::io::Write::write_all(&mut file, &buffer[..read]).map_err(io_failed)?;
         done += read as u64;
+
         if !progress(done, total) {
             return Err(AppError::user(crate::error::DOWNLOAD_CANCELLED));
         }
     }
+
     Ok(())
 }
 

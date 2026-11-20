@@ -197,6 +197,7 @@ fn removing_a_collection_keeps_mods_it_did_not_add_and_mods_another_collection_l
         ];
         save_profiles(&data, &profiles).unwrap();
     }
+
     let active = load_profiles(&data).unwrap().active;
     remove(&root, "full-root", &active, "nexus:full-root:example").unwrap();
     let profiles = load_profiles(&data).unwrap();

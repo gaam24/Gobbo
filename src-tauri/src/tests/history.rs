@@ -245,6 +245,7 @@ fn an_index_without_summaries_still_lists_its_states() {
 #[test]
 fn the_search_for_a_broken_mod_halves_the_suspects_and_puts_the_list_back() {
     let f = fixture("bisect");
+
     for name in ["modA", "modB", "modC", "modD"] {
         let zip = f.zip(
             &format!("{name}.zip"),
@@ -252,6 +253,7 @@ fn the_search_for_a_broken_mod_halves_the_suspects_and_puts_the_list_back() {
         );
         import(&f.data, SLOT_GAME, &zip, None, &mut |_, _| {}).unwrap();
     }
+
     f.enable_all(SLOT_GAME);
     bisect_start(&f.data, SLOT_GAME).unwrap();
     let on = |f: &Fixture| -> Vec<String> {

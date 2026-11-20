@@ -47,21 +47,27 @@ use std::collections::{HashMap, HashSet, VecDeque};
 /// process can start a child after its parent is gone.
 fn descendants(roots: Vec<u32>, parents: &HashMap<u32, u32>) -> Vec<u32> {
     let mut children: HashMap<u32, Vec<u32>> = HashMap::new();
+
     for (pid, parent) in parents {
         children.entry(*parent).or_default().push(*pid);
     }
+
     let mut seen = HashSet::new();
     let mut queue: VecDeque<u32> = roots.into();
     let mut ordered = Vec::new();
+
     while let Some(pid) = queue.pop_front() {
         if !seen.insert(pid) {
             continue;
         }
+
         ordered.push(pid);
+
         if let Some(kids) = children.get(&pid) {
             queue.extend(kids);
         }
     }
+
     ordered.reverse();
     ordered
 }

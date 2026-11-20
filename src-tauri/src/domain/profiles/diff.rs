@@ -38,19 +38,24 @@ struct Prepared<'a> {
 fn prepare<'a>(old: &'a [Entry], new: impl IntoIterator<Item = &'a Entry>) -> Prepared<'a> {
     let mut old_at: FxHashMap<&'a str, (usize, &'a Entry)> = FxHashMap::default();
     old_at.reserve(old.len());
+
     for (at, entry) in old.iter().enumerate() {
         old_at.insert(entry.id.as_str(), (at, entry));
     }
+
     let mut new_ids: FxHashSet<&'a str> = FxHashSet::default();
     let mut common: Vec<(usize, &'a Entry, &'a Entry)> = Vec::with_capacity(old.len());
     let mut added = Vec::new();
+
     for entry in new {
         new_ids.insert(entry.id.as_str());
+
         match old_at.get(entry.id.as_str()) {
             Some((at, before)) => common.push((*at, *before, entry)),
             None => added.push(entry),
         }
     }
+
     Prepared {
         new_ids,
         common,
@@ -93,10 +98,12 @@ pub fn changed_count_filtered<'a>(
 pub fn diff<'a>(old: &'a [Entry], new: &'a [Entry]) -> ListDiff<'a> {
     let prepared = prepare(old, new);
     let mut result = ListDiff::default();
+
     for (_, before, entry) in &prepared.common {
         if before.folder != entry.folder {
             result.updated.push((*before, entry));
         }
+
         if before.enabled != entry.enabled {
             if entry.enabled {
                 result.enabled_on.push(entry);
@@ -104,16 +111,20 @@ pub fn diff<'a>(old: &'a [Entry], new: &'a [Entry]) -> ListDiff<'a> {
                 result.enabled_off.push(entry);
             }
         }
+
         if before.priority != entry.priority {
             result.priority_changed += 1;
         }
     }
+
     result.added = prepared.added;
+
     for entry in old {
         if !prepared.new_ids.contains(entry.id.as_str()) {
             result.removed.push(entry);
         }
     }
+
     result.moved = moved(&prepared.common);
     result.changed = u32::try_from(
         result.added.len()
@@ -131,6 +142,7 @@ fn moved(common: &[(usize, &Entry, &Entry)]) -> u32 {
     if common.len() < 2 {
         return 0;
     }
+
     let positions: Vec<usize> = common.iter().map(|(at, _, _)| *at).collect();
     let in_order = longest_increasing(&positions);
     let count = common
@@ -147,11 +159,14 @@ fn longest_increasing(positions: &[usize]) -> Vec<bool> {
     let mut tails: Vec<usize> = Vec::new();
     let mut tail_at: Vec<usize> = Vec::new();
     let mut parent: Vec<Option<usize>> = vec![None; positions.len()];
+
     for (index, &position) in positions.iter().enumerate() {
         let at = tails.partition_point(|&tail| tail < position);
+
         if at > 0 {
             parent[index] = Some(tail_at[at - 1]);
         }
+
         if at == tails.len() {
             tails.push(position);
             tail_at.push(index);
@@ -160,12 +175,15 @@ fn longest_increasing(positions: &[usize]) -> Vec<bool> {
             tail_at[at] = index;
         }
     }
+
     let mut in_order = vec![false; positions.len()];
     let mut current = tail_at.last().copied();
+
     while let Some(index) = current {
         in_order[index] = true;
         current = parent[index];
     }
+
     in_order
 }
 

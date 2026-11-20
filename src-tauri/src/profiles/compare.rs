@@ -64,20 +64,25 @@ pub fn compare_profiles(
 
     // Build the right list's index once; the old lookup walked it for every entry of the left list.
     let mut right_by_id: BTreeMap<&str, &ProfileEntry> = BTreeMap::new();
+
     for entry in &right.mods {
         right_by_id.entry(entry.id.as_str()).or_insert(entry);
     }
+
     let left_ids: BTreeSet<&str> = left.mods.iter().map(|entry| entry.id.as_str()).collect();
 
     let mut rows = Vec::new();
     let mut same: u32 = 0;
+
     for entry in &left.mods {
         let first_side = side(entry);
         let second_side = right_by_id.get(entry.id.as_str()).map(|entry| side(entry));
+
         if second_side.as_ref() == Some(&first_side) {
             same += 1;
             continue;
         }
+
         rows.push(CompareRow {
             id: entry.id.clone(),
             name: name(entry),
@@ -85,10 +90,12 @@ pub fn compare_profiles(
             second: second_side,
         });
     }
+
     for entry in &right.mods {
         if left_ids.contains(entry.id.as_str()) {
             continue;
         }
+
         rows.push(CompareRow {
             id: entry.id.clone(),
             name: name(entry),

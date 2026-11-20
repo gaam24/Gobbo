@@ -37,6 +37,7 @@ pub fn resolve_sources(
     // time) and a `fommDependency` is ignored by the parser.
     let no_flags = FxHashMap::default();
     let no_installed = FxHashSet::default();
+
     if config
         .module_dependencies
         .as_ref()
@@ -56,6 +57,7 @@ pub fn resolve_sources(
         if !step.visible {
             continue;
         }
+
         for (config_group, group) in config_step.groups.iter().zip(&step.groups) {
             if let Some(problem) = group.problem {
                 return Err(FomodError::GroupRule {

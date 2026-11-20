@@ -57,6 +57,7 @@ fn block_of(mods: &[Entry], groups: &[ModGroup], pages: &PageKeys, id: &str) -> 
             return block;
         }
     }
+
     let Some(key) = pages.get(id) else {
         return vec![id.to_string()];
     };
@@ -75,16 +76,21 @@ fn block_of(mods: &[Entry], groups: &[ModGroup], pages: &PageKeys, id: &str) -> 
         _ => return vec![id.to_string()],
     };
     let mut first = start;
+
     while first > 0 && same_page(first - 1) {
         first -= 1;
     }
+
     let mut end = start + 1;
+
     while same_page(end) {
         end += 1;
     }
+
     if end - first < 2 {
         return vec![id.to_string()];
     }
+
     mods[first..end]
         .iter()
         .map(|entry| entry.id.clone())
@@ -104,21 +110,26 @@ pub fn move_block(
     if !profile.mods.iter().any(|entry| entry.id == id) {
         return Err(not_on_list(id));
     }
+
     if !profile.mods.iter().any(|entry| entry.id == target) {
         return Err(not_on_list(target));
     }
+
     let moving = block_of(&profile.mods, &profile.groups, pages, id);
     let anchor = block_of(&profile.mods, &profile.groups, pages, target);
     let moving_set: BTreeSet<&str> = moving.iter().map(String::as_str).collect();
+
     if anchor
         .iter()
         .any(|member| moving_set.contains(member.as_str()))
     {
         return Ok(());
     }
+
     let anchor_set: BTreeSet<&str> = anchor.iter().map(String::as_str).collect();
     let mut rest = Vec::with_capacity(profile.mods.len());
     let mut taken = Vec::with_capacity(moving.len());
+
     for entry in std::mem::take(&mut profile.mods) {
         if moving_set.contains(entry.id.as_str()) {
             taken.push(entry);
@@ -126,6 +137,7 @@ pub fn move_block(
             rest.push(entry);
         }
     }
+
     let places: Vec<usize> = rest
         .iter()
         .enumerate()
@@ -152,13 +164,16 @@ pub fn set_block_enabled(
     if !profile.mods.iter().any(|entry| entry.id == id) {
         return Err(not_on_list(id));
     }
+
     let block = block_of(&profile.mods, &profile.groups, pages, id);
     let wanted: BTreeSet<&str> = block.iter().map(String::as_str).collect();
+
     for entry in &mut profile.mods {
         if wanted.contains(entry.id.as_str()) {
             entry.enabled = enabled;
         }
     }
+
     Ok(())
 }
 
@@ -173,26 +188,33 @@ pub fn add_group(
     let listed: BTreeSet<&str> = profile.mods.iter().map(|entry| entry.id.as_str()).collect();
     let mut unique = Vec::with_capacity(members.len());
     let mut seen = BTreeSet::new();
+
     for member in members {
         if !listed.contains(member.as_str()) {
             return Err(not_on_list(member));
         }
+
         if seen.insert(member.as_str()) {
             unique.push(member.clone());
         }
     }
+
     if unique.len() < 2 {
         return Err(AppError::user("groups.needs_pair").with("id", id));
     }
+
     if profile.groups.iter().any(|group| group.id == id) {
         return Err(AppError::user("groups.invalid").with("id", id));
     }
+
     let wanted: BTreeSet<&str> = unique.iter().map(String::as_str).collect();
+
     for group in &mut profile.groups {
         group
             .members
             .retain(|member| !wanted.contains(member.as_str()));
     }
+
     profile.groups.retain(|group| group.members.len() >= 2);
     profile.groups.push(ModGroup {
         id: id.to_string(),
@@ -208,9 +230,11 @@ pub fn add_group(
 pub fn remove_group(profile: &mut Profile, id: &str) -> Result<(), AppError> {
     let before = profile.groups.len();
     profile.groups.retain(|group| group.id != id);
+
     if profile.groups.len() == before {
         return Err(AppError::user("groups.invalid").with("id", id));
     }
+
     Ok(())
 }
 
@@ -224,20 +248,24 @@ pub fn set_mod_group(
     if !profile.mods.iter().any(|entry| entry.id == id) {
         return Err(not_on_list(id));
     }
+
     if let Some(wanted) = group_id
         && !profile.groups.iter().any(|group| group.id == wanted)
     {
         return Err(AppError::user("groups.invalid").with("id", wanted));
     }
+
     for group in &mut profile.groups {
         group.members.retain(|member| member != id);
     }
+
     if let Some(wanted) = group_id
         && let Some(group) = profile.groups.iter_mut().find(|group| group.id == wanted)
         && !group.members.iter().any(|member| member == id)
     {
         group.members.push(id.to_string());
     }
+
     profile.groups.retain(|group| group.members.len() >= 2);
     Ok(())
 }
@@ -251,9 +279,11 @@ pub fn set_separator(
     name: &str,
 ) -> Result<(), AppError> {
     let name = name.trim();
+
     if name.is_empty() || name.chars().count() > 60 {
         return Err(AppError::user("profile.separator_name"));
     }
+
     if let Some(separator) = profile
         .separators
         .iter_mut()
@@ -262,9 +292,11 @@ pub fn set_separator(
         separator.name = name.to_string();
         return Ok(());
     }
+
     if !profile.mods.iter().any(|entry| entry.id == id) {
         return Err(not_on_list(id));
     }
+
     let block = block_of(&profile.mods, &profile.groups, pages, id);
     let anchor = block.first().cloned().unwrap_or_else(|| id.to_string());
     let separator_id = next_separator_id(profile);
@@ -283,9 +315,11 @@ pub fn normalize_groups(profile: &mut Profile) {
     let listed: BTreeSet<&str> = profile.mods.iter().map(|entry| entry.id.as_str()).collect();
     let mut used: BTreeSet<String> = BTreeSet::new();
     let mut kept = Vec::with_capacity(profile.groups.len());
+
     for group in std::mem::take(&mut profile.groups) {
         let mut local = BTreeSet::new();
         let mut members = Vec::with_capacity(group.members.len());
+
         for member in group.members {
             if listed.contains(member.as_str())
                 && !used.contains(&member)
@@ -294,10 +328,12 @@ pub fn normalize_groups(profile: &mut Profile) {
                 members.push(member);
             }
         }
+
         if members.len() >= 2 {
             used.extend(members.iter().cloned());
             kept.push(ModGroup { members, ..group });
         }
     }
+
     profile.groups = kept;
 }

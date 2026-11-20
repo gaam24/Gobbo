@@ -285,17 +285,20 @@ pub fn last_run(root: &Data, game_id: &str) -> Option<RunReport> {
     read(&data).map(|mut report| {
         report.output = output::tail(&data);
         report.app_log = app_log_tail(root);
+
         if let Ok(game) = crate::games::load(game_id) {
             let defined = crate::launch::logs::collect(&data, &game);
             report.mod_logs = crate::launch::logs::collect_mod_logs(&data, &game, &defined);
             report.game_logs = defined;
         }
+
         if let Some(state) = data.deployed_state() {
             let (decisions, total) = overlay::decisions(&state, DECISION_LIMIT);
             report.decisions = decisions.into_iter().map(OverlayDecision::from).collect();
             report.decisions_total = u32::try_from(total).unwrap_or(u32::MAX);
             report.crash_dump = overlay::latest_dump(&state);
         }
+
         report
     })
 }

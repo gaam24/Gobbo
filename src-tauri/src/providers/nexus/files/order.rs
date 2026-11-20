@@ -22,15 +22,18 @@ pub(super) fn newest_order(left: &ModFile, right: &ModFile) -> Ordering {
         (Some(left), Some(right)) => decimal_cmp(left, right),
         _ => None,
     };
+
     if let Some(order) = by_position
         && order != Ordering::Equal
     {
         return order;
     }
+
     match (left.uploaded_at, right.uploaded_at) {
         (Some(left), Some(right)) if left != right => return left.cmp(&right),
         _ => {}
     }
+
     left.file_id.cmp(&right.file_id)
 }
 
@@ -48,15 +51,19 @@ pub(super) fn decimal_cmp(left: &str, right: &str) -> Option<Ordering> {
     if integer != Ordering::Equal {
         return Some(integer);
     }
+
     let width = left_fraction.len().max(right_fraction.len());
+
     for at in 0..width {
         let left = left_fraction.as_bytes().get(at).copied().unwrap_or(b'0');
         let right = right_fraction.as_bytes().get(at).copied().unwrap_or(b'0');
         let order = left.cmp(&right);
+
         if order != Ordering::Equal {
             return Some(order);
         }
     }
+
     Some(Ordering::Equal)
 }
 
@@ -64,12 +71,14 @@ pub(super) fn decimal_cmp(left: &str, right: &str) -> Option<Ordering> {
 /// be an ASCII digit and at most one dot may appear.
 pub(super) fn split_decimal(text: &str) -> Option<(&str, &str)> {
     let (integer, fraction) = text.split_once('.').unwrap_or((text, ""));
+
     if integer.is_empty()
         || !integer.bytes().all(|byte| byte.is_ascii_digit())
         || !fraction.bytes().all(|byte| byte.is_ascii_digit())
     {
         return None;
     }
+
     Some((
         integer.trim_start_matches('0'),
         fraction.trim_end_matches('0'),

@@ -105,12 +105,14 @@ pub(in crate::packs) fn import_bundled(
         .fold(0u64, |total, (_, _, size)| total.saturating_add(*size));
     if let Some(space) = crate::infra::disk::space_for(&data.dir) {
         let free = space.free_kb.saturating_mul(1024);
+
         if needed > free {
             return Err(AppError::user("install.no_space")
                 .with("needed", needed / 1024)
                 .with("free", space.free_kb));
         }
     }
+
     let staging = Staging::create(data)?;
     // The folders this import just created, by digest. A pack with several versions of one archive resolves them to
     // these folders instead of an older copy the library already had.
@@ -133,6 +135,7 @@ pub(in crate::packs) fn import_bundled(
         let mut choices_of = Vec::with_capacity(chunk.len());
         let mut digests = Vec::with_capacity(chunk.len());
         let mut folders = Vec::with_capacity(chunk.len());
+
         for (number, &(sha256, name, expected_size)) in chunk.iter().enumerate() {
             let Some(file_name) = Path::new(name).file_name() else {
                 continue;
@@ -143,6 +146,7 @@ pub(in crate::packs) fn import_bundled(
             let target = folder.join(file_name);
             let entry = opened.zip.by_name(name).map_err(pack_error)?;
             let declared = entry.size();
+
             if declared > MAX_PACK_ARCHIVE_BYTES {
                 return Err(AppError::user("pack.archive_too_large").with("name", name));
             }
@@ -154,17 +158,21 @@ pub(in crate::packs) fn import_bundled(
                 &mut |_| {},
             )
             .map_err(io_at(&target))?;
+
             if copied > MAX_PACK_ARCHIVE_BYTES {
                 return Err(AppError::user("pack.archive_too_large").with("name", name));
             }
             // The manifest's total is untrusted: the bytes actually copied are capped too.
             copied_total = copied_total.saturating_add(copied);
+
             if copied_total > MAX_PACK_TOTAL_BYTES {
                 return Err(AppError::user("pack.too_large").with("limit", MAX_PACK_TOTAL_BYTES));
             }
+
             if (expected_size > 0 && copied != expected_size) || digest != sha256 {
                 return Err(AppError::user("pack.archive_mismatch").with("name", name));
             }
+
             let (fomod, source) = choices.get(sha256).cloned().unwrap_or_default();
             labels.push(file_name.to_string_lossy().into_owned());
             targets.push(target);
@@ -172,6 +180,7 @@ pub(in crate::packs) fn import_bundled(
             digests.push(sha256.to_string());
             folders.push(folder);
         }
+
         let batch: Vec<BatchRequest<'_>> = targets
             .iter()
             .zip(choices_of)
@@ -191,10 +200,12 @@ pub(in crate::packs) fn import_bundled(
         for folder in folders {
             let _ = fs::remove_dir_all(folder);
         }
+
         for ((label, digest), result) in labels.into_iter().zip(digests).zip(results) {
             match result {
                 Ok(Acquired::Imported(imported_view)) => {
                     view.imported += 1;
+
                     for mod_view in imported_view.mods {
                         imported
                             .entry(mod_view.sha256)
@@ -210,5 +221,6 @@ pub(in crate::packs) fn import_bundled(
             }
         }
     }
+
     Ok(imported)
 }

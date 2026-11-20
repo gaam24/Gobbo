@@ -48,22 +48,29 @@ pub(super) fn run(root: &Path, known_game_ids: &[String]) -> Result<(), AppError
         Err(error) => return Err(io_at(&games)(error)),
     };
     let mut moved_all = true;
+
     for entry in entries {
         let entry = entry.map_err(io_at(&games))?;
         let name = entry.file_name();
         let name = name.to_string_lossy();
+
         if name.starts_with('.') || name.ends_with(REMOVED_SUFFIX) || !entry.path().is_dir() {
             continue;
         }
+
         let current = game_ids::current_id(name.as_ref());
+
         if added.contains(current) {
             continue;
         }
+
         if !known.contains(current) && !game_ids::is_renamed(name.as_ref()) {
             continue;
         }
+
         let from = entry.path();
         let to = games.join(format!("{current}{REMOVED_SUFFIX}"));
+
         match move_if_absent(&from, &to) {
             Ok(true) => {}
             Ok(false) => {
@@ -83,9 +90,11 @@ pub(super) fn run(root: &Path, known_game_ids: &[String]) -> Result<(), AppError
             }
         }
     }
+
     if moved_all {
         fs::remove_file(&file).map_err(io_at(&file))?;
     }
+
     Ok(())
 }
 

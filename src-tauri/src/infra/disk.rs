@@ -37,10 +37,12 @@ pub fn space_for(path: &Path) -> Option<Space> {
 
 fn existing_ancestor(path: &Path) -> Option<PathBuf> {
     let mut current = path;
+
     loop {
         if current.exists() {
             return Some(current.to_path_buf());
         }
+
         current = current.parent()?;
     }
 }

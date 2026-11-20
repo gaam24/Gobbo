@@ -18,15 +18,18 @@ pub const fn is_invalid_name_char(c: char) -> bool {
 /// A name that Windows accepts as a file or folder name. The visible part stays close to the original.
 pub fn safe_file_name(name: &str) -> String {
     let mut out = String::with_capacity(name.len());
+
     for c in name.chars() {
         out.push(if is_invalid_name_char(c) { '-' } else { c });
     }
+
     let out = out.trim().trim_end_matches(['.', ' ']).to_string();
     let out = if out.is_empty() {
         "mod".to_string()
     } else {
         out
     };
+
     if is_reserved_file_name(&out) {
         format!("_{out}")
     } else {
@@ -50,14 +53,17 @@ pub fn is_safe_component(name: &str) -> bool {
     if name.is_empty() || name == "." || name == ".." {
         return false;
     }
+
     if cfg!(windows) {
         if name.ends_with(['.', ' ']) || is_reserved_file_name(name) {
             return false;
         }
+
         if name.chars().any(is_invalid_name_char) {
             return false;
         }
     }
+
     true
 }
 
@@ -67,12 +73,15 @@ pub fn bounded_file_name(name: &str, limit: usize) -> String {
     if name.chars().count() <= limit {
         return trim_name_end(name.to_string());
     }
+
     let hash = short_hash(name);
     // The dash and the hash take the tail of the name, so a limit too small to hold both gets a plain truncation.
     let suffix = hash.len() + 1;
+
     if limit <= suffix {
         return trim_name_end(name.chars().take(limit).collect());
     }
+
     let path = std::path::Path::new(name);
     let extension = path
         .extension()
@@ -94,6 +103,7 @@ fn trim_name_end(mut name: String) -> String {
     while name.ends_with(['.', ' ']) {
         name.pop();
     }
+
     if name.is_empty() {
         "mod".to_string()
     } else {
@@ -232,6 +242,7 @@ mod tests {
                 prop_assert!(!name.is_empty());
                 prop_assert_ne!(name.as_str(), ".");
                 prop_assert_ne!(name.as_str(), "..");
+
                 if cfg!(windows) {
                     prop_assert!(!name.ends_with(['.', ' ']));
                     prop_assert!(!name.chars().any(is_invalid_name_char));

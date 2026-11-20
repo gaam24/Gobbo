@@ -61,6 +61,7 @@ fn parsed(program: &Path) -> io::Result<Arc<Parsed>> {
     let modified = metadata.modified()?;
     {
         let entry = cache().lock().unwrap_or_else(PoisonError::into_inner);
+
         if let Some((_, _, _, parsed)) =
             entry.iter().find(|(path, cached_len, cached_modified, _)| {
                 path == program && *cached_len == len && *cached_modified == modified
@@ -69,12 +70,15 @@ fn parsed(program: &Path) -> io::Result<Arc<Parsed>> {
             return Ok(Arc::clone(parsed));
         }
     }
+
     let parsed = Arc::new(parse_file(program)?);
     let mut entry = cache().lock().unwrap_or_else(PoisonError::into_inner);
     entry.retain(|(path, _, _, _)| path != program);
+
     if entry.len() >= CACHE_ENTRIES {
         entry.remove(0);
     }
+
     entry.push((program.to_path_buf(), len, modified, Arc::clone(&parsed)));
     Ok(parsed)
 }
@@ -98,6 +102,7 @@ pub unsafe fn rewrite(
     if mapping.is_empty() {
         return Ok(0);
     }
+
     let parsed = parsed(program)?;
     let imports = &parsed.imports;
     let pe32 = parsed.pe32;
@@ -105,6 +110,7 @@ pub unsafe fn rewrite(
     // The image is smaller than 2 GiB; this start is inside the 32-bit RVA range and clear of the usual image.
     let image_size = 0x1000_0000u32;
     let mut patched = 0;
+
     for (name, path) in mapping {
         let Some(import) = imports
             .iter()
@@ -118,6 +124,7 @@ pub unsafe fn rewrite(
         };
         // SAFETY: `remote` is a fresh allocation of `path.len() + 1` bytes in the target.
         let mut written = 0;
+
         if unsafe {
             WriteProcessMemory(
                 process,
@@ -132,6 +139,7 @@ pub unsafe fn rewrite(
             free_remote(process, remote);
             return Err(io::Error::last_os_error());
         }
+
         let name_rva = (remote as usize)
             .checked_sub(base)
             .and_then(|offset| u32::try_from(offset).ok());
@@ -169,12 +177,15 @@ pub unsafe fn rewrite(
         unsafe {
             VirtualProtectEx(process, descriptor as *const c_void, 4, old, &mut old);
         }
+
         if written == FALSE {
             free_remote(process, remote);
             return Err(io::Error::last_os_error());
         }
+
         patched += 1;
     }
+
     Ok(patched)
 }
 
@@ -193,6 +204,7 @@ fn main_module(process: HANDLE, pe32: bool) -> io::Result<usize> {
     let ntdll = wide(OsStr::new("ntdll.dll"));
     // SAFETY: ntdll is loaded in every Windows process, and the name is NUL-terminated.
     let module = unsafe { GetModuleHandleW(ntdll.as_ptr()) };
+
     if module.is_null() {
         return Err(io::Error::last_os_error());
     }
@@ -220,11 +232,13 @@ fn main_module(process: HANDLE, pe32: bool) -> io::Result<usize> {
                 &mut returned,
             )
         };
+
         if status < 0 {
             return Err(io::Error::other(format!(
                 "NtQueryInformationProcess(ProcessWow64Information) failed with 0x{status:08x}"
             )));
         }
+
         address
     } else {
         let mut information: PROCESS_BASIC_INFORMATION = unsafe { std::mem::zeroed() };
@@ -238,13 +252,16 @@ fn main_module(process: HANDLE, pe32: bool) -> io::Result<usize> {
                 &mut returned,
             )
         };
+
         if status < 0 {
             return Err(io::Error::other(format!(
                 "NtQueryInformationProcess failed with 0x{status:08x}"
             )));
         }
+
         information.PebBaseAddress as usize
     };
+
     if peb == 0 {
         return Err(io::Error::other("the process has no PEB address"));
     }
@@ -266,6 +283,7 @@ fn main_module(process: HANDLE, pe32: bool) -> io::Result<usize> {
     {
         return Err(io::Error::last_os_error());
     }
+
     let base = if pe32 {
         u32::from_le_bytes(buffer[..4].try_into().map_err(|_| invalid())?) as usize
     } else {
@@ -284,6 +302,7 @@ fn allocate_near(
     size: usize,
 ) -> Option<*mut c_void> {
     let mut preferred = base.checked_add(image_size as usize)?.checked_add(0xFFFF)? & !0xFFFF;
+
     for _ in 0..32 {
         // SAFETY: the address is a hint; Windows returns a new allocation or null.
         let remote = unsafe {
@@ -295,6 +314,7 @@ fn allocate_near(
                 PAGE_READWRITE,
             )
         };
+
         if !remote.is_null() {
             let fits = (remote as usize)
                 .checked_sub(base)
@@ -302,10 +322,13 @@ fn allocate_near(
             if fits {
                 return Some(remote);
             }
+
             free_remote(process, remote);
         }
+
         preferred = preferred.checked_add(0x10000)?;
     }
+
     None
 }
 
@@ -326,9 +349,11 @@ fn ansi(path: &Path) -> io::Result<Vec<u8>> {
             std::ptr::null_mut(),
         )
     };
+
     if needed <= 0 {
         return Err(io::Error::last_os_error());
     }
+
     let mut bytes = vec![0u8; needed as usize + 1];
     // SAFETY: `bytes` has room for the converted text and the terminator.
     let written = unsafe {
@@ -343,9 +368,11 @@ fn ansi(path: &Path) -> io::Result<Vec<u8>> {
             std::ptr::null_mut(),
         )
     };
+
     if written <= 0 {
         return Err(io::Error::last_os_error());
     }
+
     bytes.truncate(written as usize);
     bytes.push(0);
     Ok(bytes)

@@ -85,6 +85,7 @@ fn parse_mod_page(text: &str) -> Result<ModPage, AppError> {
     struct Image {
         large_thumbnail_url: Option<String>,
     }
+
     let page = serde_json::from_str::<Envelope<Page>>(text)
         .map_err(bad_response)?
         .data;

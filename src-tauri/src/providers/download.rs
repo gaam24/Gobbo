@@ -42,6 +42,7 @@ pub fn fetch_archive(
     // One 429 budget for the whole operation, shared by every CDN link. The pacing is per provider and tier and runs
     // before every try: an unlimited policy returns at once, so no user waits for another provider's ceiling.
     let mut rate = http::RateRetry::default();
+
     for &url in links {
         match http::download_part(dir, url, &mut rate, &mut || clock.wait(policy), progress) {
             Ok(part) => {
@@ -51,6 +52,7 @@ pub fn fetch_archive(
                 if let Some(sidecar) = rules.sidecar {
                     sidecar::write_source(&target, sidecar);
                 }
+
                 return Ok(target);
             }
             Err(PartError::Body(problem)) => last_error = Some((rules.body_error)(problem)),
@@ -61,6 +63,7 @@ pub fn fetch_archive(
             Err(PartError::Failed(error)) => last_error = Some(error),
         }
     }
+
     Err(last_error.unwrap_or(rules.no_link))
 }
 
@@ -75,11 +78,14 @@ pub fn target_name(info: &DownloadInfo, url: &str, requested: &str, fallback: &s
     {
         return name;
     }
+
     if let Some(name) = url_archive_name(url) {
         return name;
     }
+
     let extension = archive_extension(info.content_type.as_deref());
     let requested = requested.trim();
+
     if !requested.is_empty() {
         return if crate::domain::archive::extension_of(requested).is_some() {
             requested.to_string()
@@ -87,6 +93,7 @@ pub fn target_name(info: &DownloadInfo, url: &str, requested: &str, fallback: &s
             format!("{requested}.{extension}")
         };
     }
+
     format!("{fallback}.{extension}")
 }
 
@@ -101,6 +108,7 @@ fn url_archive_name(url: &str) -> Option<String> {
 /// The kind of archive a response says it is.
 fn archive_extension(content_type: Option<&str>) -> &'static str {
     let content_type = content_type.unwrap_or_default().to_ascii_lowercase();
+
     if content_type.contains("7z") {
         "7z"
     } else if content_type.contains("rar") {
@@ -113,15 +121,18 @@ fn archive_extension(content_type: Option<&str>) -> &'static str {
 /// The name in a `Content-Disposition` header. `filename*` (RFC 5987) wins over `filename` because it carries UTF-8.
 fn filename_from_content_disposition(header: &str) -> Option<String> {
     let mut plain = None;
+
     for part in header.split(';').skip(1) {
         let Some((name, value)) = part.trim().split_once('=') else {
             continue;
         };
         let name = name.trim().to_ascii_lowercase();
         let value = value.trim().trim_matches('"');
+
         if name == "filename*" {
             // `UTF-8''name`, `UTF-8'en'name` or a bare name.
             let value = value.splitn(3, '\'').nth(2).unwrap_or(value);
+
             if let Some(decoded) = percent_decode(value).filter(|name| !name.is_empty()) {
                 return Some(decoded);
             }
@@ -129,6 +140,7 @@ fn filename_from_content_disposition(header: &str) -> Option<String> {
             plain = Some(value.to_string());
         }
     }
+
     plain
 }
 
@@ -136,12 +148,14 @@ fn filename_from_content_disposition(header: &str) -> Option<String> {
 fn percent_decode(text: &str) -> Option<String> {
     let mut bytes = Vec::with_capacity(text.len());
     let mut rest = text;
+
     while let Some(at) = rest.find('%') {
         bytes.extend_from_slice(&rest.as_bytes()[..at]);
         let hex = rest.get(at + 1..at + 3)?;
         bytes.push(u8::from_str_radix(hex, 16).ok()?);
         rest = &rest[at + 3..];
     }
+
     bytes.extend_from_slice(rest.as_bytes());
     String::from_utf8(bytes).ok()
 }

@@ -10,6 +10,7 @@ pub fn check_start(settings: &Settings) -> Result<(), AppError> {
     if !is_dir(&settings.game_root) {
         return Err(game_folder_missing());
     }
+
     Ok(())
 }
 

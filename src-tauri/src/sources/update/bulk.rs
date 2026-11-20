@@ -31,9 +31,11 @@ pub fn update_all(
             if !update.has_update {
                 return None;
             }
+
             if !wanted(only, &mod_view.id) {
                 return None;
             }
+
             Some(UpdateTarget {
                 id: mod_view.id.clone(),
                 name: mod_view.info.name.clone(),
@@ -48,11 +50,13 @@ pub fn update_all(
     let mut failed = Vec::new();
     let mut changes = Vec::new();
     let mut stopped = false;
+
     for (index, target) in targets.iter().enumerate() {
         if cancelled(cancel) {
             stopped = true;
             break;
         }
+
         let done = u32::try_from(index).unwrap_or(u32::MAX);
         let step = |stage: UpdateAllStage, part: u32| UpdateAllProgress {
             name: target.name.clone(),
@@ -78,6 +82,7 @@ pub fn update_all(
                 &mut send,
             )
         };
+
         match outcome {
             Ok(()) => {
                 updated += 1;
@@ -94,6 +99,7 @@ pub fn update_all(
             Err(error) => failed.push(Message::from(error)),
         }
     }
+
     Ok(UpdateAllView {
         status: crate::status::status(root, game_id)?,
         updated,
@@ -113,6 +119,7 @@ fn overall_percent(done: u32, total: u32, part: u32) -> u32 {
     if total == 0 {
         return 100;
     }
+
     done.saturating_mul(100)
         .saturating_add(part)
         .checked_div(total)

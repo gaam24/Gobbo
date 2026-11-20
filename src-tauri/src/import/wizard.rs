@@ -53,20 +53,25 @@ pub(super) fn fomod_allowed(
         .collect();
     let mut selection = FomodSelection::default();
     let mut name = String::new();
+
     for (index, entry) in reader.entries().iter().enumerate() {
         if entry.is_dir {
             continue;
         }
+
         fomod::normalize_path_into(&entry.name, &mut name);
         // Several patterns can match one entry. Only a single, unambiguous source and destination may move the file;
         // otherwise the archive path is the safer answer.
         let mut matched: Option<(&str, &str)> = None;
         let mut ambiguous = false;
+
         for (pattern, source) in patterns.iter().zip(&sources) {
             if !pattern.matches(&name) {
                 continue;
             }
+
             let candidate = (source.source.as_str(), source.destination.as_str());
+
             match matched {
                 None => matched = Some(candidate),
                 Some(existing) if existing != candidate => {
@@ -76,10 +81,13 @@ pub(super) fn fomod_allowed(
                 Some(_) => {}
             }
         }
+
         if matched.is_none() {
             continue;
         }
+
         selection.allowed.insert(index);
+
         if !ambiguous
             && let Some((source, destination)) = matched
             && !destination.is_empty()
@@ -89,9 +97,11 @@ pub(super) fn fomod_allowed(
                 .insert(index, virtual_game_path(&entry.name, source, destination));
         }
     }
+
     if selection.allowed.is_empty() {
         return Err(AppError::user("fomod.no_files_selected"));
     }
+
     Ok(selection)
 }
 
@@ -117,6 +127,7 @@ fn remainder_start(source: &[&str], entry: &[&str]) -> Option<usize> {
         {
             return None;
         }
+
         return Some(source.len());
     };
     // A wildcard stands for the components between the literal parts around it. Those literal parts must match for
@@ -129,12 +140,16 @@ fn remainder_start(source: &[&str], entry: &[&str]) -> Option<usize> {
     {
         return None;
     }
+
     let last_star = source.iter().rposition(|part| part.contains('*'))?;
     let tail = &source[last_star + 1..];
+
     if tail.len() > entry.len() - first_star {
         return None;
     }
+
     let tail_at = entry.len() - tail.len();
+
     if !tail
         .iter()
         .zip(&entry[tail_at..])
@@ -142,6 +157,7 @@ fn remainder_start(source: &[&str], entry: &[&str]) -> Option<usize> {
     {
         return None;
     }
+
     Some(first_star)
 }
 
@@ -153,9 +169,11 @@ fn remainder_start(source: &[&str], entry: &[&str]) -> Option<usize> {
 /// - a missing, ambiguous or unsafe destination falls back to the original archive path.
 fn virtual_game_path(original: &str, source: &str, destination: &str) -> String {
     let fallback = || original.to_string();
+
     if !crate::domain::naming::is_safe_relative_path(destination) {
         return fallback();
     }
+
     let mut source_norm = String::new();
     let mut entry_norm = String::new();
     fomod::normalize_path_into(source, &mut source_norm);
@@ -169,6 +187,7 @@ fn virtual_game_path(original: &str, source: &str, destination: &str) -> String 
         .filter(|part| !part.is_empty() && *part != ".")
         .collect();
     let original_parts = components(original);
+
     if source_parts.is_empty()
         || entry_parts.len() != original_parts.len()
         || original_parts
@@ -177,14 +196,17 @@ fn virtual_game_path(original: &str, source: &str, destination: &str) -> String 
     {
         return fallback();
     }
+
     let Some(start) = remainder_start(&source_parts, &entry_parts) else {
         return fallback();
     };
     let mut game_path = components(destination).join("/");
+
     for part in &original_parts[start..] {
         game_path.push('/');
         game_path.push_str(part);
     }
+
     game_path
 }
 

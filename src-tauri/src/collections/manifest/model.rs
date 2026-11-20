@@ -13,9 +13,11 @@ pub(super) fn issue<const N: usize>(
     params: [(&str, String); N],
 ) -> CollectionIssue {
     let mut message = Message::new(code);
+
     for (key, value) in params {
         message = message.with(key, value);
     }
+
     CollectionIssue {
         severity,
         item,

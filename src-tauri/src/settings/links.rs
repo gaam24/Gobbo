@@ -60,6 +60,7 @@ pub fn repair(app: &AppHandle, taken: &[String]) -> SourceLinksReport {
     #[cfg(any(windows, target_os = "linux"))]
     {
         let links = app.deep_link();
+
         for status in &before {
             // Best effort: the status below says which schemes are still not Gobbo's.
             if !status.registered {
@@ -67,6 +68,7 @@ pub fn repair(app: &AppHandle, taken: &[String]) -> SourceLinksReport {
             }
         }
     }
+
     let after = status(app, taken);
     let repaired = repaired_providers(&before, &after);
     SourceLinksReport {
@@ -78,16 +80,19 @@ pub fn repair(app: &AppHandle, taken: &[String]) -> SourceLinksReport {
 /// The providers that had a scheme another program handled before the repair and Gobbo handles after it.
 fn repaired_providers(before: &[SourceLinkStatus], after: &[SourceLinkStatus]) -> Vec<String> {
     let mut repaired: Vec<String> = Vec::new();
+
     for previous in before.iter().filter(|status| !status.registered) {
         let now = after.iter().any(|status| {
             status.provider == previous.provider
                 && status.scheme == previous.scheme
                 && status.registered
         });
+
         if now && !repaired.contains(&previous.provider) {
             repaired.push(previous.provider.clone());
         }
     }
+
     repaired
 }
 
@@ -119,10 +124,13 @@ fn status_now(_app: &AppHandle, _taken: &[String]) -> Vec<SourceLinkStatus> {
 #[cfg(any(windows, target_os = "linux"))]
 fn apply_now(app: &AppHandle, taken: &[String]) -> Result<(), AppError> {
     let links = app.deep_link();
+
     for provider in providers::providers() {
         let wanted = taken.iter().any(|id| id.as_str() == provider.id().as_str());
+
         for &scheme in provider.schemes() {
             let registered = links.is_registered(scheme).unwrap_or(false);
+
             match action(wanted, registered) {
                 Action::Register => {
                     links
@@ -138,6 +146,7 @@ fn apply_now(app: &AppHandle, taken: &[String]) -> Result<(), AppError> {
             }
         }
     }
+
     Ok(())
 }
 

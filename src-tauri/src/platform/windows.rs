@@ -53,10 +53,12 @@ pub fn stop_game(game_root: &Path) -> bool {
     refresh(&mut system);
     let mut parents = HashMap::new();
     let mut roots = Vec::new();
+
     for (pid, process) in system.processes() {
         if let Some(parent) = process.parent() {
             parents.insert(pid.as_u32(), parent.as_u32());
         }
+
         if process
             .exe()
             .is_some_and(|exe| in_game_folder(exe, &folder))
@@ -64,8 +66,10 @@ pub fn stop_game(game_root: &Path) -> bool {
             roots.push(pid.as_u32());
         }
     }
+
     let pids = super::descendants(roots, &parents);
     let mut stopped = false;
+
     for &pid in &pids {
         let asked = std::process::Command::new("taskkill")
             .args(["/PID", &pid.to_string()])
@@ -76,7 +80,9 @@ pub fn stop_game(game_root: &Path) -> bool {
             .is_ok_and(|status| status.success());
         stopped |= asked;
     }
+
     let deadline = Instant::now() + Duration::from_secs(2);
+
     loop {
         refresh(&mut system);
         let alive = pids
@@ -85,13 +91,16 @@ pub fn stop_game(game_root: &Path) -> bool {
         if !alive || Instant::now() >= deadline {
             break;
         }
+
         std::thread::sleep(Duration::from_millis(50));
     }
+
     for pid in pids {
         if let Some(process) = system.process(Pid::from_u32(pid)) {
             stopped |= process.kill();
         }
     }
+
     stopped
 }
 

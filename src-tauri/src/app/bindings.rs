@@ -28,6 +28,7 @@ pub fn update(builder: &tauri_specta::Builder<tauri::Wry>) {
         crate::infra::log::error("could not generate the IPC bindings");
         return;
     };
+
     if std::fs::read_to_string(BINDINGS).ok().as_deref() != Some(text.as_str())
         && let Err(error) = std::fs::write(BINDINGS, text)
     {

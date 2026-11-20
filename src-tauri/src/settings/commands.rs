@@ -64,6 +64,7 @@ pub async fn save_app_settings(
     with_data(data, move |root| {
         super::links::apply(&app, &settings.source_links)?;
         let saved = super::config::save_app_settings(root, settings);
+
         if saved.is_ok() {
             let (focused, minimized) =
                 app.get_webview_window("main")
@@ -75,6 +76,7 @@ pub async fn save_app_settings(
                     });
             super::config::apply_efficiency(efficiency, focused, minimized);
         }
+
         saved
     })
     .await
@@ -171,9 +173,11 @@ pub async fn open_path(
         } else {
             target.is_dir()
         };
+
         if !valid_kind || !crate::settings::guard::may_open(root, game.as_deref(), &target) {
             return Err(AppError::user("io.path_not_allowed"));
         }
+
         let opened = if reveal {
             tauri_plugin_opener::reveal_item_in_dir(&target)
         } else {

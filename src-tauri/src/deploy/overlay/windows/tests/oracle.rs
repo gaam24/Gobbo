@@ -66,6 +66,7 @@ fn generate(rng: &mut Rng, count: usize) -> Vec<Op> {
     (0..count)
         .map(|step| {
             let path = rng.below(PATHS.len());
+
             match rng.below(8) {
                 0 => Op::Write(path, step as u32),
                 1 => Op::Read(path),
@@ -83,6 +84,7 @@ fn generate(rng: &mut Rng, count: usize) -> Vec<Op> {
 /// The command line of one operation, with the game folder at `root`. The answer of every line is written to `answers`.
 fn command(op: Op, root: &str) -> String {
     let at = |index: usize| format!("{root}\\{}", PATHS[index]);
+
     match op {
         Op::Write(path, value) => format!("echo v{value} > \"{}\"", at(path)),
         Op::Read(path) => format!("type \"{}\"", at(path)),
@@ -100,12 +102,14 @@ fn command(op: Op, root: &str) -> String {
 fn script(ops: &[Op], root: &str, answers: &Path) -> String {
     let file = answers.display();
     let mut lines = vec![String::from("@echo off\r\n")];
+
     for (index, op) in ops.iter().enumerate() {
         lines.push(format!("({}) >> \"{file}\" 2>&1\r\n", command(*op, root)));
         lines.push(format!(
             "if errorlevel 1 (echo {index} failed >> \"{file}\") else (echo {index} ok >> \"{file}\")\r\n"
         ));
     }
+
     lines.push(format!(
         "(dir /s /b \"{root}\" | sort) >> \"{file}\" 2>&1\r\n"
     ));
@@ -140,21 +144,26 @@ struct Start {
 fn start(rng: &mut Rng) -> Start {
     let mut game = Vec::new();
     let mut mod_files = Vec::new();
+
     for index in 0..PATHS.len() {
         if index == 6 {
             // `e` is a file, never a folder.
             if rng.below(2) == 0 {
                 game.push((index, format!("game-{index}")));
             }
+
             continue;
         }
+
         if rng.below(2) == 0 {
             game.push((index, format!("game-{index}")));
         }
+
         if rng.below(3) == 0 {
             mod_files.push((index, format!("mod-{index}")));
         }
     }
+
     Start { game, mod_files }
 }
 

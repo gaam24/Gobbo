@@ -110,6 +110,7 @@ pub unsafe extern "system" fn DllMain(
             diag::flush_trace();
         }
     }
+
     1
 }
 
@@ -127,12 +128,16 @@ pub extern "C" fn GobboOverlayInit() -> i32 {
         {
             process::remember_hook(path);
         }
+
         let ready = install();
+
         if ready {
             signal_ready();
         }
+
         ready
     });
+
     if ready { 1 } else { 0 }
 }
 
@@ -141,6 +146,7 @@ fn signal_ready() {
     let name = gobbo_overlay_launch::ready_event_name(std::process::id());
     // SAFETY: `name` is a NUL-terminated name, and the call only opens the event the launcher created.
     let event = unsafe { OpenEventW(EVENT_MODIFY_STATE, 0, name.as_ptr()) };
+
     if event.is_null() {
         return;
     }
@@ -180,6 +186,7 @@ fn install() -> bool {
         game_whiteouts,
     );
     let mut redirects = Vec::new();
+
     for spec in config.redirects() {
         let layers = spec.layers();
         let whiteouts = whiteouts::load(&spec.id, &layers);
@@ -190,6 +197,7 @@ fn install() -> bool {
             whiteouts,
         ));
     }
+
     timeline.mark("whiteouts_redirects");
     state::store_session(Mounts { game, redirects });
     // Build the path cache now, not on the first hooked call: the short-name lookup and the mounts are read once,
@@ -276,6 +284,7 @@ fn log_session(config: &MountConfig) {
         env!("CARGO_PKG_VERSION"),
         std::process::id()
     ));
+
     for mount in &config.mounts {
         log(&format!(
             "mount {}: guest {}, root {}, staging {}, upper {}",
@@ -289,6 +298,7 @@ fn log_session(config: &MountConfig) {
             mount.upper.display()
         ));
     }
+
     if diag::settings().passthrough {
         log("passthrough: calls are not redirected");
     }

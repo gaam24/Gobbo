@@ -18,6 +18,7 @@ pub(crate) fn prune_old_files() {
     if !cfg!(debug_assertions) {
         return;
     }
+
     let Some(dir) = developer_dir() else {
         return;
     };
@@ -28,9 +29,11 @@ pub(crate) fn prune_old_files() {
         .filter_map(Result::ok)
         .filter_map(|entry| {
             let meta = entry.metadata().ok()?;
+
             if !meta.is_file() {
                 return None;
             }
+
             Some((entry.path(), meta.modified().ok()?))
         })
         .collect();

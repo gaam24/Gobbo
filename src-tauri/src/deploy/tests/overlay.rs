@@ -234,6 +234,7 @@ fn sleeping_in_session(f: &Fixture) -> std::process::Child {
         .spawn()
         .unwrap();
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+
     while !in_use(&f.root) {
         assert!(
             std::time::Instant::now() < deadline,
@@ -241,6 +242,7 @@ fn sleeping_in_session(f: &Fixture) -> std::process::Child {
         );
         std::thread::sleep(std::time::Duration::from_millis(10));
     }
+
     child
 }
 

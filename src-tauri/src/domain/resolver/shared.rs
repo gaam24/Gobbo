@@ -45,6 +45,7 @@ impl SharedRules {
         // Check the extension on the raw path first: most files have a different kind, and building the full
         // path key for every one of them was the expensive part of a status/build plan.
         let mut key: Option<String> = None;
+
         for (prefix, extensions) in &self.0 {
             if !extensions.is_empty()
                 && !extensions
@@ -53,14 +54,18 @@ impl SharedRules {
             {
                 continue;
             }
+
             if prefix.is_empty() {
                 return true;
             }
+
             let key = key.get_or_insert_with(|| path_key(rel));
+
             if key.starts_with(prefix.as_str()) {
                 return true;
             }
         }
+
         false
     }
 }

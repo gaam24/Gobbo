@@ -46,6 +46,7 @@ pub(crate) unsafe extern "system" fn nt_set_information_file(
             if deleting && let Some(refusal) = unsafe { hide_deleted(handle) } {
                 return refusal;
             }
+
             if let Some(result) = unsafe { rename_in_game(handle, info, length, class) } {
                 return match result {
                     Ok((renamed, hide_places)) => {
@@ -60,11 +61,13 @@ pub(crate) unsafe extern "system" fn nt_set_information_file(
                             )
                         };
                         let _last_error = PreserveLastError::capture();
+
                         if result >= 0 {
                             for (mount, rel) in hide_places {
                                 hide(mount, &rel);
                             }
                         }
+
                         result
                     }
                     Err(refusal) => refusal,
@@ -72,6 +75,7 @@ pub(crate) unsafe extern "system" fn nt_set_information_file(
             }
         }
     }
+
     let original = original!(nt_set_information_file, STATUS_UNSUCCESSFUL);
     let result = unsafe { original.call(handle, status, info, length, class) };
     let _last_error = PreserveLastError::capture();
@@ -124,10 +128,12 @@ unsafe fn rename_in_game(
         Ok(below) => below,
         Err(failure) => return Some(Err(failure.status())),
     };
+
     if is_folder(&real) && below {
         // A folder with a lower part would stay where it was, as `MoveFileExW` refuses it too.
         return Some(Err(STATUS_NOT_SUPPORTED));
     }
+
     let mut hide_places: Vec<(&'static crate::state::Mount, String)> = below
         .then(|| (mount, source_rel.clone()))
         .into_iter()
@@ -136,18 +142,22 @@ unsafe fn rename_in_game(
         // The rename leaves every mount: the file goes there as it is, and the lower entry it leaves is hidden.
         return Some(Ok((bytes.to_vec(), hide_places)));
     };
+
     if !std::ptr::eq(mount, target_place.mount) {
         // A rename between two mounts would move a file between two profile layers.
         return Some(Err(STATUS_ACCESS_DENIED));
     }
+
     let target_shown = match shown(mount, &target_place.rel) {
         Ok(shown) => shown.is_some(),
         Err(failure) => return Some(Err(failure.status())),
     };
     let same_entry = gobbo_overlay_core::same_folded(&target_place.rel, &source_rel);
+
     if name_taken(same_entry, replace, || target_shown) {
         return Some(Err(STATUS_OBJECT_NAME_COLLISION));
     }
+
     let new_name = match make_write_target(mount, &target_place.rel) {
         Ok(path) => nt_name_units(&path),
         Err(failure) => return Some(Err(failure.status())),
@@ -157,6 +167,7 @@ unsafe fn rename_in_game(
     if replace && matches!(in_lower(target_place.mount, &target_place.rel), Ok(true)) {
         hide_places.push((target_place.mount, target_place.rel.clone()));
     }
+
     Some(Ok((build_rename(bytes, &new_name), hide_places)))
 }
 
@@ -185,6 +196,7 @@ unsafe fn deletion_requested(class: u32, info: *const c_void, length: u32) -> bo
 /// `handle` must be a file handle of this process, or invalid.
 unsafe fn hide_deleted(handle: *mut c_void) -> Option<i32> {
     let real = handles::layer_path(handle)?;
+
     if let Some((mount, rel)) = handles::relative_in_upper(&real) {
         if is_folder(&real) && has_visible_entries(mount, &rel) {
             return Some(STATUS_DIRECTORY_NOT_EMPTY);
@@ -193,8 +205,10 @@ unsafe fn hide_deleted(handle: *mut c_void) -> Option<i32> {
         if in_lower(mount, &rel).unwrap_or(true) {
             hide(mount, &rel);
         }
+
         return None;
     }
+
     handles::relative_in_lower_layers(&real)
         .is_some()
         .then_some(STATUS_ACCESS_DENIED)

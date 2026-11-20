@@ -86,6 +86,7 @@ fn epic(out: &mut Vec<Candidate>, program_data: Option<&Path>) {
     else {
         return;
     };
+
     for item in list {
         let (Some(id), Some(root)) = (
             item.get("AppName").and_then(|value| value.as_str()),
@@ -104,6 +105,7 @@ fn epic(out: &mut Vec<Candidate>, program_data: Option<&Path>) {
 fn heroic(out: &mut Vec<Candidate>, home: &Path) {
     // Legendary keeps a map of AppName -> install; GOG keeps a list with `appName` and `install_path`.
     let legendary = home.join(".config/heroic/legendaryConfig/legendary/installed.json");
+
     if let Ok(text) = fs::read_to_string(&legendary)
         && let Ok(serde_json::Value::Object(map)) = serde_json::from_str::<serde_json::Value>(&text)
     {
@@ -118,7 +120,9 @@ fn heroic(out: &mut Vec<Candidate>, home: &Path) {
             });
         }
     }
+
     let gog = home.join(".config/heroic/gog_store/installed.json");
+
     if let Ok(text) = fs::read_to_string(&gog)
         && let Ok(serde_json::Value::Array(list)) = serde_json::from_str::<serde_json::Value>(&text)
     {
@@ -140,23 +144,30 @@ fn heroic(out: &mut Vec<Candidate>, home: &Path) {
 
 fn gog(out: &mut Vec<Candidate>, home: &Path, program_data: Option<&Path>) {
     let mut roots = vec![home.join("GOG Games"), home.join("Games")];
+
     if let Some(program_data) = program_data {
         roots.push(program_data.join("GOG.com/Galaxy/Games"));
     }
+
     for root in roots {
         let Ok(entries) = fs::read_dir(&root) else {
             continue;
         };
+
         for entry in entries.flatten() {
             let path = entry.path();
+
             if !path.is_dir() {
                 continue;
             }
+
             let Ok(files) = fs::read_dir(&path) else {
                 continue;
             };
+
             for file in files.flatten() {
                 let name = file.file_name().to_string_lossy().into_owned();
+
                 if let Some(id) = name
                     .strip_prefix("goggame-")
                     .and_then(|rest| rest.strip_suffix(".info"))
@@ -178,14 +189,17 @@ fn lutris(out: &mut Vec<Candidate>, home: &Path) {
     let Ok(entries) = fs::read_dir(&dir) else {
         return;
     };
+
     for entry in entries.flatten() {
         let path = entry.path();
         let is_yaml = path.extension().is_some_and(|extension| {
             extension.eq_ignore_ascii_case("yml") || extension.eq_ignore_ascii_case("yaml")
         });
+
         if !is_yaml {
             continue;
         }
+
         let Ok(text) = fs::read_to_string(&path) else {
             continue;
         };
@@ -207,9 +221,11 @@ fn lutris(out: &mut Vec<Candidate>, home: &Path) {
 fn value_of(text: &str, key: &str) -> Option<String> {
     text.lines().find_map(|line| {
         let (found, value) = line.trim().split_once(':')?;
+
         if found != key {
             return None;
         }
+
         let value = value.trim().trim_matches(|c| c == '"' || c == '\'');
         (!value.is_empty()).then(|| value.to_string())
     })

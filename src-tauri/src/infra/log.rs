@@ -64,12 +64,14 @@ pub fn error(message: impl Display) {
 /// the caller.
 fn write(level: &str, message: impl Display) {
     let line = format_line(level, &message.to_string());
+
     if let Some(log) = LOG.get()
         && let Ok(mut guard) = log.lock()
         && let Some(file) = guard.as_mut()
     {
         let _ = writeln!(file, "{line}");
     }
+
     eprintln!("gobbo: {line}");
 }
 
@@ -91,6 +93,7 @@ fn rotate_at(path: &Path, max_bytes: u64) {
     if path.metadata().map_or(0, |meta| meta.len()) < max_bytes {
         return;
     }
+
     let backup = path.with_file_name(BACKUP_FILE);
     let _ = fs::remove_file(&backup);
     let _ = fs::rename(path, backup);

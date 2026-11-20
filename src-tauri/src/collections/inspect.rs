@@ -104,11 +104,13 @@ pub fn open(
     let key = providers::saved_key(source)?.unwrap_or_default();
     let revision = collection.revision(&key, &link, revision.or(link.revision))?;
     let info = revision.info.clone();
+
     if !info.game_key.eq_ignore_ascii_case(&game_key) {
         return Err(AppError::user("collection.game_mismatch")
             .with("expected", &game_key)
             .with("found", info.game_key));
     }
+
     let data = root.game(game_id);
     let cached = cache::read_plan(&data, &info);
     let mut plan = match cached {
@@ -134,29 +136,37 @@ pub fn open(
     // The API has the fresh latest revision and changelog even when the plan came from the cache.
     plan.info.latest_revision = revision.latest_revision;
     plan.info.changelog.clone_from(&revision.info.changelog);
+
     if plan.info.name.trim().is_empty() {
         plan.info.name.clone_from(&revision.info.name);
     }
+
     if plan.info.summary.trim().is_empty() {
         plan.info.summary.clone_from(&revision.info.summary);
     }
+
     if plan.info.description.trim().is_empty() {
         plan.info.description.clone_from(&revision.info.description);
     }
+
     if plan.info.instructions.trim().is_empty() {
         plan.info
             .instructions
             .clone_from(&revision.info.instructions);
     }
+
     if plan.info.picture_url.is_none() {
         plan.info.picture_url.clone_from(&revision.info.picture_url);
     }
+
     if plan.info.author.is_none() {
         plan.info.author.clone_from(&revision.info.author);
     }
+
     if let Some(url) = collection.page_url(&game_key, &plan.info.slug) {
         plan.info.url = url;
     }
+
     let _ = cache::write_plan(&data, &plan);
     let archive = cache::archive(&data, &plan.info);
     Ok(Opened { plan, archive })
@@ -175,6 +185,7 @@ fn read_or_fetch(
     {
         return Ok(plan);
     }
+
     let Some(link) = revision.archive_link.as_deref().filter(|_| !key.is_empty()) else {
         return Err(AppError::user("collection.no_archive"));
     };

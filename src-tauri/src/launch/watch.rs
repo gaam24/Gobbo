@@ -72,10 +72,12 @@ pub fn changes(before: &Snapshot, after: &Snapshot, expected: &[String]) -> Vec<
     // quadratic. Build the set once.
     let expected: FxHashSet<&str> = expected.iter().map(String::as_str).collect();
     let mut found = Vec::new();
+
     for (path, entry) in &after.entries {
         if expected.contains(path.as_str()) {
             continue;
         }
+
         match before.entries.get(path) {
             None => found.push(GameChange {
                 path: path.clone(),
@@ -88,6 +90,7 @@ pub fn changes(before: &Snapshot, after: &Snapshot, expected: &[String]) -> Vec<
             Some(_) => {}
         }
     }
+
     for path in before.entries.keys() {
         if !after.entries.contains_key(path) && !expected.contains(path.as_str()) {
             found.push(GameChange {
@@ -96,6 +99,7 @@ pub fn changes(before: &Snapshot, after: &Snapshot, expected: &[String]) -> Vec<
             });
         }
     }
+
     found.sort_by(|a, b| a.path.cmp(&b.path));
     found
 }

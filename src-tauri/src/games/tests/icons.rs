@@ -8,11 +8,14 @@ const MAX_BYTES: u64 = 12 * 1024;
 #[test]
 fn every_shipped_icon_is_a_128_webp_within_the_size_limit() {
     let dir = Path::new(DEV_GAMES_DIR);
+
     for entry in std::fs::read_dir(dir).unwrap() {
         let path = entry.unwrap().path();
+
         if !path.is_dir() {
             continue;
         }
+
         let png = path.join("icon.png");
         assert!(
             !png.exists(),
@@ -20,9 +23,11 @@ fn every_shipped_icon_is_a_128_webp_within_the_size_limit() {
             png.display()
         );
         let icon = path.join("icon.webp");
+
         if !icon.exists() {
             continue;
         }
+
         let bytes = std::fs::read(&icon).unwrap();
         assert!(
             bytes.len() as u64 <= MAX_BYTES,
@@ -50,22 +55,27 @@ fn webp_size(bytes: &[u8]) -> Option<(u32, u32)> {
     if bytes.len() < 30 || &bytes[0..4] != b"RIFF" || &bytes[8..12] != b"WEBP" {
         return None;
     }
+
     let chunk = &bytes[12..16];
+
     if chunk == b"VP8X" {
         return Some((
             1 + u32::from_le_bytes([bytes[24], bytes[25], bytes[26], 0]),
             1 + u32::from_le_bytes([bytes[27], bytes[28], bytes[29], 0]),
         ));
     }
+
     if chunk == b"VP8L" {
         let bits = u32::from_le_bytes([bytes[21], bytes[22], bytes[23], bytes[24]]);
         return Some(((bits & 0x3fff) + 1, ((bits >> 14) & 0x3fff) + 1));
     }
+
     if chunk == b"VP8 " {
         return Some((
             u32::from(u16::from_le_bytes([bytes[26], bytes[27]]) & 0x3fff),
             u32::from(u16::from_le_bytes([bytes[28], bytes[29]]) & 0x3fff),
         ));
     }
+
     None
 }

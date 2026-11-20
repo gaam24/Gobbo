@@ -31,6 +31,7 @@ pub(crate) unsafe extern "system" fn get_module_file_name(
     // The common path stays in UTF-16: map a layer prefix in a stack buffer, or copy the program's path as it is. No
     // `String` and no `Vec`. A path longer than the stack takes the growing path below.
     let mut actual = [0u16; 1024];
+
     if let Some(length) = unsafe { read_path_units(original, module, &mut actual) } {
         return copy_mapped_module(&actual[..length], buffer, size);
     }
@@ -56,6 +57,7 @@ pub(crate) unsafe extern "system" fn get_module_file_name_a(
         fail(ERROR_INVALID_FUNCTION) as u32
     });
     let mut actual = [0u16; 1024];
+
     if let Some(length) = unsafe { read_path_units(original, module, &mut actual) } {
         return copy_mapped_module_ansi(&actual[..length], buffer, size);
     }
@@ -134,10 +136,12 @@ fn copy_mapped_module_ansi(actual: &[u16], buffer: *mut u8, size: u32) -> u32 {
     let mut mapped = [0u16; 1024];
     let answer = guest_module_units(actual, &mut mapped);
     let mut bytes = [0u8; 2048];
+
     if let Some(length) = ansi_units(answer, &mut bytes) {
         drop(last_error);
         return copy_a(&bytes[..length], buffer, size);
     }
+
     let Some(answer) = ansi(answer) else {
         return 0;
     };
@@ -171,6 +175,7 @@ pub(crate) unsafe extern "system" fn get_module_file_name_ex(
         fail(ERROR_INVALID_FUNCTION) as u32
     });
     let mut actual = [0u16; 1024];
+
     if let Some(length) = unsafe { read_ex_path_units(original, process, module, &mut actual) } {
         return copy_mapped_module(&actual[..length], buffer, size);
     }
@@ -196,6 +201,7 @@ pub(crate) unsafe extern "system" fn get_module_file_name_ex_a(
         fail(ERROR_INVALID_FUNCTION) as u32
     });
     let mut actual = [0u16; 1024];
+
     if let Some(length) = unsafe { read_ex_path_units(original, process, module, &mut actual) } {
         return copy_mapped_module_ansi(&actual[..length], buffer, size);
     }
@@ -245,24 +251,32 @@ unsafe fn read_ex_path(
 unsafe fn read_path_with(mut call: impl FnMut(*mut u16, u32) -> u32) -> Option<Vec<u16>> {
     let mut stack = [0u16; 1024];
     let mut length = call(stack.as_mut_ptr(), stack.len() as u32);
+
     if length == 0 {
         return None;
     }
+
     if (length as usize) < stack.len() {
         return Some(stack[..length as usize].to_vec());
     }
+
     let mut capacity = stack.len() * 2;
+
     loop {
         let mut buffer = vec![0u16; capacity];
         length = call(buffer.as_mut_ptr(), capacity as u32);
+
         if length == 0 {
             return None;
         }
+
         if (length as usize) < capacity {
             buffer.truncate(length as usize);
             return Some(buffer);
         }
+
         capacity *= 2;
+
         if capacity > 32_768 {
             return None;
         }
@@ -314,9 +328,11 @@ fn ansi(path: &[u16]) -> Option<Vec<u8>> {
             null_mut(),
         )
     };
+
     if needed <= 0 {
         return None;
     }
+
     let mut buffer = vec![0u8; needed as usize];
     // SAFETY: `buffer` is `needed` bytes long, as the call above asked.
     let written = unsafe {
@@ -331,9 +347,11 @@ fn ansi(path: &[u16]) -> Option<Vec<u8>> {
             null_mut(),
         )
     };
+
     if written <= 0 {
         return None;
     }
+
     buffer.truncate(written as usize);
     Some(buffer)
 }
@@ -365,6 +383,7 @@ fn copy_units<T: Copy + Zero>(path: &[T], buffer: *mut T, size: u32) -> u32 {
     if size == 0 {
         return 0;
     }
+
     let size = size as usize;
     let count = path.len().min(size - 1);
     // SAFETY: the caller passed a buffer of `size` units, and `count + 1` of them are written.
@@ -372,6 +391,7 @@ fn copy_units<T: Copy + Zero>(path: &[T], buffer: *mut T, size: u32) -> u32 {
         std::ptr::copy_nonoverlapping(path.as_ptr(), buffer, count);
         *buffer.add(count) = T::ZERO;
     }
+
     if path.len() >= size {
         set_error(ERROR_INSUFFICIENT_BUFFER);
         size as u32

@@ -77,6 +77,7 @@ impl Launch {
                 .with("detail", detail)
                 .kind(ErrorKind::Permanent)
         };
+
         match self {
             Self::Plain(mut command) => {
                 let program = command.get_program().to_string_lossy().into_owned();
@@ -85,17 +86,20 @@ impl Launch {
                     .map(|arg| arg.to_string_lossy().into_owned())
                     .collect();
                 crate::infra::log::info(format!("launch: program={program} args={args:?}"));
+
                 if let Some(writer) = output {
                     let errors = writer.try_clone().map_err(|e| failed(e.to_string()))?;
                     command
                         .stdout(Stdio::from(writer))
                         .stderr(Stdio::from(errors));
                 }
+
                 command
                     .spawn()
                     .map(Running::Plain)
                     .map_err(|e| failed(e.to_string()))
             }
+
             Self::Layered {
                 session,
                 program,
@@ -139,9 +143,11 @@ pub fn stop_game(root: &Data, game_id: &str) -> Result<bool, AppError> {
     root.definition_shared(game_id)?;
     let settings = load_settings(&root.game(game_id));
     let game_root = settings.game_root.trim();
+
     if game_root.is_empty() {
         return Ok(false);
     }
+
     Ok(crate::platform::stop_game(Path::new(game_root)))
 }
 
@@ -161,6 +167,7 @@ pub fn launch_game(
     let game = root.definition_shared(game_id)?;
     let data = root.game(game_id);
     let settings = load_settings(&data);
+
     if game_running_at(game_id, &settings.game_root) {
         return Err(game_is_running_error());
     }
@@ -169,9 +176,11 @@ pub fn launch_game(
     crate::deploy::ops::record_launch(root, game_id)?;
     report::begin(&data);
     let outcome = start_recorded(root, &game, game_id, executable, home, on_exit, &settings);
+
     if outcome.is_err() {
         report::update(&data, |r| r.finished_at = Some(now_seconds()));
     }
+
     outcome
 }
 
@@ -300,6 +309,7 @@ pub(super) fn program_launch(
     if !path.is_file() {
         return Err(executable_missing(path.display()));
     }
+
     let program = path.display().to_string();
     // Games often load their own files by relative path, so they start in the folder of their executable.
     let folder = path.parent().unwrap_or(game_root.as_path()).to_path_buf();
@@ -307,9 +317,11 @@ pub(super) fn program_launch(
     // A program that runs without Proton gets only the settings' own variables.
     let env = game_env(settings, false, &[], None)?;
     let mut launch = Launch::new(program, args, env, session);
+
     if let Launch::Plain(command) = &mut launch {
         command.current_dir(&folder);
     }
+
     Ok((launch, with_mods, "launch.native_failed"))
 }
 
@@ -336,10 +348,12 @@ pub fn game_env(
     } else {
         Vec::new()
     };
+
     for (name, value) in crate::domain::arguments::parse_env(&settings.launch_env)? {
         env.retain(|(known, _)| *known != name);
         env.push((name, value));
     }
+
     if through_proton && !native.is_empty() {
         let existing = env
             .iter()
@@ -348,11 +362,13 @@ pub fn game_env(
             .map(|(_, value)| value.as_str())
             .or(inherited);
         let dlls: Vec<&str> = native.iter().map(String::as_str).collect();
+
         if let Some(value) = crate::domain::arguments::native_first_overrides(existing, &dlls) {
             env.retain(|(name, _)| name != "WINEDLLOVERRIDES");
             env.push(("WINEDLLOVERRIDES".to_string(), value));
         }
     }
+
     Ok(env)
 }
 

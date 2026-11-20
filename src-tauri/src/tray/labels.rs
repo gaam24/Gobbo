@@ -146,6 +146,7 @@ mod tests {
     #[test]
     fn every_task_kind_has_a_bootstrap_label() {
         let labels = TrayLabels::default();
+
         for code in TASK_KINDS {
             assert_eq!(
                 labels.kinds.get(*code).map(String::as_str),
@@ -157,6 +158,7 @@ mod tests {
                 "{code} needs a bootstrap label"
             );
         }
+
         assert_eq!(labels.kinds.len(), TASK_KINDS.len());
     }
 

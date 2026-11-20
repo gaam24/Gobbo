@@ -65,17 +65,21 @@ fn every_shipped_proxy_of_a_game_is_native_when_it_is_next_to_the_program() {
         crate::games::load_dir(Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../games")))
             .unwrap();
     let mut checked = 0;
+
     for game in &shipped {
         let proxies = game.deploy.proxy_dlls();
+
         if proxies.is_empty() {
             continue;
         }
+
         checked += 1;
         let folder = game
             .executables
             .first()
             .map_or("", |exe| program_dir(&exe.path));
         let native = native_dlls(game, folder, |_| true);
+
         for dll in &proxies {
             assert!(
                 native.iter().any(|name| name.eq_ignore_ascii_case(dll)),
@@ -84,5 +88,6 @@ fn every_shipped_proxy_of_a_game_is_native_when_it_is_next_to_the_program() {
             );
         }
     }
+
     assert!(checked > 0, "a shipped game has a proxy DLL");
 }

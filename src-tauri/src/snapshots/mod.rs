@@ -94,13 +94,17 @@ fn check_game_id(game_id: &str) -> Result<(), AppError> {
 /// game's snapshot folder.
 pub fn delete(app: &Data, game_id: &str, id: &str) -> Result<(), AppError> {
     let scope = scope(app, game_id)?;
+
     if !naming::is_plain_folder(id) {
         return Err(AppError::user("snapshot.not_found"));
     }
+
     let dir = scope.dir(id);
+
     if !dir.is_dir() {
         return Err(AppError::user("snapshot.not_found"));
     }
+
     fs::remove_dir_all(&dir).map_err(io_at(&dir))
 }
 
@@ -122,6 +126,7 @@ pub fn before_switch(
     if load_profiles(&scope.game)?.get(&current).is_err() {
         return Ok(());
     }
+
     profile_state::capture_current(&scope.game, game, settings)?;
     create_in(&scope, game, settings, &current, SnapshotKind::BeforeSwitch)?;
     Ok(())
@@ -165,6 +170,7 @@ pub fn create_manual(app: &Data, game_id: &str, profile: &str) -> Result<Snapsho
     check_game_id(game_id)?;
     let game = crate::games::load(game_id)?;
     let settings = crate::context::load_settings(&app.game(game_id));
+
     if game_running_at(game_id, &settings.game_root) {
         return Err(
             AppError::user("snapshot.game_running").recovery(crate::error::Recovery::new(
@@ -172,6 +178,7 @@ pub fn create_manual(app: &Data, game_id: &str, profile: &str) -> Result<Snapsho
             )),
         );
     }
+
     create(app, &game, &settings, profile, SnapshotKind::Manual)
 }
 
@@ -195,6 +202,7 @@ pub fn restore_public(app: &Data, game_id: &str, id: &str) -> Result<RestoreOutc
 /// A manifest path must stay below its set folder. A file edited by hand must not make a restore write elsewhere.
 fn relative_path(path: &str) -> Result<PathBuf, AppError> {
     let path = Path::new(path);
+
     if path.as_os_str().is_empty()
         || path
             .components()
@@ -202,6 +210,7 @@ fn relative_path(path: &str) -> Result<PathBuf, AppError> {
     {
         return Err(AppError::user("snapshot.corrupt").with("file", path.display()));
     }
+
     Ok(path.to_path_buf())
 }
 

@@ -75,11 +75,13 @@ fn hash_and_copy_inner<D: Digest, R: Read + ?Sized>(
         };
         reporter.copy_cancellable(source, &mut writer, cancel)
     };
+
     if let Err(error) = result {
         drop(to);
         let _ = std::fs::remove_file(target);
         return Err(error);
     }
+
     reporter.finish();
     Ok((hex_string(&hasher.finalize()), reporter.done))
 }
@@ -142,10 +144,13 @@ impl<'a> Reporter<'a> {
             if cancel.is_some_and(|flag| flag.load(Ordering::Relaxed)) {
                 return Err(io::Error::new(io::ErrorKind::Interrupted, "cancelled"));
             }
+
             let read = from.read(&mut self.buffer)?;
+
             if read == 0 {
                 return Ok(());
             }
+
             to.write_all(&self.buffer[..read])?;
             self.add(read as u64);
         }

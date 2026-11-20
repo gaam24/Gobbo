@@ -62,6 +62,7 @@ impl<'a> LibraryView<'a> {
             let Some(file_id) = wanted.source_files.get(provider) else {
                 continue;
             };
+
             if let Some(version) = self.version_of_file(provider, &source.mod_id, file_id) {
                 return Some(Found {
                     family: version.family.as_str(),
@@ -70,6 +71,7 @@ impl<'a> LibraryView<'a> {
                 });
             }
         }
+
         let (family, by) = self
             .family_of_wanted_page(wanted)
             .map(|family| (family, FoundBy::Page))
@@ -207,6 +209,7 @@ mod tests {
     /// One page with two parts, each its own family; the second part's version came from file `file-b`.
     fn library() -> Library {
         let mut library = Library::default();
+
         for (id, name, part) in [
             ("fam-a", "Main File", "part-a"),
             ("fam-b", "Addon File", "part-b"),
@@ -233,6 +236,7 @@ mod tests {
                 },
             );
         }
+
         library
     }
 
@@ -242,9 +246,11 @@ mod tests {
         ))
         .unwrap();
         entry.sources = BTreeMap::from([(ProviderId::new(PROVIDER), source("page", part))]);
+
         if let Some(file) = file {
             entry.source_files = BTreeMap::from([(ProviderId::new(PROVIDER), file.to_string())]);
         }
+
         entry
     }
 

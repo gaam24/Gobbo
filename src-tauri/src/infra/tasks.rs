@@ -221,6 +221,7 @@ impl TaskKey {
         let tail: Vec<&str> = parts.collect();
         let (prefix, game) = head.split_once(':').unwrap_or((head, ""));
         let rest = tail.join("\n");
+
         match prefix {
             "apply" => TaskDedupe::Apply {
                 game: game.to_string(),
@@ -342,11 +343,13 @@ impl TaskJournal {
         let Some(mut rows) = json::read_json_or_none::<Vec<TaskView>>(&self.path) else {
             return Vec::new();
         };
+
         for row in &mut rows {
             if row.state == state::RUNNING {
                 row.state = state::FAILED.to_string();
             }
         }
+
         rows
     }
 
@@ -502,6 +505,7 @@ impl TaskFlags {
             self.persist(&inner);
             drop(inner);
         }
+
         self.emit(TASK_STARTED_EVENT, &view);
         flag
     }
@@ -529,6 +533,7 @@ impl TaskFlags {
             self.persist(&inner);
             drop(inner);
         }
+
         self.emit(TASK_STARTED_EVENT, &view);
     }
 
@@ -538,13 +543,16 @@ impl TaskFlags {
     pub fn cancel(&self, key: &str) {
         let view = {
             let mut inner = self.lock();
+
             if let Some(flag) = inner.flags.get(key) {
                 flag.store(true, Ordering::Relaxed);
             }
+
             let view = inner.tasks.get_mut(key).and_then(|task| {
                 if task.state != state::RUNNING {
                     return None;
                 }
+
                 task.state = state::CANCELLED.to_string();
                 Some(task.clone())
             });
@@ -552,6 +560,7 @@ impl TaskFlags {
             drop(inner);
             view
         };
+
         if let Some(view) = view {
             self.emit(TASK_CANCELLED_EVENT, &view);
         }
@@ -568,6 +577,7 @@ impl TaskFlags {
                 if task.state == state::CANCELLED {
                     return None;
                 }
+
                 task.state = state.to_string();
                 Some(task.clone())
             });
@@ -575,6 +585,7 @@ impl TaskFlags {
             drop(inner);
             finished
         };
+
         if let Some(view) = finished {
             self.emit(TASK_FINISHED_EVENT, &view);
         }
@@ -647,12 +658,14 @@ impl TaskHandle {
                 if task.state != state::RUNNING {
                     return None;
                 }
+
                 task.percent = Some(percent.min(100) as u8);
                 Some(task.clone())
             });
         let Some(view) = view else {
             return;
         };
+
         if let Some(app) = &self.app {
             let _ = app.emit(TASK_PROGRESS_EVENT, &view);
         }
@@ -834,6 +847,7 @@ mod tests {
             TaskKey::pack_download("game-a", "recipe.zip"),
             TaskKey::pack_link("game-a", "nxm://link"),
         ];
+
         for key in keys {
             let rebuilt = TaskKey::from(key.as_str().to_string());
             assert_eq!(rebuilt.as_str(), key.as_str());

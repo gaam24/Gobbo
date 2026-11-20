@@ -24,9 +24,11 @@ pub fn check(text: &str) -> DefinitionCheck {
 /// The folders searched for loader presets: the user's first, the bundled folder second.
 fn loader_dirs() -> Vec<PathBuf> {
     let mut dirs = Vec::with_capacity(2);
+
     if let Some(user) = user_loaders_dir() {
         dirs.push(user);
     }
+
     dirs.push(loaders_dir().to_path_buf());
     dirs
 }
@@ -49,12 +51,15 @@ pub(super) fn check_with(text: &str, loader_dirs: &[PathBuf]) -> DefinitionCheck
     for message in super::super::validate::duplicate_problems(&game.deploy) {
         problems.push(problem("deploy", message));
     }
+
     if let Err(detail) = super::super::loaders::apply(&mut game, loader_dirs) {
         problems.push(problem("loader", detail));
     }
+
     for message in game.validate() {
         problems.push(problem(section_of(&message), message));
     }
+
     let summary = Some(summary_of(&game));
     DefinitionCheck {
         ok: problems.is_empty(),
@@ -154,14 +159,17 @@ pub(super) fn source_from(
     if !is_valid_id(id) {
         return Err(AppError::user("games.unknown").with("id", id));
     }
+
     let user_path = user.map(|dir| dir.join(id).join("game.toml"));
     let (path, origin) = match user_path {
         Some(path) if path.is_file() => (path, GameOrigin::User),
         _ => (shipped.join(id).join("game.toml"), GameOrigin::Bundled),
     };
+
     if !path.is_file() {
         return Err(AppError::user("games.unknown").with("id", id));
     }
+
     let text = fs::read_to_string(&path).map_err(io_at(&path))?;
     Ok(DefinitionSource {
         id: id.to_string(),
@@ -186,24 +194,31 @@ pub(super) fn save_to(
     overwrite: bool,
 ) -> Result<SavedDefinition, AppError> {
     let check = check_with(text, loader_dirs);
+
     if !check.ok {
         return Err(invalid_error(&check));
     }
+
     let game = GameDef::parse(text).map_err(invalid_user_definition)?;
+
     if !is_valid_id(&game.id) {
         return Err(invalid_user_definition(format!(
             "invalid game id: {:?}",
             game.id
         )));
     }
+
     if shipped.join(&game.id).join("game.toml").is_file() {
         return Err(AppError::user("games.definition_bundled").with("id", &game.id));
     }
+
     let folder = user.join(&game.id);
     let path = folder.join("game.toml");
+
     if path.exists() && !overwrite {
         return Err(AppError::user("games.definition_exists").with("id", &game.id));
     }
+
     fs::create_dir_all(&folder).map_err(io_at(&folder))?;
     store::write_atomic(&path, text.as_bytes())?;
     super::super::forget_definition(&path);
@@ -217,9 +232,11 @@ pub(super) fn save_to(
 /// preview uses it, so a test archive is placed exactly as the import would place it.
 pub fn merged(text: &str) -> Result<GameDef, AppError> {
     let check = check(text);
+
     if !check.ok {
         return Err(invalid_error(&check));
     }
+
     let mut game = GameDef::parse(text).map_err(invalid_user_definition)?;
     super::super::loaders::apply(&mut game, &loader_dirs()).map_err(invalid_user_definition)?;
     Ok(game)

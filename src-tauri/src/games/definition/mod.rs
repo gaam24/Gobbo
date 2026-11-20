@@ -142,18 +142,21 @@ impl<'de> Deserialize<'de> for LoaderRef {
             {
                 let mut id = None;
                 let mut variant = None;
+
                 while let Some(key) = map.next_key::<String>()? {
                     match key.as_str() {
                         "id" => {
                             if id.is_some() {
                                 return Err(serde::de::Error::duplicate_field("id"));
                             }
+
                             id = Some(map.next_value::<String>()?);
                         }
                         "variant" => {
                             if variant.is_some() {
                                 return Err(serde::de::Error::duplicate_field("variant"));
                             }
+
                             variant = Some(map.next_value::<String>()?);
                         }
                         other => {
@@ -161,6 +164,7 @@ impl<'de> Deserialize<'de> for LoaderRef {
                         }
                     }
                 }
+
                 let id = id.ok_or_else(|| serde::de::Error::missing_field("id"))?;
                 Ok(LoaderRef { id, variant })
             }

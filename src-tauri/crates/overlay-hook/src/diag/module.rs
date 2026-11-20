@@ -55,9 +55,11 @@ pub(crate) fn remember_modules() {
             windows_sys::Win32::System::Threading::GetCurrentProcessId(),
         )
     };
+
     if snapshot == INVALID_HANDLE_VALUE {
         return;
     }
+
     let mut entry: MODULEENTRY32W = unsafe { std::mem::zeroed() };
     entry.dwSize = std::mem::size_of::<MODULEENTRY32W>() as u32;
     let mut modules = Vec::new();
@@ -110,9 +112,11 @@ fn module_at_loader(address: usize) -> Option<(usize, String)> {
         GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT;
     // SAFETY: Windows only compares the address with the ranges of the loaded modules. Nothing is read at it.
     let found = unsafe { GetModuleHandleExW(flags, address as *const u16, &mut module) };
+
     if found == 0 || module.is_null() {
         return None;
     }
+
     let path = module_path(module)?;
     let name = path.file_name().map_or_else(
         || "<unknown>".to_string(),
@@ -153,13 +157,16 @@ pub(crate) fn caller() -> String {
         RtlCaptureStackBackTrace(0, FRAMES as u32, frames.as_mut_ptr(), std::ptr::null_mut())
     } as usize;
     let own = OWN_BASE.get().copied();
+
     for frame in &frames[..captured.min(FRAMES)] {
         let address = *frame as usize;
+
         match module_at(address) {
             Some((base, _)) if Some(base) == own => {}
             _ => return locate(address),
         }
     }
+
     "unknown place".to_string()
 }
 

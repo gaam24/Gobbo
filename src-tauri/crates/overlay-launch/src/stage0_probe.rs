@@ -168,6 +168,7 @@ mod tests {
         };
         assert_ne!(ok, FALSE);
         let mut restored = 0;
+
         unsafe { VirtualProtectEx(process, first as *const c_void, 16, old, &mut restored) };
         assert_eq!(read(process, first, 16), before);
         report.push_str(&format!(
@@ -269,6 +270,7 @@ pub(super) mod m2_redirect {
             WAIT_OBJECT_0
         );
         let mut code = 0;
+
         unsafe { GetExitCodeProcess(process, &mut code) };
         assert_eq!(code, 0, "the redirected child failed");
         let text = fs::read_to_string(&out).expect("the child wrote its output");
@@ -318,7 +320,9 @@ pub(super) mod m2_redirect {
                 "a stub was not patched"
             );
         }
+
         patched.restore().expect("restored");
+
         for (address, original) in &originals {
             assert_eq!(
                 &read_bytes(process, *address, 22),
@@ -337,6 +341,7 @@ pub(super) mod m2_redirect {
             "the child did not finish"
         );
         let mut code = 0;
+
         unsafe { GetExitCodeProcess(process, &mut code) };
         code as i32
     }
@@ -405,9 +410,11 @@ fn main() {
     fn rustc(source: &Path, output: &Path, dll: bool, native: &Path) {
         let mut command = Command::new(std::env::var_os("RUSTC").unwrap_or_else(|| "rustc".into()));
         command.args(["--edition=2021", "-O", "--target", "x86_64-pc-windows-msvc"]);
+
         if dll {
             command.args(["--crate-type", "cdylib"]);
         }
+
         let status = command
             .arg("-L")
             .arg(format!("native={}", native.display()))
@@ -426,9 +433,11 @@ fn main() {
         let game = base.join("game");
         let layer = base.join("mods");
         let work = base.join("work");
+
         for folder in [&game, &layer, &work] {
             fs::create_dir_all(folder).unwrap();
         }
+
         let version_source = work.join("version.rs");
         fs::write(&version_source, LAYER_VERSION).unwrap();
         rustc(&version_source, &layer.join("version.dll"), true, &work);
@@ -521,9 +530,11 @@ fn main() {
     fn rustc(source: &Path, output: &Path, dll: bool, native: &Path) {
         let mut command = Command::new(std::env::var_os("RUSTC").unwrap_or_else(|| "rustc".into()));
         command.args(["--edition=2021", "-O", "--target", "i686-pc-windows-msvc"]);
+
         if dll {
             command.args(["--crate-type", "cdylib"]);
         }
+
         let status = command
             .arg("-L")
             .arg(format!("native={}", native.display()))
@@ -541,9 +552,11 @@ fn main() {
         let game = base.join("game");
         let layer = base.join("mods");
         let work = base.join("work");
+
         for folder in [&game, &layer, &work] {
             fs::create_dir_all(folder).unwrap();
         }
+
         let version_source = work.join("version.rs");
         fs::write(&version_source, LAYER_VERSION).unwrap();
         // The system name is exported undecorated: a `.def` file maps it to the stdcall function.

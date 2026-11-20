@@ -32,11 +32,14 @@ pub fn create(root: &Data, game: Option<&str>) -> Result<String, AppError> {
         "system.txt",
         &redact(&system_text(root)),
     )?;
+
     if let Some(log) = read_tail(&root.dir.join("gobbo.log"), LOG_TAIL) {
         add(&mut writer, options, "gobbo.log", &redact(&log))?;
     }
+
     if let Some(game_id) = game {
         let definition = crate::games::definition_path(game_id);
+
         if let Ok(text) = fs::read_to_string(&definition) {
             add(
                 &mut writer,
@@ -45,13 +48,16 @@ pub fn create(root: &Data, game: Option<&str>) -> Result<String, AppError> {
                 &redact(&text),
             )?;
         }
+
         if let Ok(report) = crate::status::preflight::preflight(root, game_id) {
             add_json(&mut writer, options, "preflight.json", &report, &redact)?;
         }
+
         if let Some(report) = crate::launch::report::last_run(root, game_id) {
             add_json(&mut writer, options, "last_run.json", &report, &redact)?;
         }
     }
+
     add(
         &mut writer,
         options,
@@ -106,9 +112,11 @@ fn system_text(root: &Data) -> String {
 /// Reads the newest `limit` bytes of a file. A missing or unreadable file is simply left out of the bundle.
 fn read_tail(path: &Path, limit: usize) -> Option<String> {
     let bytes = fs::read(path).ok()?;
+
     if bytes.len() <= limit {
         return Some(String::from_utf8_lossy(&bytes).into_owned());
     }
+
     let start = bytes.len() - limit;
     Some(String::from_utf8_lossy(&bytes[start..]).into_owned())
 }
@@ -122,23 +130,28 @@ fn replacements(root: &Data, game: Option<&str>) -> Vec<(String, String)> {
             "<home>".to_string(),
         ),
     ];
+
     if let Some(game_id) = game {
         let settings = crate::context::load_settings(&root.game(game_id));
+
         if !settings.game_root.trim().is_empty() {
             replacements.push((settings.game_root.trim().to_string(), "<game>".to_string()));
         }
     }
+
     replacements.sort_by_key(|entry| std::cmp::Reverse(entry.0.len()));
     replacements
 }
 
 fn redact_text(text: &str, replacements: &[(String, String)]) -> String {
     let mut value = text.to_string();
+
     for (from, to) in replacements {
         if !from.is_empty() {
             value = value.replace(from, to);
         }
     }
+
     value
 }
 

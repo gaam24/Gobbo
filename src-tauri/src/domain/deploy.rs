@@ -78,6 +78,7 @@ impl Deploy {
         if rel.contains(['/', '\\']) || self.root_files.is_empty() {
             return None;
         }
+
         let key = path_key(rel);
         self.root_files
             .iter()
@@ -108,9 +109,11 @@ impl Deploy {
         if self.full_root {
             return true;
         }
+
         if self.mirror.is_empty() && self.root_files.is_empty() {
             return false;
         }
+
         self.mirror_of(rel).is_some() || self.root_file_of(rel).is_some()
     }
 
@@ -120,6 +123,7 @@ impl Deploy {
         if self.full_root {
             return !files.is_empty();
         }
+
         !files.is_empty() && files.iter().all(|rel| self.keeps_game_path(rel))
     }
 
@@ -128,6 +132,7 @@ impl Deploy {
         if rel.contains(['/', '\\']) {
             return None;
         }
+
         self.moves
             .iter()
             .find(|rule| {
@@ -236,6 +241,7 @@ fn is_inside(rel: &str, dir: &str) -> bool {
     {
         return false;
     }
+
     rel.get(..dir.len())
         .is_some_and(|head| head.eq_ignore_ascii_case(dir))
         && matches!(rel.as_bytes().get(dir.len()), None | Some(b'/'))

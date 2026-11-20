@@ -92,6 +92,7 @@ fn undo_prepared_holding(
     let states = data.deployment_states();
     let prepared = states.prepared;
     let incomplete = states.incomplete;
+
     if prepared.is_empty() && incomplete.is_empty() {
         return Ok(());
     }
@@ -117,18 +118,23 @@ fn undo_prepared_holding(
         else {
             continue;
         };
+
         if !force && !profile.deployed_mods.iter().any(&holds) {
             continue;
         }
+
         let overlay = state_is_overlay(state);
+
         if running {
             if last_launched.as_deref() == Some(profile_id) {
                 return Err(game_is_running_error());
             }
+
             if !overlay {
                 return Err(game_is_running_error());
             }
         }
+
         let roots = journal_roots(&game, &settings, state.clone())?;
         undo(&roots).map_err(AppError::from)?;
         // A layer that cannot be removed (a file still held open) keeps the profile deployed, so a later cleanup
@@ -138,8 +144,10 @@ fn undo_prepared_holding(
                 remove_dir_if_exists(&layer).map_err(io_at(&layer))?;
             }
         }
+
         cleaned.push(profile_id.clone());
     }
+
     for profile in &mut profiles.profiles {
         if cleaned.contains(&profile.id) {
             profile.mark_undeployed();
@@ -154,5 +162,6 @@ fn undo_prepared_holding(
     {
         profiles.last_launched = None;
     }
+
     Ok(())
 }

@@ -58,9 +58,11 @@ pub async fn collection_run_round(
         },
     )
     .await;
+
     if let Ok(round) = &result {
         emit_page_request(&app, round);
     }
+
     result
 }
 
@@ -91,9 +93,11 @@ pub async fn collection_resolve_prompt(
     let tracked = match &decision {
         CollectionDecision::Choice { path, .. } | CollectionDecision::File { path } => {
             let was_queued = queue.importing(path).then(|| path.clone());
+
             if was_queued.is_some() {
                 publish(&app, queue);
             }
+
             was_queued
         }
         CollectionDecision::MarkDone | CollectionDecision::Skip { .. } => None,
@@ -126,9 +130,11 @@ pub async fn collection_resolve_prompt(
         },
     )
     .await;
+
     if let Ok(round) = &result {
         emit_page_request(&app, round);
     }
+
     if let Some(path) = tracked {
         // A hand-picked FOMOD still needs the wizard: keep the queue entry until the choices come back.
         let needs_wizard = result.as_ref().is_ok_and(|round| {
@@ -138,11 +144,14 @@ pub async fn collection_resolve_prompt(
                 .iter()
                 .any(|choice| choice.key == check_item)
         });
+
         if !needs_wizard {
             queue.imported(&path, result.as_ref().map(|_| ()));
         }
+
         publish(&app, queue);
     }
+
     result
 }
 

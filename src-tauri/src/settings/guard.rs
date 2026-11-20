@@ -19,16 +19,20 @@ pub fn may_open(root: &Data, game_id: Option<&str>, path: &Path) -> bool {
         let data = root.game(id);
         roots.push(data.dir.clone());
         let settings = load_settings(&data);
+
         if let Ok(deployed) = deployment_root(&game, &settings) {
             roots.push(deployed);
         }
+
         for value in settings.paths() {
             let value = value.trim();
+
             if !value.is_empty() {
                 roots.push(PathBuf::from(value));
             }
         }
     }
+
     let (Ok(path), roots) = (
         path.canonicalize(),
         roots

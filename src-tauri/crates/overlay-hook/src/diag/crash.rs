@@ -77,6 +77,7 @@ fn dbghelp() -> Option<&'static DbgHelp> {
                     LOAD_LIBRARY_SEARCH_SYSTEM32,
                 )
             };
+
             if module.is_null() {
                 return None;
             }
@@ -148,14 +149,18 @@ fn crash_report(headline: &str, events: &[String]) -> String {
         "=== {headline}\nlast {} trace lines, oldest first:\n",
         events.len()
     );
+
     for event in events {
         text.push_str(event);
         text.push('\n');
     }
+
     let dropped = super::writer::dropped_lines();
+
     if dropped > 0 {
         text.push_str(&format!("trace lines dropped: {dropped}\n"));
     }
+
     text.push('\n');
     text
 }
@@ -167,14 +172,17 @@ fn crash_report(headline: &str, events: &[String]) -> String {
 /// is still printed.
 pub(crate) fn install() {
     let switches = settings();
+
     if switches.crash.is_none() && switches.dump.is_none() && switches.dumper.is_none() {
         return;
     }
+
     if switches.crash.is_some() || switches.dump.is_some() {
         if switches.crash_first {
             // SAFETY: the handler has the signature the call takes, and it lives as long as the process.
             unsafe { AddVectoredExceptionHandler(1, Some(on_exception)) };
         }
+
         let previous = std::panic::take_hook();
         std::panic::set_hook(Box::new(move |info| {
             report_panic(info);
@@ -187,6 +195,7 @@ pub(crate) fn install() {
         arm_filter();
         REARM_WANTED.store(true, Ordering::Release);
     }
+
     install_dumper();
 }
 
@@ -211,10 +220,12 @@ fn spawn_rearm() {
             for delay in REARM_DELAYS {
                 thread::sleep(delay);
                 arm_filter();
+
                 if DUMPER.get().is_some_and(Option::is_some) {
                     DUMPER_READY.store(true, Ordering::Release);
                 }
             }
+
             loop {
                 thread::sleep(Duration::from_secs(60));
                 arm_filter();
@@ -241,6 +252,7 @@ fn install_dumper() {
             return;
         }
     };
+
     if DUMPER.set(Some(client)).is_err() {
         return;
     }
@@ -251,6 +263,7 @@ fn install_dumper() {
             crash_handler::CrashEventResult::Handled(send_context(context))
         })
     };
+
     match crash_handler::CrashHandler::attach(event) {
         Ok(handler) => {
             if DUMP_HANDLER.set(handler).is_ok() {
@@ -271,6 +284,7 @@ fn arm_filter() {
     // SAFETY: the filter has the signature Windows takes and only sends the context to the monitor.
     let previous = unsafe { SetUnhandledExceptionFilter(Some(on_unhandled)) };
     let address = previous.map_or(0, |filter| filter as *const () as usize);
+
     if address != on_unhandled as *const () as usize {
         PREVIOUS_FILTER.store(address, Ordering::Release);
         crate::trace::log(&format!(
@@ -307,12 +321,15 @@ unsafe extern "system" fn on_unhandled(pointers: *const EXCEPTION_POINTERS) -> i
         };
         let _ = send_context(&context);
     }
+
     let previous = PREVIOUS_FILTER.load(Ordering::Acquire);
+
     if previous != 0 {
         // SAFETY: the address was a filter Windows had before this one, and it takes the same pointers.
         let previous: ExceptionFilter = unsafe { std::mem::transmute(previous) };
         return unsafe { previous(pointers) };
     }
+
     EXCEPTION_CONTINUE_SEARCH
 }
 
@@ -326,14 +343,17 @@ fn send_context(context: &crash_handler::CrashContext) -> bool {
     if DUMP_REQUESTED.swap(true, Ordering::AcqRel) {
         return false;
     }
+
     let Some(client) = DUMPER.get().and_then(Option::as_ref) else {
         DUMP_REQUESTED.store(false, Ordering::Release);
         return false;
     };
     let sent = client.request_dump(context).is_ok();
+
     if !sent {
         DUMP_REQUESTED.store(false, Ordering::Release);
     }
+
     sent
 }
 
@@ -347,6 +367,7 @@ unsafe extern "system" fn on_exception(pointers: *mut EXCEPTION_POINTERS) -> i32
         .and_then(|pointers| unsafe { pointers.ExceptionRecord.as_ref() });
     if let Some(record) = record {
         let code = record.ExceptionCode as u32;
+
         if let Some(name) = crash_name(code) {
             write_dump(pointers);
             let count = (record.NumberParameters as usize).min(record.ExceptionInformation.len());
@@ -362,6 +383,7 @@ unsafe extern "system" fn on_exception(pointers: *mut EXCEPTION_POINTERS) -> i32
             ));
         }
     }
+
     EXCEPTION_CONTINUE_SEARCH
 }
 
@@ -391,6 +413,7 @@ fn write_dump(pointers: *mut EXCEPTION_POINTERS) {
     if dumper_armed() {
         return;
     }
+
     let Some(path) = &settings().dump else {
         return;
     };

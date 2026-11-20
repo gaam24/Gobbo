@@ -6,15 +6,19 @@ pub fn decode(bytes: &[u8]) -> Result<String, AppError> {
     if bytes.starts_with(&[0xEF, 0xBB, 0xBF]) {
         return Ok(String::from_utf8_lossy(&bytes[3..]).into_owned());
     }
+
     if bytes.starts_with(&[0xFF, 0xFE]) {
         return decode_utf16(&bytes[2..], true);
     }
+
     if bytes.starts_with(&[0xFE, 0xFF]) {
         return decode_utf16(&bytes[2..], false);
     }
+
     if bytes.contains(&0) {
         return decode_utf16(bytes, true);
     }
+
     String::from_utf8(bytes.to_vec()).map_err(|e| {
         AppError::new("fomod.bad_encoding")
             .with("detail", e)
@@ -37,5 +41,6 @@ fn decode_utf16(bytes: &[u8], little_endian: bool) -> Result<String, AppError> {
     if text.trim().is_empty() {
         return Err(AppError::new("fomod.empty_xml").kind(ErrorKind::Permanent));
     }
+
     Ok(text)
 }

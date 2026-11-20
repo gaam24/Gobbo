@@ -23,6 +23,7 @@ pub fn select_installed_update(
             if has_part {
                 return None;
             }
+
             source
                 .and_then(|source| source.meta.as_ref())
                 .and_then(|meta| meta.version.clone())
@@ -63,6 +64,7 @@ mod tests {
 
     fn library_with_two_versions() -> Library {
         let mut library = Library::default();
+
         for (folder, version, file) in [("old", "1.0", "100"), ("new", "2.0", "200")] {
             let record = version_with_file(folder, version);
             let sha = record.archive.clone().expect("the test sets an archive");
@@ -80,6 +82,7 @@ mod tests {
             );
             library.versions.insert(record.folder.clone(), record);
         }
+
         library
     }
 

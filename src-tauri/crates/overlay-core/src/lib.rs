@@ -120,19 +120,23 @@ impl Whiteouts {
     /// The whiteouts from their file: one relative path per line. Blank lines are skipped.
     pub fn parse(text: &str) -> Self {
         let mut whiteouts = Self::default();
+
         for line in text.lines().map(str::trim).filter(|line| !line.is_empty()) {
             whiteouts.hide(line);
         }
+
         whiteouts
     }
 
     /// The text of the whiteouts file: one relative path per line.
     pub fn to_text(&self) -> String {
         let mut text = String::with_capacity(self.paths.len() * 32);
+
         for path in &self.paths {
             text.push_str(path);
             text.push('\n');
         }
+
         text
     }
 
@@ -158,20 +162,25 @@ impl Whiteouts {
         // behavior.
         if rel.is_ascii() {
             let mut hash = FNV_OFFSET;
+
             for (index, byte) in rel.bytes().enumerate() {
                 if byte == b'\\' && self.hash_hides(hash, &rel[..index]) {
                     return true;
                 }
+
                 hash ^= u64::from(byte.to_ascii_lowercase());
                 hash = hash.wrapping_mul(FNV_PRIME);
             }
             // The whole path, including a trailing separator when the caller gave one.
             return self.hash_hides(hash, rel);
         }
+
         let mut buffer = [0u8; 1024];
+
         if let Some(lower) = fold_key_into(rel, &mut buffer) {
             return self.hides_folded(lower);
         }
+
         self.hides_folded(&fold_key(rel))
     }
 
@@ -186,25 +195,32 @@ impl Whiteouts {
         if self.paths.is_empty() {
             return false;
         }
+
         if rel.is_empty() {
             return self.contains_folded(name);
         }
+
         if rel.is_ascii() && name.is_ascii() {
             let length = rel.len() + 1 + name.len();
             let mut buffer = [0u8; 512];
+
             if length <= buffer.len() {
                 buffer[..rel.len()].copy_from_slice(rel.as_bytes());
                 buffer[rel.len()] = b'\\';
                 buffer[rel.len() + 1..length].copy_from_slice(name.as_bytes());
+
                 if let Ok(path) = std::str::from_utf8(&buffer[..length]) {
                     return self.contains_folded(path);
                 }
             }
         }
+
         let mut buffer = [0u8; 1024];
+
         if let Some(path) = fold_child_into(rel, name, &mut buffer) {
             return self.hash_hides_folded(key_hash(path), path);
         }
+
         self.contains_folded(&join_rel(rel, name))
     }
 
@@ -220,22 +236,28 @@ impl Whiteouts {
         if self.paths.is_empty() {
             return false;
         }
+
         if units_are_ascii(name) {
             let mut ascii = [0u8; 260];
             let length = name.len().min(ascii.len());
+
             if length == name.len() {
                 for (slot, unit) in ascii.iter_mut().zip(name) {
                     *slot = *unit as u8;
                 }
+
                 if let Ok(name) = std::str::from_utf8(&ascii[..length]) {
                     return self.hides_child_in_visible_folder(rel, name);
                 }
             }
         }
+
         let mut buffer = [0u8; 1024];
+
         if let Some(path) = fold_child_units_into(rel, name, &mut buffer) {
             return self.hash_hides_folded(key_hash(path), path);
         }
+
         let name = String::from_utf16_lossy(name);
         self.hides_child_in_visible_folder(rel, &name)
     }
@@ -254,13 +276,16 @@ impl Whiteouts {
     /// `hides` for a path that is already folded, as the non-ASCII branch builds it.
     fn hides_folded(&self, lower: &str) -> bool {
         let mut hash = FNV_OFFSET;
+
         for (index, byte) in lower.bytes().enumerate() {
             if byte == b'\\' && self.hash_hides_folded(hash, &lower[..index]) {
                 return true;
             }
+
             hash ^= u64::from(byte);
             hash = hash.wrapping_mul(FNV_PRIME);
         }
+
         self.hash_hides_folded(hash, lower)
     }
 
@@ -270,10 +295,13 @@ impl Whiteouts {
         if key.is_ascii() {
             return self.hash_hides(key_hash(key), key);
         }
+
         let mut buffer = [0u8; 1024];
+
         if let Some(lower) = fold_key_into(key, &mut buffer) {
             return self.hash_hides_folded(key_hash(lower), lower);
         }
+
         let lower = fold_key(key);
         self.hash_hides_folded(key_hash(&lower), &lower)
     }
@@ -284,9 +312,11 @@ impl Whiteouts {
         if self.paths.is_empty() {
             return false;
         }
+
         if self.hides(rel) {
             return true;
         }
+
         let lower = fold_key(rel);
         let prefix = if lower.is_empty() {
             String::new()
@@ -377,12 +407,15 @@ impl Layers {
         whiteouts: &Whiteouts,
     ) -> Option<(Layer, PathBuf)> {
         let upper = join(&self.upper, rel);
+
         if exists(&upper) {
             return Some((Layer::Upper, upper));
         }
+
         if whiteouts.hides(rel) {
             return None;
         }
+
         [Layer::Staging, Layer::Root]
             .into_iter()
             .filter_map(|layer| self.base(layer).map(|base| (layer, base)))
@@ -455,7 +488,9 @@ pub fn fold_char(c: char) -> char {
     if c.is_ascii() {
         return c.to_ascii_lowercase();
     }
+
     let mut lower = c.to_lowercase();
+
     match (lower.next(), lower.next()) {
         (Some(one), None) => one,
         _ => c,
@@ -468,6 +503,7 @@ pub fn fold_unit(unit: u16) -> u16 {
     if unit < 0x80 {
         return u16::from((unit as u8).to_ascii_lowercase());
     }
+
     char::from_u32(u32::from(unit))
         .and_then(|c| u16::try_from(u32::from(fold_char(c))).ok())
         .unwrap_or(unit)
@@ -483,6 +519,7 @@ pub fn fold_key(text: &str) -> String {
     if text.is_ascii() {
         return text.to_ascii_lowercase();
     }
+
     text.chars().map(fold_char).collect()
 }
 
@@ -492,21 +529,28 @@ pub fn fold_key_into<'a>(text: &str, buffer: &'a mut [u8]) -> Option<&'a str> {
         if text.len() > buffer.len() {
             return None;
         }
+
         for (slot, byte) in buffer.iter_mut().zip(text.bytes()) {
             *slot = byte.to_ascii_lowercase();
         }
+
         return std::str::from_utf8(&buffer[..text.len()]).ok();
     }
+
     let mut length = 0;
+
     for c in text.chars() {
         let mut bytes = [0u8; 4];
         let encoded = fold_char(c).encode_utf8(&mut bytes);
+
         if length + encoded.len() > buffer.len() {
             return None;
         }
+
         buffer[length..length + encoded.len()].copy_from_slice(encoded.as_bytes());
         length += encoded.len();
     }
+
     std::str::from_utf8(&buffer[..length]).ok()
 }
 
@@ -514,11 +558,13 @@ pub fn fold_key_into<'a>(text: &str, buffer: &'a mut [u8]) -> Option<&'a str> {
 fn fold_child_into<'a>(rel: &str, name: &str, buffer: &'a mut [u8]) -> Option<&'a str> {
     let mut length = 0;
     fold_rel(rel, buffer, &mut length)?;
+
     for c in name.chars() {
         if !push_fold(c, buffer, &mut length) {
             return None;
         }
     }
+
     std::str::from_utf8(&buffer[..length]).ok()
 }
 
@@ -527,11 +573,13 @@ fn fold_child_into<'a>(rel: &str, name: &str, buffer: &'a mut [u8]) -> Option<&'
 fn fold_child_units_into<'a>(rel: &str, name: &[u16], buffer: &'a mut [u8]) -> Option<&'a str> {
     let mut length = 0;
     fold_rel(rel, buffer, &mut length)?;
+
     for c in char::decode_utf16(name.iter().copied()) {
         if !push_fold(c.ok()?, buffer, &mut length) {
             return None;
         }
     }
+
     std::str::from_utf8(&buffer[..length]).ok()
 }
 
@@ -542,9 +590,11 @@ fn fold_rel(rel: &str, buffer: &mut [u8], length: &mut usize) -> Option<()> {
             return None;
         }
     }
+
     if !rel.is_empty() {
         push_byte(b'\\', buffer, length).then_some(())?;
     }
+
     Some(())
 }
 
@@ -552,9 +602,11 @@ fn fold_rel(rel: &str, buffer: &mut [u8], length: &mut usize) -> Option<()> {
 fn push_fold(c: char, buffer: &mut [u8], length: &mut usize) -> bool {
     let mut bytes = [0u8; 4];
     let encoded = fold_char(c).encode_utf8(&mut bytes);
+
     if *length + encoded.len() > buffer.len() {
         return false;
     }
+
     buffer[*length..*length + encoded.len()].copy_from_slice(encoded.as_bytes());
     *length += encoded.len();
     true
@@ -565,6 +617,7 @@ fn push_byte(byte: u8, buffer: &mut [u8], length: &mut usize) -> bool {
     if *length >= buffer.len() {
         return false;
     }
+
     buffer[*length] = byte;
     *length += 1;
     true
@@ -581,17 +634,23 @@ pub fn strip_folded_prefix<'a>(path: &'a str, root: &str) -> Option<&'a str> {
         {
             return None;
         }
+
         return Some(&path[root.len()..]);
     }
+
     let mut path_chars = path.char_indices();
     let mut end = 0;
+
     for root_char in root.chars() {
         let (at, path_char) = path_chars.next()?;
+
         if fold_char(root_char) != fold_char(path_char) {
             return None;
         }
+
         end = at + path_char.len_utf8();
     }
+
     Some(&path[end..])
 }
 
@@ -601,6 +660,7 @@ pub fn same_folded(left: &str, right: &str) -> bool {
     if left.is_ascii() && right.is_ascii() {
         return left.eq_ignore_ascii_case(right);
     }
+
     left.chars().map(fold_char).eq(right.chars().map(fold_char))
 }
 
@@ -619,6 +679,7 @@ pub fn relative_to(root: &str, path: &str) -> Option<String> {
             {
                 return relative_from_normal(root, &path);
             }
+
             relative_to_normalized(root, path)
         }
     }
@@ -627,6 +688,7 @@ pub fn relative_to(root: &str, path: &str) -> Option<String> {
 /// `path` relative to a root that is already canonical (`C:\...`, no `.`/`..`, no trailing separator).
 fn relative_from_normal(root: &str, path: &str) -> Option<String> {
     let rest = strip_folded_prefix(path, root)?;
+
     if rest.is_empty() {
         Some(String::new())
     } else {
@@ -639,9 +701,11 @@ fn relative_from_normal(root: &str, path: &str) -> Option<String> {
 /// keep the general code), for a path deeper than the small stack, and for a `/` in the drive prefix.
 fn normalize_drive(path: &str) -> Option<String> {
     let bytes = path.as_bytes();
+
     if bytes.len() < 4 || !bytes[0].is_ascii_alphabetic() || bytes[1] != b':' || bytes[2] != b'\\' {
         return None;
     }
+
     let mut out = String::with_capacity(path.len());
     out.push_str(&path[..3]);
     // The length of `out` before each component; `..` truncates back to it.
@@ -649,9 +713,11 @@ fn normalize_drive(path: &str) -> Option<String> {
     let mut depth = 0;
     let mut part_start = 3;
     let mut index = 3;
+
     loop {
         let at_end = index == path.len();
         let separator = at_end || bytes[index] == b'\\' || bytes[index] == b'/';
+
         if separator {
             match &path[part_start..index] {
                 "" | "." => {}
@@ -665,21 +731,28 @@ fn normalize_drive(path: &str) -> Option<String> {
                     if depth == starts.len() {
                         return None;
                     }
+
                     starts[depth] = out.len();
+
                     if out.len() > 3 {
                         out.push('\\');
                     }
+
                     out.push_str(part);
                     depth += 1;
                 }
             }
+
             if at_end {
                 break;
             }
+
             part_start = index + 1;
         }
+
         index += 1;
     }
+
     Some(out)
 }
 
@@ -696,12 +769,15 @@ fn relative_direct(root: &str, path: &str) -> Direct {
     if !is_canonical_drive(root) || !is_canonical_drive(path) {
         return Direct::Fallback;
     }
+
     let Some(rest) = strip_folded_prefix(path, root) else {
         return Direct::Outside;
     };
+
     if rest.is_empty() {
         return Direct::Inside(String::new());
     }
+
     match rest.strip_prefix('\\') {
         Some(rel) => Direct::Inside(rel.to_string()),
         None => Direct::Outside,
@@ -712,6 +788,7 @@ fn relative_direct(root: &str, path: &str) -> Direct {
 /// `normal` leaves unchanged.
 fn is_canonical_drive(text: &str) -> bool {
     let bytes = text.as_bytes();
+
     if bytes.len() < 4
         || !bytes[0].is_ascii_alphabetic()
         || bytes[1] != b':'
@@ -720,6 +797,7 @@ fn is_canonical_drive(text: &str) -> bool {
     {
         return false;
     }
+
     text[3..]
         .split('\\')
         .all(|part| !part.is_empty() && part != "." && part != "..")
@@ -730,6 +808,7 @@ fn relative_to_normalized(root: &str, path: &str) -> Option<String> {
     let root = normal(root);
     let path = normal(path);
     let rest = strip_folded_prefix(&path, &root)?;
+
     if rest.is_empty() {
         Some(String::new())
     } else {
@@ -743,14 +822,18 @@ pub fn join(base: &Path, rel: &str) -> PathBuf {
     if rel.is_empty() {
         return base.to_path_buf();
     }
+
     if !rel.contains('\\') {
         return base.join(rel);
     }
+
     let mut path = PathBuf::with_capacity(base.as_os_str().len() + rel.len() + 2);
     path.push(base);
+
     for part in rel.split('\\').filter(|part| !part.is_empty()) {
         path.push(part);
     }
+
     path
 }
 
@@ -775,10 +858,12 @@ const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
 /// FNV-1a over the bytes with ASCII case folded.
 fn key_hash(key: &str) -> u64 {
     let mut hash = FNV_OFFSET;
+
     for byte in key.bytes() {
         hash ^= u64::from(byte.to_ascii_lowercase());
         hash = hash.wrapping_mul(FNV_PRIME);
     }
+
     hash
 }
 
@@ -789,9 +874,11 @@ fn unhidden<T>(rel: &str, names: Vec<(String, T)>, whiteouts: &Whiteouts) -> Vec
     if whiteouts.paths.is_empty() {
         return names;
     }
+
     if whiteouts.hides(rel) {
         return Vec::new();
     }
+
     names
         .into_iter()
         .filter(|(name, _)| !whiteouts.hides_child_in_visible_folder(rel, name))
@@ -810,6 +897,7 @@ pub fn merge_listing<T>(
     let mut seen: FxHashSet<String> = FxHashSet::default();
     seen.reserve(total);
     let mut merged = Vec::with_capacity(total);
+
     for (layer, names) in [
         (Layer::Upper, upper),
         (Layer::Staging, staging),
@@ -821,6 +909,7 @@ pub fn merge_listing<T>(
             }
         }
     }
+
     merged
 }
 
@@ -838,11 +927,14 @@ pub fn wildcard_match(pattern: &str, name: &str) -> bool {
         if name == "." || name == ".." {
             return stem.chars().all(|c| c == '*');
         }
+
         return !name.contains('.') && wildcard_match(stem, name);
     }
+
     if pattern.is_ascii() && name.is_ascii() {
         return matches_from(pattern.as_bytes(), name.as_bytes());
     }
+
     let pattern: Vec<char> = pattern.chars().map(fold_char).collect();
     let name: Vec<char> = name.chars().map(fold_char).collect();
     matches_from(&pattern, &name)
@@ -855,23 +947,29 @@ pub fn wildcard_match_units(pattern: &str, name: &[u16]) -> bool {
     if pattern == "*" || pattern == "*.*" {
         return true;
     }
+
     if pattern.is_ascii() {
         let mut ascii = [0u8; 260];
         let length = name.len().min(ascii.len());
+
         if length == name.len() {
             let mut all_ascii = true;
+
             for (slot, unit) in ascii.iter_mut().zip(name) {
                 if *unit >= 0x80 {
                     all_ascii = false;
                     break;
                 }
+
                 *slot = *unit as u8;
             }
+
             if all_ascii && let Ok(name) = std::str::from_utf8(&ascii[..length]) {
                 return wildcard_match(pattern, name);
             }
         }
     }
+
     wildcard_match(pattern, &String::from_utf16_lossy(name))
 }
 
@@ -916,6 +1014,7 @@ fn matches_from<T: MatchUnit + Copy>(pattern: &[T], name: &[T]) -> bool {
     let (mut p, mut n) = (0, 0);
     // The pattern index after the last `*`, and the name index that `*` has matched up to.
     let mut star: Option<(usize, usize)> = None;
+
     while n < name.len() {
         match pattern.get(p) {
             Some(&unit) if unit.is_star() => {
@@ -940,6 +1039,7 @@ fn matches_from<T: MatchUnit + Copy>(pattern: &[T], name: &[T]) -> bool {
             },
         }
     }
+
     pattern[p..].iter().all(|&rest| rest.is_star())
 }
 
@@ -967,6 +1067,7 @@ fn normal(path: &str) -> String {
         ("", text)
     };
     let mut parts: Vec<&str> = Vec::new();
+
     for part in rest.split('\\') {
         match part {
             "" | "." => {}
@@ -976,13 +1077,17 @@ fn normal(path: &str) -> String {
             other => parts.push(other),
         }
     }
+
     let mut out = root.to_string();
+
     for part in parts {
         if !out.is_empty() && !out.ends_with('\\') {
             out.push('\\');
         }
+
         out.push_str(part);
     }
+
     out
 }
 
@@ -1395,6 +1500,7 @@ mod tests {
         if rel.is_empty() || paths.is_empty() {
             return false;
         }
+
         let lower = rel.to_lowercase();
         lower
             .match_indices('\\')
@@ -1406,9 +1512,11 @@ mod tests {
     /// The fast whiteout check and the reference agree for these hidden paths.
     fn agrees_with_reference(hidden: &[String], rel: &str) -> bool {
         let mut whiteouts = Whiteouts::default();
+
         for path in hidden {
             whiteouts.hide(path);
         }
+
         whiteouts.hides(rel) == reference_hides(&whiteouts.paths, rel)
     }
 
@@ -1448,10 +1556,13 @@ mod tests {
         let root = normal(root);
         let path = normal(path);
         let head = path.get(..root.len())?;
+
         if !head.eq_ignore_ascii_case(&root) {
             return None;
         }
+
         let rest = &path[root.len()..];
+
         if rest.is_empty() {
             Some(String::new())
         } else {
@@ -1463,14 +1574,17 @@ mod tests {
         if pattern == "*.*" {
             return true;
         }
+
         if let Some(stem) = pattern.strip_suffix('.')
             && !stem.contains('.')
         {
             if name == "." || name == ".." {
                 return stem.chars().all(|c| c == '*');
             }
+
             return !name.contains('.') && reference_wildcard(stem, name);
         }
+
         let pattern: Vec<char> = pattern.chars().map(fold_char).collect();
         let name: Vec<char> = name.chars().map(fold_char).collect();
         matches_from(&pattern, &name)

@@ -14,11 +14,13 @@ pub(super) fn effective_kind(
     let Some(dependency_type) = &option.dependency_type else {
         return option.kind;
     };
+
     for pattern in &dependency_type.patterns {
         if satisfied(&pattern.dependencies, flags, installed) {
             return pattern.kind;
         }
     }
+
     dependency_type.default_kind
 }
 

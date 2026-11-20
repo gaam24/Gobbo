@@ -118,6 +118,7 @@ fn add_records(
         })
         .map(str::to_string);
     let label = single_mod.then_some(named.as_ref()).flatten();
+
     for mut record in records {
         record.archive = Some(prepared.copy.digest.clone());
         record.parsed_sources =
@@ -141,6 +142,7 @@ fn add_records(
             |source| library.family_for_source(source, &record.info.name),
         );
         let mut family = Family::of(&record);
+
         if let Some(source) = &family_source
             && let Some(known) = family.sources.get_mut(&source.provider)
         {
@@ -151,6 +153,7 @@ fn add_records(
                 source.part_category.as_deref(),
             );
         }
+
         if let Some(known) = library.families.get_mut(&family.id) {
             if let Some(source) = &family_source
                 && let Some(entry) = known.sources.get_mut(&source.provider)
@@ -165,6 +168,7 @@ fn add_records(
         } else {
             library.families.insert(family.id.clone(), family);
         }
+
         let folder = record.folder.clone();
         imported.push(crate::import::model::ImportedModView {
             family: record.family.clone(),
@@ -177,6 +181,7 @@ fn add_records(
         library.versions.insert(folder.clone(), record);
         library.layouts.insert(folder, layout);
     }
+
     library.archives.insert(
         prepared.copy.digest.clone(),
         Archive {

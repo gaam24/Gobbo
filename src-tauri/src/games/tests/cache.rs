@@ -40,6 +40,7 @@ fn an_edited_definition_is_parsed_again_and_a_bad_one_is_not_kept() {
     assert_eq!(second.name, "Slot Game Renamed");
 
     write(&path, "schema = 1\nid = \"cache-reload\"\n");
+
     for _ in 0..2 {
         let error =
             read_through(&cache, &path, loaders_dir()).expect_err("the bad definition is refused");

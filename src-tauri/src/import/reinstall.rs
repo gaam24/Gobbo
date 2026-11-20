@@ -62,6 +62,7 @@ pub fn reinstall_mod_with(
             crate::acquire::ResolvedChoices::Chosen(Some(choices)) => {
                 Some(fomod_allowed(&archive::Archive::open(&zip)?, &choices)?)
             }
+
             crate::acquire::ResolvedChoices::Chosen(None)
             | crate::acquire::ResolvedChoices::NeedsChoice { .. } => None,
         };
@@ -85,11 +86,14 @@ pub fn reinstall_mod_with(
         if set_aside.is_dir() && !target.is_dir() {
             std::fs::rename(&set_aside, &target).map_err(io_at(&set_aside))?;
         }
+
         crate::infra::fs::remove_dir_if_exists(&set_aside).map_err(io_at(&set_aside))?;
         let had_folder = target.is_dir();
+
         if had_folder {
             std::fs::rename(&target, &set_aside).map_err(io_at(&target))?;
         }
+
         let settings = crate::context::load_settings(data);
         let roots = crate::context::target::deployment_root(game, &settings)
             .ok()
@@ -124,8 +128,10 @@ pub fn reinstall_mod_with(
                 )
                 .unwrap_or(u32::MAX);
             }
+
             library.rescan_version(&library_dir, game, folder)
         });
+
         if result.is_ok() {
             if let Some(choices) = choices
                 && let Some(record) = library.versions.get_mut(folder)
@@ -133,6 +139,7 @@ pub fn reinstall_mod_with(
                 record.fomod = choices.to_vec();
                 record.fomod_installer = true;
             }
+
             let _ = std::fs::remove_dir_all(&set_aside);
         } else if had_folder {
             let restored = crate::infra::fs::remove_dir_if_exists(&target)
@@ -146,6 +153,7 @@ pub fn reinstall_mod_with(
                 ));
             }
         }
+
         result
     })
 }
@@ -197,9 +205,11 @@ fn archive_for(
         .archive_file_of(&digest)
         .ok_or_else(|| archive_error(folder, "library.archive_missing"))?;
     let zip = data.archives().join(&file);
+
     if !zip.is_file() {
         return Err(archive_error(folder, "library.archive_missing"));
     }
+
     Ok((record, zip, file))
 }
 

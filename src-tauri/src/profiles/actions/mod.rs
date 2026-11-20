@@ -53,6 +53,7 @@ pub fn save_profile(root: &Data, game_id: &str, rows: &[Row]) -> Result<(), AppE
     let mut ids = SeparatorIds::new(&profiles.active().separators);
     // The priority of every family, read once. A scan of the active list for every row made a save quadratic.
     let mut priorities: rustc_hash::FxHashMap<&str, Option<u32>> = rustc_hash::FxHashMap::default();
+
     for entry in &profiles.active().mods {
         // The first entry wins, matching the linear lookup this map replaced.
         priorities
@@ -61,11 +62,13 @@ pub fn save_profile(root: &Data, game_id: &str, rows: &[Row]) -> Result<(), AppE
     }
     // Separators wait for the next mod row: they sit above it.
     let mut waiting: Vec<Separator> = Vec::new();
+
     for row in rows {
         if let Some(name) = &row.separator {
             waiting.push(separator(row, name, &mut ids)?);
             continue;
         }
+
         let record = library
             .versions
             .get(&row.folder)
@@ -73,9 +76,11 @@ pub fn save_profile(root: &Data, game_id: &str, rows: &[Row]) -> Result<(), AppE
         if disk_folders.binary_search(&row.folder).is_err() {
             return Err(not_in_library(&row.folder));
         }
+
         if !seen.insert(record.family.as_str()) {
             return Err(AppError::user("profile.duplicate_mod").with("folder", &row.folder));
         }
+
         separators.extend(
             std::mem::take(&mut waiting)
                 .into_iter()
@@ -92,6 +97,7 @@ pub fn save_profile(root: &Data, game_id: &str, rows: &[Row]) -> Result<(), AppE
             priority,
         });
     }
+
     separators.append(&mut waiting);
     // A separator above a mod that still waits for the library stays above it, as the list shows it at the end.
     let awaited: BTreeMap<String, String> = profiles
@@ -115,6 +121,7 @@ pub fn save_profile(root: &Data, game_id: &str, rows: &[Row]) -> Result<(), AppE
             separator.before = Some(family.clone());
         }
     }
+
     let active = profiles.active_mut();
     active.mods = entries;
     active.separators = separators;
@@ -157,9 +164,11 @@ impl SeparatorIds {
         if !wanted.is_empty() && self.used.insert(wanted.to_string()) {
             return wanted.to_string();
         }
+
         loop {
             let id = format!("sep{}", self.next);
             self.next += 1;
+
             if !self.existing.contains(&id) && self.used.insert(id.clone()) {
                 return id;
             }
@@ -175,9 +184,11 @@ pub(super) fn separator(
     ids: &mut SeparatorIds,
 ) -> Result<Separator, AppError> {
     let name = name.trim();
+
     if name.is_empty() || name.chars().count() > 60 {
         return Err(AppError::user("profile.separator_name"));
     }
+
     Ok(Separator {
         id: ids.claim(&row.folder),
         name: name.to_string(),
@@ -208,16 +219,19 @@ pub fn set_mod_priority(
     let _profiles = lock_profiles();
     let game = games::load(game_id)?;
     let data = root.game(game_id);
+
     if let Some(value) = priority {
         let Some(order) = &game.load_order else {
             return Err(AppError::user("profile.priority_unsupported"));
         };
+
         if !(order.priority_min..=order.priority_max).contains(&value) {
             return Err(AppError::user("profile.priority_out_of_range")
                 .with("min", order.priority_min)
                 .with("max", order.priority_max));
         }
     }
+
     let mut profiles = load_profiles(&data)?;
     profiles.active_entry_mut(id)?.priority = priority;
     save_profiles(&data, &profiles)
@@ -238,6 +252,7 @@ pub fn create_profile(
     let data = root.game(game_id);
     let library = load_library(&data, &game)?;
     let view = crate::library::LibraryView::new(&library);
+
     if !copy_data {
         return crate::context::edit_profiles(root, game_id, |_, game, profiles| {
             let id = profiles.create(name, copy_from)?;
@@ -255,9 +270,11 @@ pub fn create_profile(
         return Err(AppError::user("profiles.copy_source_missing"));
     };
     let _state = crate::context::lock_state(&root.dir)?;
+
     if game_running(root, game_id)? {
         return Err(game_is_running_error());
     }
+
     let _profiles = lock_profiles();
     let mut profiles = load_profiles(&data)?;
     let source = profiles.get(copy_from)?.clone();
@@ -267,16 +284,20 @@ pub fn create_profile(
     let id = profiles.create(name, Some(copy_from))?;
     let target = profiles.get(&id)?.clone();
     let copy = super::transfer::copy_profile_data(&data, &game, &settings, &source, &target);
+
     if let Err(error) = copy {
         let _ = profiles.delete(&id);
         let _ = remove_profile_state(&data, &id);
         return Err(error);
     }
+
     crate::library::sync::sync_profiles(&mut profiles, &library, &view);
+
     if let Err(error) = data.save_profiles(&profiles) {
         let _ = remove_profile_state(&data, &id);
         return Err(error);
     }
+
     Ok(())
 }
 
@@ -291,10 +312,13 @@ pub fn copy_profile_data(
     if source == target {
         return Err(AppError::user("profiles.copy_same"));
     }
+
     let _state = crate::context::lock_state(&root.dir)?;
+
     if game_running(root, game_id)? {
         return Err(game_is_running_error());
     }
+
     let _profiles = lock_profiles();
     let game = games::load(game_id)?;
     let data = root.game(game_id);
@@ -337,9 +361,11 @@ pub fn delete_profile(root: &Data, game_id: &str, id: &str) -> Result<(), AppErr
     let settings = load_settings(&data);
     let mut profiles = load_profiles(&data)?;
     profiles.get(id)?;
+
     if profiles.profiles.len() == 1 {
         return Err(AppError::user("profiles.last_profile"));
     }
+
     if !game_running(root, game_id)? {
         let next = if profiles.active == id {
             profiles
@@ -352,23 +378,30 @@ pub fn delete_profile(root: &Data, game_id: &str, id: &str) -> Result<(), AppErr
         };
         profile_state::hand_over(&data, &game, &settings, id, profiles.get(&next)?)?;
     }
+
     crate::snapshots::before_delete(root, &game, &settings, id)?;
     let state = data.profile_state(id);
+
     if state.join(JOURNAL_FILE).is_file() {
         let running = game_running(root, game_id)?;
         let overlay = state_is_overlay(&state);
+
         if running && (!overlay || profiles.last_launched.as_deref() == Some(id)) {
             return Err(game_is_running_error());
         }
+
         let roots = journal_roots(&game, &settings, state)?;
         undo(&roots).map_err(AppError::from)?;
     }
+
     profiles.delete(id)?;
     forget_profile(&data, id)?;
     remove_profile_state(&data, id)?;
+
     if profiles.last_launched.as_deref() == Some(id) {
         profiles.last_launched = None;
     }
+
     data.save_profiles(&profiles)
 }
 

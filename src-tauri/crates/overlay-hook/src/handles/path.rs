@@ -116,9 +116,11 @@ pub(crate) fn layer_path_kind(handle: *mut c_void) -> Option<(LayerKind, String)
     let mut buffer = [0u16; 512];
     let length = final_path_units(handle, &mut buffer)?;
     let kind = classify_units(&buffer[..length], text);
+
     if kind == LayerKind::Outside {
         return Some((kind, String::new()));
     }
+
     Some((kind, String::from_utf16_lossy(&buffer[..length])))
 }
 
@@ -128,6 +130,7 @@ fn classify_units(path: &[u16], mounts: &[MountText]) -> LayerKind {
         if strip_prefix_ci_units(path, &text.upper_units).is_some() {
             return LayerKind::Upper;
         }
+
         if strip_prefix_ci_units(path, &text.root_units).is_some()
             || text
                 .staging_units
@@ -138,6 +141,7 @@ fn classify_units(path: &[u16], mounts: &[MountText]) -> LayerKind {
             return LayerKind::Lower;
         }
     }
+
     LayerKind::Outside
 }
 
@@ -153,13 +157,17 @@ pub(crate) fn layer_path(handle: *mut c_void) -> Option<String> {
 pub(crate) fn outside_path_units(handle: *mut c_void, buffer: &mut [u16; 512]) -> Option<usize> {
     let mounts = mount_text()?;
     let length = final_path_units(handle, buffer)?;
+
     if classify_units(&buffer[..length], mounts) != LayerKind::Outside {
         return None;
     }
+
     let prefix = r"\\?\".encode_utf16().count();
+
     if length <= prefix || !buffer[..prefix].iter().copied().eq(r"\\?\".encode_utf16()) {
         return Some(length);
     }
+
     buffer.copy_within(prefix..length, 0);
     Some(length - prefix)
 }
@@ -213,10 +221,12 @@ fn relative_in_lower(mount: &MountText, path: &str) -> Option<String> {
 /// The guest path of the mount whose layers contain `path`, in the `\\?\` form.
 pub(crate) fn map_layer_path_cached(path: &str) -> Option<String> {
     let text = mount_text()?;
+
     for mount in text {
         if strip_prefix_ci(path, &mount.guest_verbatim).is_some() {
             return Some(path.to_string());
         }
+
         for base in [&mount.upper_verbatim]
             .into_iter()
             .chain(mount.staging_verbatim.as_ref())
@@ -227,6 +237,7 @@ pub(crate) fn map_layer_path_cached(path: &str) -> Option<String> {
             }
         }
     }
+
     None
 }
 
@@ -250,11 +261,13 @@ fn map_layer_path_text(
     if strip_prefix_ci(path, root).is_some() {
         return Some(path.to_string());
     }
+
     for base in [upper].into_iter().chain(staging) {
         if let Some(rest) = strip_prefix_ci(path, base) {
             return Some(format!("{root}{rest}"));
         }
     }
+
     None
 }
 
@@ -268,27 +281,34 @@ pub(super) fn original_path(handle: *mut c_void, flags: u32) -> Option<String> {
     let length = unsafe { original.call(handle, stack.as_mut_ptr(), stack.len() as u32, flags) };
     let _last_error = PreserveLastError::capture();
     let length = length as usize;
+
     if length == 0 {
         return None;
     }
+
     if length < stack.len() {
         return Some(String::from_utf16_lossy(&stack[..length]));
     }
+
     let mut size = length;
+
     loop {
         let mut buffer = vec![0u16; size];
         // SAFETY: the buffer is `size` units long, and the call writes at most that many.
         let length = unsafe { original.call(handle, buffer.as_mut_ptr(), size as u32, flags) };
         let _last_error = PreserveLastError::capture();
+
         if length == 0 {
             return None;
         }
+
         if (length as usize) < size {
             buffer.truncate(length as usize);
             return Some(String::from_utf16_lossy(&buffer));
         }
         // The call returns the size needed, including the terminator, when the buffer is too small.
         size = length as usize;
+
         if size > 32_768 {
             return None;
         }
@@ -327,10 +347,12 @@ unsafe fn final_path_units_with(
 /// the path is outside every layer or the guest path does not fit `out`.
 pub(crate) fn map_layer_path_units(path: &[u16], out: &mut [u16]) -> Option<usize> {
     let text = mount_text()?;
+
     for mount in text {
         if strip_prefix_ci_units(path, &mount.guest_units).is_some() {
             return copy_units(path, out);
         }
+
         for base in [mount.upper_units.as_slice()]
             .into_iter()
             .chain(mount.staging_units.as_deref())
@@ -338,15 +360,18 @@ pub(crate) fn map_layer_path_units(path: &[u16], out: &mut [u16]) -> Option<usiz
         {
             if let Some(rest) = strip_prefix_ci_units(path, base) {
                 let needed = mount.guest_units.len() + rest.len();
+
                 if needed > out.len() {
                     return None;
                 }
+
                 out[..mount.guest_units.len()].copy_from_slice(&mount.guest_units);
                 out[mount.guest_units.len()..needed].copy_from_slice(rest);
                 return Some(needed);
             }
         }
     }
+
     None
 }
 
@@ -372,9 +397,11 @@ pub(crate) fn guest_module_path_units(path: &[u16], out: &mut [u16]) -> Option<u
         VERBATIM
     };
     let length = prefix.len() + path.len();
+
     if length > verbatim.len() {
         return None;
     }
+
     verbatim[..prefix.len()].copy_from_slice(prefix);
     verbatim[prefix.len()..length].copy_from_slice(path);
     let mut guest = [0u16; 1040];
@@ -387,46 +414,56 @@ fn strip_verbatim_units(path: &[u16], out: &mut [u16]) -> Option<usize> {
     const PREFIX: &[u16] = &[b'\\' as u16, b'\\' as u16, b'?' as u16, b'\\' as u16];
     const UNC: &[u16] = &[b'U' as u16, b'N' as u16, b'C' as u16, b'\\' as u16];
     let text = path.strip_prefix(PREFIX).unwrap_or(path);
+
     if let Some(rest) = text.strip_prefix(UNC) {
         if rest.len() + 2 > out.len() {
             return None;
         }
+
         out[0] = b'\\' as u16;
         out[1] = b'\\' as u16;
         out[2..2 + rest.len()].copy_from_slice(rest);
         return Some(2 + rest.len());
     }
+
     copy_units(text, out)
 }
 
 /// `without_volume` for a UTF-16 path, in a caller's stack buffer. No allocation.
 pub(crate) fn without_volume_units(path: &[u16], out: &mut [u16]) -> Option<usize> {
     let length = strip_verbatim_units(path, out)?;
+
     if out.get(1) == Some(&u16::from(b':')) {
         out.copy_within(2..length, 0);
         return Some(length - 2);
     }
+
     Some(length)
 }
 
 /// `guest_nt_for_path` for a UTF-16 path, in a caller's stack buffer. No allocation.
 pub(crate) fn guest_nt_for_path_units(path: &[u16], out: &mut [u16]) -> Option<usize> {
     let text = mount_text()?;
+
     for mount in text {
         let Some(rest) = strip_prefix_ci_units(path, &mount.guest_units) else {
             continue;
         };
         let nt = guest_nt(mount)?;
         let mut length = 0;
+
         for unit in nt.encode_utf16().chain(rest.iter().copied()) {
             if length >= out.len() {
                 return None;
             }
+
             out[length] = unit;
             length += 1;
         }
+
         return Some(length);
     }
+
     None
 }
 
@@ -435,6 +472,7 @@ fn copy_units(path: &[u16], out: &mut [u16]) -> Option<usize> {
     if path.len() > out.len() {
         return None;
     }
+
     out[..path.len()].copy_from_slice(path);
     Some(path.len())
 }
@@ -442,9 +480,11 @@ fn copy_units(path: &[u16], out: &mut [u16]) -> Option<usize> {
 /// The `\\?\` form of an absolute path, so it compares with the answer of `GetFinalPathNameByHandleW`.
 pub(super) fn verbatim(path: &Path) -> String {
     let text = path.display().to_string();
+
     if text.starts_with(r"\\?\") || text.starts_with(r"\\.\") {
         return text;
     }
+
     let text = match text.strip_prefix(r"\\") {
         Some(server) => return format!(r"\\?\UNC\{server}"),
         None => text,
@@ -456,6 +496,7 @@ pub(super) fn verbatim(path: &Path) -> String {
 /// the end. `base` is a `\\?\` path.
 pub(super) fn strip_prefix_ci<'a>(path: &'a str, base: &str) -> Option<&'a str> {
     let rest = strip_folded_prefix(path, base)?;
+
     if rest.is_empty() || rest.starts_with('\\') {
         Some(rest)
     } else {
@@ -475,11 +516,13 @@ fn guest_nt(text: &MountText) -> Option<&str> {
 /// The NT form of a guest path, with the part below the guest folder, for the final-path translation of a layer path.
 pub(crate) fn guest_nt_for_path(path: &str) -> Option<String> {
     let text = mount_text()?;
+
     for mount in text {
         if let Some(rest) = strip_prefix_ci(path, &mount.guest_verbatim) {
             return Some(format!("{}{rest}", guest_nt(mount)?));
         }
     }
+
     None
 }
 
@@ -503,6 +546,7 @@ fn layer_nt() -> Option<&'static [MountNt]> {
         .get_or_init(|| {
             let text = mount_text()?;
             let mut mounts = Vec::with_capacity(text.len());
+
             for mount in text {
                 // One mount with a folder that cannot be opened must not disable the NT mapping of the others.
                 let Some(guest) = guest_nt(mount) else {
@@ -530,6 +574,7 @@ fn layer_nt() -> Option<&'static [MountNt]> {
                     root,
                 });
             }
+
             Some(mounts)
         })
         .as_deref()
@@ -538,6 +583,7 @@ fn layer_nt() -> Option<&'static [MountNt]> {
 /// Maps an NT layer path to the NT path of the guest folder. `None` when the path is not in a layer.
 pub(crate) fn map_layer_path_nt(units: &[u16]) -> Option<Vec<u16>> {
     let mounts = layer_nt()?;
+
     for mount in mounts {
         for (base, rel, guest, guest_rel) in [
             (
@@ -564,6 +610,7 @@ pub(crate) fn map_layer_path_nt(units: &[u16]) -> Option<Vec<u16>> {
             {
                 return Some(join_units(guest, rest));
             }
+
             if let (Some(base), Some(rel)) = (rel, guest_rel)
                 && let Some(rest) = strip_prefix_ci_units(units, base)
             {
@@ -571,6 +618,7 @@ pub(crate) fn map_layer_path_nt(units: &[u16]) -> Option<Vec<u16>> {
             }
         }
     }
+
     None
 }
 
@@ -600,9 +648,11 @@ fn nt_units(path: &Path) -> Option<Vec<u16>> {
             null_mut(),
         )
     };
+
     if handle == INVALID_HANDLE_VALUE {
         return None;
     }
+
     let units = original_path(handle, VOLUME_NAME_NT).map(|nt| nt.encode_utf16().collect());
     // SAFETY: the handle was opened above and is closed once.
     unsafe { CloseHandle(handle) };
@@ -619,7 +669,9 @@ fn strip_prefix_ci_units<'a>(path: &'a [u16], base: &[u16]) -> Option<&'a [u16]>
     {
         return None;
     }
+
     let rest = &path[base.len()..];
+
     if rest.is_empty() || rest[0] == u16::from(b'\\') {
         Some(rest)
     } else {
@@ -638,12 +690,15 @@ fn join_units(base: &[u16], rest: &[u16]) -> Vec<u16> {
 /// A path without its volume, as `VOLUME_NAME_NONE` asks: `\...`; for a server, `\\server\share\...`.
 pub(crate) fn without_volume(path: &str) -> String {
     let text = path.strip_prefix(r"\\?\").unwrap_or(path);
+
     if let Some(server) = text.strip_prefix(r"UNC\") {
         return format!(r"\\{server}");
     }
+
     if text.as_bytes().get(1) == Some(&b':') {
         return text[2..].to_string();
     }
+
     text.to_string()
 }
 

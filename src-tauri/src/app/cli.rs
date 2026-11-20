@@ -9,9 +9,11 @@ use crate::infra::storage;
 /// Returns the exit code when a program was started this way. `None` means a normal app start with a window.
 pub fn run_cli() -> Option<i32> {
     let args: Vec<String> = std::env::args().skip(1).collect();
+
     if args.first().map(String::as_str) != Some("run") {
         return None;
     }
+
     Some(match run_command(&args[1..]) {
         Ok(code) => code,
         Err(error) => {
@@ -26,10 +28,13 @@ fn run_command(args: &[String]) -> Result<i32, AppError> {
     let [game, separator, program, rest @ ..] = args else {
         return Err(usage());
     };
+
     if separator != "--" {
         return Err(usage());
     }
+
     let exe_dir = storage::exe_dir()?;
+
     match definition_dirs_from(&exe_dir) {
         Some((games, loaders)) => crate::games::set_definition_dirs(games, loaders),
         None if Path::new(crate::games::games_dir()).is_dir() => {}
@@ -37,6 +42,7 @@ fn run_command(args: &[String]) -> Result<i32, AppError> {
             return Err(AppError::new("cli.definitions_missing").with("path", exe_dir.display()));
         }
     }
+
     let root = storage::root_for_cli()?;
     crate::games::set_user_definition_dirs(root.clone());
     crate::infra::log::init(&root);

@@ -9,6 +9,7 @@ const DESCRIPTION_MAX: usize = crate::domain::DESCRIPTION_MAX;
 pub(super) fn plain_text(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     let mut rest = text;
+
     while let Some(at) = rest.find(['[', '<']) {
         out.push_str(&rest[..at]);
         let open = rest.as_bytes()[at];
@@ -19,6 +20,7 @@ pub(super) fn plain_text(text: &str) -> String {
             .filter(|tag| is_markup(tag));
         if let Some(tag) = tag {
             let name = tag.trim_start_matches('/').to_ascii_lowercase();
+
             if open == b'[' && name == "img" && !tag.starts_with('/') {
                 // A picture is no text: its address between the tags goes with it.
                 let after = &rest[at + tag.len() + 2..];
@@ -26,30 +28,38 @@ pub(super) fn plain_text(text: &str) -> String {
                     .map_or(after, |end| &after[end + "[/img]".len()..]);
                 continue;
             }
+
             if (name == "*" || name == "li") && !tag.starts_with('/') {
                 out.push_str("\n• ");
             } else if name.starts_with("br") || name == "line" || name == "p" {
                 out.push('\n');
             }
+
             rest = &rest[at + tag.len() + 2..];
         } else {
             out.push(char::from(open));
             rest = &rest[at + 1..];
         }
     }
+
     out.push_str(rest);
     let decoded = decode_entities(&out);
     let mut lines: Vec<&str> = Vec::new();
+
     for line in decoded.lines().map(str::trim) {
         if line.is_empty() && lines.last().is_none_or(|last| last.is_empty()) {
             continue;
         }
+
         lines.push(line);
     }
+
     while lines.last().is_some_and(|line| line.is_empty()) {
         lines.pop();
     }
+
     let text = lines.join("\n");
+
     match text.char_indices().nth(DESCRIPTION_MAX) {
         Some((cut, _)) => format!("{}…", &text[..cut]),
         None => text,
@@ -87,6 +97,7 @@ fn is_markup(tag: &str) -> bool {
 pub(super) fn decode_entities(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     let mut rest = text;
+
     while let Some(at) = rest.find('&') {
         out.push_str(&rest[..at]);
         let entity = rest[at + 1..]
@@ -110,6 +121,7 @@ pub(super) fn decode_entities(text: &str) -> String {
                 })
                 .and_then(char::from_u32),
         });
+
         if let (Some(entity), Some(decoded)) = (entity, decoded) {
             out.push(decoded);
             rest = &rest[at + entity.len() + 2..];
@@ -118,6 +130,7 @@ pub(super) fn decode_entities(text: &str) -> String {
             rest = &rest[at + 1..];
         }
     }
+
     out.push_str(rest);
     out
 }

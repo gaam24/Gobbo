@@ -191,12 +191,15 @@ pub fn definition_path(id: &str) -> PathBuf {
     if !is_valid_id(id) {
         return PathBuf::new();
     }
+
     if let Some(user) = user_games_dir() {
         let path = user.join(id).join("game.toml");
+
         if path.is_file() {
             return path;
         }
     }
+
     games_dir().join(id).join("game.toml")
 }
 
@@ -214,6 +217,7 @@ pub fn load_shared(id: &str) -> Result<Arc<GameDef>, AppError> {
     if !is_valid_id(id) {
         return Err(AppError::user("games.unknown").with("id", id));
     }
+
     let path = definition_path(id);
     read_cached(&path, loaders_dir())
 }
@@ -238,6 +242,7 @@ fn read_through(
     if loaders != loaders_dir() {
         return read_definition(path, loaders).map(Arc::new);
     }
+
     cache.load(path, || read_definition(path, loaders))
 }
 
@@ -247,12 +252,16 @@ fn read_through(
 pub fn load_dir(dir: &Path) -> Result<Vec<GameDef>, AppError> {
     let entries = std::fs::read_dir(dir).map_err(io_at(dir))?;
     let mut games = Vec::new();
+
     for entry in entries {
         let entry = entry.map_err(io_at(dir))?;
+
         if entry.file_name().to_string_lossy().starts_with('_') {
             continue;
         }
+
         let path = entry.path().join("game.toml");
+
         if path.is_file() {
             match read_cached(&path, loaders_dir()) {
                 Ok(game) => games.push((*game).clone()),
@@ -267,6 +276,7 @@ pub fn load_dir(dir: &Path) -> Result<Vec<GameDef>, AppError> {
             }
         }
     }
+
     games.sort_by(|a, b| a.id.cmp(&b.id));
     Ok(games)
 }
@@ -277,16 +287,21 @@ fn read_definition(path: &Path, loaders_dir: &Path) -> Result<GameDef, AppError>
     let mut game = GameDef::parse(&text).map_err(|e| invalid_definition(path, e))?;
     // A merge replaces an entry with the same key, so it would hide a duplicate that is already in this file.
     let duplicates = validate::duplicate_problems(&game.deploy);
+
     if !duplicates.is_empty() {
         return Err(invalid_definition(path, duplicates.join("; ")));
     }
+
     let mut loader_dirs = Vec::with_capacity(2);
+
     if let Some(user) = user_loaders_dir() {
         loader_dirs.push(user);
     }
+
     loader_dirs.push(loaders_dir.to_path_buf());
     loaders::apply(&mut game, &loader_dirs).map_err(|detail| invalid_definition(path, detail))?;
     let problems = game.validate();
+
     if problems.is_empty() {
         Ok(game)
     } else {

@@ -113,17 +113,23 @@ impl SourceMod {
         category: Option<&str>,
     ) -> bool {
         let mut changed = self.part_id.is_none() && part_id.is_some();
+
         if changed {
             self.part_id = part_id.map(str::to_string);
         }
+
         let name_changed = self.part_name.is_none() && name.is_some();
+
         if name_changed {
             self.part_name = name.map(str::to_string);
         }
+
         let category_changed = self.part_category.is_none() && category.is_some();
+
         if category_changed {
             self.part_category = category.map(str::to_string);
         }
+
         changed |= name_changed || category_changed;
         changed
     }
@@ -131,18 +137,22 @@ impl SourceMod {
     /// Fills every field this record lacks: the mod id, the part and the page metadata. The user's values stay.
     pub fn adopt_missing(&mut self, other: &Self) -> bool {
         let mut changed = self.mod_id.is_empty() && !other.mod_id.is_empty();
+
         if changed {
             self.mod_id.clone_from(&other.mod_id);
         }
+
         changed |= self.fill_missing_part(
             other.part_id.as_deref(),
             other.part_name.as_deref(),
             other.part_category.as_deref(),
         );
+
         if self.meta.is_none() && other.meta.is_some() {
             self.meta.clone_from(&other.meta);
             changed = true;
         }
+
         changed
     }
 

@@ -142,6 +142,7 @@ pub fn preflight(root: &Data, game_id: &str) -> Result<PreflightReport, AppError
                 .iter()
                 .find(|requirement| path_key(&requirement.path) == path_key(path))
         });
+
         if let Some(requirement) = requirement {
             checks.push(PreflightCheck {
                 id: "loader".to_string(),
@@ -207,6 +208,7 @@ pub fn preflight(root: &Data, game_id: &str) -> Result<PreflightReport, AppError
             u32::try_from(space.total_kb).unwrap_or(u32::MAX),
         )
     });
+
     match space {
         Some(space) if space.free_kb < 512 * 1024 => checks.push(check(
             "space",

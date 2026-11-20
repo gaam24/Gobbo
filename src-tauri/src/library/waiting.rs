@@ -21,6 +21,7 @@ pub fn settle_waiting(profile: &mut Profile, view: &LibraryView) -> Vec<String> 
     // The waiting mods are settled one at a time, so a mod that joins first is already in the list when a later one
     // sits above it, and the names of the rest follow it.
     let mut at = 0;
+
     while at < profile.waiting.len() {
         let Some((family, folder)) = find_version(view, &profile.waiting[at].entry) else {
             at += 1;
@@ -29,9 +30,11 @@ pub fn settle_waiting(profile: &mut Profile, view: &LibraryView) -> Vec<String> 
         let waiting = profile.waiting.remove(at);
         settled.push(family.clone());
         profile.retarget_family(waiting.key(), &family);
+
         if profile.mods.iter().any(|entry| entry.id == family) {
             continue;
         }
+
         let position = waiting
             .before
             .as_ref()
@@ -47,6 +50,7 @@ pub fn settle_waiting(profile: &mut Profile, view: &LibraryView) -> Vec<String> 
             },
         );
     }
+
     settled
 }
 

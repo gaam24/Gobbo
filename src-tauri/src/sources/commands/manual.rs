@@ -19,9 +19,11 @@ pub fn start_manual_updates(
     targets: Vec<ManualTarget>,
 ) -> ManualUpdateView {
     let view = sessions.begin(game, targets);
+
     if let Some(page) = &view.current {
         let _ = app.emit(MANUAL_PAGE_EVENT, page);
     }
+
     view
 }
 
@@ -86,9 +88,11 @@ pub async fn manual_update_download_done(
         ),
         Err(error) => (sessions.failed(&game, &id, error.code), None),
     };
+
     if let Some(page) = page {
         let _ = app.emit(MANUAL_PAGE_EVENT, &page);
     }
+
     Ok(view)
 }
 
@@ -101,9 +105,11 @@ pub fn manual_update_next(
     game: String,
 ) -> ManualUpdateView {
     let (view, page) = sessions.skip(&game);
+
     if let Some(page) = page {
         let _ = app.emit(MANUAL_PAGE_EVENT, &page);
     }
+
     view
 }
 
@@ -139,8 +145,10 @@ pub fn manual_update_reopen(
     game: String,
 ) -> Option<ManualPageRequest> {
     let page = sessions.reopen(&game);
+
     if let Some(page) = &page {
         let _ = app.emit(MANUAL_PAGE_EVENT, page);
     }
+
     page
 }

@@ -39,6 +39,7 @@ pub fn materialize(
             if entry.is_dir {
                 return None;
             }
+
             let rest = entry.name.strip_prefix(&prefix)?.strip_prefix('/')?;
             Some((index, rest))
         })
@@ -46,6 +47,7 @@ pub fn materialize(
     let bundle_dir = cache.join("bundles");
     fs::create_dir_all(&bundle_dir).map_err(io_at(&bundle_dir))?;
     let stem = crate::domain::naming::safe_limited_file_name(&item.key);
+
     if let Some(index) = file {
         let name = Path::new(&reader.entries()[index].name)
             .file_name()
@@ -58,6 +60,7 @@ pub fn materialize(
         extract(&reader, index, &target, MAX_BUNDLE_BYTES)?;
         return Ok(target);
     }
+
     if members.is_empty() {
         return Err(AppError::user("collection.bundle_missing").with("name", &item.name));
     }
@@ -71,29 +74,38 @@ pub fn materialize(
         extract(&reader, index, &target, MAX_BUNDLE_BYTES)?;
         return Ok(target);
     }
+
     let staging = bundle_dir.join(format!("{stem}-staging"));
+
     if staging.exists() {
         fs::remove_dir_all(&staging).map_err(io_at(&staging))?;
     }
+
     fs::create_dir_all(&staging).map_err(io_at(&staging))?;
     let mut paths: BTreeMap<usize, PathBuf> = BTreeMap::new();
     let mut total = 0u64;
+
     for (index, relative) in &members {
         let Some(relative) = normalized_relative_path(relative) else {
             let _ = fs::remove_dir_all(&staging);
             return Err(AppError::user("collection.bundle_path").with("name", &item.name));
         };
         total = total.saturating_add(reader.entries()[*index].size);
+
         if total > MAX_BUNDLE_BYTES {
             let _ = fs::remove_dir_all(&staging);
             return Err(AppError::user("collection.bundle_too_large").with("name", &item.name));
         }
+
         let target = staging.join(&relative);
+
         if let Some(parent) = target.parent() {
             fs::create_dir_all(parent).map_err(io_at(parent))?;
         }
+
         paths.insert(*index, target);
     }
+
     let wanted: std::collections::BTreeSet<usize> = paths.keys().copied().collect();
     reader.visit::<AppError>(&wanted, |index, data| {
         let Some(target) = paths.get(&index) else {
@@ -127,6 +139,7 @@ fn zip_tree(source: &Path, target: &Path) -> Result<(), AppError> {
     let mut entries = Vec::new();
     collect(source, source, &mut entries)?;
     entries.sort();
+
     for (path, name) in entries {
         writer
             .start_file(name, options)
@@ -134,6 +147,7 @@ fn zip_tree(source: &Path, target: &Path) -> Result<(), AppError> {
         let mut file = fs::File::open(&path).map_err(io_at(&path))?;
         std::io::copy(&mut file, &mut writer).map_err(io_at(&path))?;
     }
+
     writer
         .finish()
         .map_err(|error| AppError::user("collection.bundle_zip").with("detail", error))?;
@@ -146,12 +160,15 @@ fn collect(root: &Path, dir: &Path, out: &mut Vec<(PathBuf, String)>) -> Result<
         .filter_map(Result::ok)
         .collect();
     entries.sort_by_key(std::fs::DirEntry::file_name);
+
     for entry in entries {
         let path = entry.path();
+
         if path.is_dir() {
             collect(root, &path, out)?;
             continue;
         }
+
         let relative = path.strip_prefix(root).map_err(AppError::unexpected)?;
         let name = relative
             .components()
@@ -160,6 +177,7 @@ fn collect(root: &Path, dir: &Path, out: &mut Vec<(PathBuf, String)>) -> Result<
             .join("/");
         out.push((path, name));
     }
+
     Ok(())
 }
 

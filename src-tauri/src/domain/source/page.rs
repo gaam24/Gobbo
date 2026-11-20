@@ -48,6 +48,7 @@ impl SourceMeta {
         let Some(old) = old else {
             return;
         };
+
         if self.picture_url.is_some() && self.picture_url == old.picture_url {
             self.picture.clone_from(&old.picture);
         }
@@ -60,18 +61,23 @@ impl SourceMeta {
         let Some(old) = old else {
             return;
         };
+
         if self.picture.is_none() {
             self.keep_picture_from(Some(old));
         }
+
         if self.summary.is_none() {
             self.summary.clone_from(&old.summary);
         }
+
         if self.updated_at.is_none() {
             self.updated_at = old.updated_at;
         }
+
         if self.created_at.is_none() {
             self.created_at = old.created_at;
         }
+
         let mut extra = old.extra.clone();
         extra.append(&mut self.extra);
         self.extra = extra;

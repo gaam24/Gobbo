@@ -22,6 +22,7 @@ pub fn mounted_overlay_at(table: &str, root: &Path) -> bool {
 fn unescape_mount(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     let mut rest = text;
+
     while let Some(index) = rest.find('\\') {
         out.push_str(&rest[..index]);
         rest = &rest[index..];
@@ -36,6 +37,7 @@ fn unescape_mount(text: &str) -> String {
             rest = &rest[1..];
         }
     }
+
     out.push_str(rest);
     out
 }

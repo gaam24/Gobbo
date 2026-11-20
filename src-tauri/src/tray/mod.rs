@@ -35,6 +35,7 @@ pub fn init(app: &AppHandle) -> Result<(), AppError> {
                 .on_tray_icon_event(|icon, event| {
                     if let TrayIconEvent::Click { button, .. } = event {
                         let app = icon.app_handle();
+
                         match button {
                             MouseButton::Left => actions::show_window(app),
                             MouseButton::Right => {

@@ -85,6 +85,7 @@ pub(super) fn prefetch_archives(
     for group in indices.chunks(4) {
         std::thread::scope(|scope| {
             let mut handles = Vec::new();
+
             for &index in group {
                 let item = selected[index];
                 handles.push(scope.spawn(move || {
@@ -94,13 +95,16 @@ pub(super) fn prefetch_archives(
                             PreparedDownload::Failed(AppError::user(COLLECTION_CANCELLED)),
                         );
                     }
+
                     let mut no_progress = |_: u32| {};
+
                     match fetch_provider_item(loaded, item, cancel, &mut no_progress) {
                         Ok(downloaded) => (index, PreparedDownload::Ready(downloaded)),
                         Err(error) => (index, PreparedDownload::Failed(error)),
                     }
                 }));
             }
+
             for handle in handles {
                 if let Ok((index, result)) = handle.join() {
                     ready[index] = Some(result);
@@ -108,6 +112,7 @@ pub(super) fn prefetch_archives(
             }
         });
     }
+
     ready
 }
 

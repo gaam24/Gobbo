@@ -15,6 +15,7 @@ pub fn parse(xml: &str) -> Result<ModuleConfig, FomodError> {
         message: e.to_string(),
     })?;
     let root = doc.root_element();
+
     if root.tag_name().name() != "config" {
         return Err(FomodError::Parse {
             message: format!(
@@ -23,6 +24,7 @@ pub fn parse(xml: &str) -> Result<ModuleConfig, FomodError> {
             ),
         });
     }
+
     let module_name = text_of_child(root, "moduleName").unwrap_or_default();
     // `fommDependency` inside this tree is ignored: Gobbo is not FOMM and the version of that tool is irrelevant.
     // `gameDependency` is parsed as met; the game version is not known at import time.
@@ -42,6 +44,7 @@ pub fn parse(xml: &str) -> Result<ModuleConfig, FomodError> {
     });
 
     let mut steps = Vec::new();
+
     if let Some(steps_node) = child(root, "installSteps") {
         for step_node in steps_node
             .children()
@@ -54,6 +57,7 @@ pub fn parse(xml: &str) -> Result<ModuleConfig, FomodError> {
                 .map(parse_dependencies)
                 .transpose()?;
             let mut groups = Vec::new();
+
             if let Some(groups_node) = child(step_node, "optionalFileGroups") {
                 for group_node in groups_node
                     .children()
@@ -62,6 +66,7 @@ pub fn parse(xml: &str) -> Result<ModuleConfig, FomodError> {
                     groups.push(parse_group(group_node)?);
                 }
             }
+
             steps.push(Step {
                 name,
                 visible,
@@ -71,6 +76,7 @@ pub fn parse(xml: &str) -> Result<ModuleConfig, FomodError> {
     } else if let Some(required) = child(root, "requiredInstall") {
         // Tolerant fallback for the older, invented `<requiredInstall><files><plugin …/></files>` form.
         let mut groups = Vec::new();
+
         for files_node in required
             .children()
             .filter(|n| n.is_element() && n.tag_name().name() == "files")
@@ -88,6 +94,7 @@ pub fn parse(xml: &str) -> Result<ModuleConfig, FomodError> {
                     .collect(),
             });
         }
+
         steps.push(Step {
             name: "Required".to_string(),
             visible: None,
@@ -96,6 +103,7 @@ pub fn parse(xml: &str) -> Result<ModuleConfig, FomodError> {
     }
 
     let mut conditional = Vec::new();
+
     if let Some(node) = child(root, "conditionalFileInstalls")
         && let Some(patterns) = child(node, "patterns")
     {
@@ -157,6 +165,7 @@ fn parse_option(node: roxmltree::Node) -> Result<FomodOption, FomodError> {
     let description = text_of_child(node, "description").unwrap_or_default();
     let files = child(node, "files").map_or_else(Vec::new, parse_patterns);
     let mut flags = BTreeMap::new();
+
     if let Some(flags_node) = child(node, "conditionFlags") {
         for flag in flags_node
             .children()
@@ -197,6 +206,7 @@ fn parse_type_descriptor(
         .and_then(|kind| attr(kind, "name").as_deref().map(parse_option_kind))
         .unwrap_or(OptionKind::Optional);
     let mut patterns = Vec::new();
+
     if let Some(patterns_node) = child(dependency, "patterns") {
         for node in patterns_node
             .children()
@@ -213,6 +223,7 @@ fn parse_type_descriptor(
             patterns.push(TypePattern { dependencies, kind });
         }
     }
+
     Ok((
         default_kind,
         Some(DependencyType {
@@ -259,6 +270,7 @@ fn parse_priority(value: Option<&str>) -> i32 {
 
 fn parse_dependencies(node: roxmltree::Node) -> Result<Dependencies, FomodError> {
     let mut deps = Vec::new();
+
     for child_node in node.children().filter(roxmltree::Node::is_element) {
         match child_node.tag_name().name() {
             "fileDependency" => deps.push(Condition::Dependency(Dependency::File {
@@ -279,6 +291,7 @@ fn parse_dependencies(node: roxmltree::Node) -> Result<Dependencies, FomodError>
             _ => {}
         }
     }
+
     Ok(match attr(node, "operator").unwrap_or_default().as_str() {
         "Or" => Dependencies::Any(deps),
         _ => Dependencies::All(deps),

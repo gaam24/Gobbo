@@ -16,11 +16,14 @@ pub(super) fn run(root: &Path, _known_game_ids: &[String]) -> Result<(), AppErro
     let Ok(entries) = fs::read_dir(&games) else {
         return Ok(());
     };
+
     for entry in entries.flatten() {
         let path = entry.path();
+
         if !path.is_dir() {
             continue;
         }
+
         let config = path.join(CONFIG_FILE);
         let Some(serde_json::Value::Object(mut fields)) = json::read_json(&config).ok().flatten()
         else {
@@ -28,11 +31,14 @@ pub(super) fn run(root: &Path, _known_game_ids: &[String]) -> Result<(), AppErro
             // no old key.
             continue;
         };
+
         if fields.remove(OLD_KEY).is_none() {
             continue;
         }
+
         json::write_json(&config, &serde_json::Value::Object(fields))?;
     }
+
     Ok(())
 }
 

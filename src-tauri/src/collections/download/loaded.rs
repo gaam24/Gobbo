@@ -72,6 +72,7 @@ pub(super) fn load(
         cache_archive,
     })
 }
+
 pub(super) enum ItemOutcome {
     Installed {
         manual: bool,

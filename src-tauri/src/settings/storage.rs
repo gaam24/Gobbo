@@ -25,6 +25,7 @@ fn mode_for(data: &Path, exe_dir: Option<&Path>, custom: bool) -> StorageMode {
     if custom {
         return StorageMode::Custom;
     }
+
     match exe_dir {
         Some(exe_dir)
             if crate::domain::pathkey::same_path(data, &storage::portable_root(exe_dir)) =>

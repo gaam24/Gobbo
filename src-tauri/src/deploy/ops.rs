@@ -73,6 +73,7 @@ pub fn apply_deployment_cancellable(
         crate::snapshots::before_switch(root, &game, &settings, profiles.active())?;
         profile_state::switch(&data, &game, &settings, profiles.active())?;
     }
+
     let active = profiles.active.clone();
     let state = data.profile_state(&active);
     let roots = journal_roots(&game, &settings, state.clone())?;
@@ -98,6 +99,7 @@ pub fn apply_deployment_cancellable(
         if active_overlay && profiles.active().draft_changes() == 0 {
             return Err(deployment_active());
         }
+
         undo(&roots).map_err(AppError::from)?;
     }
 
@@ -116,8 +118,10 @@ pub fn apply_deployment_cancellable(
         &library.inputs(&mods),
         &profiles.active().winners,
     );
+
     if !game.requires.is_empty() {
         let placed = deploy_plan.placed_keys();
+
         if let Some(file) = game
             .unmet_requirement(std::path::Path::new(&settings.game_root), |key| {
                 placed.contains(key)
@@ -126,6 +130,7 @@ pub fn apply_deployment_cancellable(
             return Err(AppError::user("deploy.requirement_missing").with("path", file));
         }
     }
+
     stop_if(cancel, IMPORT_CANCELLED)?;
     let total = deploy_plan.files.len();
     progress(DeployProgress::at(DeployStage::Writing, 0, total));
@@ -146,15 +151,19 @@ pub fn apply_deployment_cancellable(
             .iter_mut()
             .find(|profile| profile.id == deployed_id);
         let exists = profile.is_some();
+
         if let Some(profile) = profile {
             profile.mark_deployed(deployed_mods, winners, deployed_at);
         }
+
         data.save_profiles(&current)?;
         exists
     };
+
     if still_exists {
         profile_state::capture_settings(&data, &game, &settings, deployed_profile)?;
     }
+
     progress(DeployProgress::at(DeployStage::Done, total, total));
     Ok(ApplyView {
         files: report.files as u32,
@@ -176,12 +185,14 @@ pub fn ensure_active_deployed(
     let active = profiles.active.clone();
     let state = data.profile_state(&active);
     let prepared = data.prepared_states();
+
     if prepared.contains_key(&active)
         && state_is_overlay(&state)
         && (profiles.active().draft_changes() == 0 || !apply_draft)
     {
         return Ok(());
     }
+
     apply_deployment(root, game_id).map(|_| ())
 }
 
@@ -211,17 +222,22 @@ pub fn undo_deployment(root: &Data, game_id: &str) -> Result<Vec<Message>, AppEr
         .or_else(|| data.incomplete_state())
         .ok_or(DeployError::NothingToUndo)?;
     let running = game_running_at(game_id, &settings.game_root);
+
     if running {
         let overlay = state_is_overlay(&state);
+
         if !overlay || profiles.last_launched.as_deref() == Some(profiles.active.as_str()) {
             return Err(game_is_running_error());
         }
     }
+
     if !running {
         profile_state::capture_current(&data, &game, &settings)?;
     }
+
     let roots = journal_roots(&game, &settings, state)?;
     let warnings = undo(&roots).map_err(AppError::from)?;
+
     if !running {
         profile_state::restore_profile(&data, &game, &settings, &profiles.active, false)?;
     }
@@ -234,5 +250,6 @@ pub fn undo_deployment(root: &Data, game_id: &str) -> Result<Vec<Message>, AppEr
         current.last_launched = None;
         data.save_profiles(&current)?;
     }
+
     Ok(warnings)
 }

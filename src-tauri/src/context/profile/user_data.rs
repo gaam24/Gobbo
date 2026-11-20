@@ -51,18 +51,23 @@ pub fn sets(
     if game.user_data.is_empty() || settings.game_root.trim().is_empty() {
         return Ok(Vec::new());
     }
+
     let context = path_context(game, settings);
     let mut sets = Vec::with_capacity(game.user_data.len());
+
     for definition in game.user_data_sets() {
         let real = context.resolve(definition.path_for_platform())?;
+
         if real.exists() && !real.is_dir() {
             return Err(AppError::user("user_data.not_a_folder")
                 .with("id", &definition.id)
                 .with("path", real.display()));
         }
+
         if pathkey::is_inside(Path::new(settings.game_root.trim()), &real) {
             return Err(AppError::user("user_data.inside_game").with("id", &definition.id));
         }
+
         let isolated = profile.user_data_isolation(&definition.id).is_isolated();
         // The Windows hook is the first implementation. Linux keeps the copy fallback until the overlayfs mounts are
         // ready; do not claim a redirect the platform does not perform.
@@ -91,6 +96,7 @@ pub fn sets(
             store: folder.join("copy"),
         });
     }
+
     check_overlaps(&sets)?;
     Ok(sets)
 }
@@ -101,6 +107,7 @@ pub fn sets(
 pub fn prepare(sets: &[Set]) -> Result<(), AppError> {
     for set in sets.iter().filter(|set| set.redirects()) {
         fs::create_dir_all(&set.upper).map_err(io_at(&set.upper))?;
+
         if !set.inherit {
             fs::create_dir_all(&set.base).map_err(io_at(&set.base))?;
         }
@@ -112,8 +119,10 @@ pub fn prepare(sets: &[Set]) -> Result<(), AppError> {
         {
             return Err(AppError::user("user_data.parent_missing").with("path", parent.display()));
         }
+
         fs::create_dir_all(&set.real).map_err(io_at(&set.real))?;
     }
+
     Ok(())
 }
 
@@ -124,19 +133,23 @@ fn seed_redirect(set: &Set) -> Result<(), AppError> {
     if !set.redirects() || set.inherit || !set.real.is_dir() {
         return Ok(());
     }
+
     let Some(folder) = set.upper.parent() else {
         return Ok(());
     };
     let marker = folder.join("seeded");
+
     if marker.exists() {
         return Ok(());
     }
+
     fs::create_dir_all(&set.upper).map_err(io_at(&set.upper))?;
     walk(
         &set.real,
         WalkErrors::Fail,
         &mut |entry, relative, is_dir| {
             let target = set.upper.join(relative);
+
             if is_dir {
                 if !target.exists() {
                     fs::create_dir_all(&target)?;
@@ -145,8 +158,10 @@ fn seed_redirect(set: &Set) -> Result<(), AppError> {
                 if let Some(parent) = target.parent() {
                     fs::create_dir_all(parent)?;
                 }
+
                 fs::copy(entry.path(), &target)?;
             }
+
             Ok(())
         },
     )
@@ -236,9 +251,11 @@ pub fn capture_settings(
     let Some(set) = sets.iter().find(|set| set.relative(&file).is_some()) else {
         return Ok(false);
     };
+
     if set.redirects() || !set.isolated {
         return Ok(true);
     }
+
     let Some(relative) = set.relative(&file) else {
         return Ok(true);
     };
@@ -266,9 +283,11 @@ struct UserDataStore<'a> {
 impl UserDataStore<'_> {
     fn resolved(&self, data: &Data, profile: &str) -> Result<Vec<Set>, AppError> {
         let state = data.profile_state(profile);
+
         if let Some(target) = self.target.filter(|target| target.id == profile) {
             return sets(self.game, self.settings, target, &state);
         }
+
         let profiles = load_profiles(data)?;
         sets(self.game, self.settings, profiles.get(profile)?, &state)
     }
@@ -290,9 +309,11 @@ impl Store for UserDataStore<'_> {
     fn prepare(&self, data: &Data, profile: &str) -> Result<(), AppError> {
         let sets = self.resolved(data, profile)?;
         prepare(&sets)?;
+
         for set in sets.iter().filter(|set| set.redirects()) {
             seed_redirect(set)?;
         }
+
         Ok(())
     }
 
@@ -300,6 +321,7 @@ impl Store for UserDataStore<'_> {
         if self.target.is_some_and(|target| target.id == profile) {
             return Ok(true);
         }
+
         Ok(load_profiles(data)?.get(profile).is_ok())
     }
 }
@@ -328,6 +350,7 @@ fn check_overlaps(sets: &[Set]) -> Result<(), AppError> {
             }
         }
     }
+
     Ok(())
 }
 
@@ -400,9 +423,11 @@ mod tests {
             collections: Vec::new(),
             waiting: Vec::new(),
         };
+
         if isolated {
             profile.set_user_data_isolation("documents", Isolation::Isolated);
         }
+
         profile
     }
 

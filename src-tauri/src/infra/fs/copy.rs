@@ -116,6 +116,7 @@ pub fn copy_tree_hashed<D: Digest>(
     let mut files = Vec::new();
     walk(source, WalkErrors::Fail, &mut |entry, relative, is_dir| {
         let to = target.join(relative);
+
         if is_dir {
             fs::create_dir_all(&to)?;
         } else {
@@ -125,6 +126,7 @@ pub fn copy_tree_hashed<D: Digest>(
             let (sha256, size) = hash_and_copy_reader::<D, _>(&mut from, &to, total, &mut |_| {})?;
             files.push((relative.to_string(), size, sha256));
         }
+
         Ok(())
     })?;
     Ok(files)
@@ -140,6 +142,7 @@ pub fn hash_tree(root: &Path) -> io::Result<(String, u32, u64)> {
         if is_dir {
             return Ok(());
         }
+
         let size = fs::metadata(entry.path())?.len();
         let digest = digest_file::<Sha256>(&entry.path(), &mut |_| {})?;
         files.insert(relative.to_string(), digest);
@@ -147,12 +150,14 @@ pub fn hash_tree(root: &Path) -> io::Result<(String, u32, u64)> {
         Ok(())
     })?;
     let mut total = Sha256::new();
+
     for (path, hash) in &files {
         total.update(path.as_bytes());
         total.update([0]);
         total.update(hash.as_bytes());
         total.update([0]);
     }
+
     Ok((
         faster_hex::hex_string(&total.finalize()),
         files.len() as u32,
@@ -162,12 +167,14 @@ pub fn hash_tree(root: &Path) -> io::Result<(String, u32, u64)> {
 
 fn copy_tree_fill(source: &Path, target: &Path) -> Result<(), CopyError> {
     let meta = fs::metadata(source)?;
+
     if meta.is_dir() {
         copy_dir(source, target, CopyMode::FillMissing)?;
     } else if !target.exists() {
         create_parent_dir(target)?;
         fs::copy(source, target)?;
     }
+
     Ok(())
 }
 
@@ -176,6 +183,7 @@ fn create_parent_dir(path: &Path) -> io::Result<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
+
     Ok(())
 }
 
@@ -195,12 +203,15 @@ fn replace_tree(source: &Path, target: &Path, keep_previous: bool) -> Result<(),
             create_parent_dir(&staging)?;
             fs::copy(source, &staging)?;
         }
+
         replace_with_staged(&staging, target, keep_previous)?;
         Ok(())
     })();
+
     if result.is_err() {
         let _ = remove_path(&staging);
     }
+
     result
 }
 
@@ -231,12 +242,14 @@ fn check_merge(source: &Path, target: &Path) -> Result<(), CopyError> {
         if found.is_some() {
             return Ok(());
         }
+
         let to = target.join(relative);
         let wanted = if is_dir {
             EntryKind::Folder
         } else {
             EntryKind::File
         };
+
         if let Some(have) = entry_kind(&to)?
             && have != wanted
         {
@@ -246,6 +259,7 @@ fn check_merge(source: &Path, target: &Path) -> Result<(), CopyError> {
                 target_kind: have,
             });
         }
+
         Ok(())
     })?;
     found.map_or(Ok(()), |conflict| Err(CopyError::Conflict(conflict)))
@@ -258,6 +272,7 @@ fn merge_file(source: &Path, target: &Path) -> Result<(), CopyError> {
     if injected_failure() {
         return Err(io::Error::other("injected copy failure").into());
     }
+
     fs::copy(source, target)?;
     Ok(())
 }
@@ -266,11 +281,13 @@ fn merge_file(source: &Path, target: &Path) -> Result<(), CopyError> {
 fn merge_entries(source: &Path, target: &Path) -> Result<(), CopyError> {
     walk(source, WalkErrors::Fail, &mut |entry, relative, is_dir| {
         let to = target.join(relative);
+
         if is_dir {
             fs::create_dir_all(&to)?;
         } else {
             merge_file(&entry.path(), &to)?;
         }
+
         Ok(())
     })?;
     Ok(())
@@ -285,11 +302,13 @@ fn merge_tree(source: &Path, target: &Path) -> Result<(), CopyError> {
     } else {
         EntryKind::File
     };
+
     if let Some(have) = entry_kind(target)?
         && have != wanted
     {
         return Err(conflict(target, wanted, have));
     }
+
     if meta.is_dir() {
         check_merge(source, target)?;
         fs::create_dir_all(target)?;
@@ -307,10 +326,12 @@ pub fn replace_with_staged(staging: &Path, target: &Path, keep_previous: bool) -
     // The one previous generation of a store entry. It is replaced on the next successful copy, so it never accumulates.
     let backup = crate::infra::store::sibling_named(target, |name| format!("{name}.old"));
     let had_target = fs::symlink_metadata(target).is_ok();
+
     if had_target {
         remove_path(&backup)?;
         fs::rename(target, &backup)?;
     }
+
     if let Err(error) = fs::rename(staging, target) {
         if had_target && let Err(restore) = fs::rename(&backup, target) {
             return Err(io::Error::new(
@@ -321,11 +342,14 @@ pub fn replace_with_staged(staging: &Path, target: &Path, keep_previous: bool) -
                 ),
             ));
         }
+
         return Err(error);
     }
+
     if had_target && !keep_previous {
         let _ = remove_path(&backup);
     }
+
     Ok(())
 }
 
@@ -338,6 +362,7 @@ fn copy_dir(source: &Path, target: &Path, mode: CopyMode) -> io::Result<()> {
     fs::create_dir_all(target)?;
     walk(source, WalkErrors::Fail, &mut |entry, rel, is_dir| {
         let to = target.join(rel);
+
         if is_dir {
             if writes_entry(mode, &to) {
                 fs::create_dir_all(&to)?;
@@ -347,8 +372,10 @@ fn copy_dir(source: &Path, target: &Path, mode: CopyMode) -> io::Result<()> {
             if injected_failure() {
                 return Err(io::Error::other("injected copy failure"));
             }
+
             fs::copy(entry.path(), &to)?;
         }
+
         Ok(())
     })
 }
@@ -370,9 +397,11 @@ pub fn fail_after(files: usize) {
 fn injected_failure() -> bool {
     FAIL_AFTER.with(|cell| {
         let left = cell.get();
+
         if left == 0 {
             return false;
         }
+
         cell.set(left - 1);
         left == 1
     })
@@ -616,6 +645,7 @@ mod tests {
             assert_eq!(fs::metadata(&copy).unwrap().len(), *size);
             assert_eq!(&digest_file::<Sha256>(&copy, &mut |_| {}).unwrap(), sha256);
         }
+
         assert_eq!(fs::read_to_string(target.join("a.txt")).unwrap(), "abc");
         assert!(target.join("nested/empty").is_dir());
     }

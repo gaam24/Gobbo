@@ -46,9 +46,11 @@ pub struct PackDownload {
 fn download_source(entry: &PackMod) -> Option<SourceRef> {
     entry.sources.keys().find_map(|provider| {
         let adapter = providers::provider(provider.as_str())?;
+
         if providers::download_route(adapter) != DownloadRoute::Direct {
             return None;
         }
+
         entry.source_ref(provider)
     })
 }
@@ -70,6 +72,7 @@ fn stop_downloads(
     if cancelled(cancel) {
         discard_downloads(downloads);
     }
+
     stop_if(cancel, PACK_CANCELLED)
 }
 
@@ -86,12 +89,15 @@ pub fn import_downloaded(
     if downloads.is_empty() {
         return Ok(Vec::new());
     }
+
     let mut labels: Vec<String> = Vec::with_capacity(downloads.len());
     let mut owned: Vec<OwnedDownload> = Vec::with_capacity(downloads.len());
+
     for (label, request) in downloads {
         labels.push(label);
         owned.push((request.zip, request.source, request.choices, request.staged));
     }
+
     let batch: Vec<BatchRequest<'_>> = owned
         .iter()
         .map(|(path, source, choices, staged)| BatchRequest {
@@ -104,12 +110,14 @@ pub fn import_downloaded(
     let results = crate::acquire::acquire_batch(root, game_id, batch, cancel, &mut |_, _| {})
         .map_err(super::import::pack_stop)?;
     let mut failed = Vec::new();
+
     for (label, result) in labels.into_iter().zip(results) {
         match result {
             Ok(Acquired::Imported(_) | Acquired::Existing { .. }) => {}
             Ok(Acquired::NeedsChoice { .. }) | Err(_) => failed.push(label),
         }
     }
+
     Ok(failed)
 }
 
@@ -152,6 +160,7 @@ pub fn download_pack_mods(
     let total = u32::try_from(wanted.len()).unwrap_or(u32::MAX);
     let mut failed = Vec::new();
     let mut downloads = Vec::new();
+
     for (index, (entry, source)) in wanted.iter().enumerate() {
         stop_downloads(cancel, &downloads)?;
         let report = &mut |percent| {
@@ -187,6 +196,7 @@ pub fn download_pack_mods(
                 .with_source(Some(downloaded.source)),
         ));
     }
+
     failed.extend(import_downloaded(root, game_id, downloads, cancel)?);
     stop_if(cancel, PACK_CANCELLED)?;
     let mut view = import_pack_with_progress(root, game_id, path, &mut |_, _| {}, cancel)?;

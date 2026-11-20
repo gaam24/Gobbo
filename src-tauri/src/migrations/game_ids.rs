@@ -28,6 +28,7 @@ pub(super) fn is_renamed(id: &str) -> bool {
 
 pub(super) fn run(root: &Path, _known_game_ids: &[String]) -> Result<(), AppError> {
     let games = root.join(GAMES_DIR);
+
     for (old, new) in RENAMED {
         for suffix in ["", REMOVED_SUFFIX] {
             let from = games.join(format!("{old}{suffix}"));
@@ -42,6 +43,7 @@ pub(super) fn run(root: &Path, _known_game_ids: &[String]) -> Result<(), AppErro
             }
         }
     }
+
     Ok(())
 }
 

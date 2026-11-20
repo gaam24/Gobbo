@@ -40,9 +40,11 @@ pub(super) fn join_root(base: &str, name: &str) -> String {
 /// `name.buffer` must hold `name.length` bytes when it is not null.
 pub(super) unsafe fn name_units(name: &UnicodeString) -> &[u16] {
     let count = usize::from(name.length) / 2;
+
     if name.buffer.is_null() || count == 0 {
         return &[];
     }
+
     unsafe { std::slice::from_raw_parts(name.buffer, count) }
 }
 
@@ -67,12 +69,15 @@ pub(super) unsafe fn object_path(attributes: *const ObjectAttributes) -> Option<
     let attributes = unsafe { attributes.as_ref()? };
     let name = unsafe { attributes.object_name.as_ref()? };
     let text = String::from_utf16_lossy(unsafe { name_units(name) });
+
     if let Some(path) = text.strip_prefix(r"\??\") {
         return Some(path.to_string());
     }
+
     if attributes.root_directory.is_null() {
         return None;
     }
+
     let base = handles::program_path(attributes.root_directory)?;
     Some(join_root(&base, &text))
 }
@@ -97,6 +102,7 @@ pub(super) unsafe fn place_name(attributes: *const ObjectAttributes) -> Option<P
     let attributes = unsafe { attributes.as_ref() }?;
     let name = unsafe { attributes.object_name.as_ref() }?;
     let units = unsafe { name_units(name) };
+
     if let Some(absolute) = strip_nt_prefix(units) {
         return place_units(absolute);
     }
@@ -135,13 +141,16 @@ unsafe fn relative_units(root: *mut c_void, name: &[u16]) -> Option<Joined> {
     if root.is_null() {
         return None;
     }
+
     let mut base = [0u16; 512];
     let base_length = handles::outside_path_units(root, &mut base)?;
     let name = trim_leading_backslashes(name);
     let length = base_length + 1 + name.len();
+
     if length > JOINED {
         return None;
     }
+
     let mut units = [0u16; JOINED];
     units[..base_length].copy_from_slice(&base[..base_length]);
     units[base_length] = u16::from(b'\\');
@@ -182,6 +191,7 @@ pub(super) unsafe fn redirect_nt(
     if writing && unsafe { object_unsafe(attributes) } {
         return Some(Err(Failure::Denied(ERROR_ACCESS_DENIED)));
     }
+
     let place = unsafe { place_name(attributes) }?;
     let target = redirect_relative_on(place.mount, &place.rel, writing, keeps_contents);
     Some(target.map(|target| match target {

@@ -66,15 +66,18 @@ pub fn install_automatic(
                 });
             }
         }
+
         prefetch_archives(&loaded, &selected, &statuses, cancel)
     } else {
         (0..selected.len()).map(|_| None).collect()
     };
+
     for (index, item) in selected.iter().enumerate() {
         if cancelled(cancel) {
             cancelled_run = true;
             break;
         }
+
         let item_status = statuses
             .statuses
             .get(&item.key)
@@ -83,6 +86,7 @@ pub fn install_automatic(
         if item_status.is_done() {
             continue;
         }
+
         if item_status == CollectionItemStatus::Unsupported {
             progress(CollectionProgress {
                 key: item.key.clone(),
@@ -96,6 +100,7 @@ pub fn install_automatic(
             skipped.push(item.key.clone());
             continue;
         }
+
         if matches!(
             item.source,
             CollectionSource::Browse { .. } | CollectionSource::Manual
@@ -112,6 +117,7 @@ pub fn install_automatic(
             });
             continue;
         }
+
         let mut report = |state, percent, error| {
             progress(CollectionProgress {
                 key: item.key.clone(),
@@ -123,6 +129,7 @@ pub fn install_automatic(
                 error,
             });
         };
+
         if provider_needs_page(item) {
             // A free account cannot fetch this file: leave it pending so the controller can open its page and wait for
             // the owned download. It is not a manual pick and not a failure of the round.
@@ -130,6 +137,7 @@ pub fn install_automatic(
             needs_user.push(item.key.clone());
             continue;
         }
+
         match install_one(
             &loaded,
             root,
@@ -144,6 +152,7 @@ pub fn install_automatic(
             }) => {
                 report(CollectionItemState::Installed, 100, None);
                 installed.push(item.key.clone());
+
                 if item_manual {
                     manual.push(item.key.clone());
                 }
@@ -183,6 +192,7 @@ pub fn install_automatic(
             }
         }
     }
+
     let session = session::finish_with_manual(root, game_id, profile_id, collection_key, &manual)?;
     Ok(CollectionInstallView {
         profile: profile_id.to_string(),
@@ -214,9 +224,11 @@ pub fn prepare_item(
         .ok_or_else(|| AppError::user("collection.item_missing").with("item", item_key))?;
     let statuses = loaded.statuses();
     let status = statuses.statuses.get(item_key);
+
     if status.is_some_and(CollectionItemStatus::is_done) {
         return Ok(CollectionItemAction::Installed);
     }
+
     if status == Some(&CollectionItemStatus::Unsupported) {
         return Ok(CollectionItemAction::Unsupported {
             reason: Message::new("collection.unsupported_source").with("name", &item.name),
@@ -231,6 +243,7 @@ pub fn prepare_item(
             name: item.name.clone(),
         });
     }
+
     match &item.source {
         CollectionSource::Provider {
             provider: provider_id,
@@ -356,9 +369,11 @@ pub fn import_file(
         &mut |_, _, _| {},
         None,
     )?;
+
     if let ItemOutcome::NeedsChoice(_) = outcome {
         return Err(AppError::user("collection.needs_choice").with("name", &item.name));
     }
+
     let manual = match item.source {
         CollectionSource::Provider { .. } => Vec::new(),
         _ => vec![item_key.to_string()],

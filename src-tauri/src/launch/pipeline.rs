@@ -81,18 +81,23 @@ pub(super) fn run(
         data.active_profile_id(),
         matches!(&launch, crate::launch::start::Launch::Layered { .. })
     ));
+
     if begin_report {
         report::begin(data);
     }
+
     let dll_started = Instant::now();
     let dlls = launch_dlls(&launch);
     let dll_report_us = u64::try_from(dll_started.elapsed().as_micros()).unwrap_or(u64::MAX);
+
     if record {
         report::update(data, |report| report.dlls = dlls);
     }
+
     if steps && with_mods {
         run_steps(data, game, Phase::BeforeStart, home, settings)?;
     }
+
     let console = if with_output {
         match output::begin(data) {
             Ok(writer) => Some(writer),
@@ -108,9 +113,11 @@ pub(super) fn run(
     let started = Instant::now();
     let mut running = launch.start(spawn_error, console)?;
     let mut on_exit = on_exit;
+
     if record {
         report::record_start(data, started, running.timings(), dll_report_us);
     }
+
     let live_flag = if live {
         game_id.map(crate::context::running::mark_started)
     } else {
@@ -126,28 +133,34 @@ pub(super) fn run(
         std::thread::spawn(move || {
             let code = running.wait();
             crate::infra::log::info(format!("launch: game={} exited with {code:?}", game.id));
+
             if record {
                 report::update(&data, |report| report.game_exit_code = code);
             }
             // The launcher can exit while the game's own processes still run in the overlay, such as Wine's services.
             // The game counts as running until the last of them has ended.
             overlay::wait_released(&session_root);
+
             if let Some(flag) = live_flag {
                 flag.store(false, Ordering::Release);
             }
+
             if let Some(notify) = notify {
                 notify(code);
             }
+
             if let Some((root, before)) = watched {
                 record_game_changes(&data, &root, &before);
             }
             // The settings are read again after the game exits: its steps may have changed its profile data.
             if steps && with_mods {
                 let after = load_settings(&data);
+
                 if let Err(error) = run_steps(&data, &game, Phase::AfterEnd, &home, &after) {
                     crate::infra::log::error(error);
                 }
             }
+
             if finish {
                 let settings = load_settings(&data);
                 super::finish_launch(&data, &game, &settings, &state_root);
@@ -161,26 +174,33 @@ pub(super) fn run(
 
     let code = running.wait();
     crate::infra::log::info(format!("launch: game={} exited with {code:?}", game.id));
+
     if let Some(flag) = live_flag {
         flag.store(false, Ordering::Release);
     }
+
     if record {
         report::update(data, |report| report.game_exit_code = code);
     }
+
     if let Some(notify) = on_exit {
         notify(code);
     }
+
     if let Some((root, before)) = watched {
         record_game_changes(data, &root, &before);
     }
+
     if steps && with_mods {
         let after = load_settings(data);
         run_steps(data, game, Phase::AfterEnd, home, &after)?;
     }
+
     if finish {
         let settings = load_settings(data);
         super::finish_launch(data, game, &settings, &state_root);
     }
+
     Ok(Outcome {
         with_mods,
         exit_code: code,
@@ -198,5 +218,6 @@ fn launch_dlls(launch: &Launch) -> Option<report::DllReport> {
             Path::new(program),
         )));
     }
+
     None
 }

@@ -304,6 +304,7 @@ fn a_new_version_of_the_same_part_joins_its_family() {
         .with_part("100")
         .with_part_meta(Some("Addon A"), Some("main"));
     let mut views = Vec::new();
+
     for (name, text) in [
         ("Addon A 225 1.0 2026-10-23T17-21Z A.zip", "one"),
         ("Addon A 225 1.1 2026-11-01T09-00Z B.zip", "two"),
@@ -341,6 +342,7 @@ fn a_new_part_joins_its_page_group_in_the_profile() {
             .with_part(part)
             .with_part_meta(Some(name), Some("main"))
     };
+
     for (name, source, path) in [
         (
             "Part A.zip",
@@ -372,6 +374,7 @@ fn a_new_part_joins_its_page_group_in_the_profile() {
 #[test]
 fn deleting_a_page_removes_every_part() {
     let f = mirror_fixture("nexus-delete-page");
+
     for (part, path) in [
         ("100", "r6/scripts/A/a.reds"),
         ("200", "r6/scripts/B/b.reds"),
@@ -684,6 +687,7 @@ fn import_reports_each_stage_from_0_to_100_in_order() {
     let mut stages: Vec<ImportStage> = seen.iter().map(|(stage, _)| *stage).collect();
     stages.dedup();
     assert_eq!(stages, [ImportStage::Hashing, ImportStage::Extracting]);
+
     for stage in stages {
         let percents: Vec<u32> = seen
             .iter()
@@ -718,11 +722,13 @@ fn overlapping_imports_keep_every_entry_in_the_index() {
 fn import_at_once<Z: AsRef<std::path::Path> + Sync>(data: &Data, zips: &[Z]) -> Vec<AppError> {
     std::thread::scope(|scope| {
         let mut handles = Vec::new();
+
         for zip in zips {
             handles.push(
                 scope.spawn(move || import(data, SLOT_GAME, zip.as_ref(), None, &mut |_, _| {})),
             );
         }
+
         handles
             .into_iter()
             .filter_map(|handle| handle.join().unwrap().err())

@@ -66,11 +66,13 @@ pub(super) fn steam_game(base: &Path, game: &GameDef) -> PathBuf {
         .first()
         .expect("a Steam game names its install folder");
     let game_root = library.join("steamapps/common").join(folder);
+
     for marker in &game.detect.markers {
         let path = game_root.join(marker);
         fs::create_dir_all(path.parent().expect("a marker has a folder")).unwrap();
         fs::write(path, b"").unwrap();
     }
+
     let app_id = game.detect.steam_app_ids[0];
     fs::create_dir_all(library.join(format!("steamapps/compatdata/{app_id}/pfx"))).unwrap();
     game_root
@@ -166,6 +168,7 @@ fn a_bepinex_archive_is_served_where_the_game_loads_it_and_the_game_folder_stays
             .unwrap()
             .expect("the overlay is deployed");
         let layers = Session::at(&state, &game_root).layers();
+
         for file in [
             "winhttp.dll",
             "doorstop_config.ini",
@@ -177,6 +180,7 @@ fn a_bepinex_archive_is_served_where_the_game_loads_it_and_the_game_folder_stays
                 "{id}: {file} is not where the game looks for it"
             );
         }
+
         assert!(!game_root.join("winhttp.dll").exists(), "{id}");
         assert!(!game_root.join("BepInEx").exists(), "{id}");
         let _ = fs::remove_dir_all(&base);
@@ -215,6 +219,7 @@ fn a_bare_plugin_at_the_archive_root_goes_to_the_plugins_folder() {
 #[test]
 fn gobbo_run_gives_the_program_the_launch_settings_and_the_proxy_override() {
     require_overlay_namespaces!();
+
     for id in &bepinex_games() {
         let base = scratch!("unity-run");
         let (data, _) = installed_game(&base, id, BEPINEX_ARCHIVE, "PROTON_USE_WINED3D=1");

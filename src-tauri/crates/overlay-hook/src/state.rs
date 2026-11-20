@@ -137,6 +137,7 @@ pub(crate) fn mounts() -> Option<&'static Mounts> {
     if diag::settings().passthrough {
         return None;
     }
+
     MOUNTS.get()
 }
 

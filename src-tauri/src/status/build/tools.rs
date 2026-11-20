@@ -29,6 +29,7 @@ pub fn tool_folder(game_root: &str, relative: &str) -> Option<String> {
     if !is_dir(game_root) || !games::is_game_relative(relative) {
         return None;
     }
+
     let file = Path::new(game_root.trim()).join(relative);
     file.is_file()
         .then(|| file.parent().map(|folder| folder.display().to_string()))

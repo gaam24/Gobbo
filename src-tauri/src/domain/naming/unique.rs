@@ -18,11 +18,14 @@ pub fn first_free(
     mut free: impl FnMut(&str) -> bool,
 ) -> String {
     let mut number = 1;
+
     loop {
         let name = variant(number);
+
         if free(&name) {
             return name;
         }
+
         number = number.saturating_add(1);
     }
 }
@@ -32,6 +35,7 @@ pub fn numbered_file_name(name: &str, number: u32) -> String {
     if number <= 1 {
         return name.to_string();
     }
+
     let (stem, extension) = crate::domain::archive::split_name(name);
     format!("{stem} ({number}){extension}")
 }

@@ -38,12 +38,14 @@ impl Library {
                 return Self::rebuild(index, library_dir, game);
             }
         };
+
         if library.schema_version > crate::domain::STATE_SCHEMA {
             return Err(AppError::new("state.schema_newer")
                 .with("found", library.schema_version)
                 .with("supported", crate::domain::STATE_SCHEMA)
                 .kind(ErrorKind::Permanent));
         }
+
         library.schema_version = crate::domain::STATE_SCHEMA;
         // A slot the definition no longer has goes to the one a rescan would pick, so an edited definition never
         // leaves a mod without a place. The slot names are compared through a set, so a large index does not scan the
@@ -59,6 +61,7 @@ impl Library {
                 version.slot = game.slot_for_folder(&version.folder);
             }
         }
+
         library.fill_layouts(game);
         Ok(library)
     }
@@ -73,10 +76,12 @@ impl Library {
             library.save(index)?;
         } else {
             let _index = lock_index();
+
             if !index.exists() {
                 library.save(index)?;
             }
         }
+
         Ok(library)
     }
 
@@ -91,6 +96,7 @@ impl Library {
         if self.layouts.len() == self.versions.len() {
             return;
         }
+
         let versions = &self.versions;
         self.layouts
             .retain(|folder, _| versions.contains_key(folder));
@@ -218,26 +224,33 @@ impl Library {
                     .extend(version.parsed_sources.keys().map(ProviderId::as_str));
             }
         }
+
         let mut labels = Vec::new();
+
         for (sha256, archive) in &self.archives {
             if archive.named.is_some() {
                 continue;
             }
+
             let mut providers = version_providers
                 .get(sha256.as_str())
                 .cloned()
                 .unwrap_or_default();
             providers.extend(archive.source_files.keys().map(ProviderId::as_str));
+
             if let Some(label) = archive_names(&providers, &archive.original_name) {
                 labels.push((sha256.clone(), label));
             }
         }
+
         let changed = !labels.is_empty();
+
         for (sha256, label) in labels {
             if let Some(archive) = self.archives.get_mut(&sha256) {
                 archive.named = Some(label);
             }
         }
+
         changed
     }
 
@@ -293,6 +306,7 @@ impl Library {
     /// families that already exist.
     pub fn family_for_source(&self, source: &SourceRef, name: &str) -> String {
         let page = crate::context::library::page_id_of(source);
+
         if let Some(part) = &source.part_id
             && let Some(family) = self.families.values().find(|family| {
                 family.sources.get(&source.provider).is_some_and(|known| {
@@ -302,17 +316,20 @@ impl Library {
         {
             return family.id.clone();
         }
+
         let page_known = self.families.values().any(|family| {
             family
                 .sources
                 .get(&source.provider)
                 .is_some_and(|known| known.mod_id == source.mod_id)
         });
+
         match (&source.part_id, page_known) {
             (Some(part), true) => format!("{page}#{part}"),
             (Some(_) | None, false) => page,
             (None, true) => {
                 let wanted = crate::domain::naming::slug(name);
+
                 if let Some(family) = self.families.values().find(|family| {
                     family.sources.get(&source.provider).is_some_and(|known| {
                         known.mod_id == source.mod_id && known.part_id.is_none()
@@ -328,10 +345,12 @@ impl Library {
                                 .get(&source.provider)
                                 .is_some_and(|id| id == &source.mod_id)
                     });
+
                     if !parsed || crate::domain::naming::slug(&family.name) == wanted {
                         return family.id.clone();
                     }
                 }
+
                 let key = source
                     .file_id
                     .as_deref()

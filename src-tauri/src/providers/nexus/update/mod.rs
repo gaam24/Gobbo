@@ -25,18 +25,22 @@ pub(super) fn check_updates(api_key: &str, requests: &[SourceUpdateRequest]) -> 
     let client = NexusClient::new(api_key);
     let mut results = Vec::new();
     let mut lookups = Vec::new();
+
     for request in requests {
         match lookup::lookup(request) {
             Ok(lookup) => lookups.push(lookup),
             Err(error) => results.push(error_result(request, error)),
         }
     }
+
     let Some(domain) = domain else {
         return results;
     };
+
     if !lookups.is_empty() {
         results.extend(workers::look_up_all(&client, domain, &lookups));
     }
+
     results
 }
 

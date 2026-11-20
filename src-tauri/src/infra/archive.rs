@@ -88,12 +88,14 @@ impl From<Error> for AppError {
 /// test can use a small synthetic list instead of a 200,000-entry archive.
 fn limits_ok(entries: &[Entry], count_limit: usize, byte_limit: u64) -> Result<(), Error> {
     let count = entries.len();
+
     if count > count_limit {
         return Err(Error::TooManyEntries {
             count,
             limit: count_limit,
         });
     }
+
     let bytes = entries
         .iter()
         .fold(0u64, |total, entry| total.saturating_add(entry.size));
@@ -103,6 +105,7 @@ fn limits_ok(entries: &[Entry], count_limit: usize, byte_limit: u64) -> Result<(
             limit: byte_limit,
         });
     }
+
     Ok(())
 }
 
@@ -176,6 +179,7 @@ impl Archive {
             if u64::try_from(bytes.len()).unwrap_or(u64::MAX) > limit {
                 return Err(Error::new("archive entry is too large"));
             }
+
             Ok(())
         })?;
         Ok(bytes)
@@ -217,10 +221,12 @@ fn visit_zip<E: From<Error>>(
     visit: &mut Visitor<'_, E>,
 ) -> Result<(), E> {
     let mut archive = zip::ZipArchive::new(open(path)?).map_err(Error::new)?;
+
     for &index in wanted {
         let mut entry = archive.by_index(index).map_err(Error::new)?;
         visit(index, &mut entry)?;
     }
+
     Ok(())
 }
 
@@ -243,12 +249,14 @@ fn list_7z(path: &Path) -> Result<Vec<Entry>, Error> {
         .collect();
     // Entries are matched to the list by name when read, so two entries with one name cannot be told apart.
     let mut seen = FxHashSet::default();
+
     if let Some(entry) = entries
         .iter()
         .find(|entry| !seen.insert(entry.name.as_str()))
     {
         return Err(Error::new(format!("two entries are named {}", entry.name)));
     }
+
     Ok(entries)
 }
 
@@ -270,18 +278,22 @@ fn visit_7z<E: From<Error>>(
     let result = reader.for_each_entries(|file, data| {
         let name = entry_name(file.name());
         let index = index_of.get(name.as_ref()).copied();
+
         if let Some(index) = index.filter(|index| wanted.contains(index))
             && let Err(error) = visit(index, data)
         {
             failure = Some(error);
             return Ok(false);
         }
+
         io::copy(data, &mut io::sink())?;
         Ok(true)
     });
+
     if let Some(error) = failure {
         return Err(error);
     }
+
     result.map_err(Error::new)?;
     Ok(())
 }
@@ -314,6 +326,7 @@ fn visit_rar<E: From<Error>>(
     let scratch = Scratch::new().map_err(Error::new)?;
     let file = scratch.path().join("entry");
     let mut index = 0;
+
     while let Some(header) = cursor.read_header().map_err(Error::new)? {
         cursor = if wanted.contains(&index) {
             let _ = std::fs::remove_file(&file);
@@ -325,6 +338,7 @@ fn visit_rar<E: From<Error>>(
         };
         index += 1;
     }
+
     Ok(())
 }
 
@@ -448,6 +462,7 @@ mod tests {
             }
             other => panic!("unexpected error: {other}"),
         }
+
         match Archive::open_limited(&path, usize::MAX, 4).unwrap_err() {
             Error::TooLarge { bytes, limit } => {
                 assert_eq!(bytes, 5);
@@ -455,12 +470,14 @@ mod tests {
             }
             other => panic!("unexpected error: {other}"),
         }
+
         let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn an_archive_over_the_byte_limit_is_refused() {
         let entries = [file_entry("a.ws", 10), file_entry("b.ws", 11)];
+
         match limits_ok(&entries, usize::MAX, 20).unwrap_err() {
             Error::TooLarge { bytes, limit } => {
                 assert_eq!(bytes, 21);
@@ -473,6 +490,7 @@ mod tests {
     #[test]
     fn a_size_sum_that_overflows_saturates() {
         let entries = [file_entry("a.ws", u64::MAX), file_entry("b.ws", 1)];
+
         match limits_ok(&entries, usize::MAX, u64::MAX - 1).unwrap_err() {
             Error::TooLarge { bytes, .. } => assert_eq!(bytes, u64::MAX),
             other => panic!("unexpected error: {other}"),
@@ -507,6 +525,7 @@ mod tests {
             CompressionMethod::Xz,
             CompressionMethod::Ppmd,
         ];
+
         for (at, method) in methods.into_iter().enumerate() {
             let dir = temp_dir(&format!("zip-method-{at}"));
             let path = dir.join("mod.zip");
@@ -601,6 +620,7 @@ mod tests {
             for extension in ["zip", "7z", "rar"] {
                 let path = fuzz_dir().join(format!("mod.{extension}"));
                 fs::write(&path, &bytes).unwrap();
+
                 match Archive::open(&path) {
                     Ok(archive) => {
                         prop_assert!(archive.entries().len() <= MAX_ARCHIVE_ENTRIES);

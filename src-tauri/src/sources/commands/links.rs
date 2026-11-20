@@ -48,16 +48,20 @@ fn receive_links(app: &AppHandle, urls: impl IntoIterator<Item = String>) {
             crate::packs::commands::queue_pack_link(app, &url);
             continue;
         }
+
         if providers::collection_link(&url).is_some() {
             if let Some(state) = app.try_state::<CollectionLinkPending>() {
                 *state.0.lock().unwrap_or_else(PoisonError::into_inner) = Some(url.clone());
             }
+
             let _ = app.emit(COLLECTION_LINK_EVENT, url);
             continue;
         }
+
         if !providers::is_source_link(&url) {
             continue;
         }
+
         let app = app.clone();
         std::thread::spawn(move || {
             let data = app.state::<Data>();
@@ -83,9 +87,11 @@ fn receive_links(app: &AppHandle, urls: impl IntoIterator<Item = String>) {
 pub fn watch_links(app: &App) {
     app.manage(Downloads::load(&app.state::<Data>()));
     app.manage(CollectionLinkPending::default());
+
     if let Ok(Some(urls)) = app.deep_link().get_current() {
         receive_links(app.handle(), urls.iter().map(ToString::to_string));
     }
+
     let handle = app.handle().clone();
     app.deep_link().on_open_url(move |event| {
         receive_links(&handle, event.urls().iter().map(ToString::to_string));
@@ -129,6 +135,7 @@ pub fn retry_download(
     if let Some(link) = downloads.retry(id) {
         receive_links(&app, [link]);
     }
+
     publish(&app, &downloads)
 }
 

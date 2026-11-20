@@ -69,6 +69,7 @@ pub fn preview_deployment(root: &Data, game_id: &str) -> Result<DeployPreview, A
         problems: Vec::new(),
         warnings: relation_warnings(&library, &view, &listed),
     };
+
     match build_plan_with_mode(
         &data,
         &game,
@@ -92,6 +93,7 @@ pub fn preview_deployment(root: &Data, game_id: &str) -> Result<DeployPreview, A
         }
         Err(error) => preview.problems.push(error.into()),
     }
+
     if !listed.iter().any(|entry| entry.enabled) {
         preview.problems.push(Message::new("preview.no_mods"));
     }

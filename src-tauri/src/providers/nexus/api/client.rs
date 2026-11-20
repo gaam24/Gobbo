@@ -46,6 +46,7 @@ impl NexusClient {
         if let Some(key) = api_key {
             client = client.header("apikey", key);
         }
+
         Self { client }
     }
 
@@ -76,6 +77,7 @@ impl NexusClient {
             name: String,
             is_premium: bool,
         }
+
         let client = Self::new(api_key);
         let text = client.request(BASE_V1, "/users/validate.json", &[], None, Endpoint::Key)?;
         let user: User = serde_json::from_str(&text).map_err(super::error::bad_response)?;
@@ -112,9 +114,11 @@ impl NexusClient {
             )
             .map_err(|error| ApiError::transport(endpoint, error).into_app())?;
         budget.update(response.rate_limit);
+
         if (200..300).contains(&response.status) {
             return Ok(response.body);
         }
+
         Err(ApiError::status(endpoint, response.status, Some(&response.body)).into_app())
     }
 }

@@ -23,6 +23,7 @@ pub(super) fn parse_rename(bytes: &[u8], class: u32) -> Option<RenameInfo> {
     {
         return None;
     }
+
     let flags = u32::from_ne_bytes(bytes[..4].try_into().ok()?);
     // In the plain form the first byte is `ReplaceIfExists`; in the `_EX` form it is a flag of the flags word.
     let replace = if class == FILE_RENAME_INFORMATION_EX {
@@ -40,9 +41,11 @@ pub(super) fn parse_rename(bytes: &[u8], class: u32) -> Option<RenameInfo> {
             .try_into()
             .ok()?,
     ) as usize;
+
     if RENAME_NAME_AT + name_bytes > bytes.len() {
         return None;
     }
+
     let (pairs, _) = bytes[RENAME_NAME_AT..RENAME_NAME_AT + name_bytes].as_chunks::<2>();
     let units: Vec<u16> = pairs.iter().map(|pair| u16::from_ne_bytes(*pair)).collect();
     Some(RenameInfo {
@@ -60,9 +63,11 @@ pub(super) fn build_rename(header: &[u8], name: &[u16]) -> Vec<u8> {
     renamed[RENAME_LENGTH_AT..RENAME_LENGTH_AT + 4]
         .copy_from_slice(&((name.len() * 2) as u32).to_ne_bytes());
     let (pairs, _) = renamed[RENAME_NAME_AT..].as_chunks_mut::<2>();
+
     for (at, unit) in pairs.iter_mut().zip(name) {
         *at = unit.to_ne_bytes();
     }
+
     renamed
 }
 

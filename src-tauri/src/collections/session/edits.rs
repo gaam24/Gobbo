@@ -68,9 +68,11 @@ pub fn skip(
             .find(|origin| origin.key() == collection_key)
             .ok_or_else(|| AppError::user("collection.not_in_profile"))?;
         let plan = cache::read_plan_or_missing(&data, origin)?;
+
         if !plan.has_item(item_key) {
             return Err(AppError::user("collection.item_missing").with("item", item_key));
         }
+
         plan
     };
     let item = plan
@@ -87,6 +89,7 @@ pub fn skip(
         if !origin.excluded.iter().any(|key| key == item_key) {
             origin.excluded.push(item_key.to_string());
         }
+
         let wanted = item.wanted();
         profile
             .waiting
@@ -94,6 +97,7 @@ pub fn skip(
     } else {
         origin.excluded.retain(|key| key != item_key);
     }
+
     let origin = origin.clone();
     save_profiles(&data, &profiles)?;
     let profile = profiles.get(profile_id)?.clone();
@@ -148,6 +152,7 @@ pub fn finish_with_manual(
             origin.manual.push(key.clone());
         }
     }
+
     origin.manual.sort();
     origin.manual.dedup();
     let mut added: BTreeSet<String> = origin.added.iter().cloned().collect();
@@ -159,12 +164,15 @@ pub fn finish_with_manual(
         if origin.excluded.iter().any(|key| key == &item.key) {
             continue;
         }
+
         let Some((family, folder)) = find_version(&view, &item.wanted()) else {
             continue;
         };
+
         if !collection_file_is_exact(item, &view, &folder) {
             continue;
         }
+
         if let Some(entry) = profile.mods.iter_mut().find(|entry| entry.id == family) {
             if item.update_policy == crate::domain::collection::CollectionUpdatePolicy::Exact
                 && entry.folder != folder
@@ -180,6 +188,7 @@ pub fn finish_with_manual(
     }
     // Keep the block in plan order. Non-collection entries keep their places.
     let mut index: BTreeMap<String, usize> = BTreeMap::new();
+
     for (position, item) in plan.ordered().iter().enumerate() {
         if let Some((family, folder)) = find_version(&view, &item.wanted())
             && collection_file_is_exact(item, &view, &folder)
@@ -187,6 +196,7 @@ pub fn finish_with_manual(
             index.entry(family).or_insert(position);
         }
     }
+
     let mut collection_entries: Vec<ProfileEntry> = profile
         .mods
         .iter()
@@ -204,13 +214,16 @@ pub fn finish_with_manual(
             .retain(|entry| !(added.contains(&entry.id) && index.contains_key(&entry.id)));
         collection_entries.sort_by_key(|entry| index.get(&entry.id).copied().unwrap_or(usize::MAX));
         let at = first.min(profile.mods.len());
+
         for (offset, entry) in collection_entries.into_iter().enumerate() {
             profile.mods.insert(at + offset, entry);
         }
     }
+
     origin.added = added.into_iter().collect();
     origin.families = member_families(&plan, &view, profile, &origin);
     origin.installed_at = crate::infra::clock::now_seconds();
+
     if let Some(index) = profile
         .collections
         .iter()
@@ -218,6 +231,7 @@ pub fn finish_with_manual(
     {
         profile.collections[index] = origin.clone();
     }
+
     save_profiles(&data, &profiles)?;
     let profile = profiles.get(profile_id)?.clone();
     let current = status::statuses(&plan, &library, &profile, Some(&origin));
@@ -239,10 +253,12 @@ pub fn mark_done(
         &[item.to_string()],
     )
 }
+
 fn collection_file_is_exact(item: &CollectionItem, view: &LibraryView<'_>, folder: &str) -> bool {
     if item.update_policy != crate::domain::collection::CollectionUpdatePolicy::Exact {
         return true;
     }
+
     let Some((provider, _, file_id)) = item.provider_file() else {
         return true;
     };

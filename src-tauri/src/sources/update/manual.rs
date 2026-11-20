@@ -160,17 +160,21 @@ impl ManualSession {
         if self.advanced.contains(id) && step != ManualStep::Failed {
             return;
         }
+
         self.steps.insert(id.to_string(), step);
+
         if let Some(change) = change
             && !self.changes.iter().any(|known| known.id == change.id)
         {
             self.changes.push(change);
         }
+
         if let Some(error) = error {
             self.errors.insert(id.to_string(), error);
         } else {
             self.errors.remove(id);
         }
+
         self.advanced.insert(id.to_string());
         self.move_to_next();
     }
@@ -179,6 +183,7 @@ impl ManualSession {
         if self.index >= self.targets.len() {
             return;
         }
+
         let next = self.targets[self.index + 1..]
             .iter()
             .position(|target| !self.advanced.contains(&target.id));
@@ -192,6 +197,7 @@ impl ManualSession {
         if self.advanced.contains(id) {
             return;
         }
+
         self.steps.insert(id.to_string(), step);
     }
 
@@ -258,6 +264,7 @@ impl ManualUpdateSessions {
         if let Some(session) = self.lock().get_mut(game) {
             session.step(id, step);
         }
+
         self.view(game)
     }
 
@@ -305,6 +312,7 @@ impl ManualUpdateSessions {
         if let Some(session) = self.lock().get_mut(game) {
             session.settle(id, ManualStep::Failed, None, Some(message));
         }
+
         self.view(game)
     }
 

@@ -85,6 +85,7 @@ pub fn trace(event: Trace<'_>) {
     if !trace_enabled() {
         return;
     }
+
     let outcome = match (event.status, &event.error) {
         (Some(status), _) => format!("{status}"),
         (None, Some(error)) => format!("failed: {error}"),
@@ -147,8 +148,10 @@ pub fn trace_failure(
 /// `apikey=` and `api_key=`.
 pub fn redact(text: &str) -> String {
     let mut out = text.to_string();
+
     for name in ["key=", "expires=", "token="] {
         let mut search = 0;
+
         while let Some(found) = out[search..].find(name) {
             let at = search + found + name.len();
             let end = out[at..]
@@ -158,6 +161,7 @@ pub fn redact(text: &str) -> String {
             search = at + 3;
         }
     }
+
     out
 }
 
@@ -184,6 +188,7 @@ pub(super) fn request_url(url: &str) -> Result<Cow<'_, str>, AppError> {
     if url.parse::<ureq::http::Uri>().is_ok() {
         return Ok(Cow::Borrowed(url));
     }
+
     url::Url::parse(url)
         .map(|parsed| Cow::Owned(parsed.to_string()))
         .map_err(|_| AppError::new("http.bad_url").kind(ErrorKind::Permanent))

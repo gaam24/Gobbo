@@ -103,6 +103,7 @@ mod tests {
             ),
             (None, None, None, None, "stem", ("stem", None)),
         ];
+
         for (label, api, name, version, stem, expected) in cases {
             let (found_name, found_version) = imported(label, api, name, version, stem);
             assert_eq!(

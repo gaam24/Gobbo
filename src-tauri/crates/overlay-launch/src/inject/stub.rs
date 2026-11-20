@@ -98,6 +98,7 @@ impl Image {
 /// Writes `value` as a little-endian pointer of `size` bytes (4 or 8).
 fn write_pointer(slot: &mut [u8], value: usize, size: usize) -> Result<(), StubError> {
     let mut bytes = [0u8; 8];
+
     if size == 8 {
         bytes[..8].copy_from_slice(
             &u64::try_from(value)
@@ -111,6 +112,7 @@ fn write_pointer(slot: &mut [u8], value: usize, size: usize) -> Result<(), StubE
                 .to_le_bytes(),
         );
     }
+
     let target = slot.get_mut(..size).ok_or(StubError::Layout)?;
     target.copy_from_slice(&bytes[..size]);
     Ok(())
@@ -124,9 +126,11 @@ pub(crate) fn build64(data: &Data64, original_rip: u64) -> Result<Image, StubErr
 
     // Save everything the stub or the called functions may change. The thread starts with an arbitrary register state.
     code.push(0x9C);
+
     for push in [0x50u8, 0x51, 0x52, 0x53, 0x55, 0x56, 0x57] {
         code.push(push);
     }
+
     for push in 0x50u8..=0x57 {
         code.extend_from_slice(&[0x41, push]);
     }
@@ -164,12 +168,15 @@ pub(crate) fn build64(data: &Data64, original_rip: u64) -> Result<Image, StubErr
 
     // Success: restore the original stack, registers and flags, then continue at the original RIP.
     code.extend_from_slice(&[0x48, 0x89, 0xEC]);
+
     for register in [0x5Fu8, 0x5E, 0x5D, 0x5C, 0x5B, 0x5A, 0x59, 0x58] {
         code.extend_from_slice(&[0x41, register]);
     }
+
     for register in [0x5Fu8, 0x5E, 0x5D, 0x5B, 0x5A, 0x59, 0x58] {
         code.push(register);
     }
+
     code.push(0x9D);
     // jmp qword ptr [rip + 0]: the original RIP follows the instruction.
     code.extend_from_slice(&[0xFF, 0x25, 0x00, 0x00, 0x00, 0x00]);
@@ -185,9 +192,11 @@ pub(crate) fn build64(data: &Data64, original_rip: u64) -> Result<Image, StubErr
     patch_jumps(&mut code, &fixups, fail)?;
 
     let mut strings = Vec::with_capacity(data.hook_path.len() * 2 + data.init_name.len());
+
     for unit in &data.hook_path {
         strings.extend_from_slice(&unit.to_le_bytes());
     }
+
     let strings_offset = 48;
     let name_offset = strings_offset + data.hook_path.len() * 2;
     let mut block = vec![0u8; strings_offset];
@@ -262,9 +271,11 @@ pub(crate) fn build32(data: &Data32, original_eip: u32) -> Result<Image, StubErr
     patch_jumps_to(&mut code, &fixups, &[fail_load, fail_proc, fail_init])?;
 
     let mut strings = Vec::with_capacity(data.hook_path.len() * 2 + data.init_name.len());
+
     for unit in &data.hook_path {
         strings.extend_from_slice(&unit.to_le_bytes());
     }
+
     let strings_offset = 24;
     let name_offset = strings_offset + data.hook_path.len() * 2;
     let mut block = vec![0u8; strings_offset];
@@ -318,6 +329,7 @@ fn patch_jumps(code: &mut [u8], fixups: &[usize], target: usize) -> Result<(), S
     for &position in fixups {
         patch_relative(code, position, target)?;
     }
+
     Ok(())
 }
 
@@ -332,6 +344,7 @@ fn patch_jumps_to(
         let target = *labels.get(label).ok_or(StubError::Layout)?;
         patch_relative(code, position, target)?;
     }
+
     Ok(())
 }
 

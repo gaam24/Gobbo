@@ -34,9 +34,11 @@ fn move_if_absent(from: &Path, to: &Path) -> Result<bool, AppError> {
     if to.exists() {
         return Ok(false);
     }
+
     if let Some(parent) = to.parent() {
         fs::create_dir_all(parent).map_err(io_at(parent))?;
     }
+
     fs::rename(from, to).map_err(io_at(from))?;
     Ok(true)
 }
@@ -53,6 +55,7 @@ pub fn run(root: &Path, known_game_ids: &[String]) {
         ("snapshots", snapshots::run),
         ("old games list", games_list::run),
     ];
+
     for (name, step) in steps {
         if let Err(error) = step(root, known_game_ids) {
             crate::infra::log::warn(format!("migration {name} failed: {error}"));

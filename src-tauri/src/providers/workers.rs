@@ -61,15 +61,19 @@ pub fn per_request<T: Sync, U: Send>(
     lost: impl Fn(&T) -> U,
 ) -> Vec<U> {
     let run = in_workers(requests.len(), |index| requests.get(index).map(&work));
+
     if run.panicked {
         crate::infra::log::error(WORKER_PANIC);
     }
+
     let mut answers: Vec<Option<U>> = requests.iter().map(|_| None).collect();
+
     for (index, value) in run.values {
         if let Some(slot) = answers.get_mut(index) {
             *slot = Some(value);
         }
     }
+
     answers
         .into_iter()
         .zip(requests)
@@ -106,6 +110,7 @@ mod tests {
             if index == 0 {
                 barrier.wait();
             }
+
             finished
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -113,6 +118,7 @@ mod tests {
             if index != 0 {
                 barrier.wait();
             }
+
             Some(index)
         });
         let finished = finished

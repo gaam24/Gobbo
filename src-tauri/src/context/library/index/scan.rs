@@ -20,6 +20,7 @@ impl Library {
         // An explicit rescan reads `info.json` again; the deployment refresh below keeps the known record.
         let scanned = scan_folders(library_dir, &refs)?;
         let mut versions = BTreeMap::new();
+
         for (folder, (files, size_bytes)) in folders.into_iter().zip(scanned) {
             let mut found = version_from_import(
                 &library_dir.join(&folder),
@@ -32,6 +33,7 @@ impl Library {
             self.ensure_family(&found);
             versions.insert(folder, found);
         }
+
         self.versions = versions;
         self.retain_families_of_versions();
         self.fill_layouts(game);
@@ -42,6 +44,7 @@ impl Library {
         let rules = LayoutRules::new(&game.deploy);
         self.layouts.clear();
         self.layouts.reserve(self.versions.len());
+
         for (folder, version) in &self.versions {
             self.layouts
                 .insert(folder.clone(), rules.profile(&version.files));
@@ -77,13 +80,16 @@ impl Library {
                 // archive and FOMOD choices are not cloned back over it.
                 found.files = files.into();
                 found.size_bytes = size_bytes;
+
                 if !found.slot.is_empty() && game.deploy.slot(&found.slot).is_none() {
                     found.slot = game.slot_for_folder(folder);
                 }
+
                 let layout = rules.profile(&found.files);
                 self.layouts.insert(folder.to_string(), layout);
                 continue;
             }
+
             let mut found = version_from_import(
                 &library_dir.join(folder),
                 folder,
@@ -97,6 +103,7 @@ impl Library {
             self.layouts.insert(folder.to_string(), layout);
             self.versions.insert(folder.to_string(), found);
         }
+
         Ok(())
     }
 
@@ -124,9 +131,11 @@ impl Library {
             return;
         };
         found.family.clone_from(&old.family);
+
         if old.slot.is_empty() || game.deploy.slot(&old.slot).is_some() {
             found.slot.clone_from(&old.slot);
         }
+
         found.archive.clone_from(&old.archive);
         // A rescan reads the folder again but does not rehash it. Keeping the baseline is what lets a verification
         // notice files that were changed by hand after the import.
@@ -184,6 +193,7 @@ pub(super) fn scan_folders(
             .map(|folder| scan_one(library_dir, folder))
             .collect();
     }
+
     let chunk = folders.len().div_ceil(workers);
     let scanned = std::thread::scope(|scope| -> Result<Vec<_>, AppError> {
         let handles: Vec<_> = folders
@@ -198,12 +208,14 @@ pub(super) fn scan_folders(
             })
             .collect();
         let mut scanned = Vec::with_capacity(folders.len());
+
         for handle in handles {
             let mut part = handle
                 .join()
                 .map_err(|_| AppError::unexpected("a library scan worker panicked"))?;
             scanned.append(&mut part);
         }
+
         Ok(scanned)
     })?;
     scanned.into_iter().collect()

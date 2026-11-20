@@ -16,6 +16,7 @@ use crate::text::wide;
 pub(crate) fn module_path(module: *mut c_void) -> Option<PathBuf> {
     // The buffer grows until the whole path fits. A path cut short would load the wrong file into the children.
     let mut size = 1024;
+
     loop {
         let mut buffer = vec![0u16; size];
         // SAFETY: the buffer is `size` UTF-16 units long, and the module handle comes from the loader.
@@ -24,11 +25,14 @@ pub(crate) fn module_path(module: *mut c_void) -> Option<PathBuf> {
         if length == 0 {
             return None;
         }
+
         if length < size {
             buffer.truncate(length);
             return Some(PathBuf::from(std::ffi::OsString::from_wide(&buffer)));
         }
+
         size *= 2;
+
         if size > 32_768 {
             return None;
         }
@@ -58,13 +62,16 @@ unsafe fn target<F: Copy>(module: &str, export: &str) -> Result<F, String> {
     let module_name = wide(OsStr::new(module));
     let mut bytes = export.as_bytes().to_vec();
     bytes.push(0);
+
     unsafe {
         let mut handle = GetModuleHandleW(module_name.as_ptr());
+
         if handle.is_null() {
             // An optional module (`advapi32` for `CreateProcessAsUserW`) may not be loaded yet. Loading it here, on the
             // install thread, is outside the loader lock.
             handle = LoadLibraryW(module_name.as_ptr());
         }
+
         let Some(address) = GetProcAddress(handle, bytes.as_ptr()) else {
             return Err(format!("{module} has no {export}"));
         };

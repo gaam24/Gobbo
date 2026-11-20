@@ -30,19 +30,23 @@ unsafe fn delete_or_remove(
     original: impl FnOnce() -> i32,
 ) -> i32 {
     unsafe { trace_call(operation, name) };
+
     if unsafe { unsafe_name(name) } {
         return fail(ERROR_ACCESS_DENIED);
     }
     // Keep the guard across the original call: the NT layer would classify the same path again.
     let guard = Guard::enter();
+
     if guard.is_some()
         && let Some(place) = unsafe { place(name) }
     {
         return in_game(place.mount, &place.rel);
     }
+
     if crate::diag::settings().pass_writes {
         unsafe { crate::trace::pass_through(operation, name, String::new) };
     }
+
     let result = original();
     let _last_error = PreserveLastError::capture();
     result
@@ -126,6 +130,7 @@ fn delete_in_game(mount: &Mount, rel: &str) -> i32 {
         }),
         below,
     );
+
     match plan {
         DeletePlan::Refuse => fail(ERROR_ACCESS_DENIED),
         DeletePlan::Missing => fail(match missing(mount, rel) {
@@ -147,13 +152,16 @@ fn delete_in_game(mount: &Mount, rel: &str) -> i32 {
                 });
                 let deleted = unsafe { original.call(upper_wide.as_ptr()) };
                 let _last_error = PreserveLastError::capture();
+
                 if deleted == 0 {
                     return 0;
                 }
             }
+
             if below {
                 hide(mount, rel);
             }
+
             1
         }
     }
@@ -188,6 +196,7 @@ fn removal_error(
     if is_root {
         return Some(ERROR_ACCESS_DENIED);
     }
+
     match shown {
         None => Some(missing()),
         Some(false) => Some(ERROR_DIRECTORY),
@@ -209,6 +218,7 @@ fn remove_in_game(mount: &Mount, rel: &str) -> i32 {
         Ok(missing) => missing.win32(),
         Err(failure) => failure.win32(),
     };
+
     if let Some(code) = removal_error(rel.is_empty(), shown_is_folder, missing_code, || {
         has_visible_entries(mount, rel)
     }) {
@@ -223,13 +233,16 @@ fn remove_in_game(mount: &Mount, rel: &str) -> i32 {
         });
         let removed = unsafe { original.call(upper_wide.as_ptr()) };
         let _last_error = PreserveLastError::capture();
+
         if removed == 0 {
             return 0;
         }
     }
+
     if below {
         hide(mount, rel);
     }
+
     1
 }
 

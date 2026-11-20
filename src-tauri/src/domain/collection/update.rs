@@ -27,12 +27,15 @@ pub fn reconcile_disabled<'a>(
         .map(ToString::to_string)
         .collect();
     let mut next: BTreeSet<String> = recorded.iter().copied().map(ToString::to_string).collect();
+
     for family in &disable {
         next.insert(family.clone());
     }
+
     for family in &enable {
         next.remove(family);
     }
+
     DisabledChange {
         disable,
         enable,

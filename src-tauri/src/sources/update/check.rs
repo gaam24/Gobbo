@@ -84,6 +84,7 @@ pub fn fill_source_info(root: &Data, game_id: &str) -> Result<u32, AppError> {
     if requests.is_empty() {
         return Ok(0);
     }
+
     let updates = run_updates(requests, false)?;
     let filled = updates
         .iter()
@@ -130,17 +131,21 @@ fn requests(
     let selected = selected_folders(profiles);
     let images = data.images();
     let mut requests = Vec::new();
+
     for family in library.families.values() {
         if only.is_some_and(|id| family.id != id) {
             continue;
         }
+
         for (provider_id, source) in &family.sources {
             let Some(provider) = providers::provider(provider_id.as_str()) else {
                 continue;
             };
+
             if !provider.capabilities().update_check {
                 continue;
             }
+
             let Some(game_key) = game.provider_key(provider_id.as_str()) else {
                 continue;
             };
@@ -179,6 +184,7 @@ fn requests(
             });
         }
     }
+
     requests
 }
 
@@ -192,6 +198,7 @@ fn run_updates(
     if requests.is_empty() {
         return Ok(Vec::new());
     }
+
     let mut groups: std::collections::BTreeMap<String, Vec<SourceUpdateRequest>> =
         std::collections::BTreeMap::new();
     for request in requests {
@@ -200,12 +207,16 @@ fn run_updates(
             .or_default()
             .push(request);
     }
+
     let mut updates = Vec::new();
+
     for (provider_id, requests) in groups {
         let provider = providers::require(&provider_id)?;
+
         if !provider.capabilities().update_check {
             continue;
         }
+
         let key = if require_key {
             // A missing key fails this provider's mods with the key error the window turns into "save your key"; the
             // other providers of the game are still checked.
@@ -227,6 +238,7 @@ fn run_updates(
         };
         updates.extend(provider.check_updates(&key, &requests));
     }
+
     Ok(updates)
 }
 
@@ -234,12 +246,14 @@ fn run_updates(
 /// profile for every family.
 fn selected_folders(profiles: &Profiles) -> rustc_hash::FxHashMap<&str, &str> {
     let mut selected = rustc_hash::FxHashMap::default();
+
     for entry in &profiles.active().mods {
         // The first entry wins, matching the linear lookup this map replaced.
         selected
             .entry(entry.id.as_str())
             .or_insert(entry.folder.as_str());
     }
+
     selected
 }
 
@@ -287,9 +301,11 @@ pub fn ignore_version(
             .cloned()
             .or_else(|| {
                 let source = family.sources.get(&provider)?;
+
                 if source.part_id.is_some() {
                     return None;
                 }
+
                 source.meta.as_ref().and_then(|meta| meta.version.clone())
             })
             .ok_or_else(|| {

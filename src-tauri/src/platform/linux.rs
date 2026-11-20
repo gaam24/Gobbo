@@ -58,12 +58,14 @@ pub fn overlay_session_pids(root: &Path) -> Vec<u32> {
         })
         .collect();
     let mut overlaid: HashMap<&Path, bool> = HashMap::new();
+
     for (pid, namespace) in &members {
         overlaid.entry(namespace.as_path()).or_insert_with(|| {
             fs::read_to_string(format!("/proc/{pid}/mountinfo"))
                 .is_ok_and(|table| mounted_overlay_at(&table, root))
         });
     }
+
     members
         .iter()
         .filter(|(_, namespace)| overlaid.get(namespace.as_path()) == Some(&true))
@@ -106,6 +108,7 @@ pub fn game_is_running(game_root: &Path) -> bool {
 fn launch_chain() -> Vec<std::ffi::OsString> {
     let mut chain = Vec::new();
     let mut pid = std::process::id();
+
     for _ in 0..64 {
         chain.push(std::ffi::OsString::from(pid.to_string()));
         let parent = fs::read_to_string(format!("/proc/{pid}/stat"))
@@ -119,6 +122,7 @@ fn launch_chain() -> Vec<std::ffi::OsString> {
             _ => break,
         }
     }
+
     chain
 }
 
@@ -137,25 +141,31 @@ pub fn stop_game(game_root: &Path) -> bool {
 fn stop_processes(processes: &[u32], grace: Duration) -> bool {
     let mut stopped = false;
     let mut alive: Vec<u32> = Vec::new();
+
     for &pid in processes {
         if pid == std::process::id() {
             continue;
         }
+
         if kill(Pid::from_raw(pid as i32), Signal::SIGTERM).is_ok() {
             stopped = true;
             alive.push(pid);
         }
     }
+
     let deadline = Instant::now() + grace;
+
     while !alive.is_empty() && Instant::now() < deadline {
         std::thread::sleep(Duration::from_millis(50));
         alive.retain(|pid| kill(Pid::from_raw(*pid as i32), None::<Signal>).is_ok());
     }
+
     for pid in alive {
         if kill(Pid::from_raw(pid as i32), Signal::SIGKILL).is_ok() {
             stopped = true;
         }
     }
+
     stopped
 }
 
@@ -176,6 +186,7 @@ impl Process {
         let needle = program.as_os_str().as_bytes();
         let processes = fs::read_dir("/proc").ok()?;
         let mut best: Option<(u32, usize)> = None;
+
         for entry in processes.filter_map(Result::ok) {
             let Some(pid) = entry
                 .file_name()
@@ -197,6 +208,7 @@ impl Process {
                 best = Some((pid, position));
             }
         }
+
         best.map(|(pid, _)| Self { pid })
     }
 
@@ -231,6 +243,7 @@ fn game_processes(game_root: &Path) -> Vec<u32> {
     };
     let mut parents = HashMap::new();
     let mut roots = Vec::new();
+
     for entry in processes.filter_map(std::result::Result::ok) {
         let Some(pid) = entry
             .file_name()
@@ -240,13 +253,16 @@ fn game_processes(game_root: &Path) -> Vec<u32> {
             continue;
         };
         let path = entry.path();
+
         if let Some(parent) = parent_of(&path) {
             parents.insert(pid, parent);
         }
+
         if fs::read(path.join("cmdline")).is_ok_and(|raw| runs_game(&raw, root.as_bytes())) {
             roots.push(pid);
         }
     }
+
     roots.extend(overlay_session_pids(game_root));
     super::descendants(roots, &parents)
 }
@@ -279,6 +295,7 @@ fn runs_game(cmdline: &[u8], root: &[u8]) -> bool {
     let mut proton = false;
     let mut overlay = false;
     let mut inside = false;
+
     for arg in cmdline
         .split(|byte| *byte == 0)
         .filter(|arg| !arg.is_empty())
@@ -287,6 +304,7 @@ fn runs_game(cmdline: &[u8], root: &[u8]) -> bool {
         overlay = overlay || arg == b"mm-overlay";
         inside = inside || starts_inside(arg);
     }
+
     if inside && (proton || overlay) {
         return true;
     }
@@ -385,6 +403,7 @@ mod tests {
                 Err(error) => panic!("could not start the test program: {error}"),
             }
         }
+
         panic!("the test program stayed busy");
     }
 

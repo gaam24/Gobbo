@@ -34,11 +34,13 @@ const fn check_limits(files: usize, total: u64) -> Result<(), InstallError> {
             limit: MAX_EXTRACT_FILES,
         });
     }
+
     if total > MAX_EXTRACT_BYTES {
         return Err(InstallError::TooLarge {
             limit: MAX_EXTRACT_BYTES,
         });
     }
+
     Ok(())
 }
 
@@ -184,10 +186,12 @@ pub fn plan_with_roots<'a>(
     // The file entries this import considers, split into parts once.
     let mut files: Vec<(usize, Vec<&str>)> = Vec::new();
     let mut skipped_files = Vec::new();
+
     for (index, entry) in archive.entries().iter().enumerate() {
         if entry.is_dir {
             continue;
         }
+
         let name = entry.name.as_str();
         // A root `info.xml` is always installer metadata. The whole `fomod/` folder is metadata only for a plain
         // archive: with a FOMOD selection the `allowed` set already holds just the files whose source pattern matched,
@@ -205,6 +209,7 @@ pub fn plan_with_roots<'a>(
             });
             continue;
         }
+
         if is_archive_noise(name) {
             skipped_files.push(SkippedFile {
                 path: entry.name.clone(),
@@ -212,6 +217,7 @@ pub fn plan_with_roots<'a>(
             });
             continue;
         }
+
         if allowed.is_some_and(|allowed| !allowed.contains(&index)) {
             skipped_files.push(SkippedFile {
                 path: entry.name.clone(),
@@ -226,18 +232,22 @@ pub fn plan_with_roots<'a>(
             .map_or(name, String::as_str);
         files.push((index, split_name(layout_name)?));
     }
+
     let layout = LayoutPlan::new(deploy, base_roots);
     let wrapper = layout.wrapper_depth(&files);
+
     for (_, parts) in &mut files {
         let strip = wrapper.min(parts.len().saturating_sub(1));
         parts.drain(..strip);
         layout.rewrite_aliases(parts);
     }
+
     let units = layout.unit_roots(&files);
     let unit_index = UnitIndex::new(&units);
 
     let mut placed = Vec::new();
     let mut skipped = 0;
+
     for (index, parts) in &files {
         if let Some((group, slot, rel)) = layout.classify(parts, &unit_index, &units, base_name)? {
             placed.push(Placed {
@@ -254,9 +264,11 @@ pub fn plan_with_roots<'a>(
             });
         }
     }
+
     if placed.is_empty() {
         return Err(InstallError::UnknownLayout);
     }
+
     attach_mirrored(&mut placed);
     Ok(Plan {
         placed,
@@ -319,8 +331,10 @@ pub fn install_zip_named_with_roots(
         .map(|item| archive.entries()[item.index].size)
         .sum();
     check_limits(planned.placed.len(), total)?;
+
     if let Some(space) = crate::infra::disk::space_for(library) {
         let free = space.free_kb.saturating_mul(1024);
+
         if total > free {
             return Err(InstallError::NoSpace {
                 needed_kb: total / 1024,
@@ -328,6 +342,7 @@ pub fn install_zip_named_with_roots(
             });
         }
     }
+
     if let Some(folder) = naming.only {
         // A reinstall keeps the mod that had the folder `folder` and leaves out the other mods of the archive.
         let groups: BTreeSet<String> = planned
@@ -351,6 +366,7 @@ pub fn install_zip_named_with_roots(
             keep
         };
         planned.placed.retain(|item| keep.contains(&item.group));
+
         if planned.placed.is_empty() {
             return Err(InstallError::UnknownLayout);
         }

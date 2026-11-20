@@ -61,12 +61,14 @@ impl CollectionCounts {
             total: u32::try_from(plan.items.len()).unwrap_or(u32::MAX),
             ..Self::default()
         };
+
         for item in &plan.items {
             if item.optional {
                 counts.optional = counts.optional.saturating_add(1);
             } else {
                 counts.required = counts.required.saturating_add(1);
             }
+
             match statuses.get(&item.key) {
                 Some(CollectionItemStatus::Installed | CollectionItemStatus::Satisfied { .. }) => {
                     counts.installed = counts.installed.saturating_add(1);
@@ -83,6 +85,7 @@ impl CollectionCounts {
                 _ => counts.pending = counts.pending.saturating_add(1),
             }
         }
+
         counts
     }
 }

@@ -33,6 +33,7 @@ pub(super) fn listed_requirements(
     {
         return None;
     }
+
     let mod_level: Vec<ModRequirement> = facet
         .map(|facet| {
             facet
@@ -149,6 +150,7 @@ pub(super) fn with_mod_level(
             });
         }
     }
+
     requires
 }
 
@@ -162,6 +164,7 @@ pub(super) fn match_file(
     if item.unmatched.is_empty() {
         return None;
     }
+
     let files = mod_files(client, mod_uid?).ok()?;
     let (digest, file) = newest_match(&files, &item.unmatched)?;
     Some((digest, file.file_id, Some(file.mod_file_id)))

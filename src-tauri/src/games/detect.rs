@@ -42,10 +42,12 @@ pub fn libraries(home: &Path) -> Vec<PathBuf> {
 pub fn libraries_in(steams: &[PathBuf]) -> Vec<PathBuf> {
     let mut libraries: Vec<PathBuf> = Vec::new();
     let mut seen = HashSet::new();
+
     for steam in steams {
         if !steam.join("steamapps").is_dir() {
             continue;
         }
+
         let vdf =
             fs::read_to_string(steam.join("steamapps/libraryfolders.vdf")).unwrap_or_default();
         let extra = super::steam::vdf_values(&vdf, "path")
@@ -57,12 +59,14 @@ pub fn libraries_in(steams: &[PathBuf]) -> Vec<PathBuf> {
             }
         }
     }
+
     libraries
 }
 
 /// Adds a library if it is not there yet. Compares paths after resolving links, because `~/.steam/steam` is often a link.
 fn push_unique(libraries: &mut Vec<PathBuf>, seen: &mut HashSet<PathBuf>, library: PathBuf) {
     let key = fs::canonicalize(&library).unwrap_or_else(|_| library.clone());
+
     if seen.insert(key) {
         libraries.push(library);
     }
@@ -125,10 +129,12 @@ pub fn scan(home: &Path, games: &[GameDef]) -> Vec<GameScan> {
 pub fn scan_with(home: &Path, program_data: Option<&Path>, games: &[GameDef]) -> Vec<GameScan> {
     let mut scans = scan_libraries(&libraries(home), games);
     let candidates = super::stores::candidates(home, program_data);
+
     for (game, scan) in games.iter().zip(scans.iter_mut()) {
         if scan.found.is_some() {
             continue;
         }
+
         if let Some(candidate) = candidates
             .iter()
             .find(|candidate| super::stores::matches(game, candidate))
@@ -143,6 +149,7 @@ pub fn scan_with(home: &Path, program_data: Option<&Path>, games: &[GameDef]) ->
             });
         }
     }
+
     scans
 }
 
@@ -170,6 +177,7 @@ mod tests {
         let steam = home.join(".local/share/Steam");
         fs::create_dir_all(steam.join("steamapps")).unwrap();
         let mut vdf = String::from("\"libraryfolders\"\n{\n");
+
         for (index, library) in extra.iter().enumerate() {
             write!(
                 vdf,
@@ -178,6 +186,7 @@ mod tests {
             )
             .unwrap();
         }
+
         vdf.push_str("}\n");
         fs::write(steam.join("steamapps/libraryfolders.vdf"), vdf).unwrap();
         steam

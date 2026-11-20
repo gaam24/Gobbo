@@ -18,6 +18,7 @@ fn main() {
         eprintln!("usage: gobbo_overlay_dump32 <state> <socket> <ready>");
         std::process::exit(2);
     };
+
     if let Err(error) = gobbo_overlay_dump::serve(
         std::path::Path::new(&state),
         std::path::Path::new(&socket),

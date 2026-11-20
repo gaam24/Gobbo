@@ -41,6 +41,7 @@ pub(super) fn copy_profile_data(
         if !source_set.isolated {
             continue;
         }
+
         if source_set.redirects() {
             copy_dir(&source_set.upper, &target_set.upper)?;
             copy_file(
@@ -61,6 +62,7 @@ pub(super) fn copy_profile_data(
     }
 
     let source_legacy = profile_state::legacy_data(&source_state);
+
     if source_legacy.is_dir() {
         copy_dir(&source_legacy, &profile_state::legacy_data(&target_state))?;
     }
@@ -70,9 +72,11 @@ pub(super) fn copy_profile_data(
     remove_file_if_exists(&target_manifest).map_err(io_at(&target_manifest))?;
     copy_file(&source_manifest, &target_manifest)?;
     let source_overwrite = profile_state::overwrite(&source_state);
+
     if source_overwrite.is_dir() {
         copy_dir(&source_overwrite, &target_overwrite)?;
     }
+
     Ok(())
 }
 
@@ -81,9 +85,11 @@ fn copy_dir(source: &Path, target: &Path) -> Result<(), AppError> {
     if !source.is_dir() {
         return Ok(());
     }
+
     if let Some(parent) = target.parent() {
         fs::create_dir_all(parent).map_err(io_at(parent))?;
     }
+
     copy_tree(source, target, CopyMode::Replace)
         .map_err(|error| io_at(target)(std::io::Error::from(error)))?;
     Ok(())
@@ -96,9 +102,11 @@ fn copy_file(source: &Path, target: &Path) -> Result<(), AppError> {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
         Err(error) => return Err(io_at(source)(error)),
     }
+
     if let Some(parent) = target.parent() {
         fs::create_dir_all(parent).map_err(io_at(parent))?;
     }
+
     fs::copy(source, target).map_err(io_at(source))?;
     Ok(())
 }

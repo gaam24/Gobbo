@@ -33,19 +33,24 @@ pub(crate) fn count(operation: &str, detail: impl FnOnce() -> String) {
     let Some(path) = &settings.diag else {
         return;
     };
+
     if !settings.calls || super::crashing() {
         return;
     }
+
     let key = format!("{operation} {}", detail());
     let report = {
         let mut counts = COUNTS.lock().unwrap_or_else(PoisonError::into_inner);
         *counts.by_key.entry(key).or_insert(0) += 1;
         counts.total += 1;
+
         if !counts.total.is_multiple_of(REPORT_EVERY) {
             return;
         }
+
         report(&counts)
     };
+
     if let Some(_guard) = Guard::enter()
         && let Err(error) = write_file(path, &report)
     {
@@ -58,14 +63,17 @@ fn report(counts: &Counts) -> String {
     let mut ranked: Vec<(&String, &u64)> = counts.by_key.iter().collect();
     ranked.sort_by(|a, b| b.1.cmp(a.1).then(a.0.cmp(b.0)));
     let mut out = format!("total events: {}\n", counts.total);
+
     if let Some((_, top)) = ranked.first()
         && **top * 4 > counts.total
     {
         out.push_str("one event is more than a quarter of all events: a loop is likely\n");
     }
+
     for (key, count) in ranked.into_iter().take(REPORT_TOP) {
         let _ = writeln!(out, "{count:>9}  {key}");
     }
+
     out
 }
 
@@ -76,12 +84,14 @@ mod tests {
     #[test]
     fn the_report_ranks_by_count_and_flags_a_loop() {
         let mut counts = Counts::default();
+
         for _ in 0..30 {
             *counts
                 .by_key
                 .entry("NtQueryAttributesFile a.dll".into())
                 .or_insert(0) += 1;
         }
+
         *counts.by_key.entry("CreateFileW b.dll".into()).or_insert(0) += 1;
         counts.total = 31;
         let text = report(&counts);
@@ -93,9 +103,11 @@ mod tests {
     #[test]
     fn a_report_without_a_dominant_call_flags_nothing() {
         let mut counts = Counts::default();
+
         for (key, count) in [("a", 5u64), ("b", 5), ("c", 5), ("d", 5)] {
             counts.by_key.insert(key.into(), count);
         }
+
         counts.total = 20;
         assert!(!report(&counts).contains("loop"));
     }

@@ -257,18 +257,24 @@ fn synced_profiles(
     save_sync: bool,
 ) -> Result<Arc<Profiles>, AppError> {
     let cached = load_profiles_shared(data)?;
+
     if data.profiles_in_step(&cached, library) {
         return Ok(cached);
     }
+
     let mut profiles = (*cached).clone();
+
     if !sync_profile_lists(&mut profiles, library, view) {
         data.remember_profiles_in_step(&cached, library);
         return Ok(cached);
     }
+
     let profiles = Arc::new(profiles);
+
     if !save_sync {
         return Ok(profiles);
     }
+
     data.save_profiles(&profiles)?;
     // The save put a new value in the cache; keep that pair so the next status reads it without copying and syncing.
     let saved = load_profiles_shared(data)?;
@@ -308,11 +314,13 @@ fn index_problems(library: &Library, listed: &[ProfileMod], check: &FolderCheck)
             .iter()
             .map(|folder| Message::new("status.folder_not_indexed").with("folder", folder)),
     );
+
     for entry in listed {
         if !library.versions.contains_key(&entry.folder) && !check.on_disk.contains(&entry.folder) {
             problems.push(Message::new(crate::error::MOD_MISSING).with("folder", &entry.folder));
         }
     }
+
     problems
 }
 
@@ -335,6 +343,7 @@ fn plan_outcome(
     listed: &[ProfileMod],
 ) -> PlanOutcome {
     let mut outcome = PlanOutcome::default();
+
     if !is_ready(
         game,
         settings,
@@ -343,6 +352,7 @@ fn plan_outcome(
     ) {
         return outcome;
     }
+
     match build_plan_with_mode(
         data,
         game,
@@ -357,6 +367,7 @@ fn plan_outcome(
             // does, and a large plan can hold thousands of paths.
             if !game.requires.is_empty() {
                 let placed = deploy_plan.placed_keys();
+
                 if let Some(file) = game
                     .unmet_requirement(Path::new(&settings.game_root), |key| placed.contains(key))
                 {
@@ -365,13 +376,16 @@ fn plan_outcome(
                         .push(Message::new("status.requirement_missing").with("path", file));
                 }
             }
+
             outcome.conflict_count = u32::try_from(deploy_plan.conflicts.len()).unwrap_or(u32::MAX);
+
             for conflict in &deploy_plan.conflicts {
                 *outcome.wins.entry(conflict.winner.clone()).or_insert(0) += 1;
                 for loser in &conflict.losers {
                     *outcome.loses.entry(loser.clone()).or_insert(0) += 1;
                 }
             }
+
             outcome.problems.extend(
                 deploy_plan
                     .problems
@@ -381,5 +395,6 @@ fn plan_outcome(
         }
         Err(error) => outcome.problems.push(error.into()),
     }
+
     outcome
 }

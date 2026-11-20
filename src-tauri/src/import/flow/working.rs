@@ -42,6 +42,7 @@ impl Drop for Claim {
         if !self.committed {
             let _ = std::fs::remove_file(&self.archive);
         }
+
         store::release_archive(&self.archive);
     }
 }
@@ -68,11 +69,14 @@ pub(super) fn remove_working_older_than(library: &std::path::Path, stale: std::t
         return;
     };
     let own = format!("{WORKING_PREFIX}{}-", std::process::id());
+
     for entry in entries.flatten() {
         let name = entry.file_name().to_string_lossy().into_owned();
+
         if !name.starts_with(WORKING_PREFIX) || name.starts_with(&own) {
             continue;
         }
+
         if store::is_older_than(&entry, stale) {
             let _ = std::fs::remove_dir_all(entry.path());
         }
@@ -90,6 +94,7 @@ mod tests {
         let stale = library.join(format!("{WORKING_PREFIX}1-abandoned"));
         let own = library.join(format!("{WORKING_PREFIX}{}-running", std::process::id()));
         let mod_folder = library.join("Mod");
+
         for dir in [&stale, &own, &mod_folder] {
             std::fs::create_dir_all(dir).unwrap();
         }

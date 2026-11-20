@@ -48,13 +48,16 @@ pub(super) fn game_source(mount: &Mount, rel: &str) -> Result<(PathBuf, bool), u
             .win32());
     };
     let below = in_lower(mount, rel).map_err(|failure| failure.win32())?;
+
     if attributes & FILE_ATTRIBUTE_DIRECTORY != 0 {
         // A folder of the game is not moved or replaced: its lower part would stay where it was.
         if below {
             return Err(ERROR_NOT_SUPPORTED);
         }
+
         return Ok((path, false));
     }
+
     let upper = mount.write_target(rel);
     copy_up(mount, rel, &upper, true).map_err(|failure| failure.win32())?;
     Ok((upper, below))

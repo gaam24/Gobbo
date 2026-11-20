@@ -22,6 +22,7 @@ impl Downloads {
             data_root: Some(root.dir.clone()),
             ..Self::default()
         };
+
         for game in managed_ids(root).unwrap_or_default() {
             let mut pending = downloads
                 .pending_file(&game)
@@ -36,6 +37,7 @@ impl Downloads {
                 .collect();
             files.sort();
             let mut on_disk = BTreeSet::new();
+
             for path in files {
                 let name = path
                     .file_name()
@@ -48,9 +50,11 @@ impl Downloads {
                     let _ = fs::remove_file(&path);
                     continue;
                 }
+
                 if !path.is_file() || !crate::infra::archive::is_archive(&name) {
                     continue;
                 }
+
                 on_disk.insert(name.clone());
                 let size = size_kb(fs::metadata(&path).map_or(0, |meta| meta.len()));
                 let source = read_source(&path);
@@ -79,16 +83,19 @@ impl Downloads {
             let changed = before_count != pending.files.len();
             {
                 let mut all = downloads.pending_lock();
+
                 if pending.files.is_empty() {
                     all.remove(&game);
                 } else {
                     all.insert(game.clone(), pending);
                 }
             }
+
             if changed {
                 downloads.save_pending(&game);
             }
         }
+
         downloads
     }
 
@@ -114,6 +121,7 @@ impl Downloads {
             return;
         };
         let state = self.pending_lock().get(game).cloned().unwrap_or_default();
+
         if let Err(error) = crate::infra::json::write_json(&path, &state) {
             crate::infra::log::warn(format!(
                 "saving pending downloads for {game}: {}",
@@ -126,16 +134,20 @@ impl Downloads {
     pub(super) fn set_pending(&self, game: &str, file: &str, waiting: bool) {
         let mut all = self.pending_lock();
         let entry = all.entry(game.to_string()).or_default();
+
         if waiting {
             entry.files.insert(file.to_string());
         } else {
             entry.files.remove(file);
         }
+
         let drop_entry = entry.files.is_empty();
         drop(all);
+
         if drop_entry {
             self.pending_lock().remove(game);
         }
+
         self.save_pending(game);
     }
 

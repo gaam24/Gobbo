@@ -93,12 +93,14 @@ pub fn start(
         .collect();
     vars.append(&mut mount_env);
     vars.push((ENV_RING.to_string(), decisions.display().to_string()));
+
     if let Some(monitor) = &monitor {
         vars.push((
             dump::ENV_DUMPER.to_string(),
             monitor.path().display().to_string(),
         ));
     }
+
     if let Some(monitor) = &monitor32 {
         vars.push((
             dump32::ENV.to_string(),
@@ -119,8 +121,10 @@ pub fn start(
         {
             vars.remove(index);
         }
+
         vars.push((name.clone(), value.clone()));
     }
+
     let setup_us = micros(request_started);
     let started = gobbo_overlay_launch::spawn_hooked(&gobbo_overlay_launch::Launch {
         program: Path::new(program),
@@ -138,6 +142,7 @@ pub fn start(
     });
     // The pipe's write end is ours only until the start: the program has its own copy now.
     drop(output);
+
     match started {
         Ok(hooked) => {
             let t = hooked.timings();
@@ -194,6 +199,7 @@ impl Running {
         if let Some(monitor) = self.dump.take() {
             monitor.stop();
         }
+
         if let Some(monitor) = self.dump32.take() {
             monitor.stop();
         }
@@ -241,22 +247,28 @@ fn resolved_imports(layers: &Layers, program: &Path) -> (Vec<ResolvedImport>, Ve
     };
     let mut imports = Vec::new();
     let mut reserved = Vec::new();
+
     for import in gobbo_overlay_launch::imports(program).unwrap_or_default() {
         if import.name.is_empty() {
             continue;
         }
+
         let game_rel = join_rel(&relative, &import.name.replace('\\', "/"));
+
         if placement::reserved(&import.name) {
             // The hook loads this DLL before the game. Only report it when a mod actually has a copy that would be
             // skipped; every game imports ws2_32, and a warning without a mod copy would be noise on every launch.
             if layers.resolve(&game_rel, Path::is_file).is_some() {
                 reserved.push(import.name);
             }
+
             continue;
         }
+
         let Some((layer, path)) = layers.resolve(&game_rel, Path::is_file) else {
             continue;
         };
+
         if layer != Layer::Root {
             imports.push(ResolvedImport {
                 name: import.name,
@@ -265,6 +277,7 @@ fn resolved_imports(layers: &Layers, program: &Path) -> (Vec<ResolvedImport>, Ve
             });
         }
     }
+
     (imports, reserved)
 }
 
@@ -284,11 +297,13 @@ fn early_config(layers: &Layers) -> Result<Option<stage0::logic::Config>, Deploy
 /// The static imports that will be patched, with the warning for a reserved name when a mod provides one.
 fn static_imports_for(layers: &Layers, program: &Path) -> Vec<(String, PathBuf)> {
     let (imports, reserved) = resolved_imports(layers, program);
+
     for name in reserved {
         crate::infra::log::warn(format!(
             "{name} is loaded by the overlay hook before the game; a mod's copy is not virtualized"
         ));
     }
+
     imports
         .into_iter()
         .map(|import| (import.name, import.source))
@@ -301,10 +316,12 @@ fn static_imports_for(layers: &Layers, program: &Path) -> Vec<(String, PathBuf)>
 pub fn reserved_dll_warnings(plan: &DeployPlan) -> Vec<Message> {
     let mut seen = BTreeSet::new();
     let mut warnings = Vec::new();
+
     for file in &plan.files {
         if !file.game_path {
             continue;
         }
+
         let name = file
             .dest
             .rsplit(['/', '\\'])
@@ -313,12 +330,14 @@ pub fn reserved_dll_warnings(plan: &DeployPlan) -> Vec<Message> {
         if !placement::reserved(name) || !seen.insert(file.dest.as_str()) {
             continue;
         }
+
         warnings.push(
             Message::new("preview.reserved_dll")
                 .with("name", name)
                 .with("path", &file.dest),
         );
     }
+
     warnings
 }
 
@@ -330,6 +349,7 @@ fn sweep_stale_copies(session: &Session) {
     if crate::platform::game_is_running(&session.root) {
         return;
     }
+
     for mount in mount_config(session).mounts {
         remove_copy_temps(&mount.upper);
     }
@@ -340,11 +360,13 @@ fn remove_copy_temps(folder: &Path) {
     let Ok(entries) = std::fs::read_dir(folder) else {
         return;
     };
+
     for entry in entries.flatten() {
         let Ok(kind) = entry.file_type() else {
             continue;
         };
         let path = entry.path();
+
         if kind.is_dir() {
             remove_copy_temps(&path);
         } else if kind.is_file()

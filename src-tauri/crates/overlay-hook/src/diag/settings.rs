@@ -99,6 +99,7 @@ fn dump_switch() -> Option<PathBuf> {
 /// the other developer files; a release build writes none until the app names a base.
 fn ring_switch() -> Option<PathBuf> {
     let developer = || developer_dir().map(|dir| dir.join("overlay-decisions"));
+
     match std::env::var_os(ENV_RING) {
         Some(value) if value.is_empty() || value == "off" => None,
         Some(value) if value == "1" || value == "on" => developer(),

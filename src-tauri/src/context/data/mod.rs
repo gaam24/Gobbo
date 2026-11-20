@@ -262,18 +262,23 @@ impl Data {
         let Ok(entries) = fs::read_dir(self.dir.join("state")) else {
             return states;
         };
+
         for entry in entries.filter_map(std::result::Result::ok) {
             let path = entry.path();
+
             if !path.is_dir() || !path.join(JOURNAL_FILE).is_file() {
                 continue;
             }
+
             let id = entry.file_name().to_string_lossy().into_owned();
+
             if marker_applied(&path) {
                 states.prepared.insert(id, path);
             } else {
                 states.incomplete.insert(id, path);
             }
         }
+
         states
     }
 
@@ -308,9 +313,11 @@ impl Data {
     pub fn save_profiles(&self, profiles: &Profiles) -> Result<(), AppError> {
         let path = self.profiles_file();
         profiles.save(&path)?;
+
         if let Some(caches) = &self.caches {
             caches.profiles.store(&path, Arc::new(profiles.clone()));
         }
+
         Ok(())
     }
 
@@ -321,9 +328,11 @@ impl Data {
         library.prune_layouts();
         library.save(&index)?;
         let library = Arc::new(library);
+
         if let Some(cache) = self.library_cache() {
             cache.store(&index, Arc::clone(&library));
         }
+
         Ok(library)
     }
 
@@ -335,15 +344,20 @@ impl Data {
         let Ok(entries) = fs::read_dir(&games) else {
             return;
         };
+
         for entry in entries.flatten() {
             let game = entry.path();
+
             if !game.is_dir() {
                 continue;
             }
+
             store::remove_temp_files(&game);
+
             for folder in ["history", "state"] {
                 let dir = game.join(folder);
                 store::remove_temp_files(&dir);
+
                 if folder == "state"
                     && let Ok(states) = fs::read_dir(&dir)
                 {
@@ -491,6 +505,7 @@ mod tests {
                 br#"{"schema_version":99,"method":"hardlink","files":1,"plan_hash":"abc"}"#,
             ),
         ];
+
         for (name, marker) in cases {
             let (data, state) = state_with_marker(name, marker);
 
@@ -521,6 +536,7 @@ mod tests {
                 br#"{"method":"hardlink","files":1,"plan_hash":"abc"}"#,
             ),
         ];
+
         for (name, marker) in cases {
             let (data, state) = state_with_marker(name, marker);
 

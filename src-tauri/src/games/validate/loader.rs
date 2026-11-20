@@ -13,18 +13,22 @@ impl LoaderDef {
     /// merged game, because an alias may point at a place the game contributes.
     pub(in crate::games) fn validate(&self) -> Vec<String> {
         let mut problems = Problems::default();
+
         if self.schema != 1 {
             problems.push(format!("unknown schema version: {}", self.schema));
         }
+
         if !is_valid_id(&self.id) {
             problems.push(format!(
                 "loader id must contain only lowercase letters, digits or '-': {:?}",
                 self.id
             ));
         }
+
         if self.name.trim().is_empty() {
             problems.push("loader name is empty".to_string());
         }
+
         if self.variants.is_empty() {
             if self.default_variant.is_some() {
                 problems.push("default_variant is set but the loader has no variants".to_string());
@@ -38,6 +42,7 @@ impl LoaderDef {
         } else {
             problems.push("a loader with variants needs default_variant".to_string());
         }
+
         for name in self.variants.keys() {
             if !is_variant(name) {
                 problems.push(format!(
@@ -45,10 +50,12 @@ impl LoaderDef {
                 ));
             }
         }
+
         check_loader_root(&self.deploy, "loader", &mut problems);
         problems.0.extend(duplicate_problems(&self.deploy));
         problems.relative("required file", &self.requires);
         problems.requirements("loader", &self.requirements);
+
         for (name, variant) in &self.variants {
             let what = format!("variant {name}");
             check_loader_root(&variant.deploy, &what, &mut problems);
@@ -56,6 +63,7 @@ impl LoaderDef {
             problems.relative(&format!("{what} required file"), &variant.requires);
             problems.requirements(&what, &variant.requirements);
         }
+
         problems.0
     }
 }
@@ -66,23 +74,29 @@ pub(in crate::games) fn duplicate_problems(deploy: &Deploy) -> Vec<String> {
     let mut problems = Problems::default();
     let mut dirs = BTreeSet::new();
     let places = deploy.slots.iter().map(|slot| &slot.dir);
+
     for dir in places.chain(deploy.mirror.iter().map(|mirror| &mirror.dir)) {
         if !dirs.insert(dir.to_lowercase()) {
             problems.push(format!("folder {dir:?} is a slot or mirror twice"));
         }
     }
+
     let mut aliases = BTreeSet::new();
+
     for name in deploy.aliases.keys() {
         if !aliases.insert(pathkey::path_key(name)) {
             problems.push(format!("alias {name:?} is repeated (case is ignored)"));
         }
     }
+
     let mut names = BTreeSet::new();
+
     for name in &deploy.root_files {
         if !names.insert(pathkey::path_key(name)) {
             problems.push(format!("root file {name:?} is listed twice"));
         }
     }
+
     problems.0
 }
 

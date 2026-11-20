@@ -38,6 +38,7 @@ pub fn plan_from_disk(
     profile: &[crate::domain::profiles::entry::ProfileMod],
 ) -> Result<DeployPlan, DeployError> {
     let mut mods = Vec::with_capacity(profile.len());
+
     for entry in profile {
         let files = if entry.enabled {
             scan::list_files(&library.join(&entry.folder))?
@@ -55,5 +56,6 @@ pub fn plan_from_disk(
             layout: None,
         });
     }
+
     Ok(plan(deploy, &mods, &BTreeMap::new()))
 }

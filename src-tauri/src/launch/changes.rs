@@ -31,13 +31,17 @@ pub(super) fn watch_game_folder(data: &Data) -> Option<(PathBuf, watch::Snapshot
     #[cfg(debug_assertions)]
     {
         std::env::var_os("GOBBO_WATCH_GAME_FOLDER")?;
+
         if !matches!(overlay_session_state(data), Ok(Some(_))) {
             return None;
         }
+
         let root = PathBuf::from(load_settings(data).game_root.trim());
+
         if root.as_os_str().is_empty() {
             return None;
         }
+
         let before = watch::take(&root);
         Some((root, before))
     }

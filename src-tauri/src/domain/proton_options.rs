@@ -32,6 +32,7 @@ pub fn available() -> Vec<String> {
     if cfg!(windows) {
         return Vec::new();
     }
+
     OPTIONS.iter().map(|(id, _, _)| (*id).to_string()).collect()
 }
 
@@ -54,6 +55,7 @@ pub fn switched(chosen: &[String], option: &str, on: bool) -> Vec<String> {
         next.retain(|id| !conflicts(id, option));
         next.push(option.to_string());
     }
+
     known(&next)
 }
 
@@ -75,18 +77,22 @@ fn chosen_options(
     chosen: &[String],
 ) -> impl Iterator<Item = &'static (&'static str, &'static str, &'static str)> {
     let mut kept: Vec<&'static (&'static str, &'static str, &'static str)> = Vec::new();
+
     for option in OPTIONS {
         if !chosen.iter().any(|picked| picked == option.0) {
             continue;
         }
+
         let conflicts = EXCLUSIVE.iter().any(|(a, b)| {
             (option.0 == *a && kept.iter().any(|kept| kept.0 == *b))
                 || (option.0 == *b && kept.iter().any(|kept| kept.0 == *a))
         });
+
         if !conflicts {
             kept.push(option);
         }
     }
+
     kept.into_iter()
 }
 

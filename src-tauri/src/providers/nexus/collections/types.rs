@@ -161,6 +161,7 @@ impl<'de> Deserialize<'de> for Id {
             Number(u64),
             Text(String),
         }
+
         match Value::deserialize(deserializer)? {
             Value::Number(value) => Ok(Self(value)),
             Value::Text(text) => text.parse().map(Self).map_err(serde::de::Error::custom),

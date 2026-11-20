@@ -81,15 +81,19 @@ impl ApiError {
     pub(super) fn into_app(self) -> AppError {
         let (code, kind) = self.code();
         let mut error = AppError::new(code).kind(kind);
+
         if code == crate::error::NEXUS_NOT_FOUND {
             error = error.with("kind", self.endpoint.not_found_kind());
         }
+
         if code == crate::error::KEY_REJECTED {
             error = error.with("provider", super::super::ID);
         }
+
         if let Some(status) = self.status {
             error = error.with("code", status);
         }
+
         let detail = self
             .problem
             .as_ref()
@@ -98,6 +102,7 @@ impl ApiError {
         if let Some(detail) = detail.filter(|text| !text.is_empty()) {
             error = error.with("detail", crate::infra::http::redact(&detail));
         }
+
         error
     }
 

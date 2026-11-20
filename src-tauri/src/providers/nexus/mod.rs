@@ -84,8 +84,10 @@ pub fn account_tier(api_key: &str) -> AccountTier {
     if let Some(tier) = cached_tier(api_key) {
         return tier;
     }
+
     let premium = key::validate_key(api_key).is_ok_and(|(_, premium)| premium);
     remember_tier(api_key, premium);
+
     if premium {
         AccountTier::Premium
     } else {
@@ -289,12 +291,15 @@ fn plain_domain(domain: &str) -> Option<&str> {
 /// The page data mapped to the shared metadata model. Fields the shared model does not name go to `extra`.
 pub(super) fn meta_from_page(page: &ModPage) -> SourceMeta {
     let mut extra = std::collections::BTreeMap::new();
+
     if let Some(uid) = &page.uid {
         extra.insert("uid".to_string(), uid.clone());
     }
+
     if let Some(game_id) = page.game_id {
         extra.insert("game_id".to_string(), game_id.to_string());
     }
+
     SourceMeta {
         name: page.name.clone(),
         author: page.author.clone(),

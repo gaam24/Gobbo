@@ -300,6 +300,7 @@ fn a_readme_in_each_of_several_plugin_roots_is_skipped() {
     let folders: Vec<&str> = import.mods.iter().map(|m| m.folder.as_str()).collect();
     assert_eq!(folders, ["Pack - PriceA", "Pack - PriceB", "Pack - PriceC"]);
     assert_eq!(import.skipped, 3);
+
     for folder in ["Pack - PriceA", "Pack - PriceB", "Pack - PriceC"] {
         assert!(!library.join(folder).join("readme.txt").is_file());
     }

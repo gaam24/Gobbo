@@ -26,6 +26,7 @@ pub fn tail_lines_with_limit(
     let mut chunks: Vec<Vec<u8>> = Vec::new();
     let mut newlines = 0;
     let mut read = 0_u64;
+
     while end > 0 && newlines <= count && read < max_bytes {
         let size = CHUNK.min(max_bytes.saturating_sub(read));
         let start = end.saturating_sub(size);
@@ -37,13 +38,16 @@ pub fn tail_lines_with_limit(
         read += end - start;
         end = start;
     }
+
     chunks.reverse();
     let tail = chunks.concat();
     let text = String::from_utf8_lossy(&tail);
     let mut lines: Vec<&str> = text.lines().collect();
+
     if end > 0 && !lines.is_empty() {
         lines.remove(0);
     }
+
     let start = lines.len().saturating_sub(count);
     Ok(lines[start..]
         .iter()

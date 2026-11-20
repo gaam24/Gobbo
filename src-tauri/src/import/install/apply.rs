@@ -34,11 +34,13 @@ pub fn fail_after(files: usize, kind: io::ErrorKind) {
 fn injected_failure() -> Option<io::ErrorKind> {
     FAIL_AFTER.with(|cell| {
         let (left, kind) = cell.get()?;
+
         if left == 1 {
             cell.set(None);
         } else {
             cell.set(Some((left - 1, kind)));
         }
+
         Some(kind)
     })
 }
@@ -54,6 +56,7 @@ pub fn extract(
 ) -> Result<Staged, InstallError> {
     // A folder takes the slot of its files in a slot; a folder of mirrored files only has none.
     let mut groups: BTreeMap<&str, &str> = BTreeMap::new();
+
     for item in &plan.placed {
         let slot = groups
             .entry(item.group.as_str())
@@ -62,6 +65,7 @@ pub fn extract(
             *slot = item.slot.as_str();
         }
     }
+
     let position: BTreeMap<&str, usize> = groups
         .keys()
         .enumerate()
@@ -93,14 +97,17 @@ pub fn extract(
     // entry was logarithmic in the number of entries.
     let mut by_index: Vec<Option<&Placed>> = vec![None; archive.entries().len()];
     let mut group_at: Vec<Option<usize>> = vec![None; archive.entries().len()];
+
     for item in &plan.placed {
         by_index[item.index] = Some(item);
         group_at[item.index] = position.get(item.group.as_str()).copied();
     }
+
     archive.visit::<InstallError>(&wanted, |index, data| {
         if crate::infra::tasks::cancelled(cancel) {
             return Err(InstallError::Cancelled);
         }
+
         let item = by_index[index].ok_or(InstallError::UnknownLayout)?;
         let at = group_at[index].ok_or(InstallError::UnknownLayout)?;
         let dst = group_dirs[at].join(&item.rel);
@@ -108,13 +115,16 @@ pub fn extract(
         if let Some(kind) = injected_failure() {
             return Err(FileError::new(&dst, io::Error::from(kind)).into());
         }
+
         if let Some(parent) = dst.parent()
             && !known_dirs.contains(parent)
         {
             fs::create_dir_all(parent).map_err(|e| FileError::new(parent, e))?;
             known_dirs.insert(parent.to_path_buf());
         }
+
         let mut out = File::create(&dst).map_err(|e| FileError::new(&dst, e))?;
+
         match reporter.copy_cancellable(data, &mut out, cancel) {
             Ok(()) => {}
             Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {
@@ -122,6 +132,7 @@ pub fn extract(
             }
             Err(error) => return Err(FileError::new(&dst, error).into()),
         }
+
         mods[at].files += 1;
         mods[at].paths.push(item.rel.clone());
         mods[at].size_bytes = mods[at]
@@ -136,6 +147,7 @@ pub fn extract(
         if crate::infra::tasks::cancelled(cancel) {
             return Err(InstallError::Cancelled);
         }
+
         let path = &group_dirs[at];
         let (digest, files, bytes) =
             crate::infra::fs::hash_tree(path).map_err(|error| FileError::new(path, error))?;
@@ -145,6 +157,7 @@ pub fn extract(
             bytes,
         });
     }
+
     Ok(Staged {
         dir: dir.to_path_buf(),
         mods,
@@ -162,6 +175,7 @@ pub fn place(
     naming: Naming<'_>,
 ) -> Result<Import, InstallError> {
     let mut named: Vec<(String, usize)> = Vec::with_capacity(staged.mods.len());
+
     for (at, staged_mod) in staged.mods.iter().enumerate() {
         let wanted = wanted_name(naming.base_name, staged.mods.len(), &staged_mod.group);
         let name = match naming.only {
@@ -178,14 +192,18 @@ pub fn place(
         skipped_files: std::mem::take(&mut staged.skipped_files),
         ..Import::default()
     };
+
     for (name, at) in named {
         let target = library.join(&name);
+
         if let Err(error) = fs::rename(staged.dir.join(at.to_string()), &target) {
             for moved in &import.mods {
                 let _ = fs::remove_dir_all(library.join(&moved.folder));
             }
+
             return Err(FileError::new(&target, error).into());
         }
+
         let mut paths = std::mem::take(&mut staged.mods[at].paths);
         paths.sort_unstable();
         import.mods.push(Installed {
@@ -197,5 +215,6 @@ pub fn place(
             integrity: staged.mods[at].integrity.clone(),
         });
     }
+
     Ok(import)
 }

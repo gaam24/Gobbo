@@ -67,12 +67,15 @@ impl PackMod {
     pub fn source_ref(&self, provider: &ProviderId) -> Option<crate::domain::source::SourceRef> {
         let source = self.sources.get(provider)?;
         let mut reference = source.source(provider);
+
         if let Some(part_id) = self.source_parts.get(provider) {
             reference = reference.with_part(part_id.clone());
         }
+
         if let Some(file_id) = self.source_files.get(provider) {
             reference = reference.with_file(file_id.clone());
         }
+
         Some(reference)
     }
 
@@ -112,15 +115,18 @@ impl PackMod {
             let Some(theirs) = other.sources.get(provider) else {
                 continue;
             };
+
             if source.mod_id != theirs.mod_id {
                 continue;
             }
+
             if let (Some(file), Some(their_file)) = (
                 self.source_files.get(provider),
                 other.source_files.get(provider),
             ) {
                 return file == their_file;
             }
+
             let part = source
                 .part_id
                 .as_ref()
@@ -133,6 +139,7 @@ impl PackMod {
                 return true;
             }
         }
+
         self.family == other.family
             || (!(self.has_source() && other.has_source()) && self.name == other.name)
     }

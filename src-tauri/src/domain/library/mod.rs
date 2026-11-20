@@ -74,6 +74,7 @@ impl Library {
         if let Some(text) = version.info.version.as_deref() {
             return Some(Cow::Borrowed(text));
         }
+
         self.archive_label_of(version)
             .map(|label| Cow::Owned(label.version.clone()))
     }

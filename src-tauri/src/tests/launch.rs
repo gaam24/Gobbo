@@ -610,12 +610,15 @@ fn cancelling_a_running_tool_stops_its_process_and_reports_a_null_code() {
     // namespace and the spawned program, so allow more than the nominal five seconds of a quiet machine.
     let deadline = Instant::now() + Duration::from_secs(15);
     let mut process = None;
+
     while process.is_none() && Instant::now() < deadline {
         process = Process::by_program(&program);
+
         if process.is_none() {
             std::thread::sleep(Duration::from_millis(25));
         }
     }
+
     let process = process.expect("the helper is running in the overlay");
     assert!(process.exists());
 
@@ -631,9 +634,11 @@ fn cancelling_a_running_tool_stops_its_process_and_reports_a_null_code() {
     );
 
     let gone_deadline = Instant::now() + Duration::from_secs(10);
+
     while process.exists() && Instant::now() < gone_deadline {
         std::thread::sleep(Duration::from_millis(25));
     }
+
     assert!(!process.exists(), "the helper process was terminated");
     assert_eq!(
         tool_task_state(notice.code, notice.cancelled),

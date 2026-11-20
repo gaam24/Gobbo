@@ -50,6 +50,7 @@ impl CollectionSource for NexusCollections {
         if !is_slug(game_key, false) || !is_slug(slug, true) {
             return None;
         }
+
         Some(format!(
             "https://www.nexusmods.com/games/{game_key}/collections/{slug}"
         ))

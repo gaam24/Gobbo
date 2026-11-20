@@ -24,9 +24,11 @@ pub fn bisect_start(root: &Data, game_id: &str) -> Result<(), AppError> {
     let data = root.game(game_id);
     let Loaded { library, .. } = load_game(root, game_id)?;
     let _profiles = lock_profiles();
+
     if read(&data).is_some() {
         return Err(AppError::user("bisect.running"));
     }
+
     let mut profiles = load_profiles(&data)?;
     let profile = profiles.active();
     let suspects: Vec<String> = profile
@@ -37,6 +39,7 @@ pub fn bisect_start(root: &Data, game_id: &str) -> Result<(), AppError> {
     if suspects.len() < 2 {
         return Err(AppError::user("bisect.not_enough"));
     }
+
     let mut search = Search {
         profile: profile.id.clone(),
         original: profile
@@ -60,9 +63,11 @@ pub fn bisect_answer(root: &Data, game_id: &str, broken: bool) -> Result<(), App
     let Loaded { library, .. } = load_game(root, game_id)?;
     let _profiles = lock_profiles();
     let mut search = read(&data).ok_or_else(not_running)?;
+
     if search.suspects.len() < 2 {
         return Err(AppError::user("bisect.done"));
     }
+
     let testing: BTreeSet<&String> = search.testing.iter().collect();
     let (on, off): (Vec<String>, Vec<String>) = search
         .suspects
@@ -84,6 +89,7 @@ pub fn bisect_stop(root: &Data, game_id: &str, disable_found: bool) -> Result<()
     let _profiles = lock_profiles();
     let search = read(&data).ok_or_else(not_running)?;
     let mut profiles = load_profiles(&data)?;
+
     if let Ok(profile) = profiles.get_mut(&search.profile) {
         let found =
             (disable_found && search.suspects.len() == 1).then(|| search.suspects[0].clone());
@@ -92,8 +98,10 @@ pub fn bisect_stop(root: &Data, game_id: &str, disable_found: bool) -> Result<()
                 entry.enabled = *enabled && found.as_ref() != Some(&entry.id);
             }
         }
+
         data.save_profiles(&profiles)?;
     }
+
     fs::remove_file(file(&data)).map_err(io_at(&file(&data)))
 }
 
@@ -103,6 +111,7 @@ fn next_test(search: &mut Search, library: &Library, profile: &mut Profile) {
     if search.suspects.len() < 2 {
         return;
     }
+
     search.step += 1;
     let half = search.suspects.len().div_ceil(2);
     search.testing = search.suspects[..half].to_vec();
@@ -121,6 +130,7 @@ fn next_test(search: &mut Search, library: &Library, profile: &mut Profile) {
         .collect();
     // Requirements follow the mods that need them, as far as they were on before the search.
     let mut queue: Vec<String> = on.iter().cloned().collect();
+
     while let Some(id) = queue.pop() {
         let requires = library
             .families
@@ -133,6 +143,7 @@ fn next_test(search: &mut Search, library: &Library, profile: &mut Profile) {
             }
         }
     }
+
     for entry in &mut profile.mods {
         entry.enabled = on.contains(&entry.id);
     }

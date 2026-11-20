@@ -97,6 +97,7 @@ impl CollectionItem {
         let mut sources = BTreeMap::new();
         let mut source_files = BTreeMap::new();
         let mut source_parts = BTreeMap::new();
+
         if let CollectionSource::Provider {
             provider,
             mod_id,
@@ -106,9 +107,11 @@ impl CollectionItem {
         {
             let provider = ProviderId::new(provider.as_str());
             source_files.insert(provider.clone(), file_id.clone());
+
             if let Some(part_id) = part_id {
                 source_parts.insert(provider.clone(), part_id.clone());
             }
+
             sources.insert(
                 provider,
                 SourceMod {
@@ -128,6 +131,7 @@ impl CollectionItem {
                 },
             );
         }
+
         PackMod {
             name: self.name.clone(),
             version: self.version.clone(),

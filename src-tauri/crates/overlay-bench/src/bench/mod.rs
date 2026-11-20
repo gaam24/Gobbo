@@ -66,6 +66,7 @@ impl Fixture {
             upper: base.join("upper"),
             outside: base.join("outside"),
         };
+
         for dir in [
             &fixture.game,
             &fixture.mods,
@@ -74,6 +75,7 @@ impl Fixture {
         ] {
             fs::create_dir_all(dir)?;
         }
+
         for root in [&fixture.game, &fixture.outside] {
             write(root.join("read").join("a.bin"), b"read-root")?;
             write(root.join("write").join("w.bin"), &[b'w'; 4096])?;
@@ -91,6 +93,7 @@ impl Fixture {
                 b"x",
             )?;
         }
+
         for number in 0..1000 {
             write(
                 fixture.game.join("big").join(format!("b{number:04}.bin")),
@@ -144,6 +147,7 @@ impl Fixture {
                 b"mod",
             )?;
         }
+
         for number in 0..10 {
             write(
                 fixture
@@ -153,6 +157,7 @@ impl Fixture {
                 b"mod",
             )?;
         }
+
         for number in 0..16 {
             write(
                 fixture.mods.join("list").join(format!("m{number}.txt")),
@@ -162,10 +167,12 @@ impl Fixture {
         // Names outside ASCII: the fold rule must not build a `String` per entry on the common path.
         for root in [&fixture.game, &fixture.outside] {
             write(root.join("zażółć").join("ąć.bin"), b"non-ascii")?;
+
             for number in 0..64 {
                 write(root.join("zażółć").join(format!("ąć{number:02}.bin")), b"x")?;
             }
         }
+
         for number in 0..8 {
             write(
                 fixture
@@ -181,6 +188,7 @@ impl Fixture {
                 write(root.join("lower").join(format!("l{number}.bin")), b"lower")?;
             }
         }
+
         for number in 0..iterations.min(MAX_WHITEOUT) {
             for root in [&fixture.game, &fixture.outside] {
                 write(
@@ -189,6 +197,7 @@ impl Fixture {
                 )?;
             }
         }
+
         Ok(fixture)
     }
 
@@ -206,6 +215,7 @@ fn write(path: PathBuf, contents: &[u8]) -> Result<(), Box<dyn Error>> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
+
     fs::write(path, contents)?;
     Ok(())
 }
@@ -230,11 +240,14 @@ struct Row {
 fn read_rows(path: &Path) -> Result<Vec<Row>, Box<dyn Error>> {
     let text = fs::read_to_string(path)?;
     let mut rows = Vec::new();
+
     for line in text.lines().skip(1) {
         let fields: Vec<&str> = line.split(',').collect();
+
         if fields.len() != 12 {
             continue;
         }
+
         rows.push(Row {
             operation: fields[0].to_string(),
             p50: fields[1].parse()?,
@@ -250,6 +263,7 @@ fn read_rows(path: &Path) -> Result<Vec<Row>, Box<dyn Error>> {
             io: fields[11].parse()?,
         });
     }
+
     Ok(rows)
 }
 
@@ -277,8 +291,10 @@ fn check(results: &[(Mode, Vec<Row>)]) -> Result<(), String> {
         ("list_nonascii", 48.0, 16.0, 10_000),
         ("metadata_nonascii", 8.0, 0.0, 500),
     ];
+
     for (operation, max_allocs, max_spelling, max_p50) in budgets {
         let operation = row(operation)?;
+
         if operation.hook_allocs > max_allocs
             || operation.spelling > max_spelling
             || operation.p50 > max_p50.saturating_mul(1000)
@@ -294,12 +310,14 @@ fn check(results: &[(Mode, Vec<Row>)]) -> Result<(), String> {
     }
     // A missing read asks the three layers once each; the parent's state is already in their answers.
     let missing = row("missing")?;
+
     if missing.probes > 3.0 {
         return Err(format!(
             "missing over probe budget: {:.2} (max 3)",
             missing.probes
         ));
     }
+
     Ok(())
 }
 
@@ -316,6 +334,7 @@ fn run(
     let base = std::env::temp_dir().join(format!("gobbo-overlay-bench-{}", std::process::id()));
     let _ = fs::remove_dir_all(&base);
     fs::create_dir_all(&base)?;
+
     if !json {
         println!("fixture: {}", base.display());
         println!("hook:    {}", hook.display());
@@ -325,8 +344,10 @@ fn run(
     }
 
     let mut measured = Vec::new();
+
     for round in 0..rounds.max(1) {
         let mut results = Vec::new();
+
         for mode in Mode::ALL {
             let dir = base.join(format!("{round}-{}", mode.name()));
             let fixture = Fixture::prepare(&dir, iterations)?;
@@ -344,6 +365,7 @@ fn run(
             };
             spawn_worker(mode, &exe, &hook, &fixture, &run)?;
             let rows = read_rows(&result)?;
+
             if mode == Mode::PassThrough {
                 for row in &rows {
                     if row.hook_allocs > 0.0 || row.probes > 0.0 || row.locks > 0.0 || row.io > 0.0
@@ -356,27 +378,35 @@ fn run(
                     }
                 }
             }
+
             results.push((mode, rows));
         }
+
         measured.push(results);
     }
+
     let results = aggregate(measured);
+
     if check_budgets {
         check(&results)?;
     }
+
     if json {
         print_json(&results);
     } else {
         print_table(&results);
     }
+
     Ok(())
 }
 
 /// The median of the per-round rows. Every round has the same modes and operations in the same order.
 fn aggregate(rounds: Vec<Vec<(Mode, Vec<Row>)>>) -> Vec<(Mode, Vec<Row>)> {
     let mut merged = Vec::new();
+
     for (mode_index, (mode, rows)) in rounds[0].iter().enumerate() {
         let mut merged_rows = Vec::new();
+
         for (operation_index, row) in rows.iter().enumerate() {
             let values: Vec<&Row> = rounds
                 .iter()
@@ -397,8 +427,10 @@ fn aggregate(rounds: Vec<Vec<(Mode, Vec<Row>)>>) -> Vec<(Mode, Vec<Row>)> {
                 io: median_f64(values.iter().map(|row| row.io)),
             });
         }
+
         merged.push((*mode, merged_rows));
     }
+
     merged
 }
 
@@ -439,9 +471,11 @@ fn spawn_worker(
         // The baseline has no hook, so a missing counter is expected there and not a build mistake.
         u8::from(mode != Mode::Baseline).to_string(),
     ];
+
     match mode {
         Mode::Baseline => {
             let status = Command::new(exe).args(&args).status()?;
+
             if !status.success() {
                 return Err(format!("baseline worker failed: {status}").into());
             }
@@ -456,6 +490,7 @@ fn spawn_worker(
             for name in OFF_SWITCHES {
                 env.push((name.to_string(), "off".to_string()));
             }
+
             let launch = Launch {
                 program: exe,
                 args: &args,
@@ -469,11 +504,13 @@ fn spawn_worker(
             };
             let hooked = spawn_hooked(&launch)?;
             let code = hooked.wait()?;
+
             if code != 0 {
                 return Err(format!("{} worker exited with 0x{code:08x}", mode.name()).into());
             }
         }
     }
+
     Ok(())
 }
 
@@ -501,6 +538,7 @@ fn print_table(results: &[(Mode, Vec<Row>)]) {
         "| mode | operation | p50 µs | p95 µs | p99 µs | mean µs | worker allocs/op | hook allocs/op | hook bytes/op | spelling/op | probes/op | locks/op | io/op |"
     );
     println!("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
+
     for (mode, rows) in results {
         for row in rows {
             println!(
@@ -530,6 +568,7 @@ fn print_table(results: &[(Mode, Vec<Row>)]) {
         "| operation | pass-through p50 | active p50 | active hook allocs/op | active probes/op | active locks/op | active io/op |"
     );
     println!("|---|---:|---:|---:|---:|---:|---:|");
+
     for row in baseline {
         let Some(active) = results
             .iter()
@@ -571,6 +610,7 @@ fn print_table(results: &[(Mode, Vec<Row>)]) {
 /// Prints the same rows as JSON, for a CI threshold or a stored measurement.
 fn print_json(results: &[(Mode, Vec<Row>)]) {
     let mut modes = Vec::new();
+
     for (mode, rows) in results {
         let rows: Vec<String> = rows
             .iter()
@@ -598,6 +638,7 @@ fn print_json(results: &[(Mode, Vec<Row>)]) {
             rows.join(",")
         ));
     }
+
     println!(r#"{{"modes":[{}]}}"#, modes.join(","));
 }
 
@@ -612,9 +653,11 @@ pub fn main() {
 fn run_main() -> Result<(), Box<dyn Error>> {
     let mut args = std::env::args().skip(1);
     let first = args.next();
+
     if first.as_deref() == Some("--ring") {
         return ring::run();
     }
+
     if first.as_deref() == Some("--worker") {
         let dir = args.next().ok_or("--worker needs a directory")?;
         let iterations = args.next().ok_or("--worker needs iterations")?.parse()?;
@@ -635,12 +678,14 @@ fn run_main() -> Result<(), Box<dyn Error>> {
             hooked,
         );
     }
+
     let mut iterations = 5_000;
     let mut warmup = 500;
     let mut rounds = 1;
     let mut json = false;
     let mut check_budgets = false;
     let mut next = first;
+
     while let Some(arg) = next.take().or_else(|| args.next()) {
         match arg.as_str() {
             "--iterations" => {
@@ -667,6 +712,7 @@ fn run_main() -> Result<(), Box<dyn Error>> {
             other => return Err(format!("unknown argument: {other}").into()),
         }
     }
+
     run(
         iterations.max(1),
         warmup,

@@ -9,9 +9,11 @@ use gobbo_overlay_core::{Whiteouts, relative_to, wildcard_match};
 
 fn whiteouts() -> Whiteouts {
     let mut whiteouts = Whiteouts::default();
+
     for number in 0..1_000 {
         whiteouts.hide(&format!(r"content\archive{number}\data\file{number}.bin"));
     }
+
     whiteouts
 }
 

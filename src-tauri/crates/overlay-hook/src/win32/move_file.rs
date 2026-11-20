@@ -34,11 +34,13 @@ unsafe fn move_file_common(
     original: impl FnOnce() -> i32,
 ) -> i32 {
     unsafe { trace_call(operation, from) };
+
     if let Some(_guard) = enter_session()
         && let Some(result) = unsafe { move_in_game(from, to, flags, mover) }
     {
         return result;
     }
+
     if crate::diag::settings().pass_writes {
         let from = unsafe { display_name(from) };
         let to = unsafe { display_name(to) };
@@ -46,6 +48,7 @@ unsafe fn move_file_common(
             "pass-through {operation} {from} -> {to} flags=0x{flags:x}"
         ));
     }
+
     let moved = original();
     let _last_error = PreserveLastError::capture();
     moved
@@ -141,17 +144,21 @@ unsafe fn move_in_game(
     if unsafe { unsafe_name(from) } || unsafe { unsafe_name(to) } {
         return Some(fail(ERROR_ACCESS_DENIED));
     }
+
     let from_place = unsafe { place(from) };
     let to_place = unsafe { place(to) };
+
     if from_place.is_none() && to_place.is_none() {
         return None;
     }
+
     if let (Some(source), Some(target)) = (&from_place, &to_place)
         && !std::ptr::eq(source.mount, target.mount)
     {
         // A move between two mounts would copy between two profile layers. Refuse rather than guess.
         return Some(fail(ERROR_ACCESS_DENIED));
     }
+
     if let Some(code) = move_refusal(flags) {
         // A move at reboot is stored in the registry for a real path; a layer path would be gone by then.
         return Some(fail(code));
@@ -173,9 +180,11 @@ unsafe fn move_in_game(
                 Ok(shown) => shown.is_some(),
                 Err(failure) => return Some(fail(failure.win32())),
             };
+
             if name_taken(same_entry, replace, || target_shown) {
                 return Some(fail(ERROR_ALREADY_EXISTS));
             }
+
             match make_write_target(place.mount, &place.rel) {
                 Ok(path) => path,
                 Err(failure) => return Some(fail(failure.win32())),
@@ -200,18 +209,21 @@ unsafe fn move_in_game(
     let dest_wide = wide(dest.as_os_str());
     let moved = mover(source_wide.as_ptr(), dest_wide.as_ptr());
     let _last_error = PreserveLastError::capture();
+
     if moved != 0
         && below
         && let Some(place) = &from_place
     {
         hide(place.mount, &place.rel);
     }
+
     if moved != 0
         && replaces_below
         && let Some(place) = &to_place
     {
         hide(place.mount, &place.rel);
     }
+
     Some(moved)
 }
 

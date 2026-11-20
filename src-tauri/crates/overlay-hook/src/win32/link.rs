@@ -24,6 +24,7 @@ pub(crate) unsafe extern "system" fn create_hard_link(
     {
         return fail(ERROR_ACCESS_DENIED);
     }
+
     let original = original!(create_hard_link, {
         fail(ERROR_INVALID_FUNCTION);
         0
@@ -48,6 +49,7 @@ pub(crate) unsafe extern "system" fn create_symbolic_link(
         let _ = fail(ERROR_ACCESS_DENIED);
         return 0;
     }
+
     let original = original!(create_symbolic_link, {
         let _ = fail(ERROR_INVALID_FUNCTION);
         0

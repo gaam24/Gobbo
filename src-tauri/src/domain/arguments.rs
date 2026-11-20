@@ -6,21 +6,27 @@ use crate::error::AppError;
 /// The value may contain `=` and spaces. When a pair of quotes surrounds it, the quotes are removed.
 pub fn parse_env(text: &str) -> Result<Vec<(String, String)>, AppError> {
     let mut vars = Vec::new();
+
     for (index, line) in text.lines().enumerate() {
         let line = line.trim();
+
         if line.is_empty() {
             continue;
         }
+
         let number = index + 1;
         let (name, value) = line
             .split_once('=')
             .ok_or_else(|| AppError::user("launch.env_no_equals").with("line", number))?;
         let name = name.trim();
+
         if name.is_empty() || name.contains(char::is_whitespace) {
             return Err(AppError::user("launch.env_bad_name").with("line", number));
         }
+
         vars.push((name.to_string(), unquote(value.trim()).to_string()));
     }
+
     Ok(vars)
 }
 
@@ -47,14 +53,17 @@ pub fn native_first_overrides(existing: Option<&str>, dlls: &[&str]) -> Option<S
         .map(override_name)
         .collect();
     let mut added = false;
+
     for dll in dlls {
         let name = override_name(dll);
+
         if !name.is_empty() && !named.contains(&name) {
             parts.push(format!("{}=n,b", dll.trim()));
             named.push(name);
             added = true;
         }
     }
+
     added.then(|| parts.join(";"))
 }
 

@@ -29,6 +29,7 @@ fn check_key(provider: &dyn SourceProvider, link_key: bool) -> Result<(), AppErr
     if !link_key {
         required_key(provider)?;
     }
+
     Ok(())
 }
 
@@ -67,16 +68,20 @@ fn transfer(
             if cancelled(cancel) {
                 return false;
             }
+
             on_bytes(received, total);
             true
         },
     );
+
     if cancelled(cancel) {
         if let Ok(downloaded) = &downloaded {
             let _ = crate::infra::sidecar::delete_download(&downloaded.path);
         }
+
         return Err(AppError::user(DOWNLOAD_CANCELLED));
     }
+
     downloaded
 }
 
@@ -92,6 +97,7 @@ pub fn fetch(
     let mut last = None;
     transfer(provider, request, cancel, &mut |received, total| {
         let percent = crate::domain::progress::percent(received, total).unwrap_or(0);
+
         if last != Some(percent) {
             on_percent(percent);
             last = Some(percent);
@@ -149,11 +155,13 @@ mod tests {
             let path = request.directory.join("fake.zip");
             std::fs::write(&path, "archive").map_err(io_at(&path))?;
             crate::infra::sidecar::write_source(&path, request.source.clone());
+
             for &(received, total) in self.chunks {
                 if !progress(received, total) {
                     break;
                 }
             }
+
             Ok(SourceDownloaded {
                 path,
                 source: request.source,

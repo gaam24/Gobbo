@@ -49,6 +49,7 @@ fn empty_list_state(n: usize) -> ListState {
 pub fn history_states(n: usize) -> (ListState, ListState) {
     let mut old = empty_list_state(n);
     let mut now = empty_list_state(n);
+
     for index in 0..n {
         let entry = |enabled| crate::domain::profiles::Entry {
             id: format!("nexus:{index}"),
@@ -59,6 +60,7 @@ pub fn history_states(n: usize) -> (ListState, ListState) {
         old.mods.push(entry(true));
         now.mods.push(entry(index % 2 == 0));
     }
+
     (old, now)
 }
 
@@ -67,6 +69,7 @@ pub fn history_states(n: usize) -> (ListState, ListState) {
 pub fn synthetic_library(mods: usize, files: usize) -> (Library, Vec<ProfileMod>) {
     let mut library = Library::default();
     let mut profile = Vec::with_capacity(mods);
+
     for m in 0..mods {
         let folder = format!("mod{m}");
         let mut paths: Vec<String> = (0..files)
@@ -115,6 +118,7 @@ pub fn synthetic_library(mods: usize, files: usize) -> (Library, Vec<ProfileMod>
             priority: None,
         });
     }
+
     (library, profile)
 }
 
@@ -131,9 +135,11 @@ pub fn synthetic_library_realistic(
     let versions = versions.max(1);
     let mut library = Library::default();
     let mut profile = Vec::with_capacity(mods);
+
     for m in 0..mods {
         let family = format!("nexus:{m}");
         let mut selected = None;
+
         for v in 0..versions {
             let folder = if versions == 1 {
                 format!("mod{m}")
@@ -172,10 +178,12 @@ pub fn synthetic_library_realistic(
                     integrity: None,
                 },
             );
+
             if v == 0 {
                 selected = Some(folder);
             }
         }
+
         library.families.insert(
             family.clone(),
             Family {
@@ -216,12 +224,14 @@ pub fn synthetic_library_realistic(
             priority: None,
         });
     }
+
     (library, profile)
 }
 
 /// One family with `versions` installed versions, each with `files` files.
 pub fn synthetic_family(versions: usize, files: usize) -> Library {
     let mut library = Library::default();
+
     for v in 0..versions {
         let folder = format!("mod{v}");
         let mut paths: Vec<String> = (0..files)
@@ -252,6 +262,7 @@ pub fn synthetic_family(versions: usize, files: usize) -> Library {
             },
         );
     }
+
     library
 }
 
@@ -302,9 +313,11 @@ pub fn archive_fixture(size: usize) -> (std::path::PathBuf, std::path::PathBuf) 
     let dir = std::env::temp_dir().join(format!("gobbo-bench-archive-{}", std::process::id()));
     std::fs::create_dir_all(&dir).expect("the benchmark folder");
     let source = dir.join("source.zip");
+
     if std::fs::metadata(&source).map_or(0, |meta| meta.len()) != size as u64 {
         std::fs::write(&source, vec![0x5a_u8; size]).expect("the benchmark archive");
     }
+
     (source, dir.join("target.zip"))
 }
 
@@ -352,9 +365,11 @@ impl StatusFixture {
         let game = root.game("the-witcher-3-wild-hunt");
         let library_dir = game.dir.join("library");
         std::fs::create_dir_all(&library_dir).expect("the benchmark library");
+
         for folder in library.versions.keys() {
             std::fs::create_dir_all(library_dir.join(folder)).expect("a benchmark mod folder");
         }
+
         library.save(&game.index()).expect("the benchmark index");
         let entries = profile
             .into_iter()
@@ -404,6 +419,7 @@ impl StatusFixture {
         std::fs::create_dir_all(&state).expect("the benchmark state");
         let journal = crate::deploy::journal::Journal::new(state.join("journal.jsonl"));
         let slot_root = self.dir.join("game").join(&slot.dir);
+
         for (folder, version) in &library.versions {
             let own = crate::domain::naming::deploy_name(&slot.prefix, &version.info.name, folder);
             let dir = slot_root.join(&own);
@@ -419,6 +435,7 @@ impl StatusFixture {
                     .expect("the benchmark journal file");
             }
         }
+
         drop(journal);
         self
     }
@@ -494,6 +511,7 @@ fn payload(index: usize, bytes: usize) -> Vec<u8> {
         state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
         *byte = (state >> 24) as u8;
     }
+
     payload
 }
 
@@ -528,6 +546,7 @@ impl ImportFixture {
                 .write_all(&payload(index, bytes))
                 .expect("a benchmark file");
         }
+
         writer.finish().expect("the benchmark archive");
         Self { dir, source }
     }
@@ -546,6 +565,7 @@ impl ImportFixture {
         writer.set_content_methods(vec![sevenz_rust2::EncoderConfiguration::new(
             sevenz_rust2::EncoderMethod::COPY,
         )]);
+
         for index in 0..files {
             let entry = sevenz_rust2::ArchiveEntry::new_file(&format!(
                 "Mods/bench/content/file_{index}.bin"
@@ -554,6 +574,7 @@ impl ImportFixture {
                 .push_archive_entry(entry, Some(std::io::Cursor::new(payload(index, bytes))))
                 .expect("a benchmark archive entry");
         }
+
         writer.finish().expect("the benchmark archive");
         Self { dir, source }
     }
@@ -636,11 +657,13 @@ impl ImportPlanFixture {
                     .expect("a benchmark archive entry");
                 writer.write_all(b"x").expect("a benchmark file");
             }
+
             writer
                 .start_file(format!("DLC/dlc{index}/content/file.bin"), options)
                 .expect("a benchmark archive entry");
             writer.write_all(b"x").expect("a benchmark file");
         }
+
         writer.finish().expect("the benchmark archive");
         Self {
             dir,
@@ -688,6 +711,7 @@ impl DeployFixture {
         let _ = std::fs::remove_dir_all(&dir);
         let (records, profile) = synthetic_library(mods, files);
         let library_dir = dir.join("library");
+
         for (folder, version) in &records.versions {
             for relative in version.files.iter() {
                 let path = library_dir.join(folder).join(relative);
@@ -696,6 +720,7 @@ impl DeployFixture {
                 std::fs::write(&path, b"x").expect("a benchmark mod file");
             }
         }
+
         let game_root = dir.join("game");
         std::fs::create_dir_all(&game_root).expect("the benchmark game folder");
         let target = Target {
@@ -814,12 +839,14 @@ impl WatchFixture {
         let dir =
             std::env::temp_dir().join(format!("gobbo-bench-watch-{}-{files}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
+
         for number in 0..files {
             let folder = dir.join(format!("d{}", number / 1_000));
             std::fs::create_dir_all(&folder).expect("a benchmark watch folder");
             std::fs::write(folder.join(format!("f{number}.bin")), b"x")
                 .expect("a benchmark watch file");
         }
+
         let before = watch::take(&dir);
         std::fs::write(dir.join("d0/f0.bin"), b"changed").expect("a changed benchmark file");
         std::fs::write(dir.join("new.bin"), b"new").expect("a new benchmark file");

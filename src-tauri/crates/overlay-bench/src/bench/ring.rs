@@ -19,6 +19,7 @@ pub(super) fn run() -> Result<(), Box<dyn Error>> {
     let mut ring = Ring::open(&path)?;
 
     let mut writes = Histogram::<u64>::new(3).map_err(|error| error.to_string())?;
+
     for index in 0..RECORDS {
         let start = Instant::now();
         ring.record(
@@ -42,12 +43,15 @@ pub(super) fn run() -> Result<(), Box<dyn Error>> {
     }
 
     let mut reads = Histogram::<u64>::new(3).map_err(|error| error.to_string())?;
+
     for _ in 0..READS {
         let start = Instant::now();
         let (decisions, total) = gobbo_overlay_decisions::read_last(&path, 100)?;
+
         if total as usize != RECORDS || decisions.len() != 100 {
             return Err("the ring benchmark read the wrong number of decisions".into());
         }
+
         reads
             .record(
                 u64::try_from(start.elapsed().as_nanos())

@@ -41,6 +41,7 @@ pub(super) fn mod_views(
             })
             .collect());
     }
+
     let chunk_size = listed.len().div_ceil(workers);
     let mut mods = Vec::with_capacity(listed.len());
     std::thread::scope(|scope| -> Result<(), AppError> {
@@ -75,6 +76,7 @@ pub(super) fn mod_views(
                 .map_err(|_| AppError::unexpected("a status worker panicked"))?;
             mods.extend(part);
         }
+
         Ok(())
     })?;
     Ok(mods)

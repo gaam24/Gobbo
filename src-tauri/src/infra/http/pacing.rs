@@ -27,27 +27,33 @@ impl Pacer {
         let DownloadPolicy::WindowBudget { max, window } = policy else {
             return;
         };
+
         loop {
             let mut starts = self.starts.lock().unwrap_or_else(PoisonError::into_inner);
             let now = Instant::now();
+
             while starts
                 .front()
                 .is_some_and(|start| now.duration_since(*start) >= window)
             {
                 starts.pop_front();
             }
+
             if starts.len() < max as usize {
                 starts.push_back(now);
                 return;
             }
+
             let Some(oldest) = starts.front().copied() else {
                 return;
             };
             let delay = window.saturating_sub(now.duration_since(oldest));
             drop(starts);
+
             if delay.is_zero() {
                 continue;
             }
+
             std::thread::sleep(delay);
         }
     }
@@ -85,6 +91,7 @@ impl ApiBudget {
             .lock()
             .unwrap_or_else(PoisonError::into_inner);
         let reset = *self.reset.lock().unwrap_or_else(PoisonError::into_inner);
+
         if let (Some(0), Some(reset)) = (remaining, reset)
             && let Ok(delay) = reset.duration_since(SystemTime::now())
             && !delay.is_zero()
@@ -171,9 +178,11 @@ mod tests {
     fn an_unlimited_policy_never_waits() {
         let clock = Pacer::default();
         let started = Instant::now();
+
         for _ in 0..20 {
             clock.wait(DownloadPolicy::Unlimited);
         }
+
         assert!(started.elapsed() < Duration::from_secs(1));
     }
 

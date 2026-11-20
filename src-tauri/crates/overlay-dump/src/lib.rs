@@ -54,6 +54,7 @@ impl Monitor {
 
     fn stop_inner(&mut self) {
         self.shutdown.store(true, Ordering::Release);
+
         if let Some(thread) = self.thread.take() {
             let _ = thread.join();
         }
@@ -88,6 +89,7 @@ pub fn start(state: &Path) -> Option<Monitor> {
         .name("overlay-dump".to_string())
         .spawn(move || {
             let mut server = server;
+
             if let Err(error) = server.run(Box::new(Handler::new(&state)), &flag, None) {
                 eprintln!("gobbo: the overlay minidumper stopped: {error}");
             }
@@ -189,6 +191,7 @@ impl ServerHandler for Handler {
                 eprintln!("gobbo: could not write the overlay crash dump: {error}");
             }
         }
+
         LoopAction::Continue
     }
 
@@ -211,6 +214,7 @@ fn prune(dir: &Path) {
         })
         .collect();
     dumps.sort_by_key(|(modified, _)| *modified);
+
     for (_, path) in dumps.iter().take(dumps.len().saturating_sub(KEEP_DUMPS)) {
         let _ = fs::remove_file(path);
     }
@@ -265,11 +269,13 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("gobbo-dumps-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
+
         for number in 0..KEEP_DUMPS + 3 {
             let path = dir.join(format!("crash-{number}.dmp"));
             fs::write(&path, b"x").unwrap();
             std::thread::sleep(Duration::from_millis(2));
         }
+
         prune(&dir);
         assert_eq!(fs::read_dir(&dir).unwrap().count(), KEEP_DUMPS);
         assert!(!dir.join("crash-0.dmp").exists());

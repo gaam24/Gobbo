@@ -129,6 +129,7 @@ pub fn queue_pack_link(app: &tauri::AppHandle, link: &str) {
     if let Some(state) = app.try_state::<PackLinkPending>() {
         *state.0.lock().unwrap_or_else(PoisonError::into_inner) = Some(link.to_string());
     }
+
     let _ = app.emit(PACK_LINK_EVENT, link.to_string());
 }
 

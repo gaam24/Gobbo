@@ -35,21 +35,25 @@ impl GameDef {
         if self.schema != 1 {
             problems.push(format!("unknown schema version: {}", self.schema));
         }
+
         if !crate::games::is_valid_id(&self.id) {
             problems.push(format!(
                 "game id must contain only lowercase letters, digits or '-': {:?}",
                 self.id
             ));
         }
+
         if self.name.trim().is_empty() {
             problems.push("game name is empty");
         }
+
         for (provider, game) in &self.providers {
             if !crate::games::is_valid_id(provider) {
                 problems.push(format!(
                     "provider id must contain only lowercase letters, digits or '-': {provider:?}"
                 ));
             }
+
             match &game.key {
                 Some(key) if is_provider_key(key) => {}
                 _ => problems.push(format!("provider {provider} needs a key for this game")),
@@ -63,12 +67,14 @@ impl GameDef {
         let Some(loader) = &self.loader else {
             return;
         };
+
         if !crate::games::is_valid_id(loader.id()) {
             problems.push(format!(
                 "loader id must contain only lowercase letters, digits or '-': {:?}",
                 loader.id()
             ));
         }
+
         if let Some(variant) = loader.variant()
             && !is_variant(variant)
         {
@@ -89,11 +95,14 @@ impl GameDef {
                 .iter()
                 .filter_map(|exe| exe.path_linux.as_ref()),
         );
+
         if self.executables.is_empty() {
             problems.push("a game needs at least one executable".to_string());
         }
+
         for path in &self.profile_data {
             problems.template("profile_data", path);
+
             if !path.trim().starts_with('{') {
                 problems.push(format!(
                     "profile_data must start with a path variable: {path:?}"
@@ -109,7 +118,9 @@ impl GameDef {
         if self.user_data.len() > 7 {
             problems.push("a game may declare at most 7 user_data sets".to_string());
         }
+
         let mut ids = BTreeSet::new();
+
         for set in &self.user_data {
             if !crate::games::is_valid_id(&set.id) {
                 problems.push(format!(
@@ -117,13 +128,17 @@ impl GameDef {
                     set.id
                 ));
             }
+
             if set.id == "game" {
                 problems.push("user_data id \"game\" is reserved for the game mount".to_string());
             }
+
             if !ids.insert(set.id.as_str()) {
                 problems.push(format!("user_data id is repeated: {:?}", set.id));
             }
+
             check_user_data_template(problems, "user_data path", &set.path);
+
             if let Some(linux) = set
                 .path_linux
                 .as_deref()
@@ -144,6 +159,7 @@ impl GameDef {
                 .iter()
                 .map(|set| (set.id.as_str(), set.linux_path())),
         ));
+
         for (first, second) in pairs {
             problems.push(format!("user_data sets {first:?} and {second:?} overlap"));
         }
@@ -151,10 +167,12 @@ impl GameDef {
 
     fn check_steps(&self, problems: &mut Problems) {
         let mut ids = BTreeSet::new();
+
         for step in &self.steps {
             if step.id.is_empty() || !ids.insert(&step.id) {
                 problems.push(format!("step id is empty or repeated: {:?}", step.id));
             }
+
             let what = format!("step {}", step.id);
             problems.relative(&what, [&step.program]);
             problems.relative(
@@ -172,9 +190,11 @@ impl GameDef {
         if self.logs.len() > 20 {
             problems.push("a game may declare at most 20 log sources".to_string());
         }
+
         for (index, source) in self.logs.iter().enumerate() {
             let what = format!("log source {}", index + 1);
             problems.relative(&what, [&source.path]);
+
             if source.pattern.is_empty()
                 || source.pattern.contains(['/', '\\'])
                 || source.pattern.contains("..")
@@ -184,6 +204,7 @@ impl GameDef {
                     source.pattern
                 ));
             }
+
             if !(1..=20).contains(&source.limit) {
                 problems.push(format!("{what} limit must be between 1 and 20"));
             }
@@ -206,11 +227,13 @@ fn keys_overlap(first: &str, second: &str) -> bool {
 fn check_user_data_template(problems: &mut Problems, what: &str, template: &str) {
     problems.template(what, template);
     let template = template.trim();
+
     if !template.starts_with('{') {
         problems.push(format!(
             "{what} must start with a path variable: {template:?}"
         ));
     }
+
     if template.starts_with("{game}") {
         problems.push(format!(
             "{what} is inside the game folder; the game mount already covers it: {template:?}"
@@ -225,8 +248,10 @@ fn overlapping_user_data<'a>(
 ) -> BTreeSet<(&'a str, &'a str)> {
     let mut seen: Vec<(&str, String)> = Vec::new();
     let mut pairs = BTreeSet::new();
+
     for (id, template) in templates {
         let key = pathkey::path_key(template.trim());
+
         for (other_id, other) in &seen {
             if keys_overlap(&key, other) {
                 let pair = if id < *other_id {
@@ -237,7 +262,9 @@ fn overlapping_user_data<'a>(
                 pairs.insert(pair);
             }
         }
+
         seen.push((id, key));
     }
+
     pairs
 }

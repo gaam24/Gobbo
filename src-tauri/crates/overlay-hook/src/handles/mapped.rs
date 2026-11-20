@@ -23,6 +23,7 @@ pub(crate) unsafe extern "system" fn mapped_file_name(
     // SAFETY: the caller passed a process handle, a base address and a buffer of `size` units.
     let length = unsafe { original.call(process, base, buffer, size) };
     let last_error = PreserveLastError::capture();
+
     if length == 0 || buffer.is_null() || size == 0 {
         return length;
     }
@@ -31,6 +32,7 @@ pub(crate) unsafe extern "system" fn mapped_file_name(
     let Some(mapped) = map_layer_path_nt(units) else {
         return length;
     };
+
     if mapped.len() >= size as usize {
         // The game path is longer than the buffer Windows just filled. Keep the original answer instead of failing a
         // call that succeeded; no caller of a layer path is expected to make its buffer shorter than the layer path.
@@ -41,6 +43,7 @@ pub(crate) unsafe extern "system" fn mapped_file_name(
         std::ptr::copy_nonoverlapping(mapped.as_ptr(), buffer, mapped.len());
         *buffer.add(mapped.len()) = 0;
     }
+
     drop(last_error);
     mapped.len() as u32
 }

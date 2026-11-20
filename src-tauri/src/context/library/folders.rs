@@ -35,6 +35,7 @@ pub fn mod_folders(library_dir: &Path) -> Result<Vec<String>, AppError> {
         Err(e) => return Err(AppError::from(FileError::new(library_dir, e))),
     };
     let mut folders = Vec::new();
+
     for entry in entries {
         let entry = entry.map_err(io_at(library_dir))?;
         // The directory listing already says whether an entry is a folder, so this does not stat every mod again.
@@ -43,10 +44,12 @@ pub fn mod_folders(library_dir: &Path) -> Result<Vec<String>, AppError> {
         let is_dir = file_type.is_dir() || (file_type.is_symlink() && entry.path().is_dir());
         let name = entry.file_name();
         let name = name.to_string_lossy();
+
         if is_dir && !name.starts_with('.') {
             folders.push(name.into_owned());
         }
     }
+
     folders.sort_unstable();
     Ok(folders)
 }

@@ -63,9 +63,11 @@ impl ModInfoEdit {
         if let Some(name) = &self.name {
             info.name.clone_from(name);
         }
+
         if let Some(version) = &self.version {
             info.version = Some(version.clone());
         }
+
         if let Some(author) = &self.author {
             info.author = Some(author.clone());
         }

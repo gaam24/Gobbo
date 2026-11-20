@@ -458,6 +458,7 @@ pub const fn route_from(
     if !can_download || key_missing {
         return DownloadRoute::Browser;
     }
+
     match known_direct {
         Some(false) => DownloadRoute::Browser,
         Some(true) | None => DownloadRoute::Direct,
@@ -472,12 +473,15 @@ pub fn browser_route_error(provider: &dyn SourceProvider) -> Option<AppError> {
     if download_route(provider) == DownloadRoute::Direct {
         return None;
     }
+
     if !provider.capabilities().direct_download {
         return Some(unsupported_by(provider.id().as_str()));
     }
+
     if let Err(error) = required_key(provider) {
         return Some(error);
     }
+
     Some(AppError::user(PAYMENT_REQUIRED))
 }
 

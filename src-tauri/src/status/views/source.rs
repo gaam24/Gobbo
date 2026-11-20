@@ -192,11 +192,13 @@ pub(in crate::status) fn description_preview(text: &str) -> String {
         if text.len() <= DESCRIPTION_PREVIEW_CHARS {
             return text.to_string();
         }
+
         let mut preview = String::with_capacity(DESCRIPTION_PREVIEW_CHARS + '…'.len_utf8());
         preview.push_str(&text[..DESCRIPTION_PREVIEW_CHARS]);
         preview.push('…');
         return preview;
     }
+
     match text.char_indices().nth(DESCRIPTION_PREVIEW_CHARS) {
         Some((cut, _)) => {
             let mut preview = String::with_capacity(cut + '…'.len_utf8());

@@ -85,6 +85,7 @@ impl Data {
     /// Refuses a change that moves files while a deployment of the game is prepared or an apply was interrupted.
     pub fn ensure_idle(&self) -> Result<(), AppError> {
         let states = self.deployment_states();
+
         if states.prepared.is_empty() && states.incomplete.is_empty() {
             Ok(())
         } else {

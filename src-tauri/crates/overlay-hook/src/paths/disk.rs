@@ -19,6 +19,7 @@ pub(crate) fn make_parent(path: &Path) -> std::io::Result<()> {
     {
         fs::create_dir_all(parent)?;
     }
+
     Ok(())
 }
 
@@ -35,6 +36,7 @@ mod tests {
         if std::os::windows::fs::symlink_file(base.join("missing.txt"), &link).is_ok() {
             assert!(exists(&link));
         }
+
         fs::remove_dir_all(&base).unwrap();
     }
 

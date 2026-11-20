@@ -130,10 +130,12 @@ impl Patched {
     /// The text the hook reads: the configuration's address, then each stub with the bytes it had before the patch.
     pub(crate) fn handover(&self) -> String {
         let mut text = format!("config {}\n", self.config_address);
+
         for (address, original) in &self.stubs {
             let hex: String = original.iter().map(|byte| format!("{byte:02x}")).collect();
             text.push_str(&format!("stub {address} {hex}\n"));
         }
+
         text
     }
 
@@ -144,6 +146,7 @@ impl Patched {
         for (address, original) in &self.stubs {
             write_code(self.process, *address, original)?;
         }
+
         write_code(self.process, self.config_address, &0u32.to_le_bytes())?;
         // SAFETY: the trampoline block was allocated in the child by `install` and is no longer reached.
         unsafe {
@@ -188,17 +191,22 @@ fn nt_prefix(folder: &Path) -> io::Result<Vec<u16>> {
     while units.len() > 3 && units.last() == Some(&u16::from(b'\\')) {
         units.pop();
     }
+
     let absolute = units.len() >= 3 && units[1] == u16::from(b':') && units[2] == u16::from(b'\\');
+
     if !absolute {
         return Err(io::Error::other("the redirect needs an absolute folder"));
     }
+
     let mut prefix = logic::NT_PREFIX.to_vec();
     prefix.extend(units);
+
     if prefix.len() > logic::PREFIX_UNITS {
         return Err(io::Error::other(
             "the folder path is too long for the redirect",
         ));
     }
+
     Ok(prefix)
 }
 
@@ -217,31 +225,39 @@ pub(crate) fn install(
         Bits::X86 => find_image(process, "ntdll.dll")?,
     };
     let mut originals = Vec::with_capacity(STUBS.len());
+
     for (index, name) in STUBS.iter().enumerate() {
         let address = match bits {
             Bits::X64 => ntdll_export(name)?,
             Bits::X86 => export_in(process, ntdll, name)?,
         };
         let original = read_code(process, address, bits.stub_length())?;
+
         if !is_accepted_stub(bits, &original, index) {
             return Err(io::Error::other(format!(
                 "the child's {name} has a stub shape the launcher does not know"
             )));
         }
+
         originals.push((address, original));
     }
+
     let image = map_image(process, bits)?;
     let trampolines = allocate(process, STUBS.len() * TRAMPOLINE_SLOT)?;
+
     for (index, (_, original)) in originals.iter().enumerate() {
         let address = trampolines + index * TRAMPOLINE_SLOT;
         write_code(process, address, original)?;
         config.trampolines[index] = address as u64;
     }
+
     for (index, name) in SHIMS.iter().enumerate() {
         config.shims[index] = (image.base + image.export(name)?) as u64;
     }
+
     let config_address = image.base + image.export(CONFIG)?;
     write_code(process, config_address, config_bytes(&config))?;
+
     for (index, (stub, _)) in originals.iter().enumerate() {
         let jump = match bits {
             Bits::X64 => jump_to(config.shims[index] as usize),
@@ -252,6 +268,7 @@ pub(crate) fn install(
         };
         write_code(process, *stub, &jump)?;
     }
+
     Ok(Patched {
         process,
         config_address,
@@ -294,6 +311,7 @@ fn is_accepted_stub(bits: Bits, bytes: &[u8], index: usize) -> bool {
     if bytes.len() < bits.stub_length() {
         return false;
     }
+
     let instructions: Vec<Instruction> =
         Decoder::with_ip(bits.bitness(), bytes, 0, DecoderOptions::NONE)
             .iter()
@@ -363,9 +381,11 @@ fn ntdll_base() -> usize {
 /// Checks that the child's ntdll is the one this process uses: its header carries the same timestamp and image size.
 fn check_ntdll(process: HANDLE) -> io::Result<()> {
     let base = ntdll_base();
+
     if base == 0 {
         return Err(io::Error::last_os_error());
     }
+
     let ours = read_code(current_process(), base, 0x400)?;
     let theirs = read_code(process, base, 0x400)?;
     let stamp =
@@ -375,6 +395,7 @@ fn check_ntdll(process: HANDLE) -> io::Result<()> {
             "the child's ntdll is not at the address this launcher expects",
         ));
     }
+
     Ok(())
 }
 
@@ -382,6 +403,7 @@ fn check_ntdll(process: HANDLE) -> io::Result<()> {
 /// child, where the launcher's own ntdll is a different image.
 fn find_image(process: HANDLE, name: &str) -> io::Result<usize> {
     let mut address = 0x10000usize;
+
     while address < 0x7FFF_0000 {
         let mut info: MEMORY_BASIC_INFORMATION = unsafe { std::mem::zeroed() };
         // SAFETY: the query writes one structure of the size given; the address is any value in the child.
@@ -393,18 +415,23 @@ fn find_image(process: HANDLE, name: &str) -> io::Result<usize> {
                 std::mem::size_of::<MEMORY_BASIC_INFORMATION>(),
             )
         };
+
         if got == 0 {
             break;
         }
+
         let base = info.BaseAddress as usize;
+
         if info.State == MEM_COMMIT
             && info.Type == MEM_IMAGE
             && export_name(process, base).is_some_and(|found| found.eq_ignore_ascii_case(name))
         {
             return Ok(base);
         }
+
         address = base + info.RegionSize;
     }
+
     Err(io::Error::other(format!(
         "the child has no image named {name}"
     )))
@@ -413,14 +440,18 @@ fn find_image(process: HANDLE, name: &str) -> io::Result<usize> {
 /// The export name of a PE image in the child, if it has an export directory whose name is at the image's own header.
 fn export_name(process: HANDLE, base: usize) -> Option<String> {
     let header = read_code(process, base, 0x1000).ok()?;
+
     if &header[..2] != b"MZ" {
         return None;
     }
+
     let nt = u32le(&header, 0x3C).ok()? as usize;
     let directory = u32le(&header, nt + 24 + 96).ok()? as usize;
+
     if directory == 0 {
         return None;
     }
+
     let export = read_code(process, base + directory, 16).ok()?;
     let name_rva = u32le(&export, 12).ok()? as usize;
     cstring(process, base + name_rva)
@@ -436,8 +467,10 @@ fn export_in(process: HANDLE, base: usize, name: &str) -> io::Result<usize> {
     let functions = u32le(&export, 28)? as usize;
     let names = u32le(&export, 32)? as usize;
     let ordinals = u32le(&export, 36)? as usize;
+
     for index in 0..count {
         let name_rva = u32le(&read_code(process, base + names + 4 * index, 4)?, 0)? as usize;
+
         if cstring(process, base + name_rva).as_deref() == Some(name) {
             let ordinal = usize::from(u16le(
                 &read_code(process, base + ordinals + 2 * index, 2)?,
@@ -447,6 +480,7 @@ fn export_in(process: HANDLE, base: usize, name: &str) -> io::Result<usize> {
             return Ok(base + rva);
         }
     }
+
     Err(io::Error::other(format!("the child's ntdll has no {name}")))
 }
 
@@ -479,25 +513,31 @@ impl Image {
 /// table. A DLL that imports something is refused: the child's loader has not started, so nothing could resolve it.
 fn map_image(process: HANDLE, bits: Bits) -> io::Result<Image> {
     let bytes = bits.dll();
+
     if bytes.is_empty() {
         return Err(io::Error::other(
             "this build has no stage 0 DLL for this child",
         ));
     }
+
     let nt = u32le(bytes, 0x3C)? as usize;
+
     if bytes.get(nt..nt + 4) != Some(b"PE\0\0") || u16le(bytes, nt + 4)? != bits.machine() {
         return Err(io::Error::other(
             "the stage 0 DLL is not the PE image for this child",
         ));
     }
+
     let section_count = usize::from(u16le(bytes, nt + 6)?);
     let optional_size = usize::from(u16le(bytes, nt + 20)?);
     let optional = nt + 24;
+
     if u16le(bytes, optional)? != bits.magic() {
         return Err(io::Error::other(
             "the stage 0 DLL has the wrong optional header",
         ));
     }
+
     let preferred = match bits {
         Bits::X64 => u64le(bytes, optional + 24)?,
         Bits::X86 => u64::from(u32le(bytes, optional + 28)?),
@@ -511,6 +551,7 @@ fn map_image(process: HANDLE, bits: Bits) -> io::Result<Image> {
             u32le(bytes, directories + 8 * index + 4)? as usize,
         ))
     };
+
     if directory(1)?.1 != 0 {
         return Err(io::Error::other(
             "the stage 0 DLL imports something; it must not",
@@ -522,24 +563,30 @@ fn map_image(process: HANDLE, bits: Bits) -> io::Result<Image> {
     let mut image = vec![0u8; image_size];
     image[..headers_size].copy_from_slice(&bytes[..headers_size]);
     let sections = nt + 24 + optional_size;
+
     for index in 0..section_count {
         let header = sections + 40 * index;
         let size = u32le(bytes, header + 16)? as usize;
         let raw = u32le(bytes, header + 20)? as usize;
         let address = u32le(bytes, header + 12)? as usize;
         let length = size.min(image_size.saturating_sub(address));
+
         if length > 0 {
             image[address..address + length].copy_from_slice(&bytes[raw..raw + length]);
         }
     }
+
     let (relocations, relocations_size) = directory(5)?;
     let mut offset = 0;
+
     while offset < relocations_size {
         let page = u32le(&image, relocations + offset)? as usize;
         let block = u32le(&image, relocations + offset + 4)? as usize;
+
         for entry in 0..(block.saturating_sub(8)) / 2 {
             let value = u16le(&image, relocations + offset + 8 + 2 * entry)?;
             let at = page + usize::from(value & 0xFFF);
+
             match (value >> 12, bits) {
                 (0, _) => {}
                 (10, Bits::X64) => {
@@ -558,8 +605,10 @@ fn map_image(process: HANDLE, bits: Bits) -> io::Result<Image> {
                 }
             }
         }
+
         offset += block;
     }
+
     let exports = read_exports(&image, directory(0)?.0)?;
     write_code(process, base, &image)?;
     Ok(Image { base, exports })
@@ -571,11 +620,13 @@ fn read_exports(image: &[u8], directory: usize) -> io::Result<HashMap<String, us
     if directory == 0 {
         return Err(io::Error::other("the stage 0 DLL exports nothing"));
     }
+
     let count = u32le(image, directory + 24)? as usize;
     let functions = u32le(image, directory + 28)? as usize;
     let names = u32le(image, directory + 32)? as usize;
     let ordinals = u32le(image, directory + 36)? as usize;
     let mut exports = HashMap::new();
+
     for index in 0..count {
         let name_rva = u32le(image, names + 4 * index)? as usize;
         let ordinal = usize::from(u16le(image, ordinals + 2 * index)?);
@@ -587,6 +638,7 @@ fn read_exports(image: &[u8], directory: usize) -> io::Result<HashMap<String, us
         let raw = String::from_utf8_lossy(&image[name_rva..name_rva + end]).into_owned();
         exports.insert(undecorate(&raw), rva);
     }
+
     Ok(exports)
 }
 
@@ -627,9 +679,11 @@ fn allocate(process: HANDLE, size: usize) -> io::Result<usize> {
             PAGE_EXECUTE_READWRITE,
         )
     } as usize;
+
     if address == 0 {
         return Err(io::Error::last_os_error());
     }
+
     Ok(address)
 }
 
@@ -647,9 +701,11 @@ fn read_code(process: HANDLE, address: usize, length: usize) -> io::Result<Vec<u
             &mut done,
         )
     };
+
     if ok == FALSE || done != length {
         return Err(io::Error::last_os_error());
     }
+
     Ok(bytes)
 }
 
@@ -666,9 +722,11 @@ fn write_code(process: HANDLE, address: usize, bytes: &[u8]) -> io::Result<()> {
             &mut old,
         )
     };
+
     if protected == FALSE {
         return Err(io::Error::last_os_error());
     }
+
     let mut written = 0;
     // SAFETY: `bytes` is valid for its length; the call reports how many it wrote.
     let ok = unsafe {
@@ -691,6 +749,7 @@ fn write_code(process: HANDLE, address: usize, bytes: &[u8]) -> io::Result<()> {
             &mut restored,
         )
     };
+
     if ok == FALSE || written != bytes.len() {
         return Err(io::Error::last_os_error());
     }

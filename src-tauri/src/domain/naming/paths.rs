@@ -35,6 +35,7 @@ pub fn is_safe_relative_path(path: &str) -> bool {
 pub fn normalized_relative_path(path: &str) -> Option<String> {
     let normalized = path.replace('\\', "/");
     let trimmed = normalized.trim_matches('/');
+
     if trimmed.is_empty()
         || trimmed
             .split('/')
@@ -42,6 +43,7 @@ pub fn normalized_relative_path(path: &str) -> Option<String> {
     {
         return None;
     }
+
     is_safe_relative_path(trimmed).then(|| trimmed.to_string())
 }
 

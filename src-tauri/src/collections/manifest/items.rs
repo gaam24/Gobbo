@@ -22,10 +22,12 @@ impl<'a> ApiIndex<'a> {
     pub(super) fn new(revision: &'a CollectionRevision) -> Self {
         let mut by_file = BTreeMap::new();
         let mut by_mod = BTreeMap::new();
+
         for module in &revision.mods {
             by_file.insert((module.mod_id.clone(), module.file_id.clone()), module);
             by_mod.entry(module.mod_id.clone()).or_insert(module);
         }
+
         Self { by_file, by_mod }
     }
 
@@ -71,6 +73,7 @@ pub(super) fn item_from_manifest(
     issues.append(&mut choice_issues);
     let (patches, mut patch_issues) = patches(module.patches);
     issues.append(&mut patch_issues);
+
     if !module.file_overrides.is_empty() {
         issues.push(issue(
             CollectionIssueSeverity::Unsupported,
@@ -79,10 +82,12 @@ pub(super) fn item_from_manifest(
             [("name", name.clone())],
         ));
     }
+
     let size_kb = source_file_size.map_or_else(
         || api_mod.map_or(0, |module| module.size_kb),
         |bytes| u32::try_from(bytes.saturating_div(1024)).unwrap_or(u32::MAX),
     );
+
     if unsupported {
         issues.push(issue(
             CollectionIssueSeverity::Unsupported,
@@ -91,6 +96,7 @@ pub(super) fn item_from_manifest(
             [("name", name.clone())],
         ));
     }
+
     let phase = module.phase.unwrap_or(0);
     let mut item = CollectionItem {
         key,
@@ -123,6 +129,7 @@ pub(super) fn item_from_manifest(
         instructions: source_instructions.unwrap_or_default(),
         adult: source_adult.unwrap_or(false) || api_mod.is_some_and(|module| module.adult),
     };
+
     if let Some(text) = module.instructions.filter(|text| !text.trim().is_empty()) {
         if item.instructions.is_empty() {
             item.instructions = text;
@@ -131,6 +138,7 @@ pub(super) fn item_from_manifest(
             item.instructions.push_str(&text);
         }
     }
+
     if matches!(item.source, CollectionSource::Provider { .. }) && api_mod.is_none() {
         issues.push(issue(
             CollectionIssueSeverity::Warning,
@@ -139,6 +147,7 @@ pub(super) fn item_from_manifest(
             [("name", item.name.clone())],
         ));
     }
+
     item
 }
 
@@ -290,6 +299,7 @@ fn choices(choices: Option<Choices>) -> (Vec<Choice>, Vec<CollectionIssue>) {
     let Some(choices) = choices else {
         return (Vec::new(), Vec::new());
     };
+
     if choices
         .kind
         .as_deref()
@@ -305,13 +315,16 @@ fn choices(choices: Option<Choices>) -> (Vec<Choice>, Vec<CollectionIssue>) {
             )],
         );
     }
+
     let mut out = Vec::new();
+
     for (step, choice_step) in choices.options.iter().enumerate() {
         for (group_index, group) in choice_step.groups.iter().enumerate() {
             for choice in &group.choices {
                 if choice.name.is_empty() {
                     continue;
                 }
+
                 out.push(Choice {
                     step: u32::try_from(step).unwrap_or(u32::MAX),
                     group_index: u32::try_from(group_index).unwrap_or(u32::MAX),
@@ -321,12 +334,14 @@ fn choices(choices: Option<Choices>) -> (Vec<Choice>, Vec<CollectionIssue>) {
             }
         }
     }
+
     (out, Vec::new())
 }
 
 fn patches(patches: BTreeMap<String, String>) -> (BTreeMap<String, String>, Vec<CollectionIssue>) {
     let mut out = BTreeMap::new();
     let mut issues = Vec::new();
+
     for (path, crc) in patches {
         let Some(path) = normalized_relative_path(&path) else {
             issues.push(issue(
@@ -338,6 +353,7 @@ fn patches(patches: BTreeMap<String, String>) -> (BTreeMap<String, String>, Vec<
             continue;
         };
         let crc = crc.trim().to_ascii_uppercase();
+
         if crc.is_empty() || !crc.bytes().all(|byte| byte.is_ascii_hexdigit()) {
             issues.push(issue(
                 CollectionIssueSeverity::Unsupported,
@@ -347,7 +363,9 @@ fn patches(patches: BTreeMap<String, String>) -> (BTreeMap<String, String>, Vec<
             ));
             continue;
         }
+
         out.insert(path, crc);
     }
+
     (out, issues)
 }

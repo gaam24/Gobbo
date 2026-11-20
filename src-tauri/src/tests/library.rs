@@ -293,9 +293,11 @@ fn a_mod_whose_archive_copy_is_gone_is_left_as_it_is() {
     let f = fixture("reinstall-no-archive");
     f.import_two_mods();
     let library = f.data.game(SLOT_GAME).library();
+
     for entry in fs::read_dir(f.data.game(SLOT_GAME).archives()).unwrap() {
         fs::remove_file(entry.unwrap().path()).unwrap();
     }
+
     fs::write(library.join("modA").join("stray.txt"), "by hand").unwrap();
 
     assert_eq!(
@@ -435,6 +437,7 @@ fn opening_is_limited_to_gobbo_and_the_game_folders() {
 #[test]
 fn deleting_unused_versions_keeps_the_selected_one() {
     let f = mirror_fixture("unused-versions");
+
     for (name, text) in [
         (
             "Remove Mods Menu 35686 1.2.0 2026-10-23T17-21Z Q6xF6llIa.zip",
@@ -448,6 +451,7 @@ fn deleting_unused_versions_keeps_the_selected_one() {
         let zip = f.zip(name, &[("r6/scripts/RemoveModsMenu/a.reds", text)]);
         import(&f.data, MIRROR_GAME, &zip, None, &mut |_, _| {}).unwrap();
     }
+
     let before = status(&f.data, MIRROR_GAME).unwrap();
     assert_eq!(before.mods[0].version_count, 2);
     assert_eq!(

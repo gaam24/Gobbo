@@ -61,12 +61,14 @@ impl LoaderDef {
             requirements: self.requirements.clone(),
             deploy: self.deploy.clone(),
         };
+
         if let Some(variant) = variant {
             rules.requires = merge_lists(rules.requires, variant.requires.clone());
             rules.requirements =
                 merge_requirements(rules.requirements, variant.requirements.clone());
             rules.deploy = merge_deploy(rules.deploy, variant.deploy.clone());
         }
+
         rules.requires = with_requirement_paths(rules.requires, &rules.requirements);
         Ok(rules)
     }
@@ -117,6 +119,7 @@ pub(super) fn load_any(dirs: &[std::path::PathBuf], id: &str) -> Result<LoaderDe
     if !super::is_valid_id(id) {
         return Err(format!("loader id is not a slug: {id:?}"));
     }
+
     let path = dirs
         .iter()
         .map(|dir| dir.join(format!("{id}.toml")))
@@ -130,6 +133,7 @@ pub(super) fn load_any(dirs: &[std::path::PathBuf], id: &str) -> Result<LoaderDe
     let text =
         std::fs::read_to_string(&path).map_err(|error| format!("{}: {error}", path.display()))?;
     let loader = LoaderDef::parse(&text).map_err(|error| format!("{}: {error}", path.display()))?;
+
     if loader.id != id {
         return Err(format!(
             "{}: id {:?} does not match the file name",
@@ -137,7 +141,9 @@ pub(super) fn load_any(dirs: &[std::path::PathBuf], id: &str) -> Result<LoaderDe
             loader.id
         ));
     }
+
     let problems = loader.validate();
+
     if problems.is_empty() {
         Ok(loader)
     } else {
@@ -169,10 +175,12 @@ pub(super) fn apply(game: &mut GameDef, dirs: &[std::path::PathBuf]) -> Result<(
         }
         None => None,
     };
+
     if let Some((rules, resolved)) = loaded {
         rules.apply_to(game);
         game.resolved_loader = Some(resolved);
     }
+
     game.requires = with_requirement_paths(std::mem::take(&mut game.requires), &game.requirements);
     Ok(())
 }
@@ -193,11 +201,13 @@ pub(super) fn with_requirement_paths(
 /// Appends `over` to `base`, dropping a value whose path key is already there. The order is base first, then over.
 fn merge_lists(mut base: Vec<String>, over: Vec<String>) -> Vec<String> {
     let mut keys: BTreeSet<String> = base.iter().map(|value| path_key(value)).collect();
+
     for value in over {
         if keys.insert(path_key(&value)) {
             base.push(value);
         }
     }
+
     base
 }
 
@@ -205,6 +215,7 @@ fn merge_lists(mut base: Vec<String>, over: Vec<String>) -> Vec<String> {
 fn merge_requirements(mut base: Vec<Requirement>, over: Vec<Requirement>) -> Vec<Requirement> {
     for requirement in over {
         let key = path_key(&requirement.path);
+
         if let Some(existing) = base
             .iter_mut()
             .find(|existing| path_key(&existing.path) == key)
@@ -214,6 +225,7 @@ fn merge_requirements(mut base: Vec<Requirement>, over: Vec<Requirement>) -> Vec
             base.push(requirement);
         }
     }
+
     base
 }
 
@@ -247,12 +259,14 @@ fn merge_deploy(base: Deploy, over: Deploy) -> Deploy {
 fn merge_by<T>(mut base: Vec<T>, over: Vec<T>, key: impl Fn(&T) -> String) -> Vec<T> {
     for item in over {
         let item_key = key(&item);
+
         if let Some(existing) = base.iter_mut().find(|existing| key(existing) == item_key) {
             *existing = item;
         } else {
             base.push(item);
         }
     }
+
     base
 }
 
@@ -262,10 +276,12 @@ fn merge_aliases(
     over: BTreeMap<String, String>,
 ) -> BTreeMap<String, String> {
     let mut aliases = base;
+
     for (name, target) in over {
         let key = path_key(&name);
         aliases.retain(|existing, _| path_key(existing) != key);
         aliases.insert(name, target);
     }
+
     aliases
 }

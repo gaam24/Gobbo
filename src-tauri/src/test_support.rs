@@ -20,6 +20,7 @@ macro_rules! scratch {
         $crate::test_support::scratch_in(module_path!(), $name)
     };
 }
+
 pub(crate) use scratch;
 
 /// A fresh folder in the system temporary directory, separate for each test. A folder with the same
@@ -43,6 +44,7 @@ pub fn overlay_namespaces_available() -> bool {
         if cfg!(not(target_os = "linux")) {
             return true;
         }
+
         std::process::Command::new("unshare")
             .args([
                 "--user",
@@ -83,11 +85,14 @@ fn clean_stale_scratch() {
             return;
         };
         let now = std::time::SystemTime::now();
+
         for entry in entries.flatten() {
             let name = entry.file_name();
+
             if !name.to_string_lossy().starts_with("gobbo-") {
                 continue;
             }
+
             let old = entry
                 .metadata()
                 .and_then(|meta| meta.modified())
@@ -122,10 +127,12 @@ pub fn make_zip(dir: &Path, file_name: &str, entries: &[(&str, &str)]) -> PathBu
     let path = dir.join(file_name);
     let mut writer = zip::ZipWriter::new(File::create(&path).unwrap());
     let options = zip::write::SimpleFileOptions::default();
+
     for (name, text) in entries {
         writer.start_file(*name, options).unwrap();
         writer.write_all(text.as_bytes()).unwrap();
     }
+
     writer.finish().unwrap();
     path
 }
@@ -667,11 +674,13 @@ path = "game.exe"
                 std::env::temp_dir().join(format!("gobbo-test-loaders-{}", std::process::id()));
             let _ = fs::remove_dir_all(&games);
             let _ = fs::remove_dir_all(&loaders);
+
             for (id, text) in ALL {
                 let folder = games.join(id);
                 fs::create_dir_all(&folder).unwrap();
                 fs::write(folder.join("game.toml"), text).unwrap();
             }
+
             fs::create_dir_all(&loaders).unwrap();
             fs::write(loaders.join(format!("{LOADER_ID}.toml")), LOADER).unwrap();
             // The shipped definitions and loader presets are copied as they are, so an app test runs a real game
@@ -711,6 +720,7 @@ path = "game.exe"
         for entry in fs::read_dir(dir).unwrap() {
             let path = entry.unwrap().path();
             let name = path.file_name().unwrap().to_string_lossy().into_owned();
+
             if keep(&path) && !name.starts_with('_') {
                 each(&name, &path);
             }

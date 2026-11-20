@@ -137,6 +137,7 @@ fn a_saved_page_picture_comes_back_as_a_data_url() {
         read_picture(&f.data.game(MIRROR_GAME).images(), "nexus-1.jpg").unwrap(),
         None
     );
+
     for bad in ["../library.json", "nexus-107.exe", ""] {
         assert_eq!(
             read_picture(&f.data.game(MIRROR_GAME).images(), bad)

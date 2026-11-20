@@ -193,12 +193,14 @@ fn finish_round(
 ) -> Result<CollectionRoundView, AppError> {
     let pages = page_requests(root, game_id, profile, collection, &install, downloads)?;
     let waiting = pages.first().cloned();
+
     if !pages.is_empty() {
         let waiting_keys: BTreeSet<&str> = pages.iter().map(|page| page.item.as_str()).collect();
         install
             .needs_user
             .retain(|key| !waiting_keys.contains(key.as_str()));
     }
+
     let mut round = round_view(install);
     round.waiting = waiting;
     Ok(round)
@@ -216,6 +218,7 @@ fn page_requests(
     downloads: &Downloads,
 ) -> Result<Vec<CollectionPageRequest>, AppError> {
     let mut pages = Vec::new();
+
     for key in &view.needs_user {
         let Some(item) = view.session.plan.item(key) else {
             continue;
@@ -248,6 +251,7 @@ fn page_requests(
             url,
         });
     }
+
     Ok(pages)
 }
 
@@ -317,6 +321,7 @@ pub fn resolve_prompt(
             session::skip(root, game_id, profile, collection, item, permanent)?;
         }
     }
+
     run_round(
         root, game_id, profile, collection, downloads, progress, cancel,
     )
@@ -486,6 +491,7 @@ mod tests {
     fn a_round_pauses_on_a_fomod_choice_before_a_manual_member() {
         let state = classify(&round(true, true, false, 2));
         assert!(!state.finished);
+
         match state.prompt {
             Some(CollectionPrompt::Choice { item, .. }) => assert_eq!(item, "fomod"),
             other => panic!("expected a FOMOD choice prompt, got {other:?}"),
@@ -496,6 +502,7 @@ mod tests {
     fn a_round_with_only_a_manual_member_pauses_on_that_member() {
         let state = classify(&round(false, true, false, 1));
         assert!(!state.finished);
+
         match state.prompt {
             Some(CollectionPrompt::Manual { item, .. }) => assert_eq!(item, "manual"),
             other => panic!("expected a manual prompt, got {other:?}"),

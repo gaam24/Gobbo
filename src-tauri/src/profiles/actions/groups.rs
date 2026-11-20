@@ -20,10 +20,12 @@ pub fn save_mod_groups(root: &Data, game_id: &str, groups: &[ModGroup]) -> Resul
 
     let mut ids = BTreeSet::new();
     let mut members = BTreeSet::new();
+
     for group in groups {
         if !ids.insert(group.id.as_str()) {
             return Err(AppError::user("groups.invalid").with("id", &group.id));
         }
+
         for member in &group.members {
             if !members.insert(member.as_str()) {
                 return Err(AppError::user("groups.invalid").with("id", member));

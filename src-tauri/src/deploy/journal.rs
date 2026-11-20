@@ -99,9 +99,11 @@ impl JournalRoots {
         let Some(settings) = &self.settings else {
             return false;
         };
+
         if !safe_journal_path(path) {
             return false;
         }
+
         if is_same_path(settings, path) {
             return true;
         }
@@ -124,6 +126,7 @@ fn safe_journal_path(path: &Path) -> bool {
     if path.as_os_str().is_empty() || !path.is_absolute() {
         return false;
     }
+
     path.components().all(|component| match component {
         Component::Normal(_) | Component::RootDir => true,
         Component::Prefix(prefix) => {
@@ -205,6 +208,7 @@ impl Journal {
     /// written straight to the operating system, so a crash of this process loses nothing that was appended.
     pub fn append(&self, entry: &Entry) -> Result<(), DeployError> {
         let mut writer = self.writer.lock().unwrap_or_else(PoisonError::into_inner);
+
         if writer.is_none() {
             let file = OpenOptions::new()
                 .create(true)
@@ -227,6 +231,7 @@ impl Journal {
                 .write_all(&writer.buffer)
                 .map_err(|e| FileError::new(&self.path, e))?;
             writer.unsynced += 1;
+
             if writer.unsynced >= 64 {
                 writer
                     .file
@@ -234,6 +239,7 @@ impl Journal {
                     .map_err(|e| FileError::new(&self.path, e))?;
                 writer.unsynced = 0;
             }
+
             Ok(())
         })
     }
@@ -242,6 +248,7 @@ impl Journal {
     /// status can call the deployment applied.
     pub fn sync(&self) -> Result<(), DeployError> {
         let mut writer = self.writer.lock().unwrap_or_else(PoisonError::into_inner);
+
         if let Some(writer) = writer.as_mut() {
             writer
                 .file
@@ -249,6 +256,7 @@ impl Journal {
                 .map_err(|e| FileError::new(&self.path, e))?;
             writer.unsynced = 0;
         }
+
         drop(writer);
         Ok(())
     }
@@ -267,6 +275,7 @@ impl Journal {
         };
         let mut reader = BufReader::new(file);
         let mut line = String::new();
+
         loop {
             line.clear();
             let read = reader
@@ -275,10 +284,13 @@ impl Journal {
             if read == 0 {
                 break;
             }
+
             let text = line.trim();
+
             if text.is_empty() {
                 continue;
             }
+
             match serde_json::from_str::<Entry>(text) {
                 Ok(entry) => visit(entry)?,
                 Err(error) => {
@@ -291,12 +303,14 @@ impl Journal {
                         self.path.display(),
                         if at_end { " at the end" } else { "" }
                     ));
+
                     if at_end {
                         break;
                     }
                 }
             }
         }
+
         Ok(())
     }
 
@@ -307,6 +321,7 @@ impl Journal {
             if matches!(entry, Entry::LayerPrepared { .. }) {
                 found = true;
             }
+
             Ok(())
         })?;
         Ok(found)
@@ -330,6 +345,7 @@ impl Journal {
             crate::infra::fs::remove_file_if_exists(&path)
                 .map_err(|error| FileError::new(&path, error))?;
         }
+
         Ok(())
     }
 }
@@ -570,6 +586,7 @@ mod tests {
                 overwrite: base.join("state/overwrite"),
             },
         ];
+
         for entry in &entries {
             assert_eq!(roots.unsafe_path(entry), None, "{entry:?}");
         }
@@ -597,12 +614,14 @@ mod tests {
                 path: PathBuf::from(r"C:\Windows\System32"),
             },
         ];
+
         for entry in &entries {
             assert!(
                 roots.unsafe_path(entry).is_some(),
                 "an escaping path must be unsafe: {entry:?}"
             );
         }
+
         assert_eq!(
             roots.unsafe_path(&Entry::FileDeployed {
                 path: outside.clone()
@@ -632,6 +651,7 @@ mod tests {
             base.join("game"),
             Some(base.join("settings/mods.settings")),
         );
+
         for path in [
             base.join("data/state/p1/journal.jsonl"),
             base.join("data/state/p1/deployment.json"),
@@ -646,6 +666,7 @@ mod tests {
                 "a state file is not a deployment path"
             );
         }
+
         assert_eq!(
             roots.unsafe_path(&Entry::FileDeployed {
                 path: base.join("data/state/p1/overwrite/x.sav"),
@@ -658,6 +679,7 @@ mod tests {
     fn a_settings_path_outside_the_settings_target_is_unsafe() {
         let base = scratch!("journal-roots-settings");
         let roots = roots(&base);
+
         for path in [
             base.join("other/mods.settings"),
             base.join("game/mods.settings"),
@@ -675,6 +697,7 @@ mod tests {
                 Some(path.as_path())
             );
         }
+
         assert_eq!(
             roots.unsafe_path(&Entry::LayerPrepared {
                 mods: base.join("other/mods"),

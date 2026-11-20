@@ -25,9 +25,11 @@ pub fn any_started_here_and_running() -> bool {
 /// Marks a game as started here and gives the flag its wait thread clears when the game exits.
 pub fn mark_started(game_id: &str) -> Arc<AtomicBool> {
     let flag = Arc::new(AtomicBool::new(true));
+
     if let Ok(mut live) = LIVE.lock() {
         live.insert(game_id.to_string(), Arc::clone(&flag));
     }
+
     flag
 }
 
@@ -40,6 +42,7 @@ pub fn game_running(
     if !crate::games::is_valid_id(game_id) {
         return Err(crate::error::AppError::user("games.unknown").with("id", game_id));
     }
+
     let settings = crate::context::load_settings(&root.game(game_id));
     Ok(game_running_at(game_id, &settings.game_root))
 }
@@ -50,6 +53,7 @@ pub fn game_running_at(game_id: &str, game_root: &str) -> bool {
     if started_here_and_running(game_id) {
         return true;
     }
+
     let game_root = game_root.trim();
     !game_root.is_empty() && crate::platform::game_is_running(Path::new(game_root))
 }

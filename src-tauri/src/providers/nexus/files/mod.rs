@@ -91,9 +91,11 @@ pub fn mod_files(client: &NexusClient, global_mod_id: &str) -> Result<Vec<ModFil
     if !is_number(global_mod_id) {
         return Err(bad_response("mod id"));
     }
+
     let text = client.get_v3(&format!("/mods/{global_mod_id}/files"), &[], Endpoint::File)?;
     let groups = parse_mod_file_groups(&text)?;
     let mut files = Vec::new();
+
     for group in groups {
         let path = format!("/mod-files/{}/versions", group.id);
         // One unreadable group does not hide the versions of the others.
@@ -102,6 +104,7 @@ pub fn mod_files(client: &NexusClient, global_mod_id: &str) -> Result<Vec<ModFil
         };
         files.extend(parse_file_versions(&text, &group));
     }
+
     Ok(files)
 }
 
@@ -110,6 +113,7 @@ pub fn part_files(client: &NexusClient, mod_file_id: &str) -> Result<Vec<ModFile
     if !is_number(mod_file_id) {
         return Err(bad_response("mod file id"));
     }
+
     let text = client.get_v3(
         &format!("/mod-files/{mod_file_id}/versions"),
         &[],
@@ -146,10 +150,12 @@ pub fn download_links(
 ) -> Result<DownloadLinks, AppError> {
     let expires = key.map(|(_, expires)| expires.to_string());
     let mut query: Vec<(&str, &str)> = Vec::new();
+
     if let (Some((key, _)), Some(expires)) = (key, expires.as_deref()) {
         query.push(("key", key.as_str()));
         query.push(("expires", expires));
     }
+
     let text = client.get_v3(
         &format!("/games/{domain}/mod-file-versions/{file_id}/download-link"),
         &query,

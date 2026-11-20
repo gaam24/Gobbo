@@ -79,15 +79,19 @@ fn build_dirs(steams: &[PathBuf], libraries: &[PathBuf], extra: &[PathBuf]) -> V
 /// Every build in `dirs`, with the tool key and the display name from `compatibilitytool.vdf` when the tool has one.
 fn installed_protons_in(dirs: &[PathBuf]) -> Vec<ProtonBuild> {
     let mut candidates: Vec<Candidate> = Vec::new();
+
     for dir in dirs {
         let Ok(entries) = fs::read_dir(dir) else {
             continue;
         };
+
         for entry in entries.filter_map(Result::ok) {
             let folder = entry.path();
+
             if !folder.join("proton").is_file() {
                 continue;
             }
+
             let tool = compat_tool(&folder);
             let folder_name = entry.file_name().to_string_lossy().into_owned();
             candidates.push(Candidate {
@@ -174,20 +178,25 @@ fn parse_compat_tool(text: &str) -> CompatTool {
     let mut tool = CompatTool::default();
     let mut in_tools = false;
     let mut depth = 0usize;
+
     for line in text.lines().map(str::trim) {
         if !in_tools {
             if line == "\"compat_tools\"" {
                 in_tools = true;
             }
+
             continue;
         }
+
         match line {
             "{" => depth += 1,
             "}" => {
                 if depth == 0 {
                     break;
                 }
+
                 depth -= 1;
+
                 if depth == 0 {
                     break;
                 }
@@ -210,6 +219,7 @@ fn parse_compat_tool(text: &str) -> CompatTool {
             _ => {}
         }
     }
+
     tool
 }
 
@@ -225,6 +235,7 @@ fn tool_key(name: &str) -> String {
     if let Some(stripped) = key.strip_suffix("_0") {
         return stripped.to_string();
     }
+
     key
 }
 
@@ -454,6 +465,7 @@ mod tests {
         let base = scratch!("proton-named");
         let steam = base.join("Steam");
         let library = base.join("library");
+
         for folder in [
             steam.join("compatibilitytools.d/Proton-CachyOS Latest"),
             library.join("steamapps/common/Proton Hotfix"),
@@ -462,6 +474,7 @@ mod tests {
             fs::create_dir_all(&folder).unwrap();
             fs::write(folder.join("proton"), "").unwrap();
         }
+
         let dirs = [
             steam.join("compatibilitytools.d"),
             library.join("steamapps/common"),

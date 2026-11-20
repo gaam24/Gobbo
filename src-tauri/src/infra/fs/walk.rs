@@ -38,6 +38,7 @@ fn walk_inner(
         Ok(entries) => entries,
         Err(error) => return skip_or_fail(errors, error),
     };
+
     for entry in entries {
         let entry = match entry {
             Ok(entry) => entry,
@@ -47,23 +48,29 @@ fn walk_inner(
             }
         };
         let base = relative.len();
+
         if base > 0 {
             relative.push('/');
         }
+
         relative.push_str(&entry.file_name().to_string_lossy());
         // `file_type` comes from the directory entry; a symlink or an unknown type needs the path check.
         let is_dir = match entry.file_type() {
             Ok(kind) if !kind.is_symlink() => kind.is_dir(),
             _ => entry.path().is_dir(),
         };
+
         if let Err(error) = visit(&entry, relative.as_str(), is_dir) {
             skip_or_fail(errors, error)?;
         }
+
         if is_dir && let Err(error) = walk_inner(&entry.path(), relative, errors, visit) {
             skip_or_fail(errors, error)?;
         }
+
         relative.truncate(base);
     }
+
     Ok(())
 }
 
@@ -75,6 +82,7 @@ pub fn list_files(dir: &Path) -> io::Result<Vec<String>> {
         if !is_dir {
             files.push(relative.to_string());
         }
+
         Ok(())
     })?;
     files.sort_unstable();
@@ -89,6 +97,7 @@ pub fn folder_size(dir: &Path) -> u64 {
         if !is_dir {
             bytes = bytes.saturating_add(entry.metadata().map_or(0, |meta| meta.len()));
         }
+
         Ok(())
     });
     bytes
@@ -103,6 +112,7 @@ pub fn list_files_with_sizes(dir: &Path) -> io::Result<(Vec<String>, u64)> {
             bytes = bytes.saturating_add(entry.metadata().map_or(0, |meta| meta.len()));
             files.push(relative.to_string());
         }
+
         Ok(())
     })?;
     files.sort_unstable();
@@ -120,6 +130,7 @@ pub fn file_sizes(dir: &Path) -> io::Result<BTreeMap<String, u64>> {
                 entry.metadata().map_or(0, |meta| meta.len()),
             );
         }
+
         Ok(())
     })?;
     Ok(files)

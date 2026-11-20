@@ -24,9 +24,11 @@ impl Meter {
     /// The speed in KB/s, when it is time for a report.
     pub(super) fn tick(&mut self, received: u64) -> Option<u32> {
         let elapsed = self.at.elapsed();
+
         if elapsed < PROGRESS_EVERY {
             return None;
         }
+
         let per_second =
             u128::from(received.saturating_sub(self.bytes)) * 1000 / elapsed.as_millis().max(1);
         self.at = Instant::now();

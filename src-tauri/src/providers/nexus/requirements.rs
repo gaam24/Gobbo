@@ -89,13 +89,17 @@ fn parse_requirements(text: &str, own_mod: u32) -> Result<Requirements, AppError
         game_scoped_id: String,
         name: String,
     }
+
     let dependencies: Dependencies = serde_json::from_str(text).map_err(bad_response)?;
     let mut requirements: Vec<Vec<ModRequirement>> = Vec::new();
+
     for definition in dependencies.dependency_definitions {
         let mut mods: Vec<ModRequirement> = Vec::new();
+
         for range in definition.ranges {
             let owner = range.target_mod_file.owner;
             let mod_id: u32 = owner.game_scoped_id.parse().unwrap_or(0);
+
             if !mods.iter().any(|known| known.mod_id == mod_id) {
                 mods.push(ModRequirement {
                     mod_id,
@@ -107,12 +111,16 @@ fn parse_requirements(text: &str, own_mod: u32) -> Result<Requirements, AppError
         if mods.iter().any(|known| known.mod_id == own_mod) {
             continue;
         }
+
         mods.retain(|known| known.mod_id != 0);
+
         if mods.is_empty() || requirements.contains(&mods) {
             continue;
         }
+
         requirements.push(mods);
     }
+
     let dlcs = dependencies
         .dlc_dependency_definitions
         .into_iter()

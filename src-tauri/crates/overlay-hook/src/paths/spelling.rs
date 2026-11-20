@@ -34,6 +34,7 @@ pub(crate) fn find_exact(base: &Path, rel: &str, name: &[u16]) -> Option<WIN32_F
             )
         }
     });
+
     if handle == INVALID_HANDLE_VALUE {
         return None;
     }
@@ -93,48 +94,59 @@ fn with_pattern_impl<R>(
                 overflowed = true;
                 break 'build;
             }
+
             units[length] = unit;
             length += 1;
         }
+
         if !rel.is_empty() {
             if length > 0 && units[length - 1] != u16::from(b'\\') {
                 if length >= units.len() - 3 {
                     overflowed = true;
                     break 'build;
                 }
+
                 units[length] = u16::from(b'\\');
                 length += 1;
             }
+
             for unit in rel.encode_utf16() {
                 if length >= units.len() - 3 {
                     overflowed = true;
                     break 'build;
                 }
+
                 units[length] = unit;
                 length += 1;
             }
         }
+
         if length > 0 && units[length - 1] != u16::from(b'\\') {
             if length >= units.len() - 2 {
                 overflowed = true;
                 break 'build;
             }
+
             units[length] = u16::from(b'\\');
             length += 1;
         }
+
         for unit in mask {
             if length >= units.len() - 1 {
                 overflowed = true;
                 break 'build;
             }
+
             units[length] = unit;
             length += 1;
         }
     }
+
     if overflowed {
         let pattern = wide(join(base, rel).join(overflow()).as_os_str());
         return call(pattern.as_ptr());
     }
+
     units[length] = 0;
     call(units.as_ptr())
 }

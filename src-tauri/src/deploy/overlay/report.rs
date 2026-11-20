@@ -61,12 +61,15 @@ pub fn clear_decisions(state: &Path) {
 /// `LAST_DUMP_FILE`; the in-process fallback always writes `CRASH_DUMP_FILE`.
 pub fn latest_dump(state: &Path) -> Option<String> {
     let marker = state.join(LAST_DUMP_FILE);
+
     if let Ok(text) = fs::read_to_string(&marker) {
         let path = text.trim();
+
         if !path.is_empty() && Path::new(path).is_file() {
             return Some(path.to_string());
         }
     }
+
     let fallback = state.join(CRASH_DUMP_FILE);
     fallback.is_file().then(|| fallback.display().to_string())
 }
@@ -112,10 +115,12 @@ pub fn session_layer_dlls(session: &Session) -> Vec<String> {
 /// The prefix of the layer below `inner`, with `/` separators. An empty `inner` gives an empty prefix.
 pub(super) fn layer_prefix(inner: &Path) -> String {
     let mut prefix = String::new();
+
     for part in inner.components() {
         prefix.push_str(&part.as_os_str().to_string_lossy());
         prefix.push('/');
     }
+
     prefix
 }
 
@@ -150,6 +155,7 @@ pub fn layer_dlls(root: &Path) -> Vec<String> {
             if !is_dir && is_dll(rel) {
                 found.push(rel.to_string());
             }
+
             Ok(())
         },
     );

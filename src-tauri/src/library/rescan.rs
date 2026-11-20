@@ -17,9 +17,11 @@ pub fn rescan(root: &Data, game_id: &str) -> Result<(), AppError> {
         let view = LibraryView::new(library);
         let _profiles = lock_profiles();
         let mut profiles = load_profiles(data)?;
+
         if sync_profiles(&mut profiles, library, &view) {
             data.save_profiles(&profiles)?;
         }
+
         Ok(())
     })
 }

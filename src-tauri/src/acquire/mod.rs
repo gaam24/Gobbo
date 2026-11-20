@@ -184,6 +184,7 @@ pub fn acquire_batch(
     let view = LibraryView::new(&library);
     let mut slots: Vec<Option<Result<Acquired, AppError>>> = Vec::with_capacity(requests.len());
     let mut pending: Vec<(usize, ImportRequest, bool, PathBuf, bool)> = Vec::new();
+
     for request in requests {
         let BatchRequest {
             origin,
@@ -192,15 +193,18 @@ pub fn acquire_batch(
             staged,
         } = request;
         let stored = matches!(choices, Choices::Stored(_));
+
         if let Some(source) = &source
             && let Some(folder) = existing_file(&view, source)
         {
             if let Origin::Download(path) = origin {
                 let _ = delete_download(path);
             }
+
             slots.push(Some(Ok(Acquired::Existing { folder })));
             continue;
         }
+
         let (path, source, removable) = match origin {
             Origin::File(path) => (path.to_path_buf(), source, false),
             Origin::Download(path) => (path.to_path_buf(), source, true),
@@ -246,6 +250,7 @@ pub fn acquire_batch(
         if let Some(digest) = staged {
             import = import.staged(digest);
         }
+
         pending.push((slots.len(), import, removable, path, stored));
         slots.push(None);
     }
@@ -271,9 +276,11 @@ pub fn acquire_batch(
                         }
                     }
                 }
+
                 return Err(error);
             }
         };
+
         for (result, (slot, _, removable, path, stored)) in results.into_iter().zip(pending) {
             let acquired = match result {
                 Ok(view) => Ok(Acquired::Imported(view)),
@@ -297,9 +304,11 @@ pub fn acquire_batch(
             // leaves; an archive that still needs wizard answers stays for the window.
             let duplicate = matches!(acquired, Ok(Acquired::Existing { .. }));
             let stopped = acquired.as_ref().is_err_and(|_| cancelled(cancel));
+
             if removable && (duplicate || stopped) {
                 let _ = delete_download(&path);
             }
+
             slots[slot] = Some(acquired);
         }
     }

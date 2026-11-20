@@ -11,6 +11,7 @@ fn chosen_group<'a>(
 ) -> Option<(usize, usize, &'a Group)> {
     let step_index = usize::try_from(choice.step).ok()?;
     let group_index = usize::try_from(choice.group_index).ok()?;
+
     if let Some(step) = config.steps.get(step_index)
         && let Some(group) = step.groups.get(group_index)
         && group.name == choice.group
@@ -21,7 +22,9 @@ fn chosen_group<'a>(
     if choice.step != 0 || choice.group_index != 0 {
         return None;
     }
+
     let mut found = None;
+
     for (step_index, step) in config.steps.iter().enumerate() {
         for (group_index, group) in step.groups.iter().enumerate() {
             if group.name == choice.group {
@@ -29,10 +32,12 @@ fn chosen_group<'a>(
                 if found.is_some() {
                     return None;
                 }
+
                 found = Some((step_index, group_index, group));
             }
         }
     }
+
     found
 }
 
@@ -46,6 +51,7 @@ pub(super) fn check_choices(config: &ModuleConfig, choices: &[Choice]) -> Result
                 option: choice.option.clone(),
             });
         };
+
         if !group
             .options
             .iter()
@@ -57,6 +63,7 @@ pub(super) fn check_choices(config: &ModuleConfig, choices: &[Choice]) -> Result
             });
         }
     }
+
     Ok(())
 }
 
@@ -67,10 +74,12 @@ pub(in crate::import::fomod) fn chosen_by_group<'a>(
     choices: &'a [Choice],
 ) -> HashMap<(usize, usize), Vec<&'a str>> {
     let mut chosen: HashMap<(usize, usize), Vec<&'a str>> = HashMap::new();
+
     for choice in choices {
         let Some((step, group_index, group)) = chosen_group(config, choice) else {
             continue;
         };
+
         if !group
             .options
             .iter()
@@ -78,11 +87,14 @@ pub(in crate::import::fomod) fn chosen_by_group<'a>(
         {
             continue;
         }
+
         let names = chosen.entry((step, group_index)).or_default();
+
         if !names.contains(&choice.option.as_str()) {
             names.push(choice.option.as_str());
         }
     }
+
     chosen
 }
 

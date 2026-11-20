@@ -18,6 +18,7 @@ pub(crate) fn load() -> Option<MountConfig> {
         let config: MountConfig = serde_json::from_str(&text).ok()?;
         return valid(config).map(long_names);
     }
+
     let layers = Layers::from_env(|name| std::env::var(name).ok())?;
     Some(long_names(MountConfig {
         version: MountConfig::VERSION,
@@ -57,8 +58,10 @@ fn valid(config: MountConfig) -> Option<MountConfig> {
     if config.version != MountConfig::VERSION || config.mounts.len() > MAX_MOUNTS {
         return None;
     }
+
     config.game()?;
     let mut ids = std::collections::BTreeSet::new();
+
     for mount in &config.mounts {
         if mount.id.is_empty()
             || !ids.insert(mount.id.as_str())
@@ -73,6 +76,7 @@ fn valid(config: MountConfig) -> Option<MountConfig> {
             return None;
         }
     }
+
     Some(config)
 }
 

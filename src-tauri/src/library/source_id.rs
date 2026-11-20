@@ -18,6 +18,7 @@ pub fn set_mod_source(
 ) -> Result<(), AppError> {
     let provider = crate::providers::require(provider_id)?;
     let mod_id = mod_id.map(|mod_id| mod_id.trim().to_string());
+
     if let Some(mod_id) = &mod_id
         && !provider.valid_mod_id(mod_id)
     {
@@ -25,6 +26,7 @@ pub fn set_mod_source(
             .with("provider", provider_id)
             .with("id", mod_id));
     }
+
     edit_library(root, game_id, |data, _, library| {
         let provider = ProviderId::new(provider_id);
         let family = library.family_mut(id)?;
@@ -42,6 +44,7 @@ pub fn set_mod_source(
             set_source(family, &provider, &mod_id, meta);
             return Ok(());
         }
+
         move_family(data, library, id, &target, &provider, &mod_id)
     })
 }
@@ -71,6 +74,7 @@ fn move_family(
         set_source(&mut source, provider, mod_id, meta);
         library.families.insert(target.to_string(), source);
     }
+
     for version in library
         .versions
         .values_mut()
@@ -78,6 +82,7 @@ fn move_family(
     {
         version.family = target.to_string();
     }
+
     library.rename_family_references(id, target);
     profiles.rename_family(id, target);
     data.save_profiles(&profiles)
@@ -87,22 +92,27 @@ fn move_family(
 /// provider data it does not have yet.
 fn absorb(family: &mut Family, source: Family) {
     family.tags.extend(source.tags);
+
     if family.notes.is_empty() {
         family.notes = source.notes;
     }
+
     if family.instructions.is_empty() {
         family.instructions = source.instructions;
     }
+
     for other in source.requires {
         if !family.requires.contains(&other) {
             family.requires.push(other);
         }
     }
+
     for other in source.incompatible {
         if !family.incompatible.contains(&other) {
             family.incompatible.push(other);
         }
     }
+
     for requirement in source.requirements {
         if !family
             .requirements
@@ -112,21 +122,26 @@ fn absorb(family: &mut Family, source: Family) {
             family.requirements.push(requirement);
         }
     }
+
     for (provider, dlcs) in source.source_dlcs {
         family.source_dlcs.entry(provider).or_insert(dlcs);
     }
+
     for (provider, sync) in source.source_sync {
         family.source_sync.entry(provider).or_insert(sync);
     }
+
     for (provider, latest) in source.latest {
         family.latest.entry(provider).or_insert(latest);
     }
+
     for (provider, latest_file) in source.latest_file_ids {
         family
             .latest_file_ids
             .entry(provider)
             .or_insert(latest_file);
     }
+
     for (provider, ignored) in source.ignored_versions {
         family.ignored_versions.entry(provider).or_insert(ignored);
     }
@@ -158,10 +173,13 @@ fn set_source(
     {
         family.forget_provider(provider);
     }
+
     let entry = family.sources.entry(provider.clone()).or_default();
+
     if entry.mod_id != mod_id {
         entry.set_part_fields(None, None, None);
     }
+
     entry.mod_id = mod_id.to_string();
     entry.meta = meta;
 }
@@ -176,13 +194,16 @@ fn merge_source(family: &mut Family, provider: &ProviderId, mod_id: &str, source
         } else {
             other_source.meta.clone()
         };
+
         if let Some(entry) = family.sources.get_mut(other_provider) {
             if typed {
                 if entry.mod_id != mod_id {
                     entry.set_part_fields(None, None, None);
                 }
+
                 entry.mod_id = mod_id.to_string();
             }
+
             if entry.meta.is_none() {
                 entry.meta = meta;
             }
@@ -196,6 +217,7 @@ fn merge_source(family: &mut Family, provider: &ProviderId, mod_id: &str, source
                 meta,
                 ..SourceMod::default()
             };
+
             if !typed {
                 entry.set_part_fields(
                     other_source.part_id.as_deref(),
@@ -203,6 +225,7 @@ fn merge_source(family: &mut Family, provider: &ProviderId, mod_id: &str, source
                     other_source.part_category.as_deref(),
                 );
             }
+
             family.sources.insert(other_provider.clone(), entry);
         }
     }

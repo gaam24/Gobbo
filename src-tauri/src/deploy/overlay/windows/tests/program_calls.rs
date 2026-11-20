@@ -660,9 +660,11 @@ public static string[] Of(string path) {
     let expected = root.join(r"archive\pc\mod\mod.dll").display().to_string();
     let lines: Vec<&str> = reported.lines().map(str::trim).collect();
     assert_eq!(lines.len(), 2, "{reported}");
+
     for line in lines {
         assert!(line.eq_ignore_ascii_case(&expected), "{line} != {expected}");
     }
+
     undo(&target.journal_roots()).unwrap();
 }
 
@@ -885,6 +887,7 @@ fn an_nt_single_entry_query_lists_each_entry_once() {
             "class {class}"
         );
     }
+
     undo(&target.journal_roots()).unwrap();
 }
 
@@ -1036,5 +1039,6 @@ fn folders_the_game_makes_stay_out_of_the_game_folder() {
             "{name} is not in the upper layer"
         );
     }
+
     undo(&target.journal_roots()).unwrap();
 }

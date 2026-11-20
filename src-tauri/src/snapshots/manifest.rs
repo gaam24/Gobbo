@@ -127,6 +127,7 @@ pub(super) fn save(scope: &SnapshotScope, dir: &Path, manifest: &Manifest) -> Re
         let _ = fs::remove_dir_all(dir);
         return Err(error);
     }
+
     Ok(())
 }
 
@@ -137,6 +138,7 @@ pub fn list(app: &Data, game_id: &str) -> Vec<SnapshotView> {
     if !naming::is_plain_folder(game_id) {
         return Vec::new();
     }
+
     list_in(&SnapshotScope::new(app, game_id))
 }
 
@@ -146,24 +148,31 @@ fn list_in(scope: &SnapshotScope) -> Vec<SnapshotView> {
     };
     let profiles = load_profiles(&scope.game).ok();
     let mut views = Vec::new();
+
     for entry in entries.flatten() {
         if !entry.path().is_dir() {
             continue;
         }
+
         let Some(manifest) = read_manifest(scope, &entry.path()) else {
             continue;
         };
+
         if manifest.version > VERSION {
             continue;
         }
+
         let mut view = view_of(&manifest);
+
         if let Some(profiles) = &profiles
             && let Ok(profile) = profiles.get(&manifest.profile)
         {
             view.profile_name.clone_from(&profile.name);
         }
+
         views.push(view);
     }
+
     views.sort_by(|left, right| {
         right
             .created_at
@@ -177,6 +186,7 @@ pub(super) fn load(scope: &SnapshotScope, id: &str) -> Result<Manifest, AppError
     if !naming::is_plain_folder(id) {
         return Err(AppError::user("snapshot.not_found"));
     }
+
     let dir = scope.dir(id);
     let manifest =
         read_manifest(scope, &dir).ok_or_else(|| AppError::user("snapshot.not_found"))?;
@@ -185,6 +195,7 @@ pub(super) fn load(scope: &SnapshotScope, id: &str) -> Result<Manifest, AppError
             .with("found", manifest.version)
             .with("supported", VERSION));
     }
+
     Ok(manifest)
 }
 
@@ -243,14 +254,17 @@ fn prune(scope: &SnapshotScope, profile: &str) -> Result<(), AppError> {
             .cmp(&left.created_at)
             .then_with(|| right.id.cmp(&left.id))
     });
+
     for view in automatic.into_iter().skip(KEEP_AUTOMATIC) {
         // The manifest checks the id too; this second check keeps a folder name from reaching outside the game.
         if !naming::is_plain_folder(&view.id) {
             continue;
         }
+
         let dir = scope.dir(&view.id);
         fs::remove_dir_all(&dir).map_err(io_at(&dir))?;
     }
+
     Ok(())
 }
 
@@ -266,10 +280,12 @@ mod tests {
     fn automatic_snapshots_keep_five_and_manual_ones_stay() {
         let (app, game, settings) = fixture("snapshot-retention");
         let store = store(&app, &game.id);
+
         for index in 0..7 {
             write(&store.join("slot.sav"), &index.to_string());
             create(&app, &game, &settings, "p1", SnapshotKind::BeforeSwitch).unwrap();
         }
+
         create(&app, &game, &settings, "p1", SnapshotKind::Manual).unwrap();
         let views = list(&app, &game.id);
         assert_eq!(

@@ -13,5 +13,6 @@ fn main() {
     if let Some(code) = gobbo_lib::run_cli() {
         std::process::exit(code);
     }
+
     gobbo_lib::run();
 }

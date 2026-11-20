@@ -51,9 +51,11 @@ pub(super) fn split_nxm(url: &str) -> Option<LinkParts> {
 pub fn parse_nxm(url: &str) -> Result<NxmLink, NxmError> {
     let link = split_nxm(url).ok_or(NxmError::BadLink)?;
     let domain = link.host();
+
     if link.url.path().starts_with("/collections/") {
         return Err(NxmError::UnsupportedCollection);
     }
+
     let parts = link.segments();
     let ["mods", mod_id, "files", file_id] = parts.as_slice() else {
         return Err(NxmError::BadLink);
@@ -63,6 +65,7 @@ pub fn parse_nxm(url: &str) -> Result<NxmLink, NxmError> {
 
     let mut key = None;
     let mut expires = None;
+
     for (name, value) in link.url.query_pairs() {
         match name.as_ref() {
             "key" if !value.is_empty() => key = Some(value.into_owned()),
@@ -70,6 +73,7 @@ pub fn parse_nxm(url: &str) -> Result<NxmLink, NxmError> {
             _ => {}
         }
     }
+
     let key = match (key, expires) {
         (None, None) => None,
         (Some(key), Some(expires)) => Some((key, expires)),
@@ -89,6 +93,7 @@ fn parse_number(text: &str) -> Result<u32, NxmError> {
     if text.is_empty() || !text.bytes().all(|byte| byte.is_ascii_digit()) {
         return Err(NxmError::BadLink);
     }
+
     text.parse().map_err(|_| NxmError::BadLink)
 }
 

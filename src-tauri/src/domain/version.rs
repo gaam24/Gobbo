@@ -46,6 +46,7 @@ impl IgnoredVersion {
         let Some(latest) = latest else {
             return false;
         };
+
         match (self.file_id.as_deref(), latest_file) {
             (Some(ignored), Some(latest)) => ignored == latest,
             (None, Some(_)) => false,
@@ -66,6 +67,7 @@ pub fn update_state(
     let Some(latest) = latest else {
         return UpdateState::Unknown;
     };
+
     if let (Some(latest_file), Some(current_file)) = (latest_file, current_file) {
         return if latest_file == current_file {
             UpdateState::Current
@@ -73,7 +75,9 @@ pub fn update_state(
             UpdateState::Newer
         };
     }
+
     let same_version = current == Some(latest);
+
     if latest_file.is_some() || current_file.is_some() {
         return if same_version {
             UpdateState::Current
@@ -81,6 +85,7 @@ pub fn update_state(
             UpdateState::Different
         };
     }
+
     match current {
         Some(current) if current == latest => UpdateState::Current,
         Some(current) if is_newer(latest, current) => UpdateState::Newer,
@@ -99,6 +104,7 @@ pub fn with_ignored(
     if matches!(state, UpdateState::Unknown | UpdateState::Current) {
         return state;
     }
+
     match ignored {
         Some(ignored) if ignored.matches(latest, latest_file) => UpdateState::Ignored,
         _ => state,
@@ -140,6 +146,7 @@ pub fn compare_display(
 pub fn compare(candidate: &str, current: &str) -> Ordering {
     let mut left = Tokens::new(candidate);
     let mut right = Tokens::new(current);
+
     loop {
         let order = match (left.next(), right.next()) {
             (None, None) => return Ordering::Equal,
@@ -148,6 +155,7 @@ pub fn compare(candidate: &str, current: &str) -> Ordering {
             (Some(a), None) => a.cmp(&Token::Number(0)),
             (None, Some(b)) => Token::Number(0).cmp(&b),
         };
+
         if order != Ordering::Equal {
             return order;
         }
@@ -200,18 +208,24 @@ impl<'a> Tokens<'a> {
 
     fn next(&mut self) -> Option<Token<'_>> {
         let bytes = self.text.as_bytes();
+
         while self.at < bytes.len() && !bytes[self.at].is_ascii_alphanumeric() {
             self.at += 1;
         }
+
         if self.at >= bytes.len() {
             return None;
         }
+
         let start = self.at;
+
         if bytes[self.at].is_ascii_digit() {
             let mut value = 0_u64;
             let mut overflow = false;
+
             while self.at < bytes.len() && bytes[self.at].is_ascii_digit() {
                 let digit = u64::from(bytes[self.at] - b'0');
+
                 match value
                     .checked_mul(10)
                     .and_then(|part| part.checked_add(digit))
@@ -219,6 +233,7 @@ impl<'a> Tokens<'a> {
                     Some(next) => value = next,
                     None => overflow = true,
                 }
+
                 self.at += 1;
             }
             // `str::parse` returned 0 for an overflowing run; keep that exact result.
@@ -227,6 +242,7 @@ impl<'a> Tokens<'a> {
             while self.at < bytes.len() && bytes[self.at].is_ascii_alphabetic() {
                 self.at += 1;
             }
+
             Some(Token::Text(&self.text[start..self.at]))
         }
     }
@@ -237,6 +253,7 @@ fn text_cmp(left: &str, right: &str) -> Ordering {
     let left = left.as_bytes();
     let right = right.as_bytes();
     let common = left.len().min(right.len());
+
     for at in 0..common {
         let order = left[at]
             .to_ascii_lowercase()
@@ -245,6 +262,7 @@ fn text_cmp(left: &str, right: &str) -> Ordering {
             return order;
         }
     }
+
     left.len().cmp(&right.len())
 }
 

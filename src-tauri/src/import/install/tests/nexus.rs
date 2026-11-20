@@ -39,6 +39,7 @@ fn a_newer_nexus_version_is_kept_next_to_the_old_one() {
         import.mods[0].folder,
         "Remove Mods Menu 35686 1.2.1 2026-11-01T09-00Z Abc123xyz"
     );
+
     for folder in [
         "Remove Mods Menu 35686 1.2.0 2026-10-23T17-21Z Q6xF6llIa",
         "Remove Mods Menu 35686 1.2.1 2026-11-01T09-00Z Abc123xyz",

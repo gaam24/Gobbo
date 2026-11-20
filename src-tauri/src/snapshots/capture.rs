@@ -53,12 +53,14 @@ pub(super) fn create_in(
     let result = capture(
         scope, game, settings, profile, &name, kind, created_at, &id, &dir,
     );
+
     match result {
         Ok(manifest) => {
             if let Err(error) = save(scope, &dir, &manifest) {
                 let _ = fs::remove_dir_all(&dir);
                 return Err(error);
             }
+
             Ok(view_of(&manifest))
         }
         Err(error) => {
@@ -108,6 +110,7 @@ fn capture(
         if !source.is_dir() && whiteouts.is_none() && whiteouts_journal.is_none() && !seeded {
             continue;
         }
+
         let set_dir = set_dir_in(dir, &set.id);
         let files = if source.is_dir() {
             copy_set(source, &set_dir)?.unwrap_or_default()
@@ -127,8 +130,10 @@ fn capture(
     }
 
     let legacy = profile_state::legacy_data(&state);
+
     if legacy.is_dir() {
         let set_dir = set_dir_in(dir, LEGACY_ID);
+
         if let Some(files) = copy_set(&legacy, &set_dir)? {
             manifest_sets.push(ManifestSet {
                 id: LEGACY_ID.to_string(),
@@ -208,6 +213,7 @@ fn copy_set(source: &Path, target: &Path) -> Result<Option<Vec<ManifestFile>>, A
         let _ = fs::remove_dir_all(target);
         return Ok(None);
     }
+
     files.sort_by(|left, right| left.path.cmp(&right.path));
     Ok(Some(files))
 }

@@ -181,22 +181,29 @@ fn status_line(snapshot: &Snapshot, labels: &TrayLabels) -> String {
     let Some(game) = &snapshot.game else {
         return labels.no_game.clone();
     };
+
     if game.running {
         return labels.game_running.clone();
     }
+
     let attention = attention_count(snapshot);
+
     if attention > 0 {
         return fill(&labels.attention, "count", &attention.to_string());
     }
+
     if let Some(busy) = &snapshot.busy {
         return label_of(&labels.busy, busy);
     }
+
     if game.draft > 0 {
         return fill(&labels.changes, "count", &game.draft.to_string());
     }
+
     if game.stage == Stage::Applied {
         return labels.applied.clone();
     }
+
     label_of(&labels.next, action_code(game.next))
 }
 
@@ -216,6 +223,7 @@ fn task_label(task: &TaskView, labels: &TrayLabels) -> String {
     let state = label_of(&labels.states, &task.state);
     let kind = label_of(&labels.kinds, &task.kind);
     let base = format!("{state} — {kind}");
+
     match task.percent {
         Some(percent) if task.state == "running" => format!(
             "{base}, {}",
@@ -277,6 +285,7 @@ pub fn render(snapshot: &Snapshot, labels: &TrayLabels) -> Rendered {
         },
         SpecItem::Separator,
     ];
+
     if let Some(game) = &snapshot.game {
         if game.running {
             items.push(SpecItem::Action {
@@ -291,6 +300,7 @@ pub fn render(snapshot: &Snapshot, labels: &TrayLabels) -> Rendered {
                 enabled: !busy,
             });
         }
+
         items.push(SpecItem::Action {
             id: "tray.undo".to_owned(),
             label: labels.undo.clone(),
@@ -311,6 +321,7 @@ pub fn render(snapshot: &Snapshot, labels: &TrayLabels) -> Rendered {
                 })
                 .collect(),
         });
+
         if snapshot.games.len() > 1 {
             items.push(SpecItem::Submenu {
                 id: "tray.games".to_owned(),
@@ -327,8 +338,10 @@ pub fn render(snapshot: &Snapshot, labels: &TrayLabels) -> Rendered {
                     .collect(),
             });
         }
+
         items.push(SpecItem::Separator);
     }
+
     let working_label = if attention > 0 {
         format!("{} ({attention})", labels.working)
     } else {
@@ -358,6 +371,7 @@ pub fn render(snapshot: &Snapshot, labels: &TrayLabels) -> Rendered {
             enabled: true,
         });
     }
+
     items.push(SpecItem::Submenu {
         id: "tray.working".to_owned(),
         label: working_label,
@@ -437,12 +451,14 @@ mod tests {
                 {
                     return Some(item);
                 }
+
                 SpecItem::Submenu {
                     id: found, items, ..
                 } => {
                     if found == id {
                         return Some(item);
                     }
+
                     if let Some(found) = in_items(items, id) {
                         return Some(found);
                     }
@@ -450,6 +466,7 @@ mod tests {
                 _ => {}
             }
         }
+
         None
     }
 

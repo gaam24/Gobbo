@@ -15,12 +15,15 @@ use crate::error::{AppError, GAME_FOLDER_MISSING};
 /// are read; nothing is changed. A folder that does not exist is an error, a folder with no obvious program is not.
 pub fn inspect_folder(path: &str) -> Result<FolderInspection, AppError> {
     let folder = PathBuf::from(path.trim());
+
     if path.trim().is_empty() {
         return Err(AppError::user(GAME_FOLDER_MISSING));
     }
+
     if !folder.is_dir() {
         return Err(AppError::user("games.not_a_folder").with("path", path));
     }
+
     let steam = steam_manifest(&folder);
     let name = steam
         .as_ref()
@@ -91,28 +94,36 @@ fn walk_executables(
     if depth > 3 || *budget == 0 {
         return;
     }
+
     for entry in sorted_entries(dir) {
         if *budget == 0 {
             break;
         }
+
         let Ok(metadata) = entry.metadata() else {
             continue;
         };
+
         if metadata.file_type().is_symlink() {
             continue;
         }
+
         let name = entry.file_name().to_string_lossy().into_owned();
         let lower = name.to_ascii_lowercase();
+
         if metadata.is_dir() {
             if SKIP_DIRS.contains(&lower.as_str()) || lower.starts_with('.') {
                 continue;
             }
+
             walk_executables(root, &entry.path(), depth + 1, budget, out);
             continue;
         }
+
         if !metadata.is_file() {
             continue;
         }
+
         *budget = budget.saturating_sub(1);
         let is_exe = Path::new(&name)
             .extension()
@@ -124,6 +135,7 @@ fn walk_executables(
         {
             continue;
         }
+
         let path = entry.path();
         let Some(relative) = path.strip_prefix(root).ok() else {
             continue;
@@ -189,36 +201,46 @@ fn walk_directories(
     if depth >= 2 || *budget == 0 {
         return;
     }
+
     for entry in sorted_entries(dir) {
         if *budget == 0 {
             break;
         }
+
         let Ok(metadata) = entry.metadata() else {
             continue;
         };
+
         if !metadata.is_dir() || metadata.file_type().is_symlink() {
             continue;
         }
+
         let name = entry.file_name().to_string_lossy().into_owned();
         let lower = name.to_ascii_lowercase();
+
         if lower.starts_with('.') || SKIP_DIRS.contains(&lower.as_str()) {
             continue;
         }
+
         let path = entry.path();
+
         if let Ok(relative) = path.strip_prefix(root) {
             *budget = budget.saturating_sub(1);
             out.push(relative.to_string_lossy().replace('\\', "/"));
         }
+
         walk_directories(root, &path, depth + 1, budget, out);
     }
 }
 
 fn detected_loaders(folder: &Path, presets: &[LoaderPresetView]) -> Vec<LoaderSuggestion> {
     let mut found = Vec::new();
+
     for preset in presets {
         if !preset.problems.is_empty() {
             continue;
         }
+
         let best = if preset.variants.is_empty() {
             score(folder, &preset.requires, &preset.places, &preset.root_files)
                 .map(|points| (None, points))
@@ -240,6 +262,7 @@ fn detected_loaders(folder: &Path, presets: &[LoaderPresetView]) -> Vec<LoaderSu
                 })
                 .max_by_key(|(_, points)| *points)
         };
+
         if let Some((variant, points)) = best
             && points > 0
         {
@@ -250,6 +273,7 @@ fn detected_loaders(folder: &Path, presets: &[LoaderPresetView]) -> Vec<LoaderSu
             });
         }
     }
+
     found
 }
 
@@ -262,34 +286,43 @@ fn score(
     root_files: &[String],
 ) -> Option<u32> {
     let mut points = 0;
+
     for path in requires {
         if folder.join(path).exists() {
             points += 2;
         }
     }
+
     for path in places {
         if folder.join(path).is_dir() {
             points += 1;
         }
     }
+
     for path in root_files {
         if folder.join(path).exists() {
             points += 1;
         }
     }
+
     (points > 0).then_some(points)
 }
 
 fn steam_manifest(folder: &Path) -> Option<SteamSuggestion> {
     let common = folder.parent()?;
+
     if common.file_name()? != "common" {
         return None;
     }
+
     let steamapps = common.parent()?;
+
     if steamapps.file_name()? != "steamapps" {
         return None;
     }
+
     let folder_name = folder.file_name()?.to_string_lossy();
+
     for entry in sorted_entries(steamapps) {
         let name = entry.file_name().to_string_lossy().into_owned();
         let is_manifest = name.starts_with("appmanifest_")
@@ -299,6 +332,7 @@ fn steam_manifest(folder: &Path) -> Option<SteamSuggestion> {
         if !is_manifest {
             continue;
         }
+
         let Ok(text) = fs::read_to_string(entry.path()) else {
             continue;
         };
@@ -320,6 +354,7 @@ fn steam_manifest(folder: &Path) -> Option<SteamSuggestion> {
             });
         }
     }
+
     None
 }
 
@@ -327,10 +362,12 @@ fn store_ids(folder: &Path) -> StoreIds {
     let mut ids = StoreIds::default();
     let home = super::super::paths::home();
     let program_data = std::env::var_os("PROGRAMDATA").map(PathBuf::from);
+
     for candidate in super::super::stores::candidates(&home, program_data.as_deref()) {
         if !same_folder(&candidate.root, folder) {
             continue;
         }
+
         match candidate.store {
             super::super::stores::Store::Gog => ids.gog.push(candidate.id),
             super::super::stores::Store::Epic => ids.epic.push(candidate.id),
@@ -338,6 +375,7 @@ fn store_ids(folder: &Path) -> StoreIds {
             super::super::stores::Store::Lutris => ids.lutris.push(candidate.id),
         }
     }
+
     ids
 }
 
@@ -353,6 +391,7 @@ fn same_folder(left: &Path, right: &Path) -> bool {
 pub(super) fn slugify(text: &str) -> String {
     let mut out = String::new();
     let mut dash = false;
+
     for character in text.chars() {
         let lower = character.to_lowercase().next().unwrap_or(character);
         let mapped = match lower {
@@ -370,6 +409,7 @@ pub(super) fn slugify(text: &str) -> String {
             'ż' | 'ź' | 'ž' => Some('z'),
             _ => None,
         };
+
         if let Some(character) = mapped {
             out.push(character);
             dash = false;
@@ -378,9 +418,11 @@ pub(super) fn slugify(text: &str) -> String {
             dash = true;
         }
     }
+
     while out.ends_with('-') {
         out.pop();
     }
+
     if out.is_empty() {
         "game".to_string()
     } else {

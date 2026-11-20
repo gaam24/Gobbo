@@ -32,6 +32,7 @@ pub async fn prepare_collection_item(
             &item,
             downloads.inner(),
         )?;
+
         match &action {
             CollectionItemAction::Waiting { url, .. }
             | CollectionItemAction::NeedsUser { url: Some(url), .. } => {
@@ -39,6 +40,7 @@ pub async fn prepare_collection_item(
             }
             _ => {}
         }
+
         Ok(action)
     })
     .await

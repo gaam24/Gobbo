@@ -98,10 +98,12 @@ fn write_settings(root: &Data, game_id: &str, settings: Settings) -> Result<(), 
     crate::games::load(game_id)?;
     let data = root.game(game_id);
     let mut settings = settings;
+
     for value in settings.paths_mut() {
         let trimmed = value.trim().to_string();
         *value = trimmed;
     }
+
     let settings = Settings {
         game_root: settings.game_root,
         settings_dir: settings.settings_dir,
@@ -141,6 +143,7 @@ pub fn set_proton_option(
     {
         return Ok(());
     }
+
     let _write = lock_settings();
     let mut settings = load_settings(&root.game(game_id));
     settings.proton_options =
@@ -152,14 +155,18 @@ pub fn set_proton_option(
 /// changes nothing.
 pub fn add_profile_data(root: &Data, game_id: &str, path: &str) -> Result<(), AppError> {
     let path = path.trim();
+
     if path.is_empty() {
         return Ok(());
     }
+
     let _write = lock_settings();
     let mut settings = load_settings(&root.game(game_id));
+
     if settings.profile_data.iter().any(|kept| kept == path) {
         return Ok(());
     }
+
     settings.profile_data.push(path.to_string());
     write_settings(root, game_id, settings)
 }
@@ -169,9 +176,11 @@ pub fn remove_profile_data(root: &Data, game_id: &str, path: &str) -> Result<(),
     let path = path.trim();
     let _write = lock_settings();
     let mut settings = load_settings(&root.game(game_id));
+
     if !settings.profile_data.iter().any(|kept| kept == path) {
         return Ok(());
     }
+
     settings.profile_data.retain(|kept| kept != path);
     write_settings(root, game_id, settings)
 }
@@ -189,6 +198,7 @@ mod tests {
             proton_dir: " /proton ".into(),
             ..Settings::default()
         };
+
         for value in settings.paths_mut() {
             let trimmed = value.trim().to_string();
             *value = trimmed;

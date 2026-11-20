@@ -51,6 +51,7 @@ pub fn preview(text: &str, path: &Path) -> Result<DefinitionPreview, AppError> {
     let base = archive_base_name(&path.to_string_lossy());
     let plan = install::plan(&archive, &game, &base, None)?;
     let mut mods: BTreeMap<String, PreviewMod> = BTreeMap::new();
+
     for item in &plan.placed {
         let entry = mods
             .entry(item.group.clone())
@@ -61,6 +62,7 @@ pub fn preview(text: &str, path: &Path) -> Result<DefinitionPreview, AppError> {
                 examples: Vec::new(),
             });
         entry.files += 1;
+
         if entry.examples.len() < 12 {
             let from = archive
                 .entries()
@@ -74,6 +76,7 @@ pub fn preview(text: &str, path: &Path) -> Result<DefinitionPreview, AppError> {
             entry.examples.push(PreviewFile { from, to });
         }
     }
+
     let skipped_examples = plan
         .skipped_files
         .iter()

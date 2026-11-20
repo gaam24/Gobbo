@@ -83,6 +83,7 @@ pub(super) fn copy_and_hash(
             download: None,
         });
     }
+
     let mut report = |percent| progress(ImportStage::Hashing, percent);
     let digest = match cancel {
         Some(flag) => hash_and_copy_cancellable::<Sha256>(zip, &copy, flag, &mut report),
@@ -127,6 +128,7 @@ pub(super) fn reserve_name(
     let (file, reserved) = loop {
         let file = store::free_archive_name(&archives, &copy.original, &copy.digest, taken);
         let reserved = archives.join(&file);
+
         match std::fs::File::create_new(&reserved) {
             Ok(_file) => break (file, reserved),
             Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {

@@ -74,6 +74,7 @@ pub fn set_mod_relations(
         if !library.families.contains_key(id) {
             return Err(not_in_library(id));
         }
+
         let requires = checked_relations(library, id, &relations.requires)?;
         let requirements = checked_requirements(library, id, &relations.requirements)?;
         let incompatible = checked_relations(library, id, &relations.incompatible)?;
@@ -121,8 +122,10 @@ fn checked_requirements(
         .get(id)
         .map_or_else(Vec::new, |family| family.requirements.clone());
     let mut kept: Vec<SourceRequirement> = Vec::new();
+
     for requirement in requirements {
         let source = &requirement.source;
+
         if let Some(listed) = saved
             .iter()
             .find(|listed| listed.from_source && same_page(&listed.source, source))
@@ -132,13 +135,17 @@ fn checked_requirements(
                 kept_requirement.ignored = requirement.ignored;
                 kept.push(kept_requirement);
             }
+
             continue;
         }
+
         if kept.iter().any(|other| same_page(&other.source, source)) {
             continue;
         }
+
         kept.push(checked_requirement(library, id, requirement)?);
     }
+
     Ok(kept)
 }
 
@@ -161,6 +168,7 @@ fn checked_requirement(
             AppError::user("relations.source_unknown").with("provider", source.provider.as_str())
         );
     };
+
     if !provider.valid_mod_id(&source.mod_id)
         || own_sources
             .get(&source.provider)
@@ -170,6 +178,7 @@ fn checked_requirement(
             .with("provider", source.provider.as_str())
             .with("mod", &source.mod_id));
     }
+
     if view
         .family_of_source(&source.provider, &source.mod_id)
         .is_some()
@@ -178,6 +187,7 @@ fn checked_requirement(
             .with("provider", source.provider.as_str())
             .with("mod", &source.mod_id));
     }
+
     let mut typed = requirement.clone();
     typed.from_source = false;
     typed.group = None;
@@ -198,15 +208,18 @@ pub fn add_requirement(
         if !library.families.contains_key(id) {
             return Err(not_in_library(id));
         }
+
         let listed = library.families.get(id).is_some_and(|family| {
             family
                 .requirements
                 .iter()
                 .any(|listed| same_page(&listed.source, &requirement.source))
         });
+
         if listed {
             return Ok(());
         }
+
         let typed = checked_requirement(library, id, requirement)?;
         library.family_mut(id)?.requirements.push(typed);
         Ok(())
@@ -246,6 +259,7 @@ pub fn set_requirement_ignored(
         {
             listed.ignored = ignored;
         }
+
         Ok(())
     })
 }
@@ -260,18 +274,22 @@ fn checked_relation(library: &Library, id: &str, other: &str) -> Result<String, 
     if other == id || !library.families.contains_key(other) {
         return Err(not_in_library(other));
     }
+
     Ok(other.to_string())
 }
 
 /// The ids that name other mods of the library, without repeats, in the order given.
 fn checked_relations(library: &Library, id: &str, ids: &[String]) -> Result<Vec<String>, AppError> {
     let mut kept: Vec<String> = Vec::new();
+
     for other in ids {
         let other = checked_relation(library, id, other)?;
+
         if !kept.contains(&other) {
             kept.push(other);
         }
     }
+
     Ok(kept)
 }
 
@@ -312,11 +330,14 @@ pub fn add_relation(
         if !library.families.contains_key(id) {
             return Err(not_in_library(id));
         }
+
         let other = checked_relation(library, id, other)?;
         let list = kind.list(library.family_mut(id)?);
+
         if !list.contains(&other) {
             list.push(other);
         }
+
         Ok(())
     })
 }
@@ -347,17 +368,20 @@ pub fn set_file_winner(
     let _profiles = lock_profiles();
     let mut profiles = load_profiles(&data)?;
     let winners = &mut profiles.active_mut().winners;
+
     match family {
         Some(id) => {
             if !library.families.contains_key(id) {
                 return Err(not_in_library(id));
             }
+
             winners.insert(crate::domain::pathkey::path_key(path), id.to_string());
         }
         None => {
             winners.remove(&crate::domain::pathkey::path_key(path));
         }
     }
+
     save_profiles(&data, &profiles)
 }
 

@@ -36,12 +36,14 @@ impl Problems {
             if requirement.name.trim().is_empty() {
                 self.push(format!("{what} requirement name is empty"));
             }
+
             if !is_game_relative(&requirement.path) {
                 self.push(format!(
                     "{what} requirement path is not relative inside the game: {:?}",
                     requirement.path
                 ));
             }
+
             if let Some(url) = &requirement.url
                 && !url.starts_with("https://")
             {

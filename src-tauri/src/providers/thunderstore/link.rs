@@ -30,10 +30,12 @@ pub fn parse_ror2mm(url: &str) -> Result<PackageVersion, AppError> {
     if !link.host().eq_ignore_ascii_case(PROTOCOL) {
         return Err(bad());
     }
+
     let parts = link.segments();
     let ["install", server, owner, name, version] = parts.as_slice() else {
         return Err(bad());
     };
+
     if !server.eq_ignore_ascii_case(SERVER)
         || !is_part(owner)
         || !is_part(name)
@@ -41,6 +43,7 @@ pub fn parse_ror2mm(url: &str) -> Result<PackageVersion, AppError> {
     {
         return Err(bad());
     }
+
     Ok(PackageVersion {
         owner: (*owner).to_string(),
         name: (*name).to_string(),

@@ -25,6 +25,7 @@ pub enum Start {
 pub fn resolve_or_prompt() -> Result<Start, AppError> {
     let exe_dir = storage::exe_dir()?;
     let global = storage::global_root().ok();
+
     match storage::resolve(&exe_dir, global.as_deref(), storage::env_override()) {
         Resolved::Known(location) => Ok(Start::Run(location)),
         Resolved::Choice(context) => {
@@ -56,14 +57,17 @@ trait Prompter {
 /// Asks until a choice is written, or until the user quits. `None` means quit.
 fn choose(context: &PromptContext, prompt: &mut impl Prompter) -> Option<StorageLocation> {
     let mut context = context.clone();
+
     loop {
         let mode = prompt.choose(&context)?;
+
         if mode == StorageMode::Portable
             && context.global_data_exists
             && !prompt.confirm_portable(&context)
         {
             continue;
         }
+
         match storage::commit(&context, mode) {
             Ok(location) => return Some(location),
             Err(error) => {
@@ -85,6 +89,7 @@ enum Language {
 
 fn language(locale: Option<&str>) -> Language {
     let primary = locale.and_then(|locale| locale.split(['-', '_']).next());
+
     if primary.is_some_and(|part| part.eq_ignore_ascii_case("pl")) {
         Language::Pl
     } else {
@@ -207,14 +212,17 @@ impl NativePrompt {
             global,
             self.strings.global_hint,
         );
+
         if !context.portable_available {
             text.push_str("\n\n");
             text.push_str(self.strings.portable_unavailable);
         }
+
         if context.global_data_exists {
             text.push_str("\n\n");
             text.push_str(self.strings.existing_data);
         }
+
         text.push_str("\n\n");
         text.push_str(self.strings.decision_hint);
         text
@@ -387,9 +395,11 @@ mod tests {
         let exe = root.join("program");
         let global = root.join("global");
         fs::create_dir_all(&exe).unwrap();
+
         if marker {
             fs::write(storage::portable_marker(&exe), "").unwrap();
         }
+
         match storage::resolve(&exe, Some(&global), None) {
             Resolved::Choice(context) => context,
             Resolved::Known(_) => panic!("expected a question"),

@@ -381,6 +381,7 @@ fn a_duplicate_inside_one_layer_is_not_hidden_by_the_merge() {
 #[test]
 fn every_shipped_loader_and_variant_merges_into_a_valid_game() {
     let dir = Path::new(super::super::DEV_LOADERS_DIR);
+
     for entry in fs::read_dir(dir).unwrap() {
         let path = entry.unwrap().path();
         let name = path.file_name().unwrap().to_string_lossy().into_owned();
@@ -390,6 +391,7 @@ fn every_shipped_loader_and_variant_merges_into_a_valid_game() {
         if !path.is_file() || !is_toml || name.starts_with('_') {
             continue;
         }
+
         let id = path.file_stem().unwrap().to_string_lossy().into_owned();
         let loader = presets::load(dir, &id).unwrap_or_else(|error| panic!("{name}: {error}"));
         let mut variants: Vec<Option<&str>> = loader
@@ -401,6 +403,7 @@ fn every_shipped_loader_and_variant_merges_into_a_valid_game() {
         if variants.is_empty() {
             variants.push(None);
         }
+
         for variant in variants {
             let mut game = GameDef::parse(MINIMAL_GAME).unwrap();
             loader
@@ -468,6 +471,7 @@ fn the_bepinex_preset_has_the_five_and_six_rules() {
         "{:?}",
         six.deploy.mirror
     );
+
     for dir in [
         "BepInEx/core",
         "BepInEx/config",

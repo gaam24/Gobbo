@@ -37,8 +37,10 @@ pub struct FacetRequirement {
 /// has and still reads the file requirements from v3.
 pub fn facets(client: &NexusClient, game_id: u32, mod_ids: &[u32]) -> BTreeMap<u32, ModFacet> {
     let mut found = BTreeMap::new();
+
     for chunk in mod_ids.chunks(FACET_BATCH) {
         let mut query = String::from("{");
+
         for (index, mod_id) in chunk.iter().enumerate() {
             // The values are u32, so they are safe in the query text.
             let _ = write!(
@@ -47,6 +49,7 @@ pub fn facets(client: &NexusClient, game_id: u32, mod_ids: &[u32]) -> BTreeMap<u
                  modRequirements {{ nexusRequirements(count: {FACET_REQUIREMENTS}) {{ nodes {{ modId modName }} }} }} }}"
             );
         }
+
         query.push('}');
         let body = json!({ "query": query }).to_string();
         let Ok(text) = client.post_graphql(&body) else {
@@ -54,6 +57,7 @@ pub fn facets(client: &NexusClient, game_id: u32, mod_ids: &[u32]) -> BTreeMap<u
         };
         found.extend(parse_facets(&text, chunk));
     }
+
     found
 }
 
@@ -98,6 +102,7 @@ fn parse_facets(text: &str, ids: &[u32]) -> BTreeMap<u32, ModFacet> {
         Number(u32),
         Text(String),
     }
+
     impl Id {
         fn number(&self) -> Option<u32> {
             match self {
@@ -113,6 +118,7 @@ fn parse_facets(text: &str, ids: &[u32]) -> BTreeMap<u32, ModFacet> {
             Err(_) => return BTreeMap::new(),
         };
     let mut found = BTreeMap::new();
+
     for (alias, node) in response.data.unwrap_or_default() {
         let Some(node) = node else {
             continue;
@@ -133,6 +139,7 @@ fn parse_facets(text: &str, ids: &[u32]) -> BTreeMap<u32, ModFacet> {
             .map(|summary| summary.trim().to_string())
             .filter(|summary| !summary.is_empty());
         let mut requirements: Vec<FacetRequirement> = Vec::new();
+
         for requirement in node
             .mod_requirements
             .and_then(|requirements| requirements.nexus_requirements)
@@ -144,10 +151,12 @@ fn parse_facets(text: &str, ids: &[u32]) -> BTreeMap<u32, ModFacet> {
             let Some(name) = requirement.mod_name.filter(|name| !name.trim().is_empty()) else {
                 continue;
             };
+
             if !requirements.iter().any(|known| known.mod_id == mod_id) {
                 requirements.push(FacetRequirement { mod_id, name });
             }
         }
+
         found.insert(
             mod_id,
             ModFacet {
@@ -158,6 +167,7 @@ fn parse_facets(text: &str, ids: &[u32]) -> BTreeMap<u32, ModFacet> {
             },
         );
     }
+
     found
 }
 

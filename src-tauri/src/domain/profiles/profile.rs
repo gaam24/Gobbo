@@ -125,6 +125,7 @@ impl Profile {
         if self.mods.iter().any(|entry| entry.id == family) {
             return false;
         }
+
         self.mods.push(Entry {
             id: family.to_string(),
             folder: folder.to_string(),
@@ -167,28 +168,35 @@ impl Profile {
                 separator.before = Some(to.to_string());
             }
         }
+
         for family in self.winners.values_mut() {
             if family == from {
                 *family = to.to_string();
             }
         }
+
         for group in &mut self.groups {
             if !group.members.iter().any(|member| member == from) {
                 continue;
             }
+
             let mut members: Vec<String> = Vec::with_capacity(group.members.len());
+
             for member in group.members.drain(..) {
                 let member = if member == from {
                     to.to_string()
                 } else {
                     member
                 };
+
                 if !members.contains(&member) {
                     members.push(member);
                 }
             }
+
             group.members = members;
         }
+
         for waiting in &mut self.waiting {
             if waiting.before.as_deref() == Some(from) {
                 waiting.before = Some(to.to_string());
@@ -216,12 +224,14 @@ impl Profile {
             else {
                 continue;
             };
+
             if dropped[at] {
                 separator.before = (at..self.mods.len())
                     .find(|&index| !dropped[index])
                     .map(|index| self.mods[index].id.clone());
             }
         }
+
         let mut index = 0;
         self.mods.retain(|_| {
             index += 1;
@@ -234,6 +244,7 @@ impl Profile {
         for group in &mut self.groups {
             group.members.retain(|id| !removed.contains(id));
         }
+
         self.groups.retain(|group| group.members.len() >= 2);
     }
 

@@ -48,16 +48,20 @@ fn decodes_utf8_and_utf16_xml() {
 
     // UTF-16 LE with a BOM, the way Windows installers save it, with non-ASCII letters.
     let mut bytes = vec![0xFF, 0xFE];
+
     for unit in utf8.encode_utf16() {
         bytes.extend_from_slice(&unit.to_le_bytes());
     }
+
     assert_eq!(decode(&bytes).expect("UTF-16LE with BOM"), utf8);
 
     // UTF-16 BE with a BOM
     let mut bytes = vec![0xFE, 0xFF];
+
     for unit in utf8.encode_utf16() {
         bytes.extend_from_slice(&unit.to_be_bytes());
     }
+
     assert_eq!(decode(&bytes).expect("UTF-16BE with BOM"), utf8);
 
     // UTF-16 LE without a BOM: recognized by the zeros in the bytes

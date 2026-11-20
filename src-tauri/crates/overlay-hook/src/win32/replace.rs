@@ -33,6 +33,7 @@ pub(crate) unsafe extern "system" fn replace_file(
     {
         return result;
     }
+
     if crate::diag::settings().pass_writes {
         let replaced_name = unsafe { display_name(replaced) };
         let replacement_name = unsafe { display_name(replacement) };
@@ -45,6 +46,7 @@ pub(crate) unsafe extern "system" fn replace_file(
             "pass-through ReplaceFileW {replaced_name} <- {replacement_name} backup={backup_name} flags=0x{flags:x}"
         ));
     }
+
     let original = original!(replace_file, {
         fail(ERROR_INVALID_FUNCTION);
         0
@@ -73,14 +75,17 @@ unsafe fn replace_in_game(
     {
         return Some(fail(ERROR_ACCESS_DENIED));
     }
+
     let replaced_place = unsafe { place(replaced) };
     let replacement_place = unsafe { place(replacement) };
     let backup_place = unsafe { place(backup) };
+
     if replaced_place.is_none() && replacement_place.is_none() && backup_place.is_none() {
         return None;
     }
     // A replacement may not cross two mounts: the copy-up and the whiteout would belong to different profile layers.
     let mut mount = None;
+
     for place in [&replaced_place, &replacement_place, &backup_place]
         .into_iter()
         .flatten()
@@ -93,6 +98,7 @@ unsafe fn replace_in_game(
             mount = Some(place.mount);
         }
     }
+
     let _mount = mount?;
 
     let (replaced_path, _) = match unsafe { source_path(replaced, replaced_place.as_ref()) } {
@@ -134,11 +140,13 @@ unsafe fn replace_in_game(
         )
     };
     let _last_error = PreserveLastError::capture();
+
     if replaced_ok != 0
         && replacement_below
         && let Some(place) = &replacement_place
     {
         hide(place.mount, &place.rel);
     }
+
     Some(replaced_ok)
 }

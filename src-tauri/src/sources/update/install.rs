@@ -39,9 +39,11 @@ pub fn update_mod_cancellable(
             .cloned()
             .ok_or_else(|| AppError::user("source.no_version").with("id", id))?;
         let mut source_ref = source.source(&provider.id());
+
         if let Some(file_id) = family.latest_file_ids.get(&provider.id()) {
             source_ref = source_ref.with_file(file_id.clone());
         }
+
         Ok((source_ref, latest))
     })?;
 
@@ -114,9 +116,11 @@ pub fn download_and_import(
 ) -> Result<Vec<String>, AppError> {
     stop_if(cancel, IMPORT_CANCELLED)?;
     let provider = providers::require(provider_id)?;
+
     if let Some(error) = providers::browser_route_error(provider) {
         return Err(error);
     }
+
     progress(UpdateProgress::at(UpdateStage::Downloading, 0, 0));
     let request = acquire::Request {
         origin: acquire::Origin::Fetch { archive_name },
@@ -131,6 +135,7 @@ pub fn download_and_import(
         progress(UpdateProgress { stage, percent });
     })
     .map_err(|error| cancelled_as_import(error, cancel))?;
+
     match acquired {
         acquire::Acquired::Imported(view) => Ok(view.folders),
         acquire::Acquired::Existing { folder } => Ok(vec![folder]),

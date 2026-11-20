@@ -12,6 +12,7 @@ use serde_json::{Value, json};
 pub fn main() {
     let mut report_path = None;
     let mut args = std::env::args().skip(1);
+
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--report" => report_path = args.next().map(PathBuf::from),
@@ -28,13 +29,16 @@ pub fn main() {
 
     let report = run();
     let text = serde_json::to_string_pretty(&report).unwrap_or_else(|_| "{}".to_string());
+
     if let Some(path) = report_path
         && let Err(error) = fs::write(&path, &text)
     {
         eprintln!("overlay-probe: could not write {}: {error}", path.display());
         std::process::exit(2);
     }
+
     println!("{text}");
+
     if !report["ok"].as_bool().unwrap_or(false) {
         std::process::exit(1);
     }
@@ -130,9 +134,11 @@ fn make_staging(staging: &Path) -> Result<(), String> {
 fn create(game: &Path, upper: &Path) -> Result<(), String> {
     io(fs::create_dir_all(game))?;
     io(fs::write(game.join("file.txt"), b"one"))?;
+
     if !upper.join("file.txt").is_file() {
         return Err("the upper copy is missing".to_string());
     }
+
     Ok(())
 }
 
@@ -155,6 +161,7 @@ fn append(game: &Path, upper: &Path) -> Result<(), String> {
     if !upper.join("file.txt").is_file() {
         return Err("the upper copy disappeared".to_string());
     }
+
     Ok(())
 }
 
@@ -169,12 +176,15 @@ fn metadata(game: &Path) -> Result<(), String> {
 /// A rename through the game path changes the upper copy only.
 fn rename(game: &Path, upper: &Path) -> Result<(), String> {
     io(fs::rename(game.join("file.txt"), game.join("renamed.txt")))?;
+
     if !upper.join("renamed.txt").is_file() {
         return Err("the renamed upper file is missing".to_string());
     }
+
     if upper.join("file.txt").exists() {
         return Err("the old upper file remains".to_string());
     }
+
     Ok(())
 }
 
@@ -188,9 +198,11 @@ fn final_path(game: &Path, root: &Path, upper: &Path) -> Result<(), String> {
     let root = root.strip_prefix(r"\\?\").unwrap_or(&root);
     let upper = upper.to_string_lossy().to_lowercase();
     let upper = upper.strip_prefix(r"\\?\").unwrap_or(&upper);
+
     if !shown.starts_with(root) || shown.starts_with(upper) {
         return Err(format!("final path {shown}"));
     }
+
     Ok(())
 }
 
@@ -201,26 +213,32 @@ fn copy_up(game: &Path, upper: &Path, staging: &Path) -> Result<(), String> {
     let visible = io(fs::read_to_string(game.join("lower.txt")))?;
     let lower = io(fs::read_to_string(staging.join("lower.txt")))?;
     let copy = io(fs::read_to_string(upper.join("lower.txt")))?;
+
     if visible != "lowercopy" || lower != "lower" || copy != "lowercopy" {
         return Err(format!(
             "visible {visible:?}, lower {lower:?}, upper {copy:?}"
         ));
     }
+
     Ok(())
 }
 
 /// Deleting a lower-layer file hides it and leaves the mod layer alone.
 fn whiteout(game: &Path, staging: &Path, upper: &Path) -> Result<(), String> {
     io(fs::remove_file(game.join("delete.txt")))?;
+
     if !staging.join("delete.txt").is_file() {
         return Err("the lower file was removed".to_string());
     }
+
     if fs::metadata(game.join("delete.txt")).is_ok() {
         return Err("the deleted file is still visible".to_string());
     }
+
     if upper.join("delete.txt").exists() {
         return Err("the delete left an upper file".to_string());
     }
+
     Ok(())
 }
 
@@ -229,19 +247,24 @@ fn list(game: &Path) -> Result<(), String> {
     for name in ["a.txt", "b.txt"] {
         io(fs::write(game.join(name), b"x"))?;
     }
+
     let mut names = Vec::new();
+
     for entry in io(fs::read_dir(game))? {
         let entry = io(entry)?;
         names.push(entry.file_name().to_string_lossy().to_ascii_lowercase());
     }
+
     for name in ["a.txt", "b.txt", "lower.txt", "renamed.txt"] {
         if !names.iter().any(|item| item == name) {
             return Err(format!("{name} missing from {names:?}"));
         }
     }
+
     if names.iter().any(|item| item == "delete.txt") {
         return Err("the whiteout is listed".to_string());
     }
+
     Ok(())
 }
 
@@ -252,6 +275,7 @@ fn link_refusal(game: &Path) -> Result<(), String> {
     let target = game.join("hard.txt");
     let linked = fs::hard_link(&source, &target);
     let _ = fs::remove_file(&source);
+
     match linked {
         Ok(()) => {
             let _ = fs::remove_file(&target);

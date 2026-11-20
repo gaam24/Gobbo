@@ -57,6 +57,7 @@ fn the_conflict_explorer_matches_the_status_and_leaves_disabled_mods_out() {
 #[test]
 fn the_conflict_explorer_matches_a_path_that_differs_only_in_case() {
     let f = fixture("explorer-case");
+
     for (name, file, text) in [
         ("modA.zip", "Mods/modA/content/X.ws", "from A"),
         ("modB.zip", "Mods/modB/content/x.ws", "from B"),
@@ -64,6 +65,7 @@ fn the_conflict_explorer_matches_a_path_that_differs_only_in_case() {
         let zip = f.zip(name, &[(file, text)]);
         import(&f.data, SLOT_GAME, &zip, None, &mut |_, _| {}).unwrap();
     }
+
     f.enable_all(SLOT_GAME);
 
     let view = status(&f.data, SLOT_GAME).unwrap();

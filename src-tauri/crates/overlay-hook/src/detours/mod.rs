@@ -138,6 +138,7 @@ macro_rules! detours {
                     {
                         let mut transaction = Transaction::new();
                         transaction.enable(hook);
+
                         match unsafe { transaction.commit(suspend) } {
                             Ok(()) => mark_enabled(&mut statuses, stringify!($field)),
                             Err(error) => {
@@ -166,19 +167,24 @@ fn thread_count() -> usize {
     unsafe {
         let process = GetCurrentProcessId();
         let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+
         if snapshot == INVALID_HANDLE_VALUE {
             return usize::MAX;
         }
+
         let mut entry: THREADENTRY32 = std::mem::zeroed();
         entry.dwSize = std::mem::size_of::<THREADENTRY32>() as u32;
         let mut threads = 0usize;
         let mut more = Thread32First(snapshot, &mut entry) != 0;
+
         while more {
             if entry.th32OwnerProcessID == process {
                 threads += 1;
             }
+
             more = Thread32Next(snapshot, &mut entry) != 0;
         }
+
         CloseHandle(snapshot);
         threads
     }
@@ -190,6 +196,7 @@ fn skipped(name: &str) -> bool {
     if diag::settings().disabled(name) {
         return true;
     }
+
     !diag::settings().calls && matches!(name, "get_file_information")
 }
 
@@ -261,5 +268,6 @@ pub(crate) unsafe fn create_hooks() -> (Hooks, Vec<HookStatus>) {
         "KernelBase.dll"
     };
     log(&format!("the file API is in {file}"));
+
     unsafe { Hooks::create(file) }
 }

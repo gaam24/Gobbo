@@ -21,6 +21,7 @@ pub(in crate::app::storage_prompt) fn message(
         eprintln!("gobbo: could not initialize GTK for the start dialog: {error}");
         return Answer::Cancel;
     }
+
     let message_type = match level {
         Level::Info => gtk::MessageType::Info,
         Level::Warning => gtk::MessageType::Warning,
@@ -60,6 +61,7 @@ pub(in crate::app::storage_prompt) fn message(
             main_loop.quit();
         });
     }
+
     dialog.show_all();
     main_loop.run();
     dialog.close();

@@ -44,21 +44,27 @@ fn copy(mut reader: PipeReader, mut file: File) {
     let mut buffer = vec![0u8; 64 * 1024];
     let mut written: u64 = 0;
     let mut full = false;
+
     loop {
         let read = match reader.read(&mut buffer) {
             Ok(0) | Err(_) => break,
             Ok(read) => read,
         };
+
         if full {
             continue;
         }
+
         let room = usize::try_from(MAX_BYTES - written).unwrap_or(usize::MAX);
         let take = read.min(room);
+
         if file.write_all(&buffer[..take]).is_err() {
             full = true;
             continue;
         }
+
         written += take as u64;
+
         if written >= MAX_BYTES {
             full = true;
             let _ = file.write_all(b"\n[output stopped at 64 MB]\n");
@@ -87,11 +93,14 @@ mod tests {
     fn wait_for(path: &Path, done: impl Fn(&[String]) -> bool) -> Vec<String> {
         for _ in 0..20 {
             let lines = tail_at(path);
+
             if done(&lines) {
                 return lines;
             }
+
             std::thread::sleep(std::time::Duration::from_millis(100));
         }
+
         tail_at(path)
     }
 
@@ -134,9 +143,11 @@ mod tests {
         let dir = scratch!("tail");
         let path = dir.join(OUTPUT_FILE);
         let mut writer = begin_at(&path).unwrap();
+
         for number in 0..600 {
             writeln!(writer, "line {number}").unwrap();
         }
+
         drop(writer);
 
         let lines = wait_for(&path, |lines| {
@@ -203,9 +214,11 @@ mod tests {
         let path = dir.join(OUTPUT_FILE);
         let mut writer = begin_at(&path).unwrap();
         let line = "x".repeat(1023);
+
         for _ in 0..2048 {
             writeln!(writer, "{line}").unwrap();
         }
+
         writeln!(writer, "end").unwrap();
         drop(writer);
 
@@ -223,10 +236,12 @@ mod tests {
         let path = dir.join(OUTPUT_FILE);
         let mut writer = begin_at(&path).unwrap();
         let chunk = vec![b'x'; 1024 * 1024 - 1];
+
         for _ in 0..65 {
             writer.write_all(&chunk).unwrap();
             writer.write_all(b"\n").unwrap();
         }
+
         drop(writer);
 
         let lines = wait_for(&path, |lines| {

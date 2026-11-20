@@ -103,6 +103,7 @@ fn state_file(data: &Data, id: u32) -> PathBuf {
 /// Reads a kept list state by its mark id, or an error when the id is unknown or the file is damaged.
 pub fn read_state(data: &Data, id: u32) -> Result<ListState, AppError> {
     let path = state_file(data, id);
+
     match json::read_json(&path) {
         Ok(Some(state)) => Ok(state),
         Ok(None) => Err(AppError::user("history.unknown")),
@@ -165,7 +166,9 @@ fn push_undo(data: &Data, index: &mut Index, mark: Mark) {
         });
         forget(data, dropped);
     }
+
     let over = index.undo.len().saturating_sub(MAX_STATES_TOTAL);
+
     if over > 0 {
         let dropped: Vec<Mark> = index.undo.drain(..over).collect();
         forget(data, dropped);
@@ -191,6 +194,7 @@ pub fn save_profiles(data: &Data, profiles: &Profiles) -> Result<(), AppError> {
     let before = Profiles::read(&data.profiles_file())?;
     let mut index = read_index(data);
     let mut changed = false;
+
     for old in before.iter().flat_map(|before| &before.profiles) {
         let Some(now) = profiles
             .profiles
@@ -199,9 +203,11 @@ pub fn save_profiles(data: &Data, profiles: &Profiles) -> Result<(), AppError> {
         else {
             continue;
         };
+
         if now.same_list(old) {
             continue;
         }
+
         let before_state = old.list_state();
         let after_state = now.list_state();
         let summary = summarize(&before_state, &after_state);
@@ -213,9 +219,11 @@ pub fn save_profiles(data: &Data, profiles: &Profiles) -> Result<(), AppError> {
     // The list is saved before the history mark. A failed list save must not leave a mark for a change that never
     // happened; a failed mark write only loses the undo entry for a change that is already on disk.
     data.save_profiles(profiles)?;
+
     if changed {
         write_index(data, &index)?;
     }
+
     Ok(())
 }
 
@@ -288,11 +296,13 @@ fn step(root: &Data, game_id: &str, back: bool) -> Result<(), AppError> {
         forget(&data, [current]);
         return Err(error);
     }
+
     if back {
         index.redo.push(current);
     } else {
         push_undo(&data, &mut index, current);
     }
+
     forget(&data, [mark]);
     write_index(&data, &index)
 }
@@ -311,6 +321,7 @@ pub fn restore_list(root: &Data, game_id: &str, id: u32) -> Result<(), AppError>
     if !known {
         return Err(AppError::user("history.unknown"));
     }
+
     let state = read_state(&data, id)?;
     profiles.active_mut().restore_list(state);
     save_profiles(&data, &profiles)
@@ -362,6 +373,7 @@ mod tests {
         let data = Data::new(base);
         let mut index = Index::default();
         let count = u32::try_from(MAX_STATES_PER_PROFILE).unwrap() + 2;
+
         for id in 0..count {
             write(&state_file(&data, id), "{}");
             push_undo(&data, &mut index, mark(id, "p1"));
@@ -384,6 +396,7 @@ mod tests {
             ..Index::default()
         };
         write_index(&data, &index).unwrap();
+
         for id in 1..=5 {
             write(&state_file(&data, id), "{}");
         }

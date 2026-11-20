@@ -22,13 +22,17 @@ pub fn set_file_winners(
     let Loaded { data, library, .. } = load_game(root, game_id)?;
     let _profiles = lock_profiles();
     let mut profiles = load_profiles(&data)?;
+
     if !library.families.contains_key(family) {
         return Err(not_in_library(family));
     }
+
     let winners = &mut profiles.active_mut().winners;
+
     for path in paths {
         winners.insert(path_key(path), family.to_string());
     }
+
     save_profiles(&data, &profiles)
 }
 
@@ -54,6 +58,7 @@ mod tests {
         let data = Data::new(scratch!(name));
         let game = data.game(test_games::SLOT_ID);
         let mut library = Library::default();
+
         for id in ["mod-a", "mod-b"] {
             library.families.insert(
                 id.to_string(),
@@ -64,6 +69,7 @@ mod tests {
                 },
             );
         }
+
         let profiles = Profiles::with_default(vec![entry("mod-a"), entry("mod-b")]);
         write(&game.index(), &serde_json::to_string(&library).unwrap());
         write(

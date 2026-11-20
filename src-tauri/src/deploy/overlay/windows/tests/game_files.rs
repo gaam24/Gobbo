@@ -364,10 +364,12 @@ fn a_file_deleted_by_the_game_can_be_written_again() {
 #[test]
 fn a_32_bit_program_reads_and_writes_through_the_layers() {
     const CMD32: &str = r"C:\Windows\SysWOW64\cmd.exe";
+
     if !Path::new(CMD32).is_file() {
         // A 32-bit test needs a 64-bit Windows installation with WOW64.
         return;
     }
+
     let (library, root, target) = fixture("wow64");
     let session = deploy_mod_a(&library, &target);
     let folder = root.join("archive/pc/mod");
@@ -416,9 +418,11 @@ fn a_32_bit_program_reads_and_writes_through_the_layers() {
 #[test]
 fn a_32_bit_child_of_a_64_bit_program_is_hooked_too() {
     const CMD32: &str = r"C:\Windows\SysWOW64\cmd.exe";
+
     if !Path::new(CMD32).is_file() {
         return;
     }
+
     let (library, root, target) = fixture("wow64-child");
     let session = deploy_mod_a(&library, &target);
     let folder = root.join("archive/pc/mod");
@@ -626,9 +630,11 @@ fn a_listing_merges_the_game_folder_read_entry_by_entry() {
     let root = target.root.clone();
     let library = base.join("library");
     let folder = root.join("archive/pc/mod");
+
     for number in 0..50 {
         write(&folder.join(format!("g{number:02}.archive")), "game");
     }
+
     write(&library.join("modA/archive/pc/mod/g03.archive"), "mod");
     write(&library.join("modA/archive/pc/mod/new.archive"), "mod");
     let session = deploy_mod_a(&library, &target);
@@ -723,6 +729,7 @@ fn scripted_answers(name: &str) -> Vec<String> {
         ),
     ];
     let mut lines = vec![String::from("@echo off\r\n")];
+
     for (label, command) in &commands {
         // The command's output goes to the answers, then its outcome: `ok` or `failed`, from its error level.
         let file = answers.display();
@@ -731,6 +738,7 @@ fn scripted_answers(name: &str) -> Vec<String> {
             "if errorlevel 1 (echo {label} failed >> \"{file}\") else (echo {label} ok >> \"{file}\")\r\n"
         ));
     }
+
     let script = out.join("probe.cmd");
     fs::write(&script, lines.concat()).unwrap();
     let code = run(

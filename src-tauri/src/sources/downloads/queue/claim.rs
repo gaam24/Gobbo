@@ -22,9 +22,11 @@ impl Downloads {
             drop(queue);
             view
         };
+
         if let Some(path) = view.path.as_deref() {
             self.clear_pending_for_path(path);
         }
+
         Some(view)
     }
 
@@ -34,10 +36,12 @@ impl Downloads {
             view.state = DownloadState::Installing;
             view.error = None;
         });
+
         if marked {
             // The window is installing it now, whether it came from a claim or the manual Install action.
             self.clear_pending_for_path(path);
         }
+
         marked
     }
 

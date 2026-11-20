@@ -58,6 +58,7 @@ pub fn parse(link: &str) -> Result<PackLink, AppError> {
     let mut target = None;
     let mut hash = None;
     let mut name = None;
+
     if parsed.scheme() == "gobbo" && parsed.host_str() == Some("pack") {
         for (key, value) in parsed.query_pairs() {
             match key.as_ref() {
@@ -69,6 +70,7 @@ pub fn parse(link: &str) -> Result<PackLink, AppError> {
         }
     } else if parsed.scheme() == "https" {
         target = Some(link.trim().to_string());
+
         for (key, value) in parsed.query_pairs() {
             if key == "sha256" {
                 hash = Some(value.into_owned());
@@ -77,16 +79,21 @@ pub fn parse(link: &str) -> Result<PackLink, AppError> {
     } else {
         return Err(invalid());
     }
+
     let target = target.ok_or_else(invalid)?;
     let address = url::Url::parse(&target).map_err(|_| invalid())?;
+
     if address.scheme() != "https" {
         return Err(AppError::user("pack.link_not_https"));
     }
+
     let hash = hash.ok_or_else(|| AppError::user("pack.link_hash_missing"))?;
     let hash = hash.to_ascii_lowercase();
+
     if hash.len() != 64 || !hash.bytes().all(|byte| byte.is_ascii_hexdigit()) {
         return Err(AppError::user("pack.link_hash_invalid"));
     }
+
     let name = name.unwrap_or_else(|| {
         address
             .path_segments()
@@ -121,6 +128,7 @@ fn safe_name(name: &str) -> String {
         crate::domain::naming::safe_file_name(base)
     };
     let base: String = base.chars().take(PACK_LINK_NAME_LIMIT).collect();
+
     if base.to_ascii_lowercase().ends_with(".gobbopack") {
         base
     } else {
@@ -151,10 +159,12 @@ pub fn download(
             too_large = true;
             return false;
         }
+
         if crate::infra::tasks::cancelled(cancel) {
             stopped = true;
             return false;
         }
+
         let percent = crate::domain::progress::percent(received, total).unwrap_or(0);
         progress(PackLinkProgress {
             received: clamp(received),
@@ -163,25 +173,33 @@ pub fn download(
         });
         true
     });
+
     if let Err(error) = result {
         let _ = fs::remove_file(&path);
+
         if too_large {
             return Err(AppError::user("pack.link_too_large"));
         }
+
         if stopped {
             return Err(AppError::user("pack.link_cancelled"));
         }
+
         return Err(error);
     }
+
     let bytes = fs::metadata(&path).map_err(io_at(&path))?.len();
+
     if bytes > MAX_PACK_LINK_BYTES {
         let _ = fs::remove_file(&path);
         return Err(AppError::user("pack.link_too_large"));
     }
+
     if let Err(error) = verify(&path, &link.sha256) {
         let _ = fs::remove_file(&path);
         return Err(error);
     }
+
     Ok(PackLinkDownload {
         path: path.display().to_string(),
         name: link.name,
@@ -200,6 +218,7 @@ const fn clamp(value: u64) -> u32 {
 /// Checks a file against the hash a link names. The caller removes the file on a failure.
 fn verify(path: &Path, expected: &str) -> Result<(), AppError> {
     let digest = digest_file::<Sha256>(path, &mut |_| {}).map_err(io_at(path))?;
+
     if digest.eq_ignore_ascii_case(expected) {
         Ok(())
     } else {

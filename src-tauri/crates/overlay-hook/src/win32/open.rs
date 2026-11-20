@@ -37,6 +37,7 @@ pub(crate) unsafe extern "system" fn create_file(
     // A new file over a name the layers show fails. Nothing is copied first: a copy would stay in the upper layer and
     // hide every later change to the mod layer for that file.
     let taken = guard.is_some() && disposition == CREATE_NEW && unsafe { shown_name(name) };
+
     if taken {
         record_decision(Kind::Refuse, Layer::None, ERROR_FILE_EXISTS, || unsafe {
             crate::text::display_name(name)
@@ -44,6 +45,7 @@ pub(crate) unsafe extern "system" fn create_file(
         fail(ERROR_FILE_EXISTS);
         return INVALID_HANDLE_VALUE;
     }
+
     let writing = writes_requested(access) || disposition != OPEN_EXISTING;
     // A device namespace can alias a file in the game folder; a write through it must not pass through unchanged.
     if writing && unsafe { unsafe_name(name) } {
@@ -53,6 +55,7 @@ pub(crate) unsafe extern "system" fn create_file(
         fail(ERROR_ACCESS_DENIED);
         return INVALID_HANDLE_VALUE;
     }
+
     let keeps_contents = disposition != CREATE_ALWAYS && disposition != TRUNCATE_EXISTING;
     let redirected = match guard.as_ref() {
         Some(_guard) => unsafe { redirect_opened(name, writing, keeps_contents) },
@@ -74,6 +77,7 @@ pub(crate) unsafe extern "system" fn create_file(
         None => (None, true),
     };
     let path = redirected.as_ref().map_or(name, |wide| wide.as_ptr());
+
     if redirected.is_some() {
         // The game-relative path is classified a second time, and only when the call report is on: it is not worth an
         // allocation on every redirected open of a normal session.
@@ -86,16 +90,19 @@ pub(crate) unsafe extern "system" fn create_file(
             )
         });
     }
+
     if outside && writing && guard.is_some() && crate::diag::settings().pass_writes {
         unsafe {
             crate::trace::pass_through("CreateFileW", name, || {
                 format!("access={access:#x} disposition={disposition}")
             });
         }
+
         record_decision(Kind::PassThrough, Layer::None, 0, || unsafe {
             crate::text::display_name(name)
         });
     }
+
     let original = original!(create_file, {
         fail(ERROR_INVALID_FUNCTION);
         INVALID_HANDLE_VALUE

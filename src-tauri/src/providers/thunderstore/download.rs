@@ -63,6 +63,7 @@ fn download_error(error: AppError) -> AppError {
     if error.code == "http.status" && error.params.get("code").map(String::as_str) == Some("404") {
         return api::not_found();
     }
+
     error
 }
 

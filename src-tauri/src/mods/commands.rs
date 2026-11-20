@@ -258,6 +258,7 @@ pub async fn import_zip(
                             }
                         },
                     )?;
+
                     match acquired {
                         acquire::Acquired::Imported(view) => Ok(view),
                         acquire::Acquired::Existing { folder } => {

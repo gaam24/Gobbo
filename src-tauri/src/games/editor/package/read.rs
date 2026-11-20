@@ -48,11 +48,13 @@ pub(super) fn read_package(path: &Path, context: &PackageContext) -> Result<Pack
 
     // Validate with the loaders from the package first, then the recipient's user and bundled presets.
     let staged = tempfile::tempdir().map_err(AppError::unexpected)?;
+
     for (loader_id, text) in &loaders {
         if let Err(error) = fs::write(staged.path().join(format!("{loader_id}.toml")), text) {
             return Err(io_at(staged.path())(error));
         }
     }
+
     let mut loader_dirs = vec![staged.path().to_path_buf()];
     loader_dirs.push(context.user_loaders.clone());
     loader_dirs.push(context.bundled_loaders.clone());
@@ -60,9 +62,11 @@ pub(super) fn read_package(path: &Path, context: &PackageContext) -> Result<Pack
     problems.extend(check.problems.iter().cloned());
 
     let mut files = vec!["game.toml".to_string()];
+
     if let Some((icon_name, _)) = &icon {
         files.push(icon_name.clone());
     }
+
     files.extend(
         loaders
             .iter()
@@ -71,15 +75,18 @@ pub(super) fn read_package(path: &Path, context: &PackageContext) -> Result<Pack
 
     let mut overwrites = Vec::new();
     let game_exists = !id.is_empty() && context.user_games.join(&id).join("game.toml").is_file();
+
     if game_exists {
         overwrites.push(format!("game {id}"));
     }
+
     if !id.is_empty() && context.bundled_games.join(&id).join("game.toml").is_file() {
         problems.push(problem(
             "general",
             format!("the id {id} belongs to a bundled game"),
         ));
     }
+
     for (loader_id, _) in &loaders {
         if context
             .user_loaders
@@ -125,19 +132,25 @@ fn find_game(archive: &Archive) -> Option<(String, usize)> {
     {
         return Some((String::new(), index));
     }
+
     let mut found = None;
+
     for (index, entry) in archive.entries().iter().enumerate() {
         if entry.is_dir {
             continue;
         }
+
         let parts: Vec<&str> = entry.name.split('/').collect();
+
         if parts.len() == 2 && parts[0] != ".." && !parts[0].is_empty() && parts[1] == "game.toml" {
             if found.is_some() {
                 return None;
             }
+
             found = Some((format!("{}/", parts[0]), index));
         }
     }
+
     found
 }
 
@@ -150,6 +163,7 @@ fn read_text(
     if entry.size > limit {
         return Err(AppError::user("games.package_too_large").with("file", &entry.name));
     }
+
     let bytes = archive
         .read_bytes_limited(index, limit)
         .map_err(AppError::from)?;
@@ -173,22 +187,27 @@ fn read_icon(
         else {
             continue;
         };
+
         if entry.size > MAX_ICON_BYTES {
             warnings.push(format!("{file_name} is larger than 12 KB and was skipped"));
             continue;
         }
+
         let Ok(bytes) = archive.read_bytes_limited(index, MAX_ICON_BYTES) else {
             warnings.push(format!("{file_name} could not be read and was skipped"));
             continue;
         };
+
         if !icon_matches(&bytes, mime) {
             warnings.push(format!(
                 "{file_name} is not a valid {mime} image and was skipped"
             ));
             continue;
         }
+
         return Some((file_name.to_string(), bytes));
     }
+
     None
 }
 
@@ -196,6 +215,7 @@ fn icon_matches(bytes: &[u8], mime: &str) -> bool {
     if mime == "png" {
         return bytes.starts_with(&[0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a]);
     }
+
     bytes.len() >= 12 && &bytes[..4] == b"RIFF" && &bytes[8..12] == b"WEBP"
 }
 
@@ -205,19 +225,23 @@ fn read_loaders(
 ) -> (Vec<(String, String)>, Vec<DefinitionProblemView>) {
     let mut loaders = Vec::new();
     let mut problems = Vec::new();
+
     for (index, entry) in archive.entries().iter().enumerate() {
         if entry.is_dir || loaders.len() >= MAX_LOADERS {
             continue;
         }
+
         let Some(rest) = entry.name.strip_prefix(&format!("{prefix}loaders/")) else {
             continue;
         };
         let Some(id) = rest.strip_suffix(".toml") else {
             continue;
         };
+
         if id.is_empty() || id.contains('/') {
             continue;
         }
+
         if entry.size > MAX_LOADER_BYTES {
             problems.push(problem(
                 "loader",
@@ -225,6 +249,7 @@ fn read_loaders(
             ));
             continue;
         }
+
         let Ok(bytes) = archive.read_bytes_limited(index, MAX_LOADER_BYTES) else {
             problems.push(problem(
                 "loader",
@@ -246,6 +271,7 @@ fn read_loaders(
                 continue;
             }
         };
+
         if loader.id != id {
             problems.push(problem(
                 "loader",
@@ -253,7 +279,9 @@ fn read_loaders(
             ));
             continue;
         }
+
         let loader_problems = loader.validate();
+
         if !loader_problems.is_empty() {
             problems.push(problem(
                 "loader",
@@ -261,8 +289,10 @@ fn read_loaders(
             ));
             continue;
         }
+
         loaders.push((id.to_string(), text));
     }
+
     (loaders, problems)
 }
 
@@ -283,6 +313,7 @@ fn loader_of(
             default_variant: loader.default_variant,
         });
     }
+
     let reference = game?.loader.as_ref()?;
     let id = reference.id().to_string();
     let name = loaders

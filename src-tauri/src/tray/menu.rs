@@ -30,9 +30,11 @@ fn make(app: &AppHandle, item: &SpecItem) -> tauri::Result<Box<dyn IsMenuItem<Wr
             items,
         } => {
             let mut owned: Vec<Box<dyn IsMenuItem<Wry>>> = Vec::with_capacity(items.len());
+
             for child in items {
                 owned.push(make(app, child)?);
             }
+
             let refs: Vec<&dyn IsMenuItem<Wry>> =
                 owned.iter().map(std::convert::AsRef::as_ref).collect();
             Ok(Box::new(Submenu::with_id_and_items(
@@ -49,9 +51,11 @@ fn make(app: &AppHandle, item: &SpecItem) -> tauri::Result<Box<dyn IsMenuItem<Wr
 /// Creates a fresh menu for one render. The previous menu is replaced by the caller.
 pub fn build(app: &AppHandle, rendered: &Rendered) -> tauri::Result<Menu<Wry>> {
     let mut owned: Vec<Box<dyn IsMenuItem<Wry>>> = Vec::with_capacity(rendered.items.len());
+
     for item in &rendered.items {
         owned.push(make(app, item)?);
     }
+
     let refs: Vec<&dyn IsMenuItem<Wry>> = owned.iter().map(std::convert::AsRef::as_ref).collect();
     Menu::with_items(app, &refs)
 }

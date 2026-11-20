@@ -40,6 +40,7 @@ impl UserData {
         if cfg!(windows) {
             return &self.path;
         }
+
         self.linux_path()
     }
 
@@ -120,6 +121,7 @@ impl Executable {
         if cfg!(windows) {
             return &self.path;
         }
+
         self.path_linux
             .as_deref()
             .filter(|path| !path.trim().is_empty())

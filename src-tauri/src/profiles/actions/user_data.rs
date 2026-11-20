@@ -24,9 +24,11 @@ pub fn set_profile_user_data(
         if !game.user_data.iter().any(|set| set.id == set_id) {
             return Err(AppError::user("user_data.unknown_set").with("id", set_id));
         }
+
         if game_running(root, game_id)? {
             return Err(game_is_running_error());
         }
+
         profiles.get_mut(profile)?.set_user_data_isolation(
             set_id,
             if isolated {
@@ -58,21 +60,26 @@ pub fn move_profile_user_data(
     let state = data.profile_state(profile_id);
     let mut profiles = load_profiles(&data)?;
     let settings = load_settings(&data);
+
     if game_running(root, game_id)? {
         return Err(game_is_running_error());
     }
+
     let definition = game
         .user_data
         .iter()
         .find(|set| set.id == set_id)
         .ok_or_else(|| AppError::user("user_data.unknown_set").with("id", set_id))?;
     let profile = profiles.get(profile_id)?;
+
     if !profile.user_data_isolation(set_id).is_isolated() {
         return Err(AppError::user("user_data.not_isolated").with("id", set_id));
     }
+
     if definition.mode == Mode::Copy {
         return Err(AppError::user("user_data.not_redirect").with("id", set_id));
     }
+
     move_set(&game, &settings, &state, profile, set_id)?;
     profiles
         .get_mut(profile_id)?
@@ -112,9 +119,11 @@ fn move_set(
 ) -> Result<(), AppError> {
     let sets = resolved_sets(game, settings, state, profile)?;
     let set = find_set(&sets, set_id)?;
+
     if !set.redirects() {
         return Err(AppError::user("user_data.not_redirect").with("id", set_id));
     }
+
     check_real_folder(set)?;
     move_redirect_to_real(set)
 }
@@ -145,14 +154,18 @@ pub fn user_data_size(
     let settings = load_settings(&data);
     let profiles = load_profiles(&data)?;
     let profile = profiles.get(profile_id)?;
+
     if !game.user_data.iter().any(|set| set.id == set_id) {
         return Err(AppError::user("user_data.unknown_set").with("id", set_id));
     }
+
     let sets = resolved_sets(&game, &settings, &data.profile_state(profile_id), profile)?;
     let set = find_set(&sets, set_id)?;
+
     if !set.isolated {
         return Ok(0);
     }
+
     let folder = if set.redirects() {
         &set.upper
     } else {
@@ -171,12 +184,14 @@ fn check_real_folder(set: &crate::domain::user_data::Set) -> Result<(), AppError
             .with("id", &set.id)
             .with("path", set.real.display()));
     }
+
     if !set.real.exists()
         && let Some(parent) = set.real.parent()
         && !parent.is_dir()
     {
         return Err(AppError::user("user_data.parent_missing").with("path", parent.display()));
     }
+
     Ok(())
 }
 
@@ -195,13 +210,17 @@ fn move_redirect_to_real(set: &crate::domain::user_data::Set) -> Result<(), AppE
     // merged copy of a path the game recreated is not removed again.
     for relative in whiteout_paths(&set.upper)? {
         let source = set.real.join(&relative);
+
         if !source.exists() {
             continue;
         }
+
         let target = removed.join(&relative);
+
         if let Some(parent) = target.parent() {
             fs::create_dir_all(parent).map_err(io_at(parent))?;
         }
+
         fs::rename(&source, &target).map_err(io_at(&source))?;
     }
 
@@ -217,12 +236,14 @@ fn move_redirect_to_real(set: &crate::domain::user_data::Set) -> Result<(), AppE
     }
 
     rename_if_exists(&set.upper, &moved_path(&set.upper, unix, ""))?;
+
     for suffix in ["whiteouts", "whiteouts.journal"] {
         rename_if_exists(
             &set.upper.with_extension(suffix),
             &moved_path(&set.upper, unix, &format!(".{suffix}")),
         )?;
     }
+
     let marker = set.upper.with_file_name("seeded");
     remove_file_if_exists(&marker).map_err(io_at(&marker))?;
     Ok(())
@@ -237,12 +258,15 @@ fn whiteout_paths(upper: &std::path::Path) -> Result<Vec<std::path::PathBuf>, Ap
 
     let mut paths = Vec::new();
     let snapshot = upper.with_extension("whiteouts");
+
     match fs::read_to_string(&snapshot) {
         Ok(text) => paths.extend(whiteout_relatives(&text)),
         Err(error) if error.kind() == io::ErrorKind::NotFound => {}
         Err(error) => return Err(io_at(&snapshot)(error)),
     }
+
     let journal = upper.with_extension("whiteouts.journal");
+
     match fs::read(&journal) {
         Ok(bytes) => {
             let text = String::from_utf8_lossy(complete_lines(&bytes));
@@ -251,6 +275,7 @@ fn whiteout_paths(upper: &std::path::Path) -> Result<Vec<std::path::PathBuf>, Ap
         Err(error) if error.kind() == io::ErrorKind::NotFound => {}
         Err(error) => return Err(io_at(&journal)(error)),
     }
+
     paths.sort_unstable();
     paths.dedup();
     Ok(paths)
@@ -276,6 +301,7 @@ fn whiteout_relatives(text: &str) -> Vec<std::path::PathBuf> {
         .iter()
         .filter_map(|path| {
             let mut relative = PathBuf::new();
+
             for part in path.split(['/', '\\']) {
                 match part {
                     "" | "." => {}
@@ -284,6 +310,7 @@ fn whiteout_relatives(text: &str) -> Vec<std::path::PathBuf> {
                     part => relative.push(part),
                 }
             }
+
             (!relative.as_os_str().is_empty()).then_some(relative)
         })
         .collect()
@@ -302,5 +329,6 @@ fn rename_if_exists(from: &std::path::Path, to: &std::path::Path) -> Result<(), 
     if from.exists() {
         std::fs::rename(from, to).map_err(io_at(from))?;
     }
+
     Ok(())
 }

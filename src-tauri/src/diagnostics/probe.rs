@@ -58,6 +58,7 @@ pub fn run_probe(root: &Data, game_id: &str) -> Result<Vec<OverlayProbeReport>, 
     if game_running(root, game_id)? {
         return Err(crate::error::game_running());
     }
+
     let loaded = load_game(root, game_id)?;
     let data = loaded.data;
     let state =
@@ -65,6 +66,7 @@ pub fn run_probe(root: &Data, game_id: &str) -> Result<Vec<OverlayProbeReport>, 
     let game_root = PathBuf::from(loaded.settings.game_root.trim());
     let session = Session::at(&state, &game_root);
     let probes = probe_programs();
+
     if probes.is_empty() {
         return Err(AppError::user("deploy.overlay_probe_missing")
             .with("path", "gobbo_overlay_probe.exe")
@@ -74,6 +76,7 @@ pub fn run_probe(root: &Data, game_id: &str) -> Result<Vec<OverlayProbeReport>, 
     }
 
     let mut reports = Vec::new();
+
     for (arch, probe) in probes {
         let report_path = state.join(format!("overlay-probe-{arch}.json"));
         let _ = fs::remove_file(&report_path);
@@ -111,6 +114,7 @@ pub fn run_probe(root: &Data, game_id: &str) -> Result<Vec<OverlayProbeReport>, 
             checks,
         });
     }
+
     Ok(reports)
 }
 
@@ -121,6 +125,7 @@ fn probe_programs() -> Vec<(&'static str, PathBuf)> {
         ("x86", ["gobbo_overlay_probe32.exe", "overlay-probe32.exe"]),
     ];
     let mut found = Vec::new();
+
     for (arch, names) in candidates {
         for name in names {
             if let Some(path) = crate::infra::binaries::adjacent(name) {
@@ -129,6 +134,7 @@ fn probe_programs() -> Vec<(&'static str, PathBuf)> {
             }
         }
     }
+
     found
 }
 

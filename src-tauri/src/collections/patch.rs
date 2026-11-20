@@ -29,6 +29,7 @@ pub fn apply(
     if patches.is_empty() {
         return Ok(0);
     }
+
     let reader = Archive::open(archive).map_err(AppError::from)?;
     let prefix = format!("patches/{}/", mod_name.trim_matches('/'));
     let patch_entry = |file: &str| {
@@ -39,6 +40,7 @@ pub fn apply(
             .position(|entry| !entry.is_dir && entry.name == wanted)
     };
     let mut applied = 0;
+
     for (file, expected_crc) in patches {
         let Some(entry) = patch_entry(file) else {
             issues.push(issue(
@@ -60,6 +62,7 @@ pub fn apply(
                 continue;
             }
         };
+
         if metadata.len() > MAX_SOURCE_BYTES {
             issues.push(issue(
                 "collection.patch_source_too_large",
@@ -68,7 +71,9 @@ pub fn apply(
             ));
             continue;
         }
+
         let actual_crc = crc32(&source).map_err(io_at(&source))?;
+
         if !actual_crc.eq_ignore_ascii_case(expected_crc) {
             issues.push(issue(
                 "collection.patch_crc_mismatch",
@@ -77,6 +82,7 @@ pub fn apply(
             ));
             continue;
         }
+
         let patch = reader
             .read_bytes_limited(entry, MAX_PATCH_BYTES)
             .map_err(AppError::from)?;
@@ -93,6 +99,7 @@ pub fn apply(
         store::replace_file_clean(&temp, &source)?;
         applied += 1;
     }
+
     Ok(applied)
 }
 
@@ -100,13 +107,17 @@ fn crc32(path: &Path) -> std::io::Result<String> {
     let mut hasher = crc32fast::Hasher::new();
     let mut file = fs::File::open(path)?;
     let mut buffer = vec![0u8; 64 * 1024];
+
     loop {
         let read = file.read(&mut buffer)?;
+
         if read == 0 {
             break;
         }
+
         hasher.update(&buffer[..read]);
     }
+
     Ok(format!("{:08X}", hasher.finalize()))
 }
 

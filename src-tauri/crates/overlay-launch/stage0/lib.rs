@@ -329,6 +329,7 @@ pub unsafe extern "C" fn memcpy(
 ) -> *mut c_void {
     let (dst, src) = (dst.cast::<u8>(), src.cast::<u8>());
     let mut index = 0;
+
     while index < length {
         // SAFETY: the caller guarantees both ranges hold `length` bytes.
         unsafe {
@@ -336,6 +337,7 @@ pub unsafe extern "C" fn memcpy(
         };
         index += 1;
     }
+
     dst.cast()
 }
 
@@ -345,11 +347,13 @@ pub unsafe extern "C" fn memcpy(
 pub unsafe extern "C" fn memset(dst: *mut c_void, value: i32, length: usize) -> *mut c_void {
     let dst = dst.cast::<u8>();
     let mut index = 0;
+
     while index < length {
         // SAFETY: the caller guarantees the range holds `length` bytes.
         unsafe { core::ptr::write_volatile(dst.add(index), value as u8) };
         index += 1;
     }
+
     dst.cast()
 }
 
@@ -362,11 +366,14 @@ pub unsafe extern "C" fn memmove(
     length: usize,
 ) -> *mut c_void {
     let (dst, src) = (dst.cast::<u8>(), src.cast::<u8>());
+
     if (dst as usize) <= (src as usize) || (dst as usize) >= (src as usize) + length {
         // SAFETY: a forward copy is safe when the destination starts before the source or past its end.
         return unsafe { memcpy(dst.cast(), src.cast(), length) }.cast();
     }
+
     let mut index = length;
+
     while index > 0 {
         index -= 1;
         // SAFETY: the caller guarantees both ranges hold `length` bytes.
@@ -374,6 +381,7 @@ pub unsafe extern "C" fn memmove(
             core::ptr::write_volatile(dst.add(index), core::ptr::read_volatile(src.add(index)))
         };
     }
+
     dst.cast()
 }
 
@@ -383,6 +391,7 @@ pub unsafe extern "C" fn memmove(
 pub unsafe extern "C" fn memcmp(left: *const c_void, right: *const c_void, length: usize) -> i32 {
     let (left, right) = (left.cast::<u8>(), right.cast::<u8>());
     let mut index = 0;
+
     while index < length {
         // SAFETY: the caller guarantees both ranges hold `length` bytes.
         let (a, b) = unsafe {
@@ -391,11 +400,14 @@ pub unsafe extern "C" fn memcmp(left: *const c_void, right: *const c_void, lengt
                 core::ptr::read_volatile(right.add(index)),
             )
         };
+
         if a != b {
             return i32::from(a) - i32::from(b);
         }
+
         index += 1;
     }
+
     0
 }
 
@@ -424,6 +436,7 @@ extern "C" fn gobbo_aulldiv(dividend: u64, divisor: u64) -> u64 {
     let (mut n_hi, mut n_lo) = ((dividend >> 32) as u32, dividend as u32);
     let (d_hi, d_lo) = ((divisor >> 32) as u32, divisor as u32);
     let (mut q_hi, mut q_lo, mut r_hi, mut r_lo) = (0u32, 0u32, 0u32, 0u32);
+
     for _ in 0..64 {
         let top = n_hi >> 31;
         n_hi = (n_hi << 1) | (n_lo >> 31);
@@ -432,6 +445,7 @@ extern "C" fn gobbo_aulldiv(dividend: u64, divisor: u64) -> u64 {
         r_lo = (r_lo << 1) | top;
         q_hi = (q_hi << 1) | (q_lo >> 31);
         q_lo <<= 1;
+
         if (r_hi, r_lo) >= (d_hi, d_lo) {
             let (lo, borrow) = r_lo.overflowing_sub(d_lo);
             r_hi = r_hi.wrapping_sub(d_hi).wrapping_sub(u32::from(borrow));
@@ -439,6 +453,7 @@ extern "C" fn gobbo_aulldiv(dividend: u64, divisor: u64) -> u64 {
             q_lo |= 1;
         }
     }
+
     (u64::from(q_hi) << 32) | u64::from(q_lo)
 }
 

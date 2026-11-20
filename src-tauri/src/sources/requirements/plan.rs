@@ -90,9 +90,11 @@ impl Builder<'_> {
             );
             return;
         }
+
         if !self.visited.insert(family_id.to_string()) {
             return;
         }
+
         let Some(family) = self.library.families.get(family_id) else {
             return;
         };
@@ -103,8 +105,10 @@ impl Builder<'_> {
                 self.walk(required, depth + 1);
                 continue;
             }
+
             let step = self.required_step(required, depth + 1);
             self.push(step);
+
             if self.library.families.contains_key(required) {
                 self.walk(required, depth + 1);
             }
@@ -121,16 +125,20 @@ impl Builder<'_> {
             if alternatives.is_empty() {
                 continue;
             }
+
             let group = (alternatives.len() > 1).then(|| format!("one-of:{family_id}:{at}"));
             let step = self.alternative_step(&alternatives, depth + 1, group);
             let family = step.family.clone();
+
             if let Some(family) = &family
                 && self.visiting.iter().any(|id| id == family)
             {
                 self.walk(family, depth + 1);
                 continue;
             }
+
             self.push(step);
+
             if let Some(family) = family {
                 self.walk(&family, depth + 1);
             }
@@ -141,6 +149,7 @@ impl Builder<'_> {
 
     fn required_step(&self, required: &str, depth: u32) -> RequirementStep {
         let name = self.name(required);
+
         if !self.library.families.contains_key(required) {
             return RequirementStep {
                 id: format!("local:{required}"),
@@ -153,6 +162,7 @@ impl Builder<'_> {
                 message: Some(Message::new(crate::error::MOD_MISSING).with("folder", name)),
             };
         }
+
         let action = if self.lookup.is_enabled(required) {
             RequirementAction::AlreadyOn
         } else {
@@ -182,6 +192,7 @@ impl Builder<'_> {
         if let Some(requirement) = enabled {
             return self.step(requirement, depth, group, RequirementAction::AlreadyOn);
         }
+
         let disabled = alternatives
             .iter()
             .find(|requirement| self.state(requirement) == RequirementAction::Enable);
@@ -254,12 +265,15 @@ impl Builder<'_> {
             Ok(provider) => provider,
             Err(error) => return Some(error.into()),
         };
+
         if let Some(error) = providers::browser_route_error(provider) {
             return Some(error.into());
         }
+
         if self.game.provider_key(provider.id().as_str()).is_none() {
             return Some(providers::no_game_key(provider.id().as_str()).into());
         }
+
         None
     }
 

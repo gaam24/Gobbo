@@ -25,14 +25,17 @@ pub(super) fn member_families(
         if origin.excluded.iter().any(|key| key == &item.key) {
             continue;
         }
+
         if let Some((family, _)) = find_version(view, &item.wanted())
             && listed.contains(family.as_str())
         {
             families.insert(family);
         }
     }
+
     families.into_iter().collect()
 }
+
 pub(super) fn session_view(
     profile: String,
     origin: CollectionOrigin,

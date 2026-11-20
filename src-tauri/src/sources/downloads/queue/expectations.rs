@@ -53,6 +53,7 @@ impl Downloads {
         if let Some(path) = path {
             self.clear_pending(game, &path);
         }
+
         Some(id)
     }
 

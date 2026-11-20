@@ -9,6 +9,7 @@ use crate::providers::nexus::link::split_nxm;
 /// Reads a website URL or an `nxm://` collection link.
 pub fn parse_collection_link(url: &str) -> Result<CollectionLink, AppError> {
     let bad = || AppError::user("collection.bad_link").with("url", url);
+
     if let Some(parts) = split_nxm(url) {
         let domain = parts.host();
         let segments = parts.segments();
@@ -17,9 +18,11 @@ pub fn parse_collection_link(url: &str) -> Result<CollectionLink, AppError> {
             ["collections", slug, "revisions", revision] => (*slug, parse_revision(revision)?),
             _ => return Err(bad()),
         };
+
         if !is_slug(slug, true) {
             return Err(bad());
         }
+
         return Ok(CollectionLink {
             provider: ProviderId::new("nexus"),
             game_key: domain.to_ascii_lowercase(),
@@ -33,16 +36,20 @@ pub fn parse_collection_link(url: &str) -> Result<CollectionLink, AppError> {
     }
 
     let url = Url::parse(url.trim()).map_err(|_| bad())?;
+
     if url.scheme() != "https" {
         return Err(bad());
     }
+
     let host = url.host_str().unwrap_or_default().to_ascii_lowercase();
+
     if !matches!(
         host.as_str(),
         "www.nexusmods.com" | "nexusmods.com" | "next.nexusmods.com"
     ) {
         return Err(bad());
     }
+
     let segments: Vec<&str> = url
         .path()
         .trim_end_matches('/')
@@ -54,9 +61,11 @@ pub fn parse_collection_link(url: &str) -> Result<CollectionLink, AppError> {
         | [domain, "collections", slug, rest @ ..] => (*domain, *slug, rest),
         _ => return Err(bad()),
     };
+
     if !is_slug(domain, false) || !is_slug(slug, true) {
         return Err(bad());
     }
+
     let revision = match rest {
         [] | ["mods" | "comments" | "changelog" | "bugs"] => query_revision(&url),
         ["revisions", revision] => parse_revision(revision)?,
@@ -85,6 +94,7 @@ fn parse_revision(text: &str) -> Result<Option<u32>, AppError> {
     if text.eq_ignore_ascii_case("latest") {
         return Ok(None);
     }
+
     let revision: u32 = text
         .parse()
         .map_err(|_| AppError::user("collection.bad_link"))?;

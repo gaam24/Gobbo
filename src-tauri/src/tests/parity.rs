@@ -169,6 +169,7 @@ fn the_same_archive_imports_the_same_record_from_every_path() {
             "every import path must build the same record"
         );
     }
+
     assert_eq!(
         records[0],
         (

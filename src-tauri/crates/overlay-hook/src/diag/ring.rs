@@ -17,6 +17,7 @@ static RING: OnceLock<Option<Mutex<Ring>>> = OnceLock::new();
 pub(crate) fn open(base: Option<&Path>) {
     let ring = base.and_then(|base| {
         let path = gobbo_overlay_decisions::process_file(base);
+
         match Ring::open(&path) {
             Ok(ring) => Some(Mutex::new(ring)),
             Err(error) => {
@@ -36,6 +37,7 @@ pub(crate) fn record(kind: Kind, layer: Layer, error: u32, path: impl FnOnce() -
     if crate::diag::crashing() {
         return;
     }
+
     let Some(Some(lock)) = RING.get() else {
         return;
     };

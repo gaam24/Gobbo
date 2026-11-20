@@ -21,13 +21,17 @@ pub(super) fn free_folder_name(
     digest: &str,
 ) -> Result<String, InstallError> {
     let wanted = crate::domain::naming::safe_limited_file_name(wanted);
+
     if !library.join(&wanted).exists() {
         return Ok(wanted);
     }
+
     let other = with_digest(&wanted, digest);
+
     if library.join(&other).exists() {
         return Err(InstallError::AlreadyInLibrary { folder: other });
     }
+
     Ok(other)
 }
 
@@ -48,9 +52,11 @@ pub(super) fn split_name(name: &str) -> Result<Vec<&str>, InstallError> {
     let unsafe_name = || InstallError::UnsafeEntry {
         name: name.to_string(),
     };
+
     if name.starts_with('/') || name.contains(':') {
         return Err(unsafe_name());
     }
+
     let parts: Vec<&str> = name
         .split('/')
         .filter(|part| !part.is_empty() && *part != ".")
@@ -62,5 +68,6 @@ pub(super) fn split_name(name: &str) -> Result<Vec<&str>, InstallError> {
     {
         return Err(unsafe_name());
     }
+
     Ok(parts)
 }

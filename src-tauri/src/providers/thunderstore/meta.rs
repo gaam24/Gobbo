@@ -16,9 +16,11 @@ pub fn meta_of(
     picture: Option<String>,
 ) -> SourceMeta {
     let mut extra = BTreeMap::new();
+
     if let Some(website) = non_empty(&version.website_url) {
         extra.insert("website_url".to_string(), website);
     }
+
     let tags: BTreeSet<&str> = package
         .community_listings
         .iter()

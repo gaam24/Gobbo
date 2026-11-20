@@ -43,6 +43,7 @@ pub fn plan_from_api(revision: &CollectionRevision, game_key: &str) -> Collectio
     let mut items = Vec::with_capacity(revision.mods.len());
     let mut seen = BTreeSet::new();
     let mut issues = Vec::new();
+
     for module in &revision.mods {
         let key = unique_key(
             format!("{}:{}", revision.info.provider, module.mod_id),
@@ -51,6 +52,7 @@ pub fn plan_from_api(revision: &CollectionRevision, game_key: &str) -> Collectio
         );
         items.push(item_from_api(key, &revision.info.provider, module));
     }
+
     for (index, resource) in revision.external.iter().enumerate() {
         let source = match &resource.url {
             Some(url) if url.starts_with("https://") => {
@@ -96,6 +98,7 @@ pub fn plan_from_api(revision: &CollectionRevision, game_key: &str) -> Collectio
             adult: false,
         });
     }
+
     let mut info = revision.info.clone();
     info.game_key = game_key.to_string();
     let order = items.iter().map(|item| item.key.clone()).collect();
@@ -148,16 +151,20 @@ fn build(
             .with("expected", game_key)
             .with("found", domain));
     }
+
     if manifest.mods.len() > MAX_ITEMS {
         return Err(AppError::user("collection.too_many_items").with("limit", MAX_ITEMS));
     }
+
     let api = ApiIndex::new(revision);
     let mut items = Vec::with_capacity(manifest.mods.len());
     let mut issues = Vec::new();
     let mut seen = BTreeSet::new();
+
     for module in manifest.mods {
         items.push(item_from_manifest(module, &api, &mut seen, &mut issues));
     }
+
     let rules = manifest_rules(&manifest.mod_rules, &items, &mut issues);
     let (order, order_issues) = order_items(&items, &rules);
     issues.extend(order_issues.into_iter().map(|message| CollectionIssue {
@@ -165,6 +172,7 @@ fn build(
         item: None,
         message,
     }));
+
     if !json_empty(&manifest.load_order) {
         issues.push(issue(
             CollectionIssueSeverity::Unsupported,
@@ -173,6 +181,7 @@ fn build(
             [],
         ));
     }
+
     if !json_empty(&manifest.tools) {
         issues.push(issue(
             CollectionIssueSeverity::Unsupported,
@@ -181,6 +190,7 @@ fn build(
             [],
         ));
     }
+
     if !json_empty(&manifest.plugins) || !json_empty(&manifest.plugin_rules) {
         issues.push(issue(
             CollectionIssueSeverity::Unsupported,
@@ -189,6 +199,7 @@ fn build(
             [],
         ));
     }
+
     if archive
         .entries()
         .iter()
@@ -201,15 +212,18 @@ fn build(
             [],
         ));
     }
+
     let has_bundles = items
         .iter()
         .any(|item| matches!(item.source, CollectionSource::Bundle { .. }));
     let has_patches = items.iter().any(|item| !item.patches.is_empty());
     let mut info = revision.info.clone();
     info.game_key = game_key.to_string();
+
     if !manifest.info.name.trim().is_empty() {
         info.name = manifest.info.name;
     }
+
     if let Some(author) = manifest
         .info
         .author
@@ -217,15 +231,19 @@ fn build(
     {
         info.author = Some(author);
     }
+
     if !manifest.info.description.trim().is_empty() {
         info.description = manifest.info.description;
     }
+
     if !manifest.info.install_instructions.trim().is_empty() {
         info.instructions = manifest.info.install_instructions;
     }
+
     if !manifest.info.game_versions.is_empty() {
         info.game_versions = manifest.info.game_versions;
     }
+
     Ok(CollectionPlan {
         format: PLAN_FORMAT,
         info,

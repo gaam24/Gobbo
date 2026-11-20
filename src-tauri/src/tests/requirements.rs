@@ -104,6 +104,7 @@ fn an_alternative_group_needs_one_step_and_says_which_key_is_missing() {
     let data = f.data.game(SLOT_GAME);
     let mut library = load_library(&data, &game).unwrap();
     let family = library.families.get_mut(&c).unwrap();
+
     for (mod_id, name) in [("owner-one", "One"), ("owner-two", "Two")] {
         family.requirements.push(SourceRequirement {
             source: SourceRef::new("thunderstore", mod_id),
@@ -113,6 +114,7 @@ fn an_alternative_group_needs_one_step_and_says_which_key_is_missing() {
             ignored: false,
         });
     }
+
     library.save(&data.index()).unwrap();
 
     let preview = plan(&f.data, SLOT_GAME, "modC").unwrap();

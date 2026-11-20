@@ -31,6 +31,7 @@ pub fn install_cancellable(
     let game = games::load(game_id)?;
     let mut resolved: Vec<(String, Option<String>)> = Vec::new();
     let mut failed = Vec::new();
+
     for step in &plan.steps {
         match step.action {
             RequirementAction::Enable => {
@@ -43,6 +44,7 @@ pub fn install_cancellable(
                 let Some(source) = &step.source else {
                     continue;
                 };
+
                 match resolve_cancellable(root, game_id, source.clone(), cancel, progress) {
                     Ok(item) => resolved.push((item.family, item.folder)),
                     Err(error) => failed.push(error.into()),
@@ -51,12 +53,15 @@ pub fn install_cancellable(
             RequirementAction::AlreadyOn | RequirementAction::Blocked => {}
         }
     }
+
     stop_if(cancel, IMPORT_CANCELLED)?;
 
     let installed = u32::try_from(resolved.len()).unwrap_or(u32::MAX);
+
     if !resolved.is_empty() {
         enable_all(root, &game, &resolved)?;
     }
+
     let blocked = plan
         .steps
         .iter()
@@ -101,13 +106,16 @@ fn enable_all(
     let _profiles = lock_profiles();
     let mut profiles = load_profiles(&data)?;
     sync::sync_profiles(&mut profiles, &library, &view);
+
     for (family, folder) in resolved {
         let entry = profiles.active_entry_mut(family)?;
         entry.enabled = true;
+
         if let Some(folder) = folder {
             entry.folder.clone_from(folder);
         }
     }
+
     crate::context::profile::history::save_profiles(&data, &profiles)
 }
 
@@ -142,12 +150,14 @@ fn resolve_cancellable(
         view.family_of_source(&source.provider, &source.mod_id)
             .map(str::to_string)
     };
+
     if let Some(family) = existing {
         return Ok(Resolved {
             family,
             folder: None,
         });
     }
+
     let folders = download_and_import(
         root,
         game_id,

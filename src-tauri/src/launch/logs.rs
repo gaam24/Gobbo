@@ -36,6 +36,7 @@ pub fn collect(data: &Data, game: &GameDef) -> Vec<GameLog> {
     if game.logs.is_empty() {
         return Vec::new();
     }
+
     let Some(root) = game_root(data) else {
         return Vec::new();
     };
@@ -61,13 +62,16 @@ pub fn collect_mod_logs(data: &Data, game: &GameDef, defined: &[GameLog]) -> Vec
     };
     let mut found = Vec::new();
     let mut bases = vec![(3, layers.upper.as_path())];
+
     if let Some(staging) = &layers.staging {
         bases.push((2, staging.as_path()));
     }
+
     for (rank, base) in bases {
         if !base.is_dir() {
             continue;
         }
+
         let _ = fs::walk(base, WalkErrors::Skip, &mut |_entry, relative, is_dir| {
             if !is_dir && is_log(relative) {
                 push(
@@ -77,9 +81,11 @@ pub fn collect_mod_logs(data: &Data, game: &GameDef, defined: &[GameLog]) -> Vec
                     rank,
                 );
             }
+
             Ok(())
         });
     }
+
     found.sort_by_key(|candidate| std::cmp::Reverse(candidate.modified_at));
     found
         .into_iter()
@@ -117,6 +123,7 @@ fn is_log(path: &str) -> bool {
 /// The newest files of one source. A file path gives one log; a folder gives up to `limit` logs, newest first.
 fn source_logs(layers: &Layers, source: &LogSource) -> Vec<GameLog> {
     let path = source.path.trim();
+
     if path.is_empty() {
         return Vec::new();
     }
@@ -136,11 +143,13 @@ fn source_logs(layers: &Layers, source: &LogSource) -> Vec<GameLog> {
         .iter()
         .any(|(_, base)| gobbo_overlay_core::join(base, folder).is_dir());
     let mut candidates: Vec<Candidate> = Vec::new();
+
     if is_folder {
         collect_folder(layers, folder, &pattern, source.recursive, &mut candidates);
     } else {
         collect_file(layers, folder, &mut candidates);
     }
+
     candidates.sort_by_key(|candidate| std::cmp::Reverse(candidate.modified_at));
     candidates
         .into_iter()
@@ -161,6 +170,7 @@ struct Candidate {
 fn collect_file(layers: &Layers, relative: &str, found: &mut Vec<Candidate>) {
     for (rank, base) in layer_bases(layers) {
         let path = gobbo_overlay_core::join(base, relative);
+
         if path.is_file() {
             push(found, relative, path, rank);
         }
@@ -175,16 +185,20 @@ fn collect_folder(
     found: &mut Vec<Candidate>,
 ) {
     let folder = folder.trim_end_matches('/');
+
     for (rank, base) in layer_bases(layers) {
         let dir = gobbo_overlay_core::join(base, folder);
+
         if !dir.is_dir() {
             continue;
         }
+
         if recursive {
             let _ = fs::walk(&dir, WalkErrors::Skip, &mut |_entry, relative, is_dir| {
                 if !is_dir {
                     add_candidate(found, folder, relative, &dir, rank, pattern);
                 }
+
                 Ok(())
             });
         } else if let Ok(entries) = std::fs::read_dir(&dir) {
@@ -192,6 +206,7 @@ fn collect_folder(
                 if entry.file_type().is_ok_and(|kind| kind.is_dir()) {
                     continue;
                 }
+
                 let name = entry.file_name().to_string_lossy().into_owned();
                 add_candidate(found, folder, &name, &dir, rank, pattern);
             }
@@ -208,9 +223,11 @@ fn add_candidate(
     pattern: &str,
 ) {
     let name = relative.rsplit('/').next().unwrap_or(relative);
+
     if !matches(name, pattern) {
         return;
     }
+
     let path = dir.join(relative);
     let full = if folder.is_empty() || folder == "." {
         relative.to_string()
@@ -223,15 +240,18 @@ fn add_candidate(
 /// The layers from highest to lowest. A source that exists in more than one layer takes the highest one.
 fn layer_bases(layers: &Layers) -> Vec<(u8, &Path)> {
     let mut bases = vec![(3, layers.upper.as_path())];
+
     if let Some(staging) = &layers.staging {
         bases.push((2, staging.as_path()));
     }
+
     bases.push((1, layers.root.as_path()));
     bases
 }
 
 fn push(found: &mut Vec<Candidate>, relative: &str, path: PathBuf, rank: u8) {
     let key = relative.replace('\\', "/");
+
     if let Some(existing) = found.iter_mut().find(|entry| entry.relative == key) {
         if rank > existing.rank {
             let modified_at = modified(&path);
@@ -242,8 +262,10 @@ fn push(found: &mut Vec<Candidate>, relative: &str, path: PathBuf, rank: u8) {
                 modified_at,
             };
         }
+
         return;
     }
+
     let modified_at = modified(&path);
     found.push(Candidate {
         relative: key,
@@ -286,6 +308,7 @@ fn matches(text: &str, pattern: &str) -> bool {
             }
         }
     }
+
     inner(text.as_bytes(), pattern.as_bytes())
 }
 

@@ -37,6 +37,7 @@ pub fn with_source_name(
     let bare = info.name.is_empty() || info.name == folder;
     let label_name = archive.and_then(|archive| archive.name.as_deref());
     let stand_in = bare || label_name.is_some_and(|name| name == info.name);
+
     if let Some(name) = page_name.filter(|name| stand_in && !name.is_empty())
         && info.name != name
     {
@@ -50,11 +51,13 @@ pub fn with_source_name(
             info.name = name.to_string();
         }
     }
+
     if info.version.is_none()
         && let Some(archive) = archive
     {
         info.version = Some(archive.version.clone());
     }
+
     info
 }
 
@@ -71,6 +74,7 @@ impl<'view, 'data, 'list> SourceLookup<'view, 'data, 'list> {
     pub fn new(view: &'view LibraryView<'data>, listed: &'list [ProfileMod]) -> Self {
         let mut enabled = rustc_hash::FxHashSet::default();
         let mut enabled_order = Vec::new();
+
         for entry in listed.iter().filter(|entry| entry.enabled) {
             if enabled.insert(entry.id.as_str()) {
                 enabled_order.push(entry.id.as_str());
@@ -91,6 +95,7 @@ impl<'view, 'data, 'list> SourceLookup<'view, 'data, 'list> {
         let Some(first) = families.next() else {
             return RequirementState::Missing;
         };
+
         if self.enabled.contains(first) || families.any(|family| self.enabled.contains(family)) {
             RequirementState::Enabled
         } else {
@@ -109,6 +114,7 @@ impl<'view, 'data, 'list> SourceLookup<'view, 'data, 'list> {
 pub fn source_alternatives(requirements: &[SourceRequirement]) -> Vec<Vec<&SourceRequirement>> {
     let mut lists: Vec<Vec<&SourceRequirement>> = Vec::new();
     let mut list_of_group: FxHashMap<(&str, u32), usize> = FxHashMap::default();
+
     for requirement in requirements {
         let Some(group) = requirement.group else {
             lists.push(vec![requirement]);
@@ -121,6 +127,7 @@ pub fn source_alternatives(requirements: &[SourceRequirement]) -> Vec<Vec<&Sourc
         });
         lists[at].push(requirement);
     }
+
     lists
 }
 
@@ -152,6 +159,7 @@ fn unmet_descriptors<'a>(
     family: &'a Family,
 ) -> Vec<Unmet<'a>> {
     let mut unmet = Vec::new();
+
     for required in &family.requires {
         if !library.families.contains_key(required) {
             unmet.push(Unmet::RequiredMissing(required));
@@ -159,6 +167,7 @@ fn unmet_descriptors<'a>(
             unmet.push(Unmet::RequiredDisabled(required));
         }
     }
+
     for alternatives in source_alternatives(&family.requirements) {
         // An ignored requirement stays in the inspector but never counts: a list of ignored alternatives is skipped, and
         // an ignored one cannot meet a list another requirement still has to meet.
@@ -169,26 +178,33 @@ fn unmet_descriptors<'a>(
         if alternatives.is_empty() {
             continue;
         }
+
         let mut state = RequirementState::Missing;
         let mut met = false;
+
         for (index, requirement) in alternatives.iter().enumerate() {
             let found = lookup.state_source(&requirement.source);
+
             if index == 0 {
                 state = found;
             }
+
             if found == RequirementState::Enabled {
                 met = true;
                 break;
             }
         }
+
         if met {
             continue;
         }
+
         unmet.push(Unmet::Alternatives {
             alternatives,
             state,
         });
     }
+
     unmet
 }
 
@@ -248,17 +264,21 @@ impl<'a> UnmetRequirements<'a> {
         listed: &[ProfileMod],
     ) -> Self {
         let mut by_family = FxHashMap::default();
+
         for entry in listed {
             let Some(family) = library.families.get(&entry.id) else {
                 continue;
             };
+
             if family.requires.is_empty() && family.requirements.is_empty() {
                 continue;
             }
+
             by_family
                 .entry(family.id.as_str())
                 .or_insert_with(|| unmet_descriptors(library, lookup, family));
         }
+
         Self { library, by_family }
     }
 
@@ -307,11 +327,13 @@ pub fn relation_warnings_with(
     let mut position: Option<FxHashMap<&str, usize>> = None;
     let mut warnings = Vec::new();
     let mut pairs: BTreeSet<(String, String)> = BTreeSet::new();
+
     for id in &lookup.enabled_order {
         let Some(family) = library.families.get(*id) else {
             continue;
         };
         warnings.extend(unmet.messages(family));
+
         for other in &family.overrides {
             let position = position.get_or_insert_with(|| {
                 listed
@@ -320,6 +342,7 @@ pub fn relation_warnings_with(
                     .map(|(at, entry)| (entry.id.as_str(), at))
                     .collect()
             });
+
             if enabled.contains(other.as_str()) && position.get(other.as_str()) < position.get(*id)
             {
                 warnings.push(
@@ -329,6 +352,7 @@ pub fn relation_warnings_with(
                 );
             }
         }
+
         for other in &family.incompatible {
             if enabled.contains(other.as_str()) {
                 let pair = if *id <= other.as_str() {
@@ -336,6 +360,7 @@ pub fn relation_warnings_with(
                 } else {
                     (other.clone(), (*id).to_string())
                 };
+
                 if pairs.insert(pair.clone()) {
                     warnings.push(
                         Message::new("relations.conflict")
@@ -346,6 +371,7 @@ pub fn relation_warnings_with(
             }
         }
     }
+
     warnings
 }
 

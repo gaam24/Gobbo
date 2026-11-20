@@ -33,6 +33,7 @@ pub fn save(account: &str, key: &str) -> Result<(), AppError> {
             Err(error) => Err(key_error(error, "source.key_save_failed")),
         };
     }
+
     entry
         .set_password(key)
         .map_err(|error| key_error(error, "source.key_save_failed"))?;

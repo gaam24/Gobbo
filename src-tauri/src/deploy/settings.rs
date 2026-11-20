@@ -48,9 +48,11 @@ pub fn merge(current: Option<&str>, rows: &[SettingsRow]) -> (String, Vec<Touche
     let eol = if text.contains("\r\n") { "\r\n" } else { "\n" };
     let mut lines: Vec<String> = text.lines().map(str::to_string).collect();
     let mut touched = Vec::new();
+
     for row in rows {
         upsert(&mut lines, row, &mut touched);
     }
+
     (join(&lines, eol), touched)
 }
 
@@ -62,6 +64,7 @@ pub fn revert(current: &str, touched: &[Touched]) -> String {
         "\n"
     };
     let mut lines: Vec<String> = current.lines().map(str::to_string).collect();
+
     for change in touched.iter().rev() {
         match (section(&lines, &change.folder), &change.before) {
             (Some((start, end)), Some(before)) => {
@@ -79,26 +82,31 @@ pub fn revert(current: &str, touched: &[Touched]) -> String {
                 if lines.last().is_some_and(|line| !line.trim().is_empty()) {
                     lines.push(String::new());
                 }
+
                 lines.extend(before.iter().cloned());
             }
             (None, None) => {}
         }
     }
+
     join(&lines, eol)
 }
 
 fn join(lines: &[String], eol: &str) -> String {
     let mut out = String::new();
+
     for line in lines {
         out.push_str(line);
         out.push_str(eol);
     }
+
     out
 }
 
 fn upsert(lines: &mut Vec<String>, row: &SettingsRow, touched: &mut Vec<Touched>) {
     let enabled = if row.enabled { "1" } else { "0" };
     let priority = row.priority.to_string();
+
     if let Some((start, end)) = section(lines, &row.folder) {
         touched.push(Touched {
             folder: row.folder.clone(),
@@ -109,15 +117,18 @@ fn upsert(lines: &mut Vec<String>, row: &SettingsRow, touched: &mut Vec<Touched>
         set_key(lines, &row.folder, "Priority", &priority);
         return;
     }
+
     let blank_before = lines.last().is_some_and(|line| !line.trim().is_empty());
     touched.push(Touched {
         folder: row.folder.clone(),
         before: None,
         blank_before,
     });
+
     if blank_before {
         lines.push(String::new());
     }
+
     lines.push(format!("[{}]", row.folder));
     lines.push(format!("Enabled={enabled}"));
     lines.push(format!("Priority={priority}"));
@@ -136,6 +147,7 @@ fn section(lines: &[String], folder: &str) -> Option<(usize, usize)> {
     while end > start + 1 && lines[end - 1].trim().is_empty() {
         end -= 1;
     }
+
     Some((start, end))
 }
 
@@ -148,6 +160,7 @@ fn set_key(lines: &mut Vec<String>, folder: &str, key: &str, value: &str) {
             .split_once('=')
             .is_some_and(|(k, _)| k.trim().eq_ignore_ascii_case(key))
     });
+
     match found {
         Some(i) => lines[i] = format!("{key}={value}"),
         None => lines.insert(start + 1, format!("{key}={value}")),

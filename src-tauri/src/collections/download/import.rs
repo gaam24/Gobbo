@@ -82,6 +82,7 @@ pub(super) fn install_one(
                     if cancelled(cancel) {
                         return false;
                     }
+
                     progress(
                         CollectionItemState::Downloading,
                         crate::domain::progress::percent(received, total).unwrap_or(0),
@@ -90,9 +91,11 @@ pub(super) fn install_one(
                     true
                 },
             )?;
+
             if !downloaded.is_archive {
                 return Ok(ItemOutcome::NeedsUser);
             }
+
             let outcome = import_member(
                 loaded,
                 root,
@@ -166,6 +169,7 @@ pub(super) fn import_member(
             })));
         }
     };
+
     if !item.patches.is_empty()
         && let Some(folder) = view.folders.first()
         && let Some(archive) = &loaded.cache_archive
@@ -185,6 +189,7 @@ pub(super) fn import_member(
                 item.name
             ));
         }
+
         for issue in issues {
             crate::infra::log::warn(format!(
                 "collection patch {}: {}",
@@ -192,5 +197,6 @@ pub(super) fn import_member(
             ));
         }
     }
+
     Ok(ItemOutcome::Installed { manual: false })
 }

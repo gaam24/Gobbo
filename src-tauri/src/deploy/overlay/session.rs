@@ -132,6 +132,7 @@ const fn supported() -> Result<(), DeployError> {
     if !crate::platform::supports_overlay() {
         return Err(DeployError::OverlayUnsupported);
     }
+
     Ok(())
 }
 
@@ -173,6 +174,7 @@ pub fn prepare_with_progress(
     if !reused && in_use(&session.root) {
         return Err(DeployError::OverlayInUse { path: session.root });
     }
+
     if !reused && session.mods.exists() {
         fs::remove_dir_all(&session.mods).map_err(|e| FileError::new(&session.mods, e))?;
     }
@@ -180,12 +182,15 @@ pub fn prepare_with_progress(
     // path. So a rebuilt layer starts without the whiteouts of the old one, including its journal.
     let whiteouts = session.layers().whiteouts_file();
     let whiteouts_journal = session.layers().whiteouts_journal_file();
+
     if !reused && whiteouts.exists() {
         fs::remove_file(&whiteouts).map_err(|e| FileError::new(&whiteouts, e))?;
     }
+
     if !reused && whiteouts_journal.exists() {
         fs::remove_file(&whiteouts_journal).map_err(|e| FileError::new(&whiteouts_journal, e))?;
     }
+
     let jobs = if reused {
         Vec::new()
     } else {
@@ -197,11 +202,13 @@ pub fn prepare_with_progress(
         mods: session.mods.clone(),
         overwrite: session.overwrite.clone(),
     })?;
+
     for dir in [&session.mods, &session.overwrite, &session.work] {
         fs::create_dir_all(dir).map_err(|e| FileError::new(dir, e))?;
     }
 
     let mut report = ApplyReport::default();
+
     if reused {
         report.files = plan.files.len();
         progress(DeployProgress::at(
@@ -210,6 +217,7 @@ pub fn prepare_with_progress(
             report.files,
         ));
     }
+
     let mut known_dirs = rustc_hash::FxHashSet::default();
     crate::deploy::progress::write_jobs(
         &jobs,
@@ -218,6 +226,7 @@ pub fn prepare_with_progress(
             if known_dirs.insert(job.dir.clone()) {
                 fs::create_dir_all(&job.dir).map_err(|e| FileError::new(&job.dir, e))?;
             }
+
             Ok(())
         },
         |job| {
@@ -241,6 +250,7 @@ pub fn prepare_with_progress(
 /// it again. `overwrite/` stays too, because it holds the game's writes, so we warn when it is not empty.
 pub fn finish(overwrite: &Path, warnings: &mut Vec<Message>) {
     let has_writes = fs::read_dir(overwrite).is_ok_and(|mut entries| entries.next().is_some());
+
     if has_writes {
         warnings.push(Message::new("undo.overlay_writes_kept").with("path", overwrite.display()));
     }
@@ -266,9 +276,11 @@ pub fn make_room(
             if running {
                 return Err(game_is_running_error());
             }
+
             undo(&roots.at_state(path.clone())).map_err(AppError::from)?;
         }
     }
+
     Ok(())
 }
 
@@ -286,14 +298,18 @@ pub(in crate::deploy) fn matches_plan(
     // The scan lists the layer's files with `/` and sorted, so the plan's paths take the same form.
     let prefix = layer_prefix(inner);
     let mut planned = Vec::with_capacity(plan.files.len());
+
     for file in &plan.files {
         let src = library.join(plan.folder(file)).join(plan.rel_path(file));
         let layered = format!("{prefix}{}", file.dest);
+
         if !same_file(&src, &mods.join(&layered)) {
             return Ok(false);
         }
+
         planned.push(layered);
     }
+
     let present = scan::list_files(mods)?;
     planned.sort_unstable();
     Ok(planned == present)

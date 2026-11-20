@@ -64,12 +64,15 @@ pub fn preview(
             BTreeSet::new()
         };
         let mut saved = BTreeSet::new();
+
         for file in &set.files {
             saved.insert(file.path.clone());
             let path = target.join(relative_path(&file.path)?);
+
             match fs::metadata(&path) {
                 Ok(meta) if meta.is_file() && meta.len() == file.size => {
                     let digest = digest_file::<Sha256>(&path, &mut |_| {}).map_err(io_at(&path))?;
+
                     if digest != file.sha256 {
                         preview.replaced += 1;
                         bytes = bytes.saturating_add(file.size);
@@ -85,9 +88,12 @@ pub fn preview(
                 }
             }
         }
+
         preview.removed += u32::try_from(current.difference(&saved).count()).unwrap_or(u32::MAX);
+
         if let Some(space) = disk::space_for(target) {
             free_kb = free_kb.min(space.free_kb);
+
             if !fits(space.free_kb, files_bytes(&set.files)) {
                 preview.bytes = clamp_u32(bytes);
                 preview.free_kb = clamp_u32(free_kb);
@@ -102,6 +108,7 @@ pub fn preview(
         && let Some(space) = disk::space_for(&scope.app.dir)
     {
         free_kb = free_kb.min(space.free_kb);
+
         if !fits(space.free_kb, manifest_bytes(&manifest)) {
             preview.bytes = clamp_u32(bytes);
             preview.free_kb = clamp_u32(free_kb);
@@ -109,6 +116,7 @@ pub fn preview(
             return Ok(preview);
         }
     }
+
     preview.bytes = clamp_u32(bytes);
     preview.free_kb = clamp_u32(free_kb);
     Ok(preview)
@@ -124,6 +132,7 @@ pub fn restore(
 ) -> Result<RestoreOutcome, AppError> {
     let scope = scope(app, &game.id)?;
     let _state = crate::context::lock_state(&app.dir)?;
+
     if game_running_at(&game.id, &settings.game_root) {
         return Err(
             AppError::user("snapshot.game_running").recovery(crate::error::Recovery::new(
@@ -131,14 +140,17 @@ pub fn restore(
             )),
         );
     }
+
     let manifest = load(&scope, id)?;
     let resolved = resolved_profile(&scope, &manifest)?;
     let before = preview(app, game, settings, id)?;
+
     if !before.enough_space {
         return Err(AppError::user("snapshot.no_space")
             .with("needed", before.bytes)
             .with("free", before.free_kb));
     }
+
     let backup = if resolved.created {
         None
     } else {
@@ -153,10 +165,12 @@ pub fn restore(
     let targets = targets(&scope, game, settings, &manifest, &resolved.profile)?;
     let full = manifest.profile_state.is_some();
     let mut files = 0u32;
+
     for (set, target) in &targets {
         let source = set_dir_in(&scope.dir(id), &set.id);
         files = files.saturating_add(restore_set(&source, target, set, full)?);
     }
+
     apply_profile_state(&scope, &manifest, &resolved)?;
     // A profile that owns the real folders sees the restored copy at once; a redirected set is already live in its layer.
     crate::context::profile::restore_owned(
@@ -181,26 +195,32 @@ fn resolved_profile(
     manifest: &Manifest,
 ) -> Result<ResolvedProfile, AppError> {
     let profiles = load_profiles(&scope.game)?;
+
     if let Ok(profile) = profiles.get(&manifest.profile) {
         let mut profile = profile.clone();
+
         if let Some(saved) = &manifest.profile_state {
             profile.user_data.clone_from(&saved.user_data);
             profile.pack.clone_from(&saved.pack);
             profile.collections.clone_from(&saved.collections);
         }
+
         return Ok(ResolvedProfile {
             profile,
             created: false,
         });
     }
+
     let Some(saved) = &manifest.profile_state else {
         return Err(
             AppError::user("snapshot.profile_missing").with("profile", &manifest.profile_name)
         );
     };
+
     if !naming::is_plain_folder(&manifest.profile) {
         return Err(AppError::user("snapshot.corrupt").with("file", &manifest.profile));
     }
+
     let name = restored_name(&manifest.profile_name);
     let mut profile = Profile::new(manifest.profile.clone(), name, Vec::new());
     profile.restore_list(saved.list.clone());
@@ -220,6 +240,7 @@ struct ResolvedProfile {
 /// The name a recreated profile starts from. It is made unique when it is added.
 fn restored_name(name: &str) -> String {
     let name = name.trim();
+
     if name.is_empty() {
         "Restored profile".to_string()
     } else {
@@ -239,6 +260,7 @@ fn apply_profile_state(
     };
     let _profiles = lock_profiles();
     let mut profiles = load_profiles(&scope.game)?;
+
     if resolved.created {
         let id = if naming::is_plain_folder(&manifest.profile)
             && profiles.get(&manifest.profile).is_err()
@@ -261,6 +283,7 @@ fn apply_profile_state(
         profile.pack.clone_from(&saved.pack);
         profile.collections.clone_from(&saved.collections);
     }
+
     history::save_profiles(&scope.game, &profiles)
 }
 
@@ -274,16 +297,21 @@ fn restore_set(
     full: bool,
 ) -> Result<u32, AppError> {
     let files = &set.files;
+
     if files.is_empty() {
         if set.target == Target::Overwrite || (full && set.target == Target::Upper) {
             remove_dir_if_exists(target).map_err(io_at(target))?;
+
             if full && set.target == Target::Upper {
                 restore_redirect_state(target, set)?;
             }
+
             return Ok(0);
         }
+
         return Err(AppError::user("snapshot.corrupt").with("file", target.display()));
     }
+
     let parent = target.parent().unwrap_or(target);
     fs::create_dir_all(parent).map_err(io_at(parent))?;
     let staging = parent.join(format!(".gobbo-restore-{}", unique_suffix()));
@@ -292,20 +320,26 @@ fn restore_set(
             let relative = relative_path(&file.path)?;
             let from = source.join(&relative);
             let to = staging.join(&relative);
+
             if let Some(parent) = to.parent() {
                 fs::create_dir_all(parent).map_err(io_at(parent))?;
             }
+
             fs::copy(&from, &to).map_err(io_at(&from))?;
             let meta = fs::metadata(&to).map_err(io_at(&to))?;
             let digest = digest_file::<Sha256>(&to, &mut |_| {}).map_err(io_at(&to))?;
+
             if meta.len() != file.size || digest != file.sha256 {
                 return Err(AppError::user("snapshot.corrupt").with("file", &file.path));
             }
         }
+
         replace_with_staged(&staging, target, true).map_err(io_at(target))?;
+
         if full && set.target == Target::Upper {
             restore_redirect_state(target, set)?;
         }
+
         Ok(u32::try_from(files.len()).unwrap_or(u32::MAX))
     })();
     let _ = fs::remove_dir_all(&staging);
@@ -318,17 +352,20 @@ fn restore_redirect_state(upper: &Path, set: &ManifestSet) -> Result<(), AppErro
     if let Some(parent) = upper.parent() {
         fs::create_dir_all(parent).map_err(io_at(parent))?;
     }
+
     write_optional(&user_data::whiteouts(upper), set.whiteouts.as_deref())?;
     write_optional(
         &user_data::whiteouts_journal(upper),
         set.whiteouts_journal.as_deref(),
     )?;
     let marker = user_data::seeded(upper);
+
     if set.seeded {
         write_atomic(&marker, b"").map_err(AppError::from)?;
     } else {
         remove_file_if_exists(&marker).map_err(io_at(&marker))?;
     }
+
     Ok(())
 }
 
@@ -352,17 +389,21 @@ fn targets(
     let state = scope.game.profile_state(&profile.id);
     let sets = user_data::sets(game, settings, profile, &state)?;
     let mut targets = Vec::with_capacity(manifest.sets.len() + 1);
+
     for set in &manifest.sets {
         if set.id == LEGACY_ID {
             targets.push((set.clone(), profile_state::legacy_data(&state)));
             continue;
         }
+
         let Some(current) = sets.iter().find(|current| current.id == set.id) else {
             return Err(AppError::user("snapshot.set_missing").with("set", &set.id));
         };
+
         if !current.isolated {
             return Err(AppError::user("snapshot.set_shared").with("set", &set.id));
         }
+
         let target = if current.redirects() {
             current.upper.clone()
         } else {
@@ -370,9 +411,11 @@ fn targets(
         };
         targets.push((set.clone(), target));
     }
+
     if let Some(overwrite) = &manifest.overwrite {
         targets.push((overwrite.clone(), profile_state::overwrite(&state)));
     }
+
     Ok(targets)
 }
 

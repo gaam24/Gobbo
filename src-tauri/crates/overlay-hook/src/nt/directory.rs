@@ -69,12 +69,14 @@ impl Listing {
     /// root layer one entry at a time.
     fn fill_batch(&mut self, want: usize) {
         self.batch.clear();
+
         while self.batch.len() < want {
             if self.next < self.layers.taken.entries.len() {
                 self.batch.push(self.layers.taken.entries[self.next]);
                 self.next += 1;
                 continue;
             }
+
             let Layers { taken, root, .. } = &mut self.layers;
             let Some(root) = root.as_mut() else {
                 break;
@@ -84,6 +86,7 @@ impl Listing {
             };
             self.batch.push(data);
         }
+
         self.batch_pos = 0;
     }
 
@@ -106,11 +109,13 @@ impl Listing {
             };
             self.fill_batch(want);
         }
+
         let (status, bytes, consumed) =
             respond(class, &self.batch, self.batch_pos, info, length, single);
         if status == STATUS_SUCCESS {
             self.batch_pos += consumed;
         }
+
         (status, bytes, consumed)
     }
 }
@@ -233,6 +238,7 @@ pub(crate) unsafe extern "system" fn nt_query_directory_file_ex(
         },
         None => None,
     };
+
     unsafe {
         query_or_original("NtQueryDirectoryFileEx", query, || {
             let original = original!(nt_query_directory_file_ex, STATUS_INVALID_PARAMETER);
@@ -279,6 +285,7 @@ unsafe fn query_or_original(
         crate::trace::trace_status(operation, status);
         return status;
     }
+
     let status = original();
     let _last_error = crate::win32::PreserveLastError::capture();
     crate::trace::trace_status(operation, status);
@@ -313,6 +320,7 @@ unsafe fn query(
     if !event.is_null() || !apc.is_null() || iosb.is_null() || info.is_null() {
         return None;
     }
+
     if !nt_listing::knows(class) {
         return None;
     }
@@ -324,9 +332,11 @@ unsafe fn query(
     // A handle outside every mount passes straight through. Classify it before taking the listing lock, so the
     // pass-through path keeps its zero-lock budget.
     let raw_kind = raw_length.and_then(|length| handles::layer_kind_units(&raw_buffer[..length]));
+
     if raw_kind == Some(handles::LayerKind::Outside) {
         return None;
     }
+
     if let Some(path_length) = raw_length
         && restart == 0
     {
@@ -336,12 +346,14 @@ unsafe fn query(
         // check belongs to the build, and a handle reused for another folder has another final path and rebuilds.
         crate::stat_lock();
         let mut listings = LISTINGS.lock().unwrap_or_else(PoisonError::into_inner);
+
         if let Some(entry) = listings.get_mut(&(handle as usize)) {
             match entry {
                 TableEntry::Plain { raw: stored, used } if stored.as_slice() == raw => {
                     *used = stamp;
                     return None;
                 }
+
                 TableEntry::Merged(listing)
                     if listing.matches(raw)
                         && Arc::ptr_eq(&listing.whiteouts, &listing.mount.whiteouts_snapshot()) =>
@@ -355,6 +367,7 @@ unsafe fn query(
             }
         }
     }
+
     let (mount, rel) = match raw_length {
         Some(path_length) => {
             let real = String::from_utf16_lossy(&raw_buffer[..path_length]);
@@ -362,9 +375,11 @@ unsafe fn query(
         }
         None => {
             let (kind, real) = handles::layer_path_kind(handle)?;
+
             if kind == handles::LayerKind::Outside {
                 return None;
             }
+
             handles::relative_in_layers(&real)?
         }
     };
@@ -384,11 +399,13 @@ unsafe fn query(
         }
     };
     let mask = mask(name)?;
+
     if plain_folder(mount, &rel, mask.as_ref()) {
         // The merged view is the real game folder; remember the handle so continuation calls pass through without
         // probing the layers again.
         crate::stat_lock();
         let mut listings = LISTINGS.lock().unwrap_or_else(PoisonError::into_inner);
+
         if listings.len() >= MAX_LISTINGS
             && let Some(oldest) = listings
                 .iter()
@@ -397,6 +414,7 @@ unsafe fn query(
         {
             listings.remove(&oldest);
         }
+
         listings.insert(
             handle as usize,
             TableEntry::Plain {
@@ -406,6 +424,7 @@ unsafe fn query(
         );
         return None;
     }
+
     crate::trace::call_with("NtQueryDirectoryFile", || rel.clone());
 
     crate::stat_lock();
@@ -439,6 +458,7 @@ unsafe fn query(
         });
         crate::stat_lock();
         listings = LISTINGS.lock().unwrap_or_else(PoisonError::into_inner);
+
         if listings.len() >= MAX_LISTINGS
             && let Some(oldest) = listings
                 .iter()
@@ -447,6 +467,7 @@ unsafe fn query(
         {
             listings.remove(&oldest);
         }
+
         listings.insert(
             handle as usize,
             TableEntry::Merged(Box::new(Listing {
@@ -462,6 +483,7 @@ unsafe fn query(
             })),
         );
     }
+
     match listings.get_mut(&(handle as usize))? {
         TableEntry::Merged(listing) => {
             listing.used = stamp;
@@ -483,6 +505,7 @@ fn plain_folder(mount: &crate::state::Mount, rel: &str, mask: &str) -> bool {
     if mount.whiteouts_snapshot().affects_listing(rel) {
         return false;
     }
+
     !has_entry(
         mount,
         Layer::Upper,
@@ -512,13 +535,17 @@ fn mask(name: *const UnicodeString) -> Option<Cow<'static, str>> {
         return Some(Cow::Borrowed("*"));
     };
     let units = unsafe { name_units(name) };
+
     if units.is_empty() {
         return Some(Cow::Borrowed("*"));
     }
+
     let mask = String::from_utf16_lossy(units);
+
     if mask.contains(['\\', '/']) {
         return None;
     }
+
     Some(Cow::Owned(mask))
 }
 
@@ -535,10 +562,13 @@ fn respond(
     if start >= entries.len() {
         return (STATUS_NO_MORE_FILES, 0, 0);
     }
+
     if !nt_listing::knows(class) {
         return (STATUS_INVALID_INFO_CLASS, 0, 0);
     }
+
     let buffer = unsafe { std::slice::from_raw_parts_mut(info.cast::<u8>(), length as usize) };
+
     match nt_listing::fill(
         class,
         entries.len(),
@@ -604,9 +634,11 @@ mod tests {
         let mut data: WIN32_FIND_DATAW = unsafe { std::mem::zeroed() };
         data.dwFileAttributes = attributes;
         data.nFileSizeLow = 7;
+
         for (slot, unit) in data.cFileName.iter_mut().zip(name.encode_utf16()) {
             *slot = unit;
         }
+
         data
     }
 

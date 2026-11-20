@@ -14,15 +14,19 @@ use std::path::PathBuf;
 /// Adding and checking a game give the same error for a folder that is not the game's.
 fn game_folder(game: &games::GameDef, game_root: &str) -> Result<PathBuf, AppError> {
     let game_root = game_root.trim();
+
     if game_root.is_empty() {
         return Err(crate::error::game_folder_missing());
     }
+
     let path = PathBuf::from(game_root);
+
     if !detect::has_markers(&path, game) {
         return Err(AppError::user("games.not_game_folder")
             .with("path", game_root)
             .with("game", &game.name));
     }
+
     Ok(path)
 }
 
@@ -70,20 +74,26 @@ pub fn remove_game(root: &Data, game_id: &str) -> Result<Vec<ManagedGame>, AppEr
     let _state = crate::context::lock_state(&root.dir)?;
     games::load(game_id)?;
     idle_data(root, game_id)?;
+
     if crate::context::running::game_running(root, game_id)? {
         return Err(crate::error::game_running());
     }
+
     let active = root.game(game_id);
+
     if !active.dir.is_dir() {
         return managed_games(root);
     }
+
     let removed = removed_path(&root.dir, game_id);
+
     if removed.exists() {
         return Err(io_at(&removed)(io::Error::new(
             io::ErrorKind::AlreadyExists,
             "the removed game data folder already exists",
         )));
     }
+
     fs::rename(&active.dir, &removed).map_err(io_at(&active.dir))?;
     managed_games(root)
 }
@@ -93,12 +103,14 @@ pub fn restore_game(root: &Data, game_id: &str) -> Result<Vec<ManagedGame>, AppE
     let _state = crate::context::managed::lock_state(root)?;
     games::load(game_id)?;
     let removed = removed_path(&root.dir, game_id);
+
     if !removed.is_dir() {
         return Err(io_at(&removed)(io::Error::new(
             io::ErrorKind::NotFound,
             "the removed game data folder does not exist",
         )));
     }
+
     restore_removed(root, game_id)?;
     managed_games(root)
 }

@@ -80,6 +80,7 @@ pub unsafe fn inject_early(process: HANDLE, thread: HANDLE, hook: &Path) -> io::
             format!("the overlay hook {} is missing", hook.display()),
         ));
     }
+
     let hook_path = wide(hook.as_os_str());
 
     #[cfg(target_arch = "x86_64")]
@@ -93,6 +94,7 @@ pub unsafe fn inject_early(process: HANDLE, thread: HANDLE, hook: &Path) -> io::
             init_name: INIT_NAME,
             flags: HOOK_SEARCH,
         };
+
         unsafe { inject_x64(process, thread, data) }
     }
     #[cfg(target_arch = "x86")]
@@ -106,6 +108,7 @@ pub unsafe fn inject_early(process: HANDLE, thread: HANDLE, hook: &Path) -> io::
             init_name: INIT_NAME,
             flags: HOOK_SEARCH,
         };
+
         unsafe { inject_x86(process, thread, data) }
     }
     #[cfg(not(any(target_arch = "x86_64", target_arch = "x86")))]
@@ -128,11 +131,13 @@ pub fn inject_early_by_tid(pid: u32, tid: u32, hook: &Path) -> io::Result<()> {
             pid,
         )
     };
+
     if process.is_null() {
         return Err(io::Error::last_os_error());
     }
     // SAFETY: the rights are the ones the context read and write need; the thread id is the caller's target.
     let thread = unsafe { OpenThread(THREAD_GET_CONTEXT | THREAD_SET_CONTEXT, FALSE, tid) };
+
     if thread.is_null() {
         // SAFETY: `process` was opened above and is closed once.
         unsafe { CloseHandle(process) };
@@ -145,6 +150,7 @@ pub fn inject_early_by_tid(pid: u32, tid: u32, hook: &Path) -> io::Result<()> {
         CloseHandle(thread);
         CloseHandle(process);
     }
+
     result
 }
 
@@ -155,14 +161,17 @@ fn kernel32() -> io::Result<HMODULE> {
     let name = wide(std::ffi::OsStr::new("kernel32.dll"));
     // SAFETY: `name` is a NUL-terminated UTF-16 path.
     let module = unsafe { GetModuleHandleW(name.as_ptr()) };
+
     if !module.is_null() {
         return Ok(module);
     }
     // SAFETY: `name` is a NUL-terminated UTF-16 path and the call only loads a system DLL.
     let module = unsafe { LoadLibraryW(name.as_ptr()) };
+
     if module.is_null() {
         return Err(io::Error::last_os_error());
     }
+
     Ok(module)
 }
 
@@ -190,6 +199,7 @@ unsafe fn place(process: HANDLE, remote: *mut c_void, image: &Image) -> io::Resu
             &mut written,
         )
     };
+
     if code == FALSE || written != image.code.len() {
         return Err(io::Error::last_os_error());
     }
@@ -206,6 +216,7 @@ unsafe fn place(process: HANDLE, remote: *mut c_void, image: &Image) -> io::Resu
             &mut data_written,
         )
     };
+
     if result == FALSE || data_written != image.data.len() {
         return Err(io::Error::last_os_error());
     }
@@ -232,10 +243,13 @@ unsafe fn write_image(process: HANDLE, mut image: Image) -> io::Result<*mut c_vo
             PAGE_EXECUTE_READWRITE,
         )
     };
+
     if remote.is_null() {
         return Err(io::Error::last_os_error());
     }
+
     let data_base = remote as usize + image.code.len();
+
     if let Err(error) = image
         .set_data_base(data_base)
         .and_then(|()| image.set_string_pointers(data_base))
@@ -250,6 +264,7 @@ unsafe fn write_image(process: HANDLE, mut image: Image) -> io::Result<*mut c_vo
         unsafe { VirtualFreeEx(process, remote, 0, MEM_RELEASE) };
         return Err(error);
     }
+
     Ok(remote)
 }
 
@@ -267,6 +282,7 @@ unsafe fn inject_x64(process: HANDLE, thread: HANDLE, data: Data64) -> io::Resul
     if unsafe { GetThreadContext(thread, &mut context) } == FALSE {
         return Err(io::Error::last_os_error());
     }
+
     let original = context.Rip;
     let image = stub::build64(&data, original).map_err(stub_error)?;
     // SAFETY: the allocation and the image are built for the target process.
@@ -278,6 +294,7 @@ unsafe fn inject_x64(process: HANDLE, thread: HANDLE, data: Data64) -> io::Resul
         unsafe { VirtualFreeEx(process, remote, 0, MEM_RELEASE) };
         return Err(io::Error::last_os_error());
     }
+
     Ok(())
 }
 
@@ -292,6 +309,7 @@ unsafe fn inject_x86(process: HANDLE, thread: HANDLE, data: Data32) -> io::Resul
     if unsafe { GetThreadContext(thread, &mut context) } == FALSE {
         return Err(io::Error::last_os_error());
     }
+
     let original = context.Eip;
     let image = stub::build32(&data, original).map_err(stub_error)?;
     // SAFETY: the allocation and the image are built for the target process.
@@ -303,6 +321,7 @@ unsafe fn inject_x86(process: HANDLE, thread: HANDLE, data: Data32) -> io::Resul
         unsafe { VirtualFreeEx(process, remote, 0, MEM_RELEASE) };
         return Err(io::Error::last_os_error());
     }
+
     Ok(())
 }
 

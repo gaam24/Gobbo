@@ -97,6 +97,7 @@ pub(super) fn look_up_all(
                     item.part_id = Some(id);
                 }
             }
+
             let part_latest = part
                 .as_deref()
                 .and_then(|part| part_files(client, part).ok())
@@ -117,15 +118,19 @@ pub(super) fn look_up_all(
 
     // One facet batch per game. The same game-scoped id is only unique inside its game.
     let mut by_game: BTreeMap<u32, Vec<u32>> = BTreeMap::new();
+
     for work in &work {
         if let Some(game_id) = work.page.as_ref().and_then(|page| page.game_id) {
             by_game.entry(game_id).or_default().push(work.item.nexus_id);
         }
     }
+
     let mut facets = BTreeMap::new();
+
     for (game_id, ids) in by_game {
         facets.extend(crate::providers::nexus::api::facets(client, game_id, &ids));
     }
+
     for work in &mut work {
         let Some(page) = work.page.as_mut() else {
             continue;
@@ -159,9 +164,11 @@ pub(super) fn look_up_all(
         },
         |_| None,
     );
+
     for (work, requires) in work.iter_mut().zip(listed) {
         work.requires = requires;
     }
+
     work.into_iter().map(source_update).collect()
 }
 
@@ -216,9 +223,11 @@ fn source_update(work: Work) -> SourceUpdate {
         None => (None, None),
     };
     let mut source = work.item.source;
+
     if source.part_id.is_none() {
         source.part_id = work.item.part_id.map(|id| id.to_string());
     }
+
     SourceUpdate {
         family: work.item.family,
         source,

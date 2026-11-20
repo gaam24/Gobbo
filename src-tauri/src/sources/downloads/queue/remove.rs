@@ -44,6 +44,7 @@ impl Downloads {
             drop(queue);
             removed
         };
+
         match removed {
             Some((game, path)) => {
                 self.clear_pending(&game, &path);

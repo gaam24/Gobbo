@@ -98,19 +98,23 @@ pub(crate) fn load(id: &str, layers: &Layers) -> Whiteouts {
                 .map_or(0, |at| at + 1);
             let text = String::from_utf8_lossy(&bytes[..complete]);
             let replayed = replay(&mut whiteouts, &text);
+
             if complete < bytes.len() {
                 truncate_to(&journal_path, complete as u64);
             }
+
             replayed
         }
         Err(_) => 0,
     };
+
     if replayed > 0 {
         match save(layers, &whiteouts) {
             Ok(()) => truncate(&journal_path),
             Err(error) => log(&format!("could not fold the whiteout journal: {error}")),
         }
     }
+
     let journal = open_journal(layers);
     let mut all = journals().lock().unwrap_or_else(PoisonError::into_inner);
     all.insert(id.to_string(), journal);
@@ -121,17 +125,21 @@ pub(crate) fn load(id: &str, layers: &Layers) -> Whiteouts {
 /// newline is ignored: it is a write that a crash interrupted.
 fn replay(whiteouts: &mut Whiteouts, text: &str) -> usize {
     let mut applied = 0;
+
     for line in text.split_inclusive('\n') {
         let Some(line) = line.strip_suffix('\n') else {
             continue;
         };
         let line = line.trim();
+
         if line.is_empty() {
             continue;
         }
+
         whiteouts.hide(line);
         applied += 1;
     }
+
     applied
 }
 
@@ -141,15 +149,19 @@ fn append(mount_id: &str, snapshot: &Arc<Whiteouts>, rel: &str) {
     let Some(journal) = guard.get_mut(mount_id).and_then(Option::as_mut) else {
         return;
     };
+
     if let Err(error) = journal.write(rel) {
         log(&format!(
             "could not append to the whiteout journal: {error}"
         ));
+
         if let Some(entry) = guard.get_mut(mount_id) {
             *entry = None;
         }
+
         return;
     }
+
     if journal.lines >= COMPACT_AFTER
         && let Err(error) = journal.compact(snapshot)
     {
@@ -160,6 +172,7 @@ fn append(mount_id: &str, snapshot: &Arc<Whiteouts>, rel: &str) {
 /// Opens the journal for appending. A failure is logged and leaves the snapshot-only mode for this mount.
 fn open_journal(layers: &Layers) -> Option<Journal> {
     let path = layers.whiteouts_journal_file();
+
     match OpenOptions::new().create(true).append(true).open(&path) {
         Ok(handle) => Some(Journal {
             handle,
@@ -186,6 +199,7 @@ fn save(layers: &Layers, whiteouts: &Whiteouts) -> io::Result<()> {
     if result.is_err() {
         let _ = fs::remove_file(&temporary);
     }
+
     result
 }
 
