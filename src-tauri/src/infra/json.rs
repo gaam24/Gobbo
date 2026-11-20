@@ -53,11 +53,13 @@ pub fn read_json_or_default<T: DeserializeOwned + Default>(path: &Path) -> T {
 /// Keeps a file that did not parse as `<name>.json.broken` and reports it.
 pub fn keep_broken(path: &Path, error: &impl std::fmt::Display) {
     let broken = broken_path(path);
-    let _ = fs::rename(path, &broken);
+    let kept = match fs::rename(path, &broken) {
+        Ok(()) => format!("it was kept as {}", broken.display()),
+        Err(rename) => format!("it could not be kept as {} ({rename})", broken.display()),
+    };
     crate::infra::log::warn(format!(
-        "{} could not be read ({error}); it was kept as {}",
-        path.display(),
-        broken.display()
+        "{} could not be read ({error}); {kept}",
+        path.display()
     ));
 }
 

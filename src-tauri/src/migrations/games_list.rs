@@ -24,13 +24,7 @@ pub(super) fn run(root: &Path, known_game_ids: &[String]) -> Result<(), AppError
         Ok(Some(legacy)) => legacy,
         Ok(None) => return Ok(()),
         Err(ReadError::Parse(error)) => {
-            let broken = json::broken_path(&file);
-            let _ = fs::rename(&file, &broken);
-            crate::infra::log::warn(format!(
-                "{} could not be read ({error}); it was kept as {}",
-                file.display(),
-                broken.display()
-            ));
+            json::keep_broken(&file, &error);
             return Ok(());
         }
         Err(ReadError::Io(error)) => return Err(io_at(&file)(error)),
