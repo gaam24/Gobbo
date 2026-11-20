@@ -202,15 +202,21 @@ fn resolve(
                 return Err(Failure::Denied(code));
             }
         };
-        if visible.is_none()
-            && let Err(failure) = check_parent(mount, rel)
-        {
-            record_decision(Kind::Missing, DecisionLayer::None, failure.win32(), || {
-                mount.decision_path(rel)
-            });
-            return Err(failure);
-        }
-        let path = spelled_like(mount.write_target(rel), visible.as_ref());
+        let path = match prepare_write_target(mount, rel, visible.is_some()) {
+            Ok(target) => spelled_like(target, visible.as_ref()),
+            Err(TargetFailure::Parent(failure)) => {
+                record_decision(Kind::Missing, DecisionLayer::None, failure.win32(), || {
+                    mount.decision_path(rel)
+                });
+                return Err(failure);
+            }
+            Err(TargetFailure::Folder(failure)) => {
+                record_decision(Kind::Refuse, DecisionLayer::None, failure.win32(), || {
+                    mount.decision_path(rel)
+                });
+                return Err(failure);
+            }
+        };
         if let Err(failure) = copy_up_shown(rel, &path, keeps_contents, visible) {
             record_decision(Kind::Refuse, DecisionLayer::None, failure.win32(), || {
                 mount.decision_path(rel)
@@ -262,13 +268,36 @@ fn resolve(
     }
 }
 
+/// Which step of the write rule refused, so each caller records the decision its own API owes.
+enum TargetFailure {
+    Parent(Failure),
+    Folder(Failure),
+}
+
+/// The write rule: check the logical parent, resolve the upper target, make its folder. `parent_checked` skips the
+/// query when a visible file already proved the parent exists.
+fn prepare_write_target(
+    mount: &Mount,
+    rel: &str,
+    parent_checked: bool,
+) -> Result<PathBuf, TargetFailure> {
+    if !parent_checked {
+        check_parent(mount, rel).map_err(TargetFailure::Parent)?;
+    }
+
+    let target = mount.write_target(rel);
+    make_parent(&target)
+        .map_err(Failure::Io)
+        .map_err(TargetFailure::Folder)?;
+    Ok(target)
+}
+
 /// The upper-layer path a write to `rel` goes to, with its folder made, so the caller can create the file there. The
 /// logical parent must exist in a layer first: a write cannot create a missing folder on its own.
 pub(crate) fn make_write_target(mount: &Mount, rel: &str) -> Result<PathBuf, Failure> {
-    check_parent(mount, rel)?;
-    let target = mount.write_target(rel);
-    make_parent(&target)?;
-    Ok(target)
+    prepare_write_target(mount, rel, false).map_err(|failure| match failure {
+        TargetFailure::Parent(failure) | TargetFailure::Folder(failure) => failure,
+    })
 }
 
 /// The game-relative folder that holds `rel`; the game folder itself is `""`.
@@ -489,11 +518,14 @@ pub(crate) fn copy_up(
     } else {
         None
     };
+    // This route serves a move or replace source: unlike the write path, nobody has made the target's folder yet.
+    make_parent(target)?;
     copy_up_shown(rel, target, keeps_contents, visible)
 }
 
 /// `copy_up` with the visible file already probed by the write path. The probe is the expensive part on a cold layer;
-/// the caller that found a lower file also knows its parent exists, so it does not ask again.
+/// the caller that found a lower file also knows its parent exists, so it does not ask again. The target's folder is
+/// the caller's to make: `prepare_write_target` on the write path, `copy_up` for a move or replace source.
 fn copy_up_shown(
     rel: &str,
     target: &Path,
@@ -501,17 +533,14 @@ fn copy_up_shown(
     visible: Option<(Layer, PathBuf, u32)>,
 ) -> Result<(), Failure> {
     if !keeps_contents {
-        make_parent(target)?;
         return Ok(());
     }
     let Some((layer, source, attributes)) = visible else {
-        make_parent(target)?;
         return Ok(());
     };
     if layer == Layer::Upper {
         return Ok(());
     }
-    make_parent(target)?;
     if !copy_needed(
         keeps_contents,
         Some((layer, attributes & FILE_ATTRIBUTE_DIRECTORY == 0)),

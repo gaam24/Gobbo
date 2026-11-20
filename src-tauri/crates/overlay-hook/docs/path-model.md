@@ -90,7 +90,7 @@ The path layer is the most important part of the crate. Do not add another ad-ho
   program that writes `A.TXT` over `a.txt` leaves `a.txt` in its listing. Only the leaf is taken here.
 - The listing shows the spelling of every component the same way: an entry that a lower layer has under the same name, and
   that no whiteout hides, is listed with the lower spelling (root, then staging, then upper; `search/listing.rs`
-  `apply_spellings`). A small set (at most 32 upper/staging entries) asks each lower layer for the exact name through
+  `apply_spellings`). A small set (at most 8 upper/staging entries) asks each lower layer for the exact name through
   `paths/spelling.rs`; a larger one reads the root folder once and reuses that spelling for every taken name, because
   one exact search per mod file cost a disk search per entry. The mask is built in UTF-16, so no `String` is allocated
   per entry. The copy in the plain tree of the oracle does the same, because NTFS keeps the name of an existing entry

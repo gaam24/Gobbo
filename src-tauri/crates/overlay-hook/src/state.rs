@@ -26,6 +26,9 @@ pub(crate) struct Mount {
     pub(crate) id: String,
     pub(crate) guest: PathBuf,
     pub(crate) layers: Layers,
+    /// A change is published by replacing this `Arc`, never by mutating through it. A reader that caches the snapshot
+    /// detects a newer one only with `Arc::ptr_eq`: that pointer check is the NT listing's sole staleness signal, so
+    /// changing the set behind the same pointer would leave cached listings serving entries built from the old set.
     whiteouts: RwLock<Arc<Whiteouts>>,
 }
 
@@ -40,7 +43,8 @@ impl Mount {
         }
     }
 
-    /// The published whiteout snapshot. The lock is held only for the clone.
+    /// The published snapshot. The lock is held only for the clone; the returned `Arc`'s pointer identifies the
+    /// generation, so a cached snapshot is stale exactly when `Arc::ptr_eq` no longer holds against a fresh one.
     pub(crate) fn whiteouts_snapshot(&self) -> Arc<Whiteouts> {
         crate::stat_lock();
         self.whiteouts
@@ -54,8 +58,9 @@ impl Mount {
         read(&self.whiteouts_snapshot())
     }
 
-    /// Mutates the snapshot and returns the published set. The write lock is held only for the change; the caller does
-    /// file I/O after it returns.
+    /// Mutates the snapshot through `Arc::make_mut` and returns the published set. When the set is shared this replaces
+    /// the `Arc`, so readers holding the old pointer can tell it is stale. The write lock is held only for the change;
+    /// the caller does file I/O after it returns.
     pub(crate) fn update_whiteouts(&self, change: impl FnOnce(&mut Whiteouts)) -> Arc<Whiteouts> {
         let mut snapshot = self
             .whiteouts
@@ -68,14 +73,11 @@ impl Mount {
     /// Whether a read from the mount's base can keep the caller's own path. Only the game mount and an inherited
     /// user-data redirect have `guest == root`; a redirect that starts empty has an internal base folder.
     pub(crate) fn guest_is_root(&self) -> bool {
-        if cfg!(windows) {
-            gobbo_overlay_core::same_folded(
-                &self.guest.to_string_lossy(),
-                &self.layers.root.to_string_lossy(),
-            )
-        } else {
-            self.guest == self.layers.root
-        }
+        // This crate only builds for Windows, so the folded comparison is always the one that applies.
+        gobbo_overlay_core::same_folded(
+            &self.guest.to_string_lossy(),
+            &self.layers.root.to_string_lossy(),
+        )
     }
 
     /// The path a decision record carries. The game keeps its game-relative path; a redirect is prefixed with its set
@@ -142,7 +144,7 @@ pub(crate) fn mounts() -> Option<&'static Mounts> {
 }
 
 /// The game mount, or `None` when the environment named no layers.
-pub(crate) fn game() -> Option<&'static Mount> {
+fn game() -> Option<&'static Mount> {
     mounts().map(|mounts| &mounts.game)
 }
 

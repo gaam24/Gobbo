@@ -17,13 +17,11 @@ use windows_sys::Win32::Storage::FileSystem::{
     FindExSearchLimitToDirectories, FindExSearchNameMatch, WIN32_FIND_DATAW,
 };
 
-use super::listing::{RootStream, Taken, dot_entries, find_layers};
+use super::listing::{RootStream, Taken, find_layers};
 use crate::guard::Guard;
 use crate::paths::{place, shown};
 use crate::trace::{trace, trace_call};
 use crate::win32::{PreserveLastError, fail, set_error};
-
-const INVALID_HANDLE: *mut c_void = usize::MAX as *mut c_void;
 
 /// One folder listing that a program is reading: the entries of the upper and staging layers (and the `.` and `..` the
 /// listing starts with), and the root layer, which is read as the program asks for it.
@@ -231,8 +229,7 @@ unsafe fn start_search(
         // A refused attribute query is reported as Windows reports it, not as a missing folder.
         Err(failure) => return Some(no_entries(failure.win32())),
     };
-    let leading = dot_entries(mount, rel, mask, Some(&own));
-    let layers = find_layers(mount, rel, mask, level, search, flags, true, leading);
+    let layers = find_layers(mount, rel, mask, level, search, flags, true, Some(&own));
 
     if let Some((handle, first)) = layers.direct {
         unsafe { *data = first };
@@ -261,7 +258,7 @@ unsafe fn start_search(
 /// The failure of a listing: the error is set, and the handle is the invalid one.
 fn no_entries(code: u32) -> *mut c_void {
     set_error(code);
-    INVALID_HANDLE
+    INVALID_HANDLE_VALUE
 }
 
 /// The next entry of one of our listings: `Some(1)` with the entry, `Some(0)` at the end, `None` for any other handle.
@@ -324,6 +321,6 @@ mod tests {
         assert!(ours(SEARCH_BASE as *mut c_void));
         assert!(ours((SEARCH_BASE + 2) as *mut c_void));
         assert!(!ours(4 as *mut c_void));
-        assert!(!ours(INVALID_HANDLE));
+        assert!(!ours(INVALID_HANDLE_VALUE));
     }
 }

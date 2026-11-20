@@ -484,9 +484,9 @@ impl Drop for RootStream {
         unsafe { FindClose(self.handle) };
     }
 }
-/// The parts of a listing: the entries of the upper and staging layers, the root layer still to be read, and the real
-/// root handle when the merged view is exactly the game folder.
-pub(crate) struct Layers {
+/// The parts of a merged listing: the entries of the upper and staging layers, the root layer still to be read, and the
+/// real root handle when the merged view is exactly the game folder.
+pub(crate) struct ListingLayers {
     pub(crate) taken: Taken,
     pub(crate) root: Option<RootStream>,
     /// The real `FindFirstFileExW` handle and its first entry, when no upper/staging entry and no whiteout can change
@@ -494,13 +494,15 @@ pub(crate) struct Layers {
     pub(crate) direct: Option<(HANDLE, WIN32_FIND_DATAW)>,
 }
 
-// SAFETY: a handle and a find entry are plain values, and a `Layers` is reached only through the lock of its listing.
-unsafe impl Send for Layers {}
+// SAFETY: a handle and a find entry are plain values, and a `ListingLayers` is reached only through the lock of its
+// listing.
+unsafe impl Send for ListingLayers {}
 
-/// The entries of a game-relative folder for a listing: the upper and staging layers read now, and the root layer as a
-/// stream. The layers are merged by the system listing call itself. The pattern filters the names in each layer, so the
+/// The entries of a game-relative folder for a listing: the dots, the upper and staging layers read now, and the root
+/// layer as a stream. The listing starts with `.` and `..`, as the Win32 listing does and as a plain NTFS folder lists
+/// them. The layers are merged by the system listing call itself. The pattern filters the names in each layer, so the
 /// hook does not walk and match every entry by hand. `allow_direct` lets a caller that can return a real find handle take
-/// the game folder unchanged.
+/// the game folder unchanged. `own` is the folder path a caller already probed for the dot entries.
 #[expect(
     clippy::too_many_arguments,
     reason = "the caller already has the listing arguments; grouping them would add a struct used once"
@@ -513,14 +515,16 @@ pub(crate) fn find_layers(
     search: i32,
     flags: u32,
     allow_direct: bool,
-    leading: Vec<WIN32_FIND_DATAW>,
-) -> Layers {
+    own: Option<&Path>,
+) -> ListingLayers {
     // The internal listing calls set their own last error; keep the caller's value for the success path.
     let _last_error = PreserveLastError::capture();
     let whiteouts = mount.whiteouts_snapshot();
     let hidden_folder = whiteouts.hides(rel);
     let directories_only = search == FindExSearchLimitToDirectories;
-    let mut taken = Taken::leading(leading);
+    // Only this function adds the dots, so a caller cannot accidentally add them twice. `own` is the folder path a
+    // caller already probed; without one the dots probe the folder and its parent themselves.
+    let mut taken = Taken::leading(dot_entries(mount, rel, mask, own));
 
     for (layer, base) in mount.layer_paths() {
         if layer != Layer::Upper && hidden_folder {
@@ -548,7 +552,7 @@ pub(crate) fn find_layers(
                     search,
                     flags,
                 );
-                return Layers {
+                return ListingLayers {
                     taken,
                     root: None,
                     direct: None,
@@ -568,14 +572,14 @@ pub(crate) fn find_layers(
             );
 
             if direct {
-                return Layers {
+                return ListingLayers {
                     taken,
                     root: None,
                     direct: Some((handle, data)),
                 };
             }
 
-            return Layers {
+            return ListingLayers {
                 taken,
                 root: Some(RootStream {
                     handle,
@@ -629,7 +633,7 @@ pub(crate) fn find_layers(
         search,
         flags,
     );
-    Layers {
+    ListingLayers {
         taken,
         root: None,
         direct: None,
@@ -852,12 +856,7 @@ fn lower_spelling(
 /// The `.` and `..` entries that a listing of a game-relative folder starts with, as the system lists them: `.` has the
 /// folder's own details, and `..` the folder above. The game folder's `..` is the folder that holds it. A mask that does
 /// not match a name leaves that entry out. The layers never add these entries (see `is_dot_name`).
-pub(crate) fn dot_entries(
-    mount: &Mount,
-    rel: &str,
-    mask: &str,
-    own: Option<&Path>,
-) -> Vec<WIN32_FIND_DATAW> {
+fn dot_entries(mount: &Mount, rel: &str, mask: &str, own: Option<&Path>) -> Vec<WIN32_FIND_DATAW> {
     let parent_rel = rel.rsplit_once('\\').map_or("", |(parent, _)| parent);
     // The caller has usually probed the folder already (`shown`); reuse that path instead of probing it again.
     let own = own.map(Path::to_path_buf).or_else(|| {
@@ -983,7 +982,7 @@ mod tests {
             FindExSearchNameMatch,
             0,
             true,
-            Vec::new(),
+            None,
         );
         let (handle, first) = layers.direct.unwrap();
         assert!(layers.root.is_none());
@@ -1113,7 +1112,6 @@ mod tests {
             Whiteouts::default(),
         );
 
-        let leading = dot_entries(&mount, folder, "*", None);
         let mut layers = find_layers(
             &mount,
             folder,
@@ -1122,7 +1120,7 @@ mod tests {
             FindExSearchNameMatch,
             0,
             false,
-            leading,
+            None,
         );
         let mut names = Vec::new();
         let mut next = 0;
@@ -1171,12 +1169,14 @@ mod tests {
         assert_eq!(time.dwHighDateTime, 0x0123_4567);
     }
 
+    /// Guards only the LOOKUP side: an index that already holds two names under one hash keeps both entries findable
+    /// through `Taken::find`. The push side that could create such a state is deliberately not exercised — finding a
+    /// 64-bit FNV collision by search is far too expensive — so the colliding index is installed directly instead.
     #[test]
     fn a_hash_collision_keeps_both_entries_findable() {
         let mut taken = Taken::leading(Vec::new());
         taken.push_layer(entry("A"), Layer::Upper);
         taken.push_layer(entry("B"), Layer::Upper);
-        // The state a real collision leaves: the index points at the later entry and the earlier one is in the list.
         let hash = name_hash(crate::win32::find_data_name(&taken.entries[0]));
         taken.index.insert(hash, 1);
         taken.collisions.push((hash, 0));
@@ -1234,7 +1234,7 @@ mod tests {
             FindExSearchNameMatch,
             0,
             false,
-            Vec::new(),
+            None,
         );
         let names: Vec<String> = layers
             .taken

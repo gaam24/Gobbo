@@ -29,7 +29,8 @@ use crate::diag::record_decision;
 use crate::guard::Guard;
 use crate::handles;
 use crate::paths::shown;
-use crate::search::{Layers, dot_entries, find_layers, has_entry};
+use crate::search::{ListingLayers, find_layers, has_entry};
+use crate::state::Mount;
 
 use crate::types::UnicodeString;
 
@@ -44,14 +45,14 @@ const MAX_BATCH: usize = 128;
 /// One listing a program is reading. The upper and staging entries are held (a mod folder is small), and the root layer
 /// is streamed: memory follows the mod layers, not the size of the game folder.
 struct Listing {
-    mount: &'static crate::state::Mount,
+    mount: &'static Mount,
     /// The game-relative folder and the actual final path of the handle. The path is compared as UTF-16 on every call:
     /// a handle reused for another folder must rebuild the listing, and a matching one needs no `String`.
     rel: String,
     raw: Vec<u16>,
     /// The whiteout snapshot the listing was built from. A newer snapshot falls back to the visibility check.
     whiteouts: Arc<Whiteouts>,
-    layers: Layers,
+    layers: ListingLayers,
     /// The next entry of `layers.taken` to put into `batch`.
     next: usize,
     batch: Vec<WIN32_FIND_DATAW>,
@@ -77,7 +78,7 @@ impl Listing {
                 continue;
             }
 
-            let Layers { taken, root, .. } = &mut self.layers;
+            let ListingLayers { taken, root, .. } = &mut self.layers;
             let Some(root) = root.as_mut() else {
                 break;
             };
@@ -118,6 +119,14 @@ impl Listing {
 
         (status, bytes, consumed)
     }
+}
+
+/// Whether a cached merged listing can keep answering a query for `rel` on `mount`. A whiteout change replaces the
+/// mount's `Arc`, so a pointer mismatch means the entries were built against the old visibility and must be rebuilt.
+fn serves_cached(listing: &Listing, mount: &Mount, rel: &str) -> bool {
+    listing.rel == rel
+        && std::ptr::eq(listing.mount, mount)
+        && Arc::ptr_eq(&listing.whiteouts, &mount.whiteouts_snapshot())
 }
 
 /// One handle in the listing table: a plain folder the original NT query serves, or a merged snapshot.
@@ -354,9 +363,11 @@ unsafe fn query(
                     return None;
                 }
 
+                // No `rel`/`mount` has been resolved here yet (that would need a `String`), so the listing's own
+                // identity stands in for them and only the snapshot freshness is checked.
                 TableEntry::Merged(listing)
                     if listing.matches(raw)
-                        && Arc::ptr_eq(&listing.whiteouts, &listing.mount.whiteouts_snapshot()) =>
+                        && serves_cached(listing, listing.mount, &listing.rel) =>
                 {
                     listing.used = stamp;
                     let (status, bytes, _) = listing.respond(class, info, length, single != 0);
@@ -432,17 +443,13 @@ unsafe fn query(
     let rebuild = restart != 0
         || match listings.get(&(handle as usize)) {
             None => true,
-            Some(TableEntry::Merged(listing)) => {
-                listing.rel != rel || !std::ptr::eq(listing.mount, mount)
-            }
+            Some(TableEntry::Merged(listing)) => !serves_cached(listing, mount, &rel),
             Some(TableEntry::Plain { raw, .. }) => {
                 raw_length.is_none_or(|length| raw.as_slice() != &raw_buffer[..length])
             }
         };
     if rebuild {
         drop(listings);
-        // The listing starts with `.` and `..`, as the Win32 listing does and as a plain NTFS folder lists them.
-        let leading = dot_entries(mount, &rel, &mask, Some(&own));
         let layers = find_layers(
             mount,
             &rel,
@@ -451,7 +458,7 @@ unsafe fn query(
             FindExSearchNameMatch,
             0,
             false,
-            leading,
+            Some(&own),
         );
         record_decision(Kind::List, DecisionLayer::None, 0, || {
             mount.decision_path(&rel)
@@ -501,7 +508,7 @@ unsafe fn query(
 /// Whether the folder's merged view is exactly the real game folder: no whiteout affects this folder's own listing, and
 /// neither the upper nor the staging layer has a non-dot entry matching the caller's pattern. The original NT query can
 /// then serve the program unchanged, with its own cursor and flags.
-fn plain_folder(mount: &crate::state::Mount, rel: &str, mask: &str) -> bool {
+fn plain_folder(mount: &Mount, rel: &str, mask: &str) -> bool {
     if mount.whiteouts_snapshot().affects_listing(rel) {
         return false;
     }
@@ -653,47 +660,6 @@ mod tests {
     }
 
     #[test]
-    fn a_single_entry_is_returned_without_a_next_offset() {
-        let entries = [entry("a", 0), entry("bb", 0)];
-        let mut buffer = [0u8; 512];
-        let (status, bytes, consumed) = respond(
-            nt_listing::DIRECTORY,
-            &entries,
-            0,
-            buffer.as_mut_ptr().cast(),
-            buffer.len() as u32,
-            true,
-        );
-        assert_eq!(status, STATUS_SUCCESS);
-        assert_eq!(consumed, 1);
-        assert_eq!(u32::from_le_bytes(buffer[0..4].try_into().unwrap()), 0);
-        assert_eq!(bytes, 66);
-    }
-
-    #[test]
-    fn entries_are_chained_and_the_last_one_ends_the_list() {
-        let entries = [entry("a", 0), entry("bb", 0)];
-        let mut buffer = [0u8; 512];
-        let (status, bytes, consumed) = respond(
-            nt_listing::DIRECTORY,
-            &entries,
-            0,
-            buffer.as_mut_ptr().cast(),
-            buffer.len() as u32,
-            false,
-        );
-        assert_eq!(status, STATUS_SUCCESS);
-        assert_eq!(consumed, 2);
-        let next = u32::from_le_bytes(buffer[0..4].try_into().unwrap()) as usize;
-        assert_eq!(next, 72);
-        assert_eq!(
-            u32::from_le_bytes(buffer[next..next + 4].try_into().unwrap()),
-            0
-        );
-        assert_eq!(bytes, next + 68);
-    }
-
-    #[test]
     fn a_buffer_too_small_for_one_entry_overflows_and_consumes_nothing() {
         let entries = [entry("a", 0)];
         let mut buffer = [0u8; 32];
@@ -710,8 +676,10 @@ mod tests {
         assert_eq!(consumed, 0);
     }
 
+    /// The hook-specific part of the end case: `Fill::End` becomes `STATUS_NO_MORE_FILES` and the cursor is not
+    /// advanced. The core test only pins the bare marker and the unknown-class dispatch.
     #[test]
-    fn the_end_of_the_list_is_no_more_files() {
+    fn an_exhausted_listing_maps_the_end_to_no_more_files_without_consuming() {
         let entries = [entry("a", 0)];
         let mut buffer = [0u8; 512];
         let (status, bytes, consumed) = respond(
@@ -725,5 +693,49 @@ mod tests {
         assert_eq!(status, STATUS_NO_MORE_FILES);
         assert_eq!(bytes, 0);
         assert_eq!(consumed, 0);
+    }
+
+    #[test]
+    fn a_changed_whiteout_snapshot_stops_a_listing_from_serving_a_cached_query() {
+        let layers = gobbo_overlay_core::Layers::new(
+            std::path::PathBuf::from("game"),
+            None,
+            std::path::PathBuf::from("upper"),
+        );
+        let mount: &'static Mount = Box::leak(Box::new(Mount::new(
+            "game".to_string(),
+            std::path::PathBuf::from("game"),
+            layers,
+            Whiteouts::default(),
+        )));
+        let rel = "folder".to_string();
+        let snapshot = mount.whiteouts_snapshot();
+        let listing = |whiteouts: Arc<Whiteouts>| Listing {
+            mount,
+            rel: rel.clone(),
+            raw: Vec::new(),
+            whiteouts,
+            layers: ListingLayers {
+                taken: crate::search::Taken::leading(Vec::new()),
+                root: None,
+                direct: None,
+            },
+            next: 0,
+            batch: Vec::new(),
+            batch_pos: 0,
+            used: 0,
+        };
+
+        assert!(serves_cached(&listing(Arc::clone(&snapshot)), mount, &rel));
+        assert!(!serves_cached(
+            &listing(Arc::new(Whiteouts::default())),
+            mount,
+            &rel
+        ));
+        assert!(!serves_cached(
+            &listing(Arc::clone(&snapshot)),
+            mount,
+            "other"
+        ));
     }
 }

@@ -7,5 +7,8 @@
 mod listing;
 mod session;
 
-pub(crate) use listing::{Layers, dot_entries, find_layers, has_entry, has_visible_entries};
+pub(crate) use listing::{ListingLayers, find_layers, has_entry, has_visible_entries};
+// The NT listing's whiteout-staleness test builds a `Listing` with an empty `Taken`.
+#[cfg(test)]
+pub(crate) use listing::Taken;
 pub(crate) use session::{find_close, find_first, find_first_ex, find_next};

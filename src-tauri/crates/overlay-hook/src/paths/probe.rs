@@ -80,7 +80,7 @@ pub(crate) fn probe_child(base: &Path, rel: &str) -> Probe {
 }
 
 /// Queries the attributes of a NUL-terminated UTF-16 path.
-pub(crate) fn probe_units(units: &[u16]) -> Probe {
+fn probe_units(units: &[u16]) -> Probe {
     crate::stat_probe();
     // SAFETY: `units` is NUL-terminated and lives until the call returns.
     let attributes = unsafe { GetFileAttributesW(units.as_ptr()) };

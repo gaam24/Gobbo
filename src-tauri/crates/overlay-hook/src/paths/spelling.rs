@@ -61,7 +61,7 @@ pub(crate) fn with_pattern<R>(
 }
 
 /// `with_pattern` for a mask that is already UTF-16, as a directory name is. No `String` is built for the common path.
-pub(crate) fn with_pattern_units<R>(
+fn with_pattern_units<R>(
     base: &Path,
     rel: &str,
     mask: &[u16],

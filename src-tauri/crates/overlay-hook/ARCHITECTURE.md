@@ -221,7 +221,7 @@ The platform rules are in [docs/platforms.md](docs/platforms.md).
   staging entry can change the folder's own listing and no whiteout hides the folder or an immediate child
   (`Whiteouts::affects_listing`), `start_search` returns the real `FindFirstFileExW` handle instead; the program's
   `FindNextFileW` and `FindClose` calls then pass through, so an unmodded folder lists as fast as without Gobbo. The NT
-  directory query uses the same `Layers`/`RootStream`, pulls at least 64 and at most 128 entries per
+  directory query uses the same `ListingLayers`/`RootStream`, pulls at least 64 and at most 128 entries per
   response (more when the caller's buffer is large), and no longer materializes the whole folder. A folder with no
   upper/staging entry matching the query and no whiteout affecting its own listing is remembered as a plain handle: every
   query on it passes to the original `NtQueryDirectoryFile`, and a restart or a changed final path checks the layers
