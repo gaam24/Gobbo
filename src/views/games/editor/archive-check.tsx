@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useTranslation } from "@/i18n";
+import { ARCHIVE_EXTENSIONS } from "@/lib/archives";
 import { messageOf, unwrap } from "@/lib/ipc";
 import { pickFiles } from "@/lib/tauri";
 
@@ -20,7 +21,7 @@ export function ArchiveCheck({ text }: { text: string }) {
 	const [file, setFile] = useState<string | null>(null);
 
 	const run = async () => {
-		const [picked] = await pickFiles(t("editor.archive.filter"), ["zip", "7z", "rar"], false);
+		const [picked] = await pickFiles(t("editor.archive.filter"), ARCHIVE_EXTENSIONS, false);
 		if (!picked) return;
 		setFile(picked);
 		setBusy(true);

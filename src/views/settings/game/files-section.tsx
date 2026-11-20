@@ -1,13 +1,8 @@
-import type { KeyboardEvent } from "react";
 import type { Status } from "@/bindings";
 import { Input } from "@/components/ui/input";
 import { useTranslation } from "@/i18n";
-import { Section, SettingRow } from "@/views/settings/controls";
+import { commitOnEnter, Section, SettingRow } from "@/views/settings/controls";
 import { PathActions } from "@/views/settings/path-actions";
-
-function commitOnEnter(event: KeyboardEvent<HTMLInputElement>) {
-	if (event.key === "Enter") event.currentTarget.blur();
-}
 
 /// The game folder and the folders the mods read from. They are drafts until the form is saved, so the buttons next to
 /// each one open and copy what the user has typed, not only what was saved.

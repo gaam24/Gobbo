@@ -3,10 +3,9 @@ import { useUiActions } from "@/app/contexts/ui-context";
 import { useWorkspaceActions } from "@/app/contexts/workspace-context";
 import { commands } from "@/bindings";
 import { useTranslation } from "@/i18n";
+import { isArchive } from "@/lib/archives";
 import { CommandError, messageOf, unwrap } from "@/lib/ipc";
 import { useFileDrop } from "@/lib/use-file-drop";
-
-const ARCHIVE_EXTENSIONS = [".zip", ".7z", ".rar"];
 
 /// The full-window hint shown while files are dragged over the app. A single archive is checked for a definition
 /// package first; if it is one, the import dialog opens. Anything else is a mod archive and follows the usual import.
@@ -40,9 +39,4 @@ export function FileDropHost() {
 			{t("import.dropHint")}
 		</div>
 	);
-}
-
-function isArchive(path: string): boolean {
-	const lower = path.toLowerCase();
-	return ARCHIVE_EXTENSIONS.some((extension) => lower.endsWith(extension));
 }

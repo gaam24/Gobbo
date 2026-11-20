@@ -1,14 +1,9 @@
-import type { KeyboardEvent } from "react";
 import type { Status } from "@/bindings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useTranslation } from "@/i18n";
-import { Section, SettingRow } from "@/views/settings/controls";
-
-function commitOnEnter(event: KeyboardEvent<HTMLInputElement>) {
-	if (event.key === "Enter") event.currentTarget.blur();
-}
+import { commitOnEnter, Section, SettingRow } from "@/views/settings/controls";
 
 /// What the game is started with: its parameters and environment variables, and the Steam launch option when the game
 /// is started from Steam. The Steam line is copied as one string because Steam's field is outside Gobbo.

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { commands, type Settings, type Status } from "@/bindings";
 import { useTranslation } from "@/i18n";
 import { unwrap } from "@/lib/ipc";
-import { pickFile, pickFolder } from "@/lib/pick-path";
+import { pickFile, pickFolder } from "@/lib/tauri";
 import { useLoad } from "@/lib/use-load";
 import { isProtonOption, type ProtonOption } from "@/views/settings/game/proton-options";
 

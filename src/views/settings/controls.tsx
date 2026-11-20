@@ -1,5 +1,5 @@
 import { cn } from "cn";
-import type { ReactNode } from "react";
+import type { KeyboardEvent, ReactNode } from "react";
 import { HelpHint } from "@/components/app/help-hint";
 import { Field, FieldContent, FieldDescription, FieldLabel } from "@/components/ui/field";
 
@@ -87,4 +87,9 @@ export function SettingsGroup({ title, className, children }: { title: string; c
 			<div className="mt-2">{children}</div>
 		</section>
 	);
+}
+
+/// Commits a text setting on Enter: the input saves on blur.
+export function commitOnEnter(event: KeyboardEvent<HTMLInputElement>) {
+	if (event.key === "Enter") event.currentTarget.blur();
 }

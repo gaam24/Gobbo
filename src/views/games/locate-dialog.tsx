@@ -9,7 +9,7 @@ import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "
 import { Spinner } from "@/components/ui/spinner";
 import { useTranslation } from "@/i18n";
 import { messageOf } from "@/lib/ipc";
-import { pickFolder } from "@/lib/pick-path";
+import { pickFolder } from "@/lib/tauri";
 
 /// How long the folder check waits after the last change to the folder, so it does not run on every keystroke.
 const CHECK_DELAY_MS = 300;

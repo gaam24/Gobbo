@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useTranslation } from "@/i18n";
-import type { FullMod, Mod } from "@/lib/mods";
+import { type FullMod, type Mod, modName } from "@/lib/mods";
 import { SourceRequirements } from "@/sources/source-requirements";
 
 /// The kinds of relation, in the order the inspector shows them.
@@ -30,7 +30,7 @@ export function RelationsSection({
 	/// Each edit names one target in one list. The backend merges it into its newest list, so two quick edits keep both.
 	const add = (kind: RelationKind, id: string) => void gameActions.addRelation(mod.id, kind, id);
 	const remove = (kind: RelationKind, id: string) => void gameActions.removeRelation(mod.id, kind, id);
-	const nameOf = (id: string) => mods.find((item) => item.id === id)?.info.name ?? id;
+	const nameOf = (id: string) => modName(mods, id);
 	const others = mods.filter((item) => item.id !== mod.id);
 	const relations: Relations = {
 		requires: mod.requires,

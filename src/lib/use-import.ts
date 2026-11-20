@@ -10,6 +10,7 @@ import {
 	type Status,
 } from "@/bindings";
 import { useTranslation } from "@/i18n";
+import { ARCHIVE_EXTENSIONS, isArchive } from "@/lib/archives";
 import { clearFailedTask, recordFailedTask } from "@/lib/failed-tasks-store";
 import type { FomodChoice } from "@/lib/fomod";
 import { alreadyInLibraryOf, cancelledOf, messageOf, unwrap } from "@/lib/ipc";
@@ -104,14 +105,6 @@ interface UseImportOptions {
 	onArchiveReport: (gameId: string, folder: string, name: string) => void;
 	/// Called after a download with a known source is imported, with the ids of the mods it added to the profile.
 	onSourceImport: (gameId: string, ids: string[]) => void;
-}
-
-/// Archive formats the import reads. The file picker offers the same list.
-const ARCHIVE_EXTENSIONS = ["zip", "7z", "rar"];
-
-function isArchive(path: string): boolean {
-	const name = fileName(path).toLowerCase();
-	return ARCHIVE_EXTENSIONS.some((extension) => name.endsWith(`.${extension}`));
 }
 
 /// The activity row of one archive. A running import and its failure share the id, so a retry cannot leave two rows.

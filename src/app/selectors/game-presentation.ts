@@ -1,5 +1,6 @@
 import type { BlockerKey, NextAction, Status } from "@/bindings";
 import type { TranslationKey } from "@/i18n";
+import { assertNever } from "@/lib/assert";
 
 /// How a state is shown: the same tones as the shared status badge.
 export type GameTone = "neutral" | "success" | "warning" | "danger";
@@ -235,11 +236,6 @@ function statusPresentation(status: Status): GamePresentation {
 		default:
 			return assertNever(status.stage);
 	}
-}
-
-/// A closed union with a new variant must fail to compile here, not fall back to a wrong button at run time.
-function assertNever(value: never): never {
-	throw new Error(`Unhandled game state: ${JSON.stringify(value)}`);
 }
 
 /// The primary action for the backend's next action. Each action keeps the label and the handler it had before the

@@ -533,6 +533,11 @@ export function updatesOf(mods: readonly Mod[], failures: Record<string, UpdateR
 }
 
 /// The author shown for a mod: the one from its provider page when a check brought it, else the one from the archive.
+/// The display name of a mod id; the id itself when the mod is not in the list.
+export function modName(mods: readonly Mod[] | undefined, id: string): string {
+	return mods?.find((mod) => mod.id === id)?.info.name ?? id;
+}
+
 export function authorOf(mod: Mod): string | null {
 	return mod.source?.author ?? mod.info.author ?? null;
 }

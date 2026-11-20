@@ -10,6 +10,7 @@ import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { useTranslation } from "@/i18n";
+import { ARCHIVE_EXTENSIONS } from "@/lib/archives";
 import { errorText } from "@/lib/ipc";
 import { formatTime } from "@/lib/mods";
 import { pickFiles } from "@/lib/tauri";
@@ -90,7 +91,7 @@ export function GamesPanel({
 	const scanTime = scannedAt ? formatTime(scannedAt.getTime(), i18n.language) : null;
 
 	const importDefinition = async () => {
-		const [path] = await pickFiles(t("settings.game.exportFilter"), ["zip", "7z", "rar"], false);
+		const [path] = await pickFiles(t("settings.game.exportFilter"), ARCHIVE_EXTENSIONS, false);
 		if (path) openDialog({ kind: "definition-import", path });
 	};
 

@@ -35,3 +35,21 @@ export async function pickFiles(name: string, extensions: string[], multiple: bo
 	if (picked === null) return [];
 	return typeof picked === "string" ? [picked] : picked;
 }
+
+/// Asks for one folder, for a game, a Proton build or a per-profile folder.
+export async function pickFolder(): Promise<string | null> {
+	const test = e2eDialogs();
+	if (test?.folder !== undefined) return test.folder;
+	const { open } = await loadDialog();
+	const picked = await open({ directory: true, multiple: false });
+	return typeof picked === "string" ? picked : null;
+}
+
+/// Asks for one file of any kind, for a per-profile single-file path.
+export async function pickFile(): Promise<string | null> {
+	const test = e2eDialogs();
+	if (test?.file !== undefined) return test.file;
+	const { open } = await loadDialog();
+	const picked = await open({ multiple: false });
+	return typeof picked === "string" ? picked : null;
+}

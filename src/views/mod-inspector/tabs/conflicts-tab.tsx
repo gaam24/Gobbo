@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader } from "@/components/ui/empty";
 import { ItemContent } from "@/components/ui/item";
 import { useTranslation } from "@/i18n";
+import { modName } from "@/lib/mods";
 
 /// Mods that share files with the selected one. Each row says who wins, with an arrow and a word, and goes to that mod.
 export function ConflictsTab({
@@ -100,7 +101,7 @@ interface FileWinnersProps {
 export function FileWinners({ modId, conflicts, status, canChoose, onSetWinner }: FileWinnersProps) {
 	const { t } = useTranslation();
 	if (conflicts.length === 0) return null;
-	const nameOf = (id: string) => status.mods.find((item) => item.id === id)?.info.name ?? id;
+	const nameOf = (id: string) => modName(status.mods, id);
 
 	return (
 		<section className="grid gap-2">

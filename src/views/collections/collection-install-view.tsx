@@ -13,6 +13,7 @@ import { ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item";
 import { Progress } from "@/components/ui/progress";
 import { Spinner } from "@/components/ui/spinner";
 import { useTranslation } from "@/i18n";
+import { ARCHIVE_EXTENSIONS } from "@/lib/archives";
 import { collectionItemLabel, orderedItems, revisionLabel } from "@/lib/collections";
 import { errorText, translate } from "@/lib/ipc";
 import { pickFiles } from "@/lib/tauri";
@@ -77,7 +78,7 @@ export function CollectionInstallView({ onClose }: { onClose: () => void }) {
 		return t("collection.install.idle");
 	};
 	const chooseManual = async () => {
-		const [path] = await pickFiles(t("collection.fileFilter"), ["7z", "zip", "rar"], false);
+		const [path] = await pickFiles(t("collection.fileFilter"), ARCHIVE_EXTENSIONS, false);
 		if (path) await collections.importManual(path);
 	};
 

@@ -7,8 +7,7 @@ import type { DefinitionCheck_Serialize, FolderInspection_Serialize, GameOrigin,
 import { commands } from "@/bindings";
 import { useTranslation } from "@/i18n";
 import { messageOf, unwrap } from "@/lib/ipc";
-import { pickFolder } from "@/lib/pick-path";
-import { pickSaveFile } from "@/lib/tauri";
+import { pickFolder, pickSaveFile } from "@/lib/tauri";
 import {
 	type DraftIssue,
 	type GameDraft,

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
 import { ItemActions, ItemContent, ItemTitle } from "@/components/ui/item";
 import { useTranslation } from "@/i18n";
+import { modName } from "@/lib/mods";
 import { suggestTranslationPairs, type TranslationHint } from "@/lib/translation-hints";
 import { isTextList, readPref, writePref } from "@/lib/ui-prefs";
 import { nextGroupId } from "@/views/groups/group-edit-dialog";
@@ -23,7 +24,7 @@ export function TranslationHintsDialog({ onClose }: { onClose: () => void }) {
 	const [dismissed, setDismissed] = useState<string[]>(() => readPref<string[]>(DISMISSED_PREF, [], isTextList));
 	const groups = status?.groups ?? [];
 	const hints = suggestTranslationPairs(status?.mods ?? [], groups).filter((hint) => !dismissed.includes(pairKey(hint)));
-	const nameOf = (id: string) => status?.mods.find((mod) => mod.id === id)?.info.name ?? id;
+	const nameOf = (id: string) => modName(status?.mods, id);
 
 	const dismiss = (hint: TranslationHint) => {
 		const key = pairKey(hint);

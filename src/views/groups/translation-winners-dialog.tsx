@@ -9,6 +9,7 @@ import { FieldError } from "@/components/ui/field";
 import { ItemContent, ItemTitle } from "@/components/ui/item";
 import { useTranslation } from "@/i18n";
 import { messageOf, unwrap } from "@/lib/ipc";
+import { modName } from "@/lib/mods";
 import { sharedConflictPaths } from "@/lib/translation-hints";
 import { useLoad } from "@/lib/use-load";
 
@@ -24,7 +25,7 @@ export function TranslationWinnersDialog({ gameId, groupId, onClose }: { gameId:
 	const members = group?.members ?? [];
 	const baseId = members[0];
 	const translationId = members[1];
-	const nameOf = (id: string | undefined) => (id ? (status?.mods.find((mod) => mod.id === id)?.info.name ?? id) : "");
+	const nameOf = (id: string | undefined) => (id ? modName(status?.mods, id) : "");
 	// modDetails names the selected version by folder, while a group holds family ids.
 	const baseFolder = baseId ? status?.mods.find((mod) => mod.id === baseId)?.folder : undefined;
 	const translationFolder = translationId ? status?.mods.find((mod) => mod.id === translationId)?.folder : undefined;
