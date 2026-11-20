@@ -126,13 +126,14 @@ pub(super) fn run(
         std::thread::spawn(move || {
             let code = running.wait();
             crate::infra::log::info(format!("launch: game={} exited with {code:?}", game.id));
+            if record {
+                report::update(&data, |report| report.game_exit_code = code);
+            }
             // The launcher can exit while the game's own processes still run in the overlay, such as Wine's services.
+            // The game counts as running until the last of them has ended.
             overlay::wait_released(&session_root);
             if let Some(flag) = live_flag {
                 flag.store(false, Ordering::Release);
-            }
-            if record {
-                report::update(&data, |report| report.game_exit_code = code);
             }
             if let Some(notify) = notify {
                 notify(code);
