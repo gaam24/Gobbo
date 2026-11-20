@@ -49,8 +49,8 @@ export function useModFilter({
 		for (const mod of mods) {
 			if (hidden.has(mod.id)) continue;
 
-			for (const filter of counted) {
-				if (passesFilter(mod, filter, updates)) all[filter] += 1;
+			for (const chip of counted) {
+				if (passesFilter(mod, chip, updates)) all[chip] += 1;
 			}
 		}
 
