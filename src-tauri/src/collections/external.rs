@@ -9,8 +9,7 @@ use md5::Md5;
 use url::Url;
 
 use crate::error::{AppError, io_at};
-use crate::infra::http::{self, BodyProblem};
-use crate::infra::store;
+use crate::infra::http::{self, BodyProblem, PartError};
 use crate::providers::download::{free_download_name, target_name};
 
 /// The largest direct file Gobbo downloads. A collection is a recipe, not a disk image.
@@ -31,32 +30,25 @@ pub fn download(
     progress: &mut dyn FnMut(u64, u64) -> bool,
 ) -> Result<Downloaded, AppError> {
     validate_url(url)?;
-    fs::create_dir_all(directory).map_err(io_at(directory))?;
-    let part = http::temporary_download(directory);
-    // A direct file has no provider account to pace: the server's own 429 is the only limit that applies here, and
-    // the shared retry budget honours its `Retry-After`.
-    let info = http::RateRetry::default().run(|| {
-        http::download_with_info(url, &part, &mut |received, total| {
-            if total > MAX_EXTERNAL_BYTES {
-                return false;
-            }
-            progress(received, total)
-        })
+    // A direct file has no provider account to pace: the server's own 429 is the only limit that applies here.
+    let part = http::download_part(
+        directory,
+        url,
+        &mut http::RateRetry::default(),
+        &mut || {},
+        &mut |received, total| total <= MAX_EXTERNAL_BYTES && progress(received, total),
+    )
+    .map_err(|error| match error {
+        PartError::Failed(error) => error,
+        PartError::Body(BodyProblem::Empty) => AppError::user("collection.external_empty"),
+        PartError::Body(BodyProblem::Html) => AppError::user("collection.external_html"),
     })?;
-    if info.bytes > MAX_EXTERNAL_BYTES {
-        let _ = fs::remove_file(&part);
+    if part.info.bytes > MAX_EXTERNAL_BYTES {
         return Err(
             AppError::user("collection.external_too_large").with("limit", MAX_EXTERNAL_BYTES)
         );
     }
-    if let Some(problem) = http::body_problem(&info, &part) {
-        let _ = fs::remove_file(&part);
-        return Err(match problem {
-            BodyProblem::Empty => AppError::user("collection.external_empty"),
-            BodyProblem::Html => AppError::user("collection.external_html"),
-        });
-    }
-    let name = target_name(&info, url, "", "external");
+    let name = target_name(&part.info, url, "", "external");
     let name = if crate::domain::archive::extension_of(&name).is_some() {
         name
     } else {
@@ -65,7 +57,7 @@ pub fn download(
     // A direct file has no provider identity, so never treat an existing file with the same name as its own earlier
     // download: number the new one instead of inventing a provider id for the comparison.
     let target = free_download_name(directory, &name, None);
-    store::replace_file_clean(&part, &target)?;
+    part.keep_as(&target)?;
     let actual_kb = u32::try_from(
         fs::metadata(&target)
             .map_err(io_at(&target))?

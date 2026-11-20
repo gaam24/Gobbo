@@ -9,9 +9,11 @@ mod pacing;
 mod retry;
 
 pub use client::Client;
+#[cfg(test)]
+pub use download::body_problem;
 pub use download::{
-    BodyProblem, DownloadInfo, PART_SUFFIX, body_problem, download, download_with_info, network,
-    status_error, temporary_download,
+    BodyProblem, DownloadInfo, PART_SUFFIX, PartError, download, download_part, network,
+    status_error,
 };
 pub use helpers::{Trace, USER_AGENT, agent, redact, trace, trace_failure, trace_response};
 pub use pacing::{RateLimit, api_budget, pacer};

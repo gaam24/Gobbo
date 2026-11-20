@@ -2,14 +2,13 @@
 //! answer is an archive, the move into place and the sidecar that names the source. A provider supplies its links,
 //! its name rule and its error for a non-archive answer; the rest is shared.
 
-use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::domain::rate::AccountTier;
 use crate::domain::source::SourceRef;
-use crate::error::{AppError, io_at};
-use crate::infra::http::{self, BodyProblem, DownloadInfo};
-use crate::infra::{sidecar, store};
+use crate::error::AppError;
+use crate::infra::http::{self, BodyProblem, DownloadInfo, PartError};
+use crate::infra::sidecar;
 
 /// What one provider adds to an archive download.
 pub struct ArchiveRules<'a> {
@@ -37,47 +36,29 @@ pub fn fetch_archive(
     rules: ArchiveRules<'_>,
     progress: &mut dyn FnMut(u64, u64) -> bool,
 ) -> Result<PathBuf, AppError> {
-    fs::create_dir_all(dir).map_err(io_at(dir))?;
-    // A short unique part name keeps two links for the same file apart and stays inside the Windows path limit.
-    let part = http::temporary_download(dir);
     let mut last_error = None;
     let policy = super::download_policy(rules.provider, rules.tier);
     let clock = http::pacer(&format!("{}:{}", rules.provider, rules.tier as u8));
-    // One budget for the whole operation, shared by every CDN link, and the same 429 rule every other file download
-    // uses. Pacing stays here with the provider's files; the wrapper knows nothing about providers or tiers.
+    // One 429 budget for the whole operation, shared by every CDN link. The pacing is per provider and tier and runs
+    // before every try: an unlimited policy returns at once, so no user waits for another provider's ceiling.
     let mut rate = http::RateRetry::default();
     for &url in links {
-        // The policy is per provider and tier: an unlimited one returns at once, so no user waits for another
-        // provider's ceiling. It is checked before every try, including a retry after a 429.
-        let info = rate.run(|| {
-            clock.wait(policy);
-            http::download_with_info(url, &part, progress)
-        });
-        match info {
-            Ok(info) => {
-                if let Some(problem) = http::body_problem(&info, &part) {
-                    let _ = fs::remove_file(&part);
-                    last_error = Some((rules.body_error)(problem));
-                    continue;
-                }
-                let target = (rules.target)(&info, url);
-                store::replace_file_clean(&part, &target)?;
+        match http::download_part(dir, url, &mut rate, &mut || clock.wait(policy), progress) {
+            Ok(part) => {
+                let target = (rules.target)(&part.info, url);
+                part.keep_as(&target)?;
                 // Without the source the import reads the mod from the archive's name, so a failed write loses little.
                 if let Some(sidecar) = rules.sidecar {
                     sidecar::write_source(&target, sidecar);
                 }
                 return Ok(target);
             }
-            Err(error) if error.code == crate::error::DOWNLOAD_CANCELLED => {
-                let _ = fs::remove_file(&part);
+            Err(PartError::Body(problem)) => last_error = Some((rules.body_error)(problem)),
+            Err(PartError::Failed(error)) if error.code == crate::error::DOWNLOAD_CANCELLED => {
                 return Err(error);
             }
-            // A 429 with no retry budget left, like any other failed link, is remembered as the last error and the
-            // next link gets its turn. The wrapper returns the server's error unchanged.
-            Err(error) => {
-                let _ = fs::remove_file(&part);
-                last_error = Some(error);
-            }
+            // A failed link, a 429 past the budget included, is remembered and the next link gets its turn.
+            Err(PartError::Failed(error)) => last_error = Some(error),
         }
     }
     Err(last_error.unwrap_or(rules.no_link))

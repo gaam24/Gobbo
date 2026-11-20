@@ -38,19 +38,15 @@ pub fn save_picture(
     if saved_url == Some(url) && target.is_file() {
         return Some(name);
     }
-    std::fs::create_dir_all(images).ok()?;
-    let part = crate::infra::http::temporary_download(images);
-    let Some(info) = download_info(url, &part) else {
-        let _ = std::fs::remove_file(&part);
-        return None;
-    };
-    if crate::infra::http::body_problem(&info, &part).is_some() {
-        let _ = std::fs::remove_file(&part);
-        return None;
-    }
-    if crate::infra::store::replace_file_clean(&part, &target).is_err() {
-        return None;
-    }
+    let part = crate::infra::http::download_part(
+        images,
+        url,
+        &mut crate::infra::http::RateRetry::default(),
+        &mut || {},
+        &mut |received, _| received <= PICTURE_MAX_BYTES,
+    )
+    .ok()?;
+    part.keep_as(&target).ok()?;
     Some(name)
 }
 
@@ -58,17 +54,6 @@ pub fn save_picture(
 /// Windows and Linux. A Nexus id is a number (`nexus-107`); a Thunderstore id is `owner-name`.
 pub fn stem(provider: &str, mod_id: &str) -> String {
     format!("{provider}-{}", mod_id.to_ascii_lowercase())
-}
-
-/// Downloads `url` into `part`, with the picture size limit.
-fn download_info(url: &str, part: &Path) -> Option<crate::infra::http::DownloadInfo> {
-    crate::infra::http::RateRetry::default()
-        .run(|| {
-            crate::infra::http::download_with_info(url, part, &mut |received, _| {
-                received <= PICTURE_MAX_BYTES
-            })
-        })
-        .ok()
 }
 
 /// A saved picture as a data URL, for the panel: the window takes no pictures from the network. `None` when the file

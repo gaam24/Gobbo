@@ -19,11 +19,70 @@ pub struct DownloadInfo {
 }
 
 /// A unique temporary file for a download in `dir`, next to its final name.
-pub fn temporary_download(dir: &std::path::Path) -> std::path::PathBuf {
+fn temporary_download(dir: &std::path::Path) -> std::path::PathBuf {
     dir.join(format!(
         ".gobbo-{}{PART_SUFFIX}",
         crate::infra::store::unique_suffix()
     ))
+}
+
+/// A finished download in a temporary part file next to its final place. Dropping it removes the file, so a failed or
+/// refused download leaves nothing behind; `keep_as` moves it to its real name.
+pub struct Part {
+    path: std::path::PathBuf,
+    pub info: DownloadInfo,
+}
+
+impl Part {
+    /// Moves the file to `target`, replacing a file that is there.
+    pub fn keep_as(self, target: &std::path::Path) -> Result<(), AppError> {
+        crate::infra::store::replace_file_clean(&self.path, target)
+    }
+}
+
+impl Drop for Part {
+    fn drop(&mut self) {
+        // Gone already after `keep_as`; otherwise the download failed or was refused.
+        let _ = std::fs::remove_file(&self.path);
+    }
+}
+
+/// Why `download_part` kept no file.
+#[derive(Debug)]
+pub enum PartError {
+    /// The request failed or was cancelled; the server's error as it came.
+    Failed(AppError),
+    /// The server answered with an empty file or a web page.
+    Body(BodyProblem),
+}
+
+/// Downloads `url` into a temporary part file in `dir`. `before` runs before every try, including a retry after a 429
+/// within `rate`'s budget, so a caller can pace its provider there. An empty answer or a web page is refused.
+pub fn download_part(
+    dir: &std::path::Path,
+    url: &str,
+    rate: &mut RateRetry,
+    before: &mut dyn FnMut(),
+    progress: &mut dyn FnMut(u64, u64) -> bool,
+) -> Result<Part, PartError> {
+    std::fs::create_dir_all(dir)
+        .map_err(|error| PartError::Failed(crate::error::io_at(dir)(error)))?;
+    let path = temporary_download(dir);
+    let downloaded = rate.run(|| {
+        before();
+        download_with_info(url, &path, progress)
+    });
+    let part = Part {
+        info: match downloaded {
+            Ok(info) => info,
+            Err(error) => {
+                let _ = std::fs::remove_file(&path);
+                return Err(PartError::Failed(error));
+            }
+        },
+        path,
+    };
+    body_problem(&part.info, &part.path).map_or(Ok(part), |problem| Err(PartError::Body(problem)))
 }
 
 /// Whether the response is a web page rather than the archive the caller asked for.
