@@ -62,7 +62,9 @@ export function ArchiveReportDialog({
 				<FileList title={t("archiveReport.changed", { count: report.changed.length })} files={report.changed} />
 				{otherSkipped.length > 0 && (
 					<FileList
-						title={t("archiveReport.otherSkipped", { count: otherSkipped.length })}
+						title={t("archiveReport.otherSkipped", {
+							count: otherSkipped.length,
+						})}
 						files={otherSkipped.map((file) => `${file.path} — ${reason(file.reason)}`)}
 					/>
 				)}

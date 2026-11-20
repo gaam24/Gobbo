@@ -55,9 +55,21 @@ export function DeploymentSummary({
 			{!status.deployed && (
 				<GettingStarted
 					steps={[
-						{ done: status.mods.length > 0, title: t("start.add.title"), hint: t("start.add.hint") },
-						{ done: enabled.length > 0, title: t("start.enable.title"), hint: t("start.enable.hint") },
-						{ done: false, title: t("start.deploy.title"), hint: t("start.deploy.hint") },
+						{
+							done: status.mods.length > 0,
+							title: t("start.add.title"),
+							hint: t("start.add.hint"),
+						},
+						{
+							done: enabled.length > 0,
+							title: t("start.enable.title"),
+							hint: t("start.enable.hint"),
+						},
+						{
+							done: false,
+							title: t("start.deploy.title"),
+							hint: t("start.deploy.hint"),
+						},
 					]}
 					actions={
 						status.mods.length === 0 ? (
@@ -106,11 +118,22 @@ export function DeploymentSummary({
 			<FactList
 				facts={[
 					fact(t("deploy.game"), gameName, { className: "truncate" }),
-					fact(t("deploy.enabled"), t("deploy.enabledCount", { enabled: enabled.length, total: status.mods.length }), {
+					fact(
+						t("deploy.enabled"),
+						t("deploy.enabledCount", {
+							enabled: enabled.length,
+							total: status.mods.length,
+						}),
+						{
+							className: "tabular-nums",
+						},
+					),
+					fact(t("deploy.conflicts"), status.conflict_count, {
 						className: "tabular-nums",
 					}),
-					fact(t("deploy.conflicts"), status.conflict_count, { className: "tabular-nums" }),
-					fact(t("deploy.updates"), updatesCount, { className: "tabular-nums" }),
+					fact(t("deploy.updates"), updatesCount, {
+						className: "tabular-nums",
+					}),
 					fact(t("deploy.lastDeployed"), status.deployed_at ? formatTime(status.deployed_at * 1000, i18n.language) : null, {
 						className: "tabular-nums",
 					}),

@@ -49,7 +49,10 @@ export function CollectionPanelView({ onClose }: { onClose: () => void }) {
 			width="3xl"
 			className="h-[85vh]"
 			title={<CollectionTitle name={session.origin.name} revision={revisionLabel(session.origin)} provider={session.origin.provider} />}
-			description={collectionMeta(t, i18n.language, { ...session.plan.info, author: session.origin.author })}
+			description={collectionMeta(t, i18n.language, {
+				...session.plan.info,
+				author: session.origin.author,
+			})}
 			onClose={onClose}
 		>
 			<div className="flex h-full min-h-0 flex-col gap-4 text-sm">

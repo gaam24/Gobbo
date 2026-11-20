@@ -221,7 +221,10 @@ export function ModTable({
 		const target = event.over?.id;
 
 		if (isColumnId(dragged) && isColumnId(target) && dragged !== target) {
-			setLayout({ ...layout, order: moveColumnTo(layout.order, dragged, target) });
+			setLayout({
+				...layout,
+				order: moveColumnTo(layout.order, dragged, target),
+			});
 		}
 	};
 	/// One step left or right from a header's menu, past the columns on screen only.
@@ -313,7 +316,9 @@ export function ModTable({
 				<p className="text-subtle-foreground px-2 pb-1 text-xs">{t("mods.columnsHint")}</p>
 				{squeezed.length > 0 && (
 					<p className="text-muted-foreground px-2 pb-1 text-xs">
-						{t("mods.columnsSqueezed", { list: squeezed.map((column) => t(`mods.col.${column.id}`)).join(", ") })}
+						{t("mods.columnsSqueezed", {
+							list: squeezed.map((column) => t(`mods.col.${column.id}`)).join(", "),
+						})}
 					</p>
 				)}
 				{COLUMN_GROUPS.map((group, index) => (
@@ -384,7 +389,15 @@ export function ModTable({
 		if (row.kind === "page" || row.kind === "group") {
 			// `tableItems` keeps the page details on a page row, so wrap them in the same `Group` a user row already is.
 			const header: Group =
-				row.kind === "page" ? { source: "page", id: row.id, name: row.page.name, parts: row.page.mods, page: row.page } : row.group;
+				row.kind === "page"
+					? {
+							source: "page",
+							id: row.id,
+							name: row.page.name,
+							parts: row.page.mods,
+							page: row.page,
+						}
+					: row.group;
 			const storedId = row.kind === "group" ? (row.group.group?.id ?? row.id) : null;
 			const source = header.parts.find((mod) => mod.sources.length > 0)?.sources[0];
 			return (

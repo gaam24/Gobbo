@@ -20,7 +20,13 @@ interface PackGame {
 
 function packOptions(name: string, profiles: string[], archives: "none" | "unlisted" | "all") {
 	return {
-		info: { id: "", name, version: "1.0", author: "E2E", description: "A pack from the suite" },
+		info: {
+			id: "",
+			name,
+			version: "1.0",
+			author: "E2E",
+			description: "A pack from the suite",
+		},
 		profiles,
 		archives,
 	};
@@ -74,7 +80,10 @@ describe("mod packs", () => {
 		expectFile(file);
 		assert.ok(zipNames(file).includes("pack.json"), "the pack has no manifest");
 		await removeLibraryMods(game.id);
-		const preview = await invoke<PackPreview>("inspect_pack", { game: game.id, path: file });
+		const preview = await invoke<PackPreview>("inspect_pack", {
+			game: game.id,
+			path: file,
+		});
 		assert.equal(preview.total, 2);
 		assert.equal(preview.have, 0);
 		assert.equal(preview.bundled, 2);
@@ -92,7 +101,10 @@ describe("mod packs", () => {
 		});
 		assert.equal(exported.archives, 0);
 		await removeLibraryMods(game.id);
-		const preview = await invoke<PackPreview>("inspect_pack", { game: game.id, path: file });
+		const preview = await invoke<PackPreview>("inspect_pack", {
+			game: game.id,
+			path: file,
+		});
 		assert.equal(preview.total, 2);
 		assert.equal(preview.have, 0);
 		assert.equal(preview.bundled, 0);
@@ -109,7 +121,10 @@ describe("mod packs", () => {
 			options: packOptions("E2E Import Pack", [profile], "all"),
 		});
 		await removeLibraryMods(source.id);
-		const imported = await invoke<PackImportView>("import_pack", { game: source.id, path: file });
+		const imported = await invoke<PackImportView>("import_pack", {
+			game: source.id,
+			path: file,
+		});
 		assert.equal(imported.imported, 2);
 		assert.equal(imported.profiles_created, 1);
 		assert.equal(imported.failed.length, 0);
@@ -131,7 +146,10 @@ describe("mod packs", () => {
 		const game = await sourceGame("pack-link");
 
 		try {
-			await invokeWithChannel("download_pack_link", { game: game.id, link: "http://example.invalid/pack.gobbopack" });
+			await invokeWithChannel("download_pack_link", {
+				game: game.id,
+				link: "http://example.invalid/pack.gobbopack",
+			});
 			throw new Error("the link was expected to be refused");
 		} catch (error) {
 			assert.ok(error instanceof CommandFailure, "the link failed with an unexpected error");

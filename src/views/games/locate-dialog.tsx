@@ -77,7 +77,10 @@ export function LocateDialog({
 }) {
 	const { t } = useTranslation();
 	const [folder, setFolder] = useState("");
-	const [checked, setChecked] = useState<{ folder: string; result: FolderCheck } | null>(null);
+	const [checked, setChecked] = useState<{
+		folder: string;
+		result: FolderCheck;
+	} | null>(null);
 	const [busy, setBusy] = useState(false);
 	const trimmed = folder.trim();
 

@@ -94,7 +94,12 @@ export function PanelHandle({
 			onKeyDown={(event) => {
 				const step = event.shiftKey ? 64 : 16;
 				const now = current(event.currentTarget);
-				const keys: Record<string, number> = { ArrowLeft: now + step, ArrowRight: now - step, Home: max, End: min };
+				const keys: Record<string, number> = {
+					ArrowLeft: now + step,
+					ArrowRight: now - step,
+					Home: max,
+					End: min,
+				};
 				const next = keys[event.key];
 
 				if (event.key === "Enter") onReset();

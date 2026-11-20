@@ -15,7 +15,15 @@ const GAME = "game-a";
 type TypedTask = RegisteredTask & { dedupe?: TaskDedupe };
 
 function local(id: string, dedupe?: TaskDedupe): TypedTask {
-	return { id, game: GAME, kind: "update", title: "Local", state: "running", source: "local", dedupe };
+	return {
+		id,
+		game: GAME,
+		kind: "update",
+		title: "Local",
+		state: "running",
+		source: "local",
+		dedupe,
+	};
 }
 
 function backend(id: string, kind: string, dedupe: TaskDedupe): TypedTask {
@@ -79,7 +87,16 @@ test("a failed import row shares its group with the backend row of the same impo
 });
 
 test("a failure without an identity keeps its id as its group", () => {
-	const [row] = localFailedTasks([{ id: "import:/mods/a.zip", kind: "import", title: "Could not import a.zip" }], []);
+	const [row] = localFailedTasks(
+		[
+			{
+				id: "import:/mods/a.zip",
+				kind: "import",
+				title: "Could not import a.zip",
+			},
+		],
+		[],
+	);
 	expect(row?.dedupeKey).toBeUndefined();
 });
 

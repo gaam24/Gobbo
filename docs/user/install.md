@@ -7,14 +7,14 @@ asks where the library, profiles and settings should live.
 
 Take the archive for your system from the [latest release](https://github.com/gaam24/Gobbo/releases/latest).
 
-| Asset                                         | What it is                                                  |
-| --------------------------------------------- | ----------------------------------------------------------- |
-| `gobbo-<version>-windows-<arch>-portable.zip` | The program, ready to run. Unpack it anywhere.              |
-| `Gobbo-Mods-Organizer_<version>_x64-setup.exe` | The Windows installer (NSIS).                              |
-| `gobbo-<version>-linux-<arch>-portable.zip`   | The program, ready to run. Unpack it anywhere.              |
-| `Gobbo-Mods-Organizer_<version>_amd64.AppImage` | The Linux AppImage.                                       |
-| `SHA256SUMS.txt`                              | The SHA-256 of every download in the release.               |
-| `sbom-*.cdx.json`, `THIRD-PARTY-NOTICES-*.md` | The software bill of materials and the third-party notices. |
+| Asset                                           | What it is                                                  |
+| ----------------------------------------------- | ----------------------------------------------------------- |
+| `gobbo-<version>-windows-<arch>-portable.zip`   | The program, ready to run. Unpack it anywhere.              |
+| `Gobbo-Mods-Organizer_<version>_x64-setup.exe`  | The Windows installer (NSIS).                               |
+| `gobbo-<version>-linux-<arch>-portable.zip`     | The program, ready to run. Unpack it anywhere.              |
+| `Gobbo-Mods-Organizer_<version>_amd64.AppImage` | The Linux AppImage.                                         |
+| `SHA256SUMS.txt`                                | The SHA-256 of every download in the release.               |
+| `sbom-*.cdx.json`, `THIRD-PARTY-NOTICES-*.md`   | The software bill of materials and the third-party notices. |
 
 The portable archive contains the program and the `games/` and `loaders/` data folders. On Windows it also contains the
 overlay hook and helper programs. It does not contain a `gobbo.storage.json`; the first start creates it after you

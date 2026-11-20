@@ -48,8 +48,21 @@ test("the summary leaves out zero parts and keeps the timeline order", () => {
 test("a preview with no visible change cannot be restored", () => {
 	expect(hasPreviewChanges(preview())).toBe(false);
 	expect(hasPreviewChanges(preview({ moved: 1 }))).toBe(true);
-	expect(hasPreviewChanges(preview({ adds: [{ id: "a", name: "A", folder: "a", version: null, enabled: true, missing: false }] }))).toBe(
-		true,
-	);
+	expect(
+		hasPreviewChanges(
+			preview({
+				adds: [
+					{
+						id: "a",
+						name: "A",
+						folder: "a",
+						version: null,
+						enabled: true,
+						missing: false,
+					},
+				],
+			}),
+		),
+	).toBe(true);
 	expect(hasPreviewChanges(preview({ winners: 1 }))).toBe(true);
 });

@@ -36,7 +36,10 @@ export function StorageView({
 	onOpen: (gameId: string, path: string) => void | Promise<void>;
 }) {
 	const { t } = useTranslation();
-	const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null);
+	const [confirmDelete, setConfirmDelete] = useState<{
+		id: string;
+		name: string;
+	} | null>(null);
 
 	const names = useMemo(() => new Map(games.map((game) => [game.id, game.name])), [games]);
 	const active = usage?.filter((entry) => !entry.removed) ?? [];
@@ -148,7 +151,9 @@ export function StorageView({
 				open={confirmDelete !== null}
 				onOpenChange={(open) => !open && setConfirmDelete(null)}
 				title={t("storage.deleteTitle", { name: confirmDelete?.name ?? "" })}
-				description={t("storage.deleteBody", { name: confirmDelete?.name ?? "" })}
+				description={t("storage.deleteBody", {
+					name: confirmDelete?.name ?? "",
+				})}
 				confirmLabel={t("storage.delete")}
 				onConfirm={() => {
 					const entry = confirmDelete;

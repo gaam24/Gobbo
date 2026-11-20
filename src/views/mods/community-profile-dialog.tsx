@@ -137,7 +137,11 @@ export function CommunityProfileDialog({ gameId, onClose }: { gameId: string; on
 											</span>
 										</div>
 										{item.state === "other_version" && (
-											<ItemDescription>{t("community.otherVersion", { version: item.selected_version ?? "—" })}</ItemDescription>
+											<ItemDescription>
+												{t("community.otherVersion", {
+													version: item.selected_version ?? "—",
+												})}
+											</ItemDescription>
 										)}
 										{item.state === "missing" && <ItemDescription className="text-destructive">{t("community.missing")}</ItemDescription>}
 									</ItemContent>

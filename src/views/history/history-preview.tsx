@@ -29,10 +29,17 @@ export function HistoryPreviewPane({ preview, locale }: { preview: HistoryPrevie
 	return (
 		<div className="grid content-start gap-4">
 			<header className="grid gap-1">
-				<h3 className="text-base font-semibold">{t("history.preview.title", { time: formatHistoryTime(preview.at, locale) })}</h3>
+				<h3 className="text-base font-semibold">
+					{t("history.preview.title", {
+						time: formatHistoryTime(preview.at, locale),
+					})}
+				</h3>
 				<p className="text-muted-foreground text-sm">{t("history.preview.hint")}</p>
 				<p className="text-muted-foreground text-xs tabular-nums">
-					{t("history.preview.after", { enabled: preview.enabled, total: preview.total })}
+					{t("history.preview.after", {
+						enabled: preview.enabled,
+						total: preview.total,
+					})}
 				</p>
 			</header>
 
@@ -67,19 +74,25 @@ export function HistoryPreviewPane({ preview, locale }: { preview: HistoryPrevie
 				describe={modLine}
 			/>
 			<ChangeGroup
-				title={t("history.preview.versions", { count: preview.versions.length })}
+				title={t("history.preview.versions", {
+					count: preview.versions.length,
+				})}
 				items={preview.versions}
 				missing={(change) => change.from.missing || change.to.missing}
 				describe={(change) => `${modLine(change.from)} → ${modLine(change.to)}`}
 			/>
 			<ChangeGroup
-				title={t("history.preview.switchesOn", { count: preview.switches_on.length })}
+				title={t("history.preview.switchesOn", {
+					count: preview.switches_on.length,
+				})}
 				items={preview.switches_on}
 				missing={isMissing}
 				describe={versionOf}
 			/>
 			<ChangeGroup
-				title={t("history.preview.switchesOff", { count: preview.switches_off.length })}
+				title={t("history.preview.switchesOff", {
+					count: preview.switches_off.length,
+				})}
 				items={preview.switches_off}
 				missing={isMissing}
 				describe={versionOf}

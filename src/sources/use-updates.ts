@@ -203,5 +203,14 @@ export function useModUpdates({ gameId, status, onStatus, nameOf, notify, notify
 		});
 	};
 
-	return { updates, checkingGame, checkingGames, checkMod, checkModFromMenu, checkUpdates, forget, forgetAll };
+	return {
+		updates,
+		checkingGame,
+		checkingGames,
+		checkMod,
+		checkModFromMenu,
+		checkUpdates,
+		forget,
+		forgetAll,
+	};
 }

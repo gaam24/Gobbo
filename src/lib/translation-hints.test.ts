@@ -118,7 +118,14 @@ test("a text naming several languages returns the first in table order", () => {
 
 test("a translation is paired with the base whose name it repeats", () => {
 	const hints = suggestTranslationPairs([mod("base-mod", "base-mod"), mod("base-mod-pl", "base-mod-pl")], []);
-	expect(hints).toEqual([{ baseId: "base-mod", translationId: "base-mod-pl", language: "pl", confidence: 0.95 }]);
+	expect(hints).toEqual([
+		{
+			baseId: "base-mod",
+			translationId: "base-mod-pl",
+			language: "pl",
+			confidence: 0.95,
+		},
+	]);
 });
 
 test("a meaningful word of the base name is enough, but scores below the full name", () => {
@@ -133,7 +140,14 @@ test("a meaningful word of the base name is enough, but scores below the full na
 
 test("a language word in tags is a signal too", () => {
 	const hints = suggestTranslationPairs([mod("base-mod", "base-mod"), mod("base-mod-tr", "base-mod-x", { tags: ["Türkçe"] })], []);
-	expect(hints).toEqual([{ baseId: "base-mod", translationId: "base-mod-tr", language: "tr", confidence: 0.95 }]);
+	expect(hints).toEqual([
+		{
+			baseId: "base-mod",
+			translationId: "base-mod-tr",
+			language: "tr",
+			confidence: 0.95,
+		},
+	]);
 });
 
 test("a different provider page raises the score and the same page lowers it", () => {

@@ -12,9 +12,21 @@ const CONSOLE_KEY = shortcutKey("console");
 export function useGlobalShortcuts({ openPalette }: { openPalette: () => void }) {
 	const { dialog } = useUiState();
 	const { toggleInspector, toggleConsole, openDialog } = useUiActions();
-	const latest = useRef({ openPalette, toggleInspector, toggleConsole, openDialog, dialog });
+	const latest = useRef({
+		openPalette,
+		toggleInspector,
+		toggleConsole,
+		openDialog,
+		dialog,
+	});
 	useEffect(() => {
-		latest.current = { openPalette, toggleInspector, toggleConsole, openDialog, dialog };
+		latest.current = {
+			openPalette,
+			toggleInspector,
+			toggleConsole,
+			openDialog,
+			dialog,
+		};
 	});
 
 	useEffect(() => {

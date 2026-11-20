@@ -38,15 +38,15 @@ Gobbo Mods Organizer is a desktop mod manager for PC games. It keeps a separate 
 
 ## Why Gobbo
 
-| What you get | How it helps |
-|---|---|
-| 🧹 **A clean game folder** | Overlay is the only way mods reach the game. The real folder stays untouched on Windows and Linux, and each profile gets its own layer. |
-| 🌍 **Universal by design** | Gobbo never special-cases a game or an engine. A game's layout lives in `games/<id>/game.toml` and shared loaders in `loaders/`; profiles, conflicts and packs work the same everywhere. |
-| ↩️ **A way back for every change** | History with undo and redo, a preview before every apply, and snapshots before a risky change. |
-| ⚠️ **Conflicts you can see** | Set the order, pick the winning file, add override rules and see what needs attention before you play. |
-| 🐧 **Linux as a first-class platform** | A native Linux app, games through Steam and Proton, and the same clean-folder workflow as Windows. |
-| 🔒 **Your setup stays yours** | Portable or global data, no account and no telemetry; provider keys live in the operating system's credential store. Free software under GPL-3.0. |
-| 📦 **Share a setup, not a pile of files** | A mod pack records the exact files, versions, installer choices, order and rules. Gobbo lists what's missing before it imports anything. |
+| What you get                              | How it helps                                                                                                                                                                             |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 🧹 **A clean game folder**                | Overlay is the only way mods reach the game. The real folder stays untouched on Windows and Linux, and each profile gets its own layer.                                                  |
+| 🌍 **Universal by design**                | Gobbo never special-cases a game or an engine. A game's layout lives in `games/<id>/game.toml` and shared loaders in `loaders/`; profiles, conflicts and packs work the same everywhere. |
+| ↩️ **A way back for every change**        | History with undo and redo, a preview before every apply, and snapshots before a risky change.                                                                                           |
+| ⚠️ **Conflicts you can see**              | Set the order, pick the winning file, add override rules and see what needs attention before you play.                                                                                   |
+| 🐧 **Linux as a first-class platform**    | A native Linux app, games through Steam and Proton, and the same clean-folder workflow as Windows.                                                                                       |
+| 🔒 **Your setup stays yours**             | Portable or global data, no account and no telemetry; provider keys live in the operating system's credential store. Free software under GPL-3.0.                                        |
+| 📦 **Share a setup, not a pile of files** | A mod pack records the exact files, versions, installer choices, order and rules. Gobbo lists what's missing before it imports anything.                                                 |
 
 ## What it does
 
@@ -86,14 +86,14 @@ The first start asks where Gobbo should keep your data. **Portable** keeps the m
 
 ## Documentation
 
-| Guide | What it covers |
-|---|---|
-| [Quick start](docs/user/quickstart.md) | Add a game, import a mod, apply it and undo it in about five minutes |
-| [Install and data](docs/user/install.md) | Downloads, checksums, requirements, storage modes and backups |
-| [Supported games](docs/user/games.md) | What's tested today, how to add a game, and how mods reach the game |
-| [Linux and Steam](docs/user/linux.md) | The Steam launch option, Proton and the overlayfs limits |
-| [Troubleshooting](docs/user/troubleshooting.md) | Common errors, the log and the support bundle |
-| [All documentation](docs/README.md) | The full map, including contributor and architecture guides |
+| Guide                                           | What it covers                                                       |
+| ----------------------------------------------- | -------------------------------------------------------------------- |
+| [Quick start](docs/user/quickstart.md)          | Add a game, import a mod, apply it and undo it in about five minutes |
+| [Install and data](docs/user/install.md)        | Downloads, checksums, requirements, storage modes and backups        |
+| [Supported games](docs/user/games.md)           | What's tested today, how to add a game, and how mods reach the game  |
+| [Linux and Steam](docs/user/linux.md)           | The Steam launch option, Proton and the overlayfs limits             |
+| [Troubleshooting](docs/user/troubleshooting.md) | Common errors, the log and the support bundle                        |
+| [All documentation](docs/README.md)             | The full map, including contributor and architecture guides          |
 
 ## Supported games
 

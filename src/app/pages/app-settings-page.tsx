@@ -45,7 +45,13 @@ export function AppSettingsPage() {
 			<AppSettings
 				language={language}
 				onLanguage={saveLanguage}
-				providers={{ list: providers, keysSaved, accounts, links: sourceLinks, status: linkStatus }}
+				providers={{
+					list: providers,
+					keysSaved,
+					accounts,
+					links: sourceLinks,
+					status: linkStatus,
+				}}
 				providerActions={{
 					onSaveKey: saveSourceKey,
 					onValidateKey: validateSourceKey,

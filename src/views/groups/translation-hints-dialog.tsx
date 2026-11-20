@@ -58,17 +58,26 @@ export function TranslationHintsDialog({ onClose }: { onClose: () => void }) {
 						const language = hint.language ?? t("mods.hints.unknownLanguage");
 						const baseName = nameOf(hint.baseId);
 						const translationName = nameOf(hint.translationId);
-						const groupName = t("mods.hints.groupName", { name: baseName, language });
+						const groupName = t("mods.hints.groupName", {
+							name: baseName,
+							language,
+						});
 						return (
 							<BoxListRow key={pairKey(hint)}>
 								<ItemContent className="w-full min-w-0 gap-2.5">
 									<div className="min-w-0">
 										{/* The pair fills its own line; buttons never share this row with the names. */}
 										<ItemTitle className="line-clamp-2 w-full min-w-0 font-medium text-pretty break-words">
-											{t("mods.hints.pair", { base: baseName, translation: translationName })}
+											{t("mods.hints.pair", {
+												base: baseName,
+												translation: translationName,
+											})}
 										</ItemTitle>
 										<p className="text-muted-foreground mt-1 text-xs">
-											{t("mods.hints.meta", { language, percent: Math.round(hint.confidence * 100) })}
+											{t("mods.hints.meta", {
+												language,
+												percent: Math.round(hint.confidence * 100),
+											})}
 										</p>
 									</div>
 

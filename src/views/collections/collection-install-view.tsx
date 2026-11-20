@@ -97,7 +97,11 @@ export function CollectionInstallView({ onClose }: { onClose: () => void }) {
 					{collections.mode && <Badge variant="outline">{t(`collection.mode.short.${collections.mode}`)}</Badge>}
 				</CollectionTitle>
 			}
-			description={t("collection.install.progress", { done, total: wanted, pending: session.counts.pending })}
+			description={t("collection.install.progress", {
+				done,
+				total: wanted,
+				pending: session.counts.pending,
+			})}
 			onClose={onClose}
 		>
 			<div className="flex h-full min-h-0 flex-col gap-4 text-sm">

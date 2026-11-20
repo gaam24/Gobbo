@@ -80,7 +80,11 @@ export function AppDialogs() {
 		if (dialogRef.current?.kind === "manual-updates") closeDialog();
 	}, [closeDialog]);
 
-	const manual = useManualUpdates({ downloads, openDialog, closeDialogIfManual });
+	const manual = useManualUpdates({
+		downloads,
+		openDialog,
+		closeDialogIfManual,
+	});
 
 	const confirmPreview = async () => {
 		if (dialog?.kind !== "deploy") return;
@@ -145,7 +149,10 @@ export function AppDialogs() {
 			title: t("tasks.customChoices"),
 			detail: t("tasks.waitingForYou"),
 			state: "waiting",
-			open: { label: t("tasks.openWindow"), run: () => setWizardHiddenFor(null) },
+			open: {
+				label: t("tasks.openWindow"),
+				run: () => setWizardHiddenFor(null),
+			},
 			cancel: {
 				label: t("tasks.stop"),
 				run: () => {

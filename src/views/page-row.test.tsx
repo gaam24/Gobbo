@@ -108,7 +108,13 @@ test("a page header still shows its name, page menu and delete action", () => {
 		category: null,
 		mods: [part("nexus:225", "Base", "1.0"), part("nexus:225#200", "Addon", "2.0")],
 	};
-	const group: Group = { source: "page", id: page.id, name: page.name, parts: page.mods, page };
+	const group: Group = {
+		source: "page",
+		id: page.id,
+		name: page.name,
+		parts: page.mods,
+		page,
+	};
 	const html = render(group);
 	expect(html).toContain("KS Page");
 	expect(html).toContain("2 parts");
@@ -123,7 +129,12 @@ test("a user-group header shows its name and a mod count, without the page actio
 		id: "group:g1",
 		name: "Quality tweaks",
 		parts: [part("one", "One", "1.0"), part("two", "Two", "2.0")],
-		group: { id: "g1", name: "Quality tweaks", members: ["one", "two"], kind: "bundle" },
+		group: {
+			id: "g1",
+			name: "Quality tweaks",
+			members: ["one", "two"],
+			kind: "bundle",
+		},
 	};
 	const html = render(group);
 	expect(html).toContain("Quality tweaks");
@@ -140,7 +151,13 @@ test("a translation group shows its language and the translation action", () => 
 		id: "group:g2",
 		name: "German pack",
 		parts: [part("one", "One", "1.0"), part("two", "Two", "2.0")],
-		group: { id: "g2", name: "German pack", members: ["one", "two"], kind: "translation", language: "German" },
+		group: {
+			id: "g2",
+			name: "German pack",
+			members: ["one", "two"],
+			kind: "translation",
+			language: "German",
+		},
 	};
 	const html = render(group, withCategory);
 	expect(html).toContain("German");
@@ -158,7 +175,13 @@ test("a page header says the check failed when a part's check failed, not up to 
 		category: null,
 		mods: [part("nexus:225", "Base", "1.0"), part("nexus:225#200", "Addon", "2.0")],
 	};
-	const group: Group = { source: "page", id: page.id, name: page.name, parts: page.mods, page };
+	const group: Group = {
+		source: "page",
+		id: page.id,
+		name: page.name,
+		parts: page.mods,
+		page,
+	};
 	const failed: UpdateReport = {
 		id: "nexus:225",
 		provider: "nexus",

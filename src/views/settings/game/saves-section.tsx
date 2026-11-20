@@ -47,7 +47,12 @@ export function SavesSection({
 	const active = status.profiles.find((entry) => entry.active);
 	const profile = active?.name ?? "";
 	const profileId = active?.id ?? "";
-	const [moving, setMoving] = useState<{ id: string; label: string; upper: string; path: string } | null>(null);
+	const [moving, setMoving] = useState<{
+		id: string;
+		label: string;
+		upper: string;
+		path: string;
+	} | null>(null);
 
 	return (
 		<Section
@@ -100,7 +105,14 @@ export function SavesSection({
 														variant="outline"
 														size="sm"
 														disabled={gameRunning}
-														onClick={() => setMoving({ id: set.id, label, upper: set.upper, path: set.path })}
+														onClick={() =>
+															setMoving({
+																id: set.id,
+																label,
+																upper: set.upper,
+																path: set.path,
+															})
+														}
 													>
 														<Undo2 /> {t("settings.userData.move")}
 													</Button>

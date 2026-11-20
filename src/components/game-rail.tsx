@@ -49,7 +49,12 @@ export function GameRail({
 	activeId: string | undefined;
 	view: AppView;
 	/// The active game's folders, because `Status` loads on its change; the other games have no paths.
-	paths: { library: string; archives: string; profile: string | null; overwrite: string | null } | null;
+	paths: {
+		library: string;
+		archives: string;
+		profile: string | null;
+		overwrite: string | null;
+	} | null;
 	notices: Notice[];
 	downloads: DownloadsBadge;
 	onSelect: (id: string) => void;
@@ -210,7 +215,12 @@ function GameTile({
 	/// Whether the folder still exists.
 	ready: boolean;
 	active: boolean;
-	paths: { library: string; archives: string; profile: string | null; overwrite: string | null } | null;
+	paths: {
+		library: string;
+		archives: string;
+		profile: string | null;
+		overwrite: string | null;
+	} | null;
 	onSelect: () => void;
 	onOpen: (path: string) => void | Promise<void>;
 	onCopy: (path: string) => void | Promise<void>;

@@ -62,7 +62,11 @@ export function DownloadsProvider({
 	const installDownload = useCallback(
 		(download: Download) => {
 			void attempt(async () => {
-				if (download.path) await importPaths([download.path], { game: download.game, source: download.source });
+				if (download.path)
+					await importPaths([download.path], {
+						game: download.game,
+						source: download.source,
+					});
 			});
 		},
 		[attempt, importPaths],
@@ -78,7 +82,10 @@ export function DownloadsProvider({
 					// The backend has dropped its wait; reflect that at once so a cancelled wizard can be retried from
 					// the ordinary waiting install row instead of leaving a dead wizard row behind.
 					setDownloads((queue) => queue.map((item) => (item.id === download.id ? { ...item, auto_install: false } : item)));
-					await importPaths([claimed.path], { game: claimed.game, source: claimed.source });
+					await importPaths([claimed.path], {
+						game: claimed.game,
+						source: claimed.source,
+					});
 				}
 			});
 		},
@@ -101,7 +108,10 @@ export function DownloadsProvider({
 				kind: "import",
 				title: t("tasks.waitingInstall", { name: download.name }),
 				state: "waiting",
-				open: { label: t("downloads.install"), run: () => installWizard(download) },
+				open: {
+					label: t("downloads.install"),
+					run: () => installWizard(download),
+				},
 				source: "local",
 			});
 		}
@@ -136,7 +146,14 @@ export function DownloadsProvider({
 
 	const summary = useMemo(() => downloadSummary(downloads), [downloads]);
 	const value = useMemo(
-		(): Downloads => ({ downloads, summary, installDownload, removeDownload, retryDownload, clearDownloads }),
+		(): Downloads => ({
+			downloads,
+			summary,
+			installDownload,
+			removeDownload,
+			retryDownload,
+			clearDownloads,
+		}),
 		[clearDownloads, downloads, installDownload, removeDownload, retryDownload, summary],
 	);
 

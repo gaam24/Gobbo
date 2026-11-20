@@ -49,7 +49,10 @@ async function importWithChoices(prepared: FomodGame, option: string): Promise<v
 }
 
 async function extrasOf(prepared: FomodGame, folder: string): Promise<ModExtras | undefined> {
-	const extras = await invoke<ModExtras[]>("mod_extras", { game: prepared.id, folders: [folder] });
+	const extras = await invoke<ModExtras[]>("mod_extras", {
+		game: prepared.id,
+		folders: [folder],
+	});
 	return extras[0];
 }
 

@@ -62,7 +62,9 @@ export async function invokeResult<T>(command: string, args: Record<string, unkn
 		command,
 		args,
 	);
-	const envelope = raw as { e2e: { ok: true; value: T } | { ok: false; error: string } };
+	const envelope = raw as {
+		e2e: { ok: true; value: T } | { ok: false; error: string };
+	};
 	const result = envelope.e2e;
 
 	if (result.ok) return result;
@@ -92,7 +94,9 @@ export async function invokeWithChannel<T>(command: string, args: Record<string,
 						recovery: record.recovery,
 						message: error instanceof Error ? error.message : String(error),
 					};
-					resolve({ e2e: { ok: false, error: JSON.stringify(payload), events } });
+					resolve({
+						e2e: { ok: false, error: JSON.stringify(payload), events },
+					});
 				};
 				void (async () => {
 					try {
@@ -101,7 +105,10 @@ export async function invokeWithChannel<T>(command: string, args: Record<string,
 						if (!bridge) throw new Error("the Tauri bridge is not available");
 						const progress = new bridge.core.Channel();
 						progress.onmessage = (message: unknown) => events.push(message);
-						const value = await bridge.core.invoke(cmd, { ...callArgs, progress });
+						const value = await bridge.core.invoke(cmd, {
+							...callArgs,
+							progress,
+						});
 						resolve({ e2e: { ok: true, value, events } });
 					} catch (error) {
 						failed(error);

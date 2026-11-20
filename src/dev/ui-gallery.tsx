@@ -88,7 +88,12 @@ const FAKE_REPORT: RunReport = {
 		"ChromaSDKPlugin failed to load!",
 		"File 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Cyberpunk 2077\\bin\\x64\\sl.common.dll' is signed by NVIDIA and the signature was verified.",
 	],
-	game_changes: [{ path: "bin/x64/plugins/cyber_engine_tweaks/mods/DriftVolume/DriftVolume-Lua.log", kind: "modified" }],
+	game_changes: [
+		{
+			path: "bin/x64/plugins/cyber_engine_tweaks/mods/DriftVolume/DriftVolume-Lua.log",
+			kind: "modified",
+		},
+	],
 	game_changes_total: 1,
 	decisions: [
 		{
@@ -106,7 +111,13 @@ const FAKE_REPORT: RunReport = {
 	crash_dump: null,
 	dlls: {
 		layer: ["bin/x64/winmm.dll", "bin/x64/version.dll"],
-		injected: [{ name: "WINMM.dll", path: "bin/x64/WINMM.dll", source: "mods/winmm/bin/x64/WINMM.dll" }],
+		injected: [
+			{
+				name: "WINMM.dll",
+				path: "bin/x64/WINMM.dll",
+				source: "mods/winmm/bin/x64/WINMM.dll",
+			},
+		],
 	},
 };
 

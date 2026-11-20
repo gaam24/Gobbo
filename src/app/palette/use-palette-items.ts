@@ -117,7 +117,13 @@ export function usePaletteItems(): () => PaletteItem[] {
 				reason: applyReason,
 				run: deploy,
 			},
-			{ id: "import", icon: Upload, label: t("mods.import"), keywords: t("palette.keywords.import"), run: workspace.pickArchives },
+			{
+				id: "import",
+				icon: Upload,
+				label: t("mods.import"),
+				keywords: t("palette.keywords.import"),
+				run: workspace.pickArchives,
+			},
 			{
 				id: "collection",
 				icon: Boxes,
@@ -181,7 +187,12 @@ export function usePaletteItems(): () => PaletteItem[] {
 				label: t("mods.sortAlpha"),
 				run: gameActions.sortList,
 			},
-			{ id: "sort-rules", icon: ListTree, label: t("mods.sortByRules"), run: () => openDialog({ kind: "sort" }) },
+			{
+				id: "sort-rules",
+				icon: ListTree,
+				label: t("mods.sortByRules"),
+				run: () => openDialog({ kind: "sort" }),
+			},
 			{
 				id: "details",
 				icon: PanelRight,
@@ -202,7 +213,13 @@ export function usePaletteItems(): () => PaletteItem[] {
 					toggleConsole();
 				},
 			},
-			{ id: "rescan", icon: RefreshCw, label: t("mods.rescan"), hint: shortcutHint("rescan"), run: gameActions.rescan },
+			{
+				id: "rescan",
+				icon: RefreshCw,
+				label: t("mods.rescan"),
+				hint: shortcutHint("rescan"),
+				run: gameActions.rescan,
+			},
 			{
 				id: "bisect",
 				icon: SearchCheck,
@@ -239,8 +256,18 @@ export function usePaletteItems(): () => PaletteItem[] {
 				keywords: t("setupCheck.hint"),
 				run: () => openDialog({ kind: "setup" }),
 			},
-			{ id: "pack-export", icon: Package, label: t("pack.export"), run: () => openDialog({ kind: "pack-export" }) },
-			{ id: "pack-import", icon: Package, label: t("pack.import"), run: workspace.pickPack },
+			{
+				id: "pack-export",
+				icon: Package,
+				label: t("pack.export"),
+				run: () => openDialog({ kind: "pack-export" }),
+			},
+			{
+				id: "pack-import",
+				icon: Package,
+				label: t("pack.import"),
+				run: workspace.pickPack,
+			},
 			{
 				id: "overwrite",
 				icon: FileStack,
@@ -257,7 +284,12 @@ export function usePaletteItems(): () => PaletteItem[] {
 				reason: reasonWhen(!gameStatus.settings.game_root, t("palette.reason.noGameFolder")),
 				run: () => openFolderPath(gameStatus.settings.game_root),
 			},
-			{ id: "library-folder", icon: FolderOpen, label: t("games.openLibrary"), run: () => openFolderPath(gameStatus.library_dir) },
+			{
+				id: "library-folder",
+				icon: FolderOpen,
+				label: t("games.openLibrary"),
+				run: () => openFolderPath(gameStatus.library_dir),
+			},
 			{
 				id: "copy-list",
 				icon: Copy,
@@ -271,8 +303,20 @@ export function usePaletteItems(): () => PaletteItem[] {
 	};
 
 	const gameEntries = (gameStatus: Status): PaletteItem[] => [
-		{ id: "go-mods", group: "go", icon: ListTree, label: t("palette.items.mods", { game: gameName }), run: toMods },
-		{ id: "go-game-settings", group: "go", icon: Settings2, label: t("mods.gameSettings"), run: openGameSettings },
+		{
+			id: "go-mods",
+			group: "go",
+			icon: ListTree,
+			label: t("palette.items.mods", { game: gameName }),
+			run: toMods,
+		},
+		{
+			id: "go-game-settings",
+			group: "go",
+			icon: Settings2,
+			label: t("mods.gameSettings"),
+			run: openGameSettings,
+		},
 		...gameStatus.mods.map(
 			(mod): PaletteItem => ({
 				id: `mod-${mod.id}`,
@@ -301,11 +345,41 @@ export function usePaletteItems(): () => PaletteItem[] {
 
 	return () => [
 		...(id && status ? [...gameActionsFor(status), ...gameEntries(status)] : []),
-		{ id: "go-downloads", group: "go", icon: DownloadIcon, label: t("downloads.title"), run: openDownloads },
-		{ id: "go-notifications", group: "go", icon: Bell, label: t("notifications.title"), run: openNotifications },
-		{ id: "go-storage", group: "go", icon: HardDrive, label: t("storage.title"), run: openStorage },
-		{ id: "go-games", group: "go", icon: Plus, label: t("app.addGame"), run: showGames },
-		{ id: "go-settings", group: "go", icon: Settings2, label: t("app.settings"), run: openAppSettings },
+		{
+			id: "go-downloads",
+			group: "go",
+			icon: DownloadIcon,
+			label: t("downloads.title"),
+			run: openDownloads,
+		},
+		{
+			id: "go-notifications",
+			group: "go",
+			icon: Bell,
+			label: t("notifications.title"),
+			run: openNotifications,
+		},
+		{
+			id: "go-storage",
+			group: "go",
+			icon: HardDrive,
+			label: t("storage.title"),
+			run: openStorage,
+		},
+		{
+			id: "go-games",
+			group: "go",
+			icon: Plus,
+			label: t("app.addGame"),
+			run: showGames,
+		},
+		{
+			id: "go-settings",
+			group: "go",
+			icon: Settings2,
+			label: t("app.settings"),
+			run: openAppSettings,
+		},
 		{
 			id: "go-shortcuts",
 			group: "go",

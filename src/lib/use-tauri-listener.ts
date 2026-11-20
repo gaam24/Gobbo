@@ -19,7 +19,10 @@ export interface ListenerScope {
 /// The mount-safe core, free of React so the async unlisten race can be tested on its own. `listen` resolves after the
 /// component may already have unmounted (React mounts effects twice in development), so registration and cleanup share
 /// one list of stop functions.
-export function createListenerScope(listen: Listen): { scope: ListenerScope; close: () => void } {
+export function createListenerScope(listen: Listen): {
+	scope: ListenerScope;
+	close: () => void;
+} {
 	let active = true;
 	const stops: Unlisten[] = [];
 	const scope: ListenerScope = {

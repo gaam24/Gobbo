@@ -137,8 +137,15 @@ describe("games", () => {
 	it("shows Verified and Unverified badges on user definitions", async () => {
 		const verifiedId = uniqueId("games-verified");
 		const unverifiedId = uniqueId("games-unverified");
-		const verified = prepareGame({ id: verifiedId, name: `E2E Verified ${verifiedId}`, verified: true });
-		const unverified = prepareGame({ id: unverifiedId, name: `E2E Unverified ${unverifiedId}` });
+		const verified = prepareGame({
+			id: verifiedId,
+			name: `E2E Verified ${verifiedId}`,
+			verified: true,
+		});
+		const unverified = prepareGame({
+			id: unverifiedId,
+			name: `E2E Unverified ${unverifiedId}`,
+		});
 		await openGames();
 		await waitForText(`E2E Verified ${verifiedId}`);
 		await waitForText("Verified");
@@ -170,7 +177,10 @@ describe("games", () => {
 		const id = uniqueId("games-setup");
 		const name = `E2E Setup ${id}`;
 		const fixture = prepareGame({ id, name, loadOrder: true });
-		await invoke<ManagedGame[]>("add_game", { game: id, gameRoot: fixture.root });
+		await invoke<ManagedGame[]>("add_game", {
+			game: id,
+			gameRoot: fixture.root,
+		});
 		await reloadWindow();
 		await waitForGame(name);
 		await clickByLabel(name);

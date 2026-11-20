@@ -47,7 +47,10 @@ export function ColumnHeader({
 	const name = t(`mods.col.${column.id}`);
 	const { listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: column.id });
 	// The header moves sideways only, so the vertical part of the drag is left out.
-	const style: CSSProperties = { transform: CSS.Transform.toString(transform && { ...transform, y: 0 }), transition };
+	const style: CSSProperties = {
+		transform: CSS.Transform.toString(transform && { ...transform, y: 0 }),
+		transition,
+	};
 
 	return (
 		<ContextMenu>

@@ -376,7 +376,9 @@ async function readSource(path: string): Promise<Buffer> {
 
 	if (best.kind === "png") return data;
 	const raw = decodeDib(data);
-	return await sharp(raw.data, { raw: { width: raw.width, height: raw.height, channels: 4 } })
+	return await sharp(raw.data, {
+		raw: { width: raw.width, height: raw.height, channels: 4 },
+	})
 		.png()
 		.toBuffer();
 }
@@ -384,14 +386,26 @@ async function readSource(path: string): Promise<Buffer> {
 async function convertOne(game: GameFolder, source: string, dryRun: boolean): Promise<Conversion> {
 	const input = await readSource(source);
 	const base = sharp(input, { failOn: "error" })
-		.resize(ICON_SIZE, ICON_SIZE, { fit: "cover", position: "centre", kernel: "lanczos3" })
+		.resize(ICON_SIZE, ICON_SIZE, {
+			fit: "cover",
+			position: "centre",
+			kernel: "lanczos3",
+		})
 		.toColourspace("srgb");
 
 	let output: Buffer | undefined;
 	let quality = QUALITY;
 
 	for (const candidate of QUALITIES) {
-		output = await base.clone().webp({ quality: candidate, alphaQuality: 100, effort: 6, smartSubsample: true }).toBuffer();
+		output = await base
+			.clone()
+			.webp({
+				quality: candidate,
+				alphaQuality: 100,
+				effort: 6,
+				smartSubsample: true,
+			})
+			.toBuffer();
 		quality = candidate;
 
 		if (output.length <= TARGET_BYTES) break;
@@ -430,7 +444,10 @@ function webpSize(bytes: Buffer): { width: number; height: number } | null {
 	const chunk = bytes.toString("ascii", 12, 16);
 
 	if (chunk === "VP8X") {
-		return { width: 1 + bytes.readUIntLE(24, 3), height: 1 + bytes.readUIntLE(27, 3) };
+		return {
+			width: 1 + bytes.readUIntLE(24, 3),
+			height: 1 + bytes.readUIntLE(27, 3),
+		};
 	}
 
 	if (chunk === "VP8L") {
@@ -440,7 +457,10 @@ function webpSize(bytes: Buffer): { width: number; height: number } | null {
 	}
 
 	if (chunk === "VP8 ") {
-		return { width: bytes.readUInt16LE(26) & 0x3fff, height: bytes.readUInt16LE(28) & 0x3fff };
+		return {
+			width: bytes.readUInt16LE(26) & 0x3fff,
+			height: bytes.readUInt16LE(28) & 0x3fff,
+		};
 	}
 
 	return null;
@@ -485,7 +505,14 @@ function checkOne(game: GameFolder): CheckRow | undefined {
 		warnings.push(`${formatBytes(bytes.length)} is above the ${formatBytes(TARGET_BYTES)} target`);
 	}
 
-	return { game: game.id, bytes: bytes.length, width: size?.width ?? 0, height: size?.height ?? 0, problems, warnings };
+	return {
+		game: game.id,
+		bytes: bytes.length,
+		width: size?.width ?? 0,
+		height: size?.height ?? 0,
+		problems,
+		warnings,
+	};
 }
 
 function statusOf(row: CheckRow): "FAIL" | "warn" | "ok" {

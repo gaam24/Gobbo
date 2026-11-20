@@ -4,7 +4,12 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useTranslation } from "@/i18n";
 
 /// The widths a dialog can take. Each is a whole class name, so Tailwind finds it in this file.
-const WIDTHS = { sm: "sm:max-w-sm", lg: "sm:max-w-lg", xl: "sm:max-w-xl", "3xl": "sm:max-w-3xl" } as const;
+const WIDTHS = {
+	sm: "sm:max-w-sm",
+	lg: "sm:max-w-lg",
+	xl: "sm:max-w-xl",
+	"3xl": "sm:max-w-3xl",
+} as const;
 
 /// A dialog that stays open until it is closed. Its body and its footer are the children. The body spaces its blocks
 /// 16 px apart, so a dialog does not add its own `grid gap-4` wrapper; lists inside it use `BoxList`.

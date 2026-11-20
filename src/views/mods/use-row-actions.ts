@@ -68,20 +68,29 @@ export function useRowActions({
 	/// From a row's menu: a separator with a plain name goes above the mod, and its name field opens once it is there.
 	/// The separators that were there before tell the new one apart.
 	/// `id` is the mod the separator is placed above; the backend gives the new separator its own id.
-	const [naming, setNaming] = useState<{ before: string | null; known: ReadonlySet<string> } | null>(null);
+	const [naming, setNaming] = useState<{
+		before: string | null;
+		known: ReadonlySet<string>;
+	} | null>(null);
 	const freshSeparator =
 		naming === null
 			? null
 			: (separators.find((separator) => !naming.known.has(separator.id) && (separator.before ?? null) === naming.before)?.id ?? null);
 	const addSeparatorAbove = useCallback(
 		(modId: string) => {
-			setNaming({ before: modId, known: new Set(separators.map((separator) => separator.id)) });
+			setNaming({
+				before: modId,
+				known: new Set(separators.map((separator) => separator.id)),
+			});
 			void onSetSeparator(modId, t("separators.newName"));
 		},
 		[onSetSeparator, separators, t],
 	);
 	const addSeparatorAtEnd = () => {
-		setNaming({ before: null, known: new Set(separators.map((separator) => separator.id)) });
+		setNaming({
+			before: null,
+			known: new Set(separators.map((separator) => separator.id)),
+		});
 		void onSetSeparator("", t("separators.newName"));
 	};
 	/// The list's own menu, on its empty part: the rows and the header have menus of their own. The action waits until

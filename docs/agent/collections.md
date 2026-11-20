@@ -7,20 +7,20 @@ never learn that a collection exists; deployment works on the profile list like 
 
 The feature module is `src-tauri/src/collections/`:
 
-| Path | Owns |
-|---|---|
-| `manifest/` | reading `collection.json`, validating paths and counts, building `CollectionPlan` and its order |
-| `inspect.rs` | parsing the link, reading the API revision, fetching the archive, writing the cache |
-| `check.rs` | refreshing the newest revision of the profile's collections through each provider's own adapter |
-| `status.rs` | per-member status against the library and one profile |
-| `session/` | creating or updating the profile, waiting entries, skip/restore, finish, manual-done, remove |
-| `download/` | the automatic loop, the guided item actions, importing one member, patches |
-| `bundle.rs` | turning `bundled/<fileExpression>` into an archive |
-| `external.rs` | direct HTTP downloads with size/MD5 checks |
-| `patch.rs` | bsdiff patches with a CRC32 guard |
-| `cache.rs` | cache paths and the plan file |
-| `model.rs` | IPC shapes |
-| `commands/` | Tauri commands |
+| Path          | Owns                                                                                            |
+| ------------- | ----------------------------------------------------------------------------------------------- |
+| `manifest/`   | reading `collection.json`, validating paths and counts, building `CollectionPlan` and its order |
+| `inspect.rs`  | parsing the link, reading the API revision, fetching the archive, writing the cache             |
+| `check.rs`    | refreshing the newest revision of the profile's collections through each provider's own adapter |
+| `status.rs`   | per-member status against the library and one profile                                           |
+| `session/`    | creating or updating the profile, waiting entries, skip/restore, finish, manual-done, remove    |
+| `download/`   | the automatic loop, the guided item actions, importing one member, patches                      |
+| `bundle.rs`   | turning `bundled/<fileExpression>` into an archive                                              |
+| `external.rs` | direct HTTP downloads with size/MD5 checks                                                      |
+| `patch.rs`    | bsdiff patches with a CRC32 guard                                                               |
+| `cache.rs`    | cache paths and the plan file                                                                   |
+| `model.rs`    | IPC shapes                                                                                      |
+| `commands/`   | Tauri commands                                                                                  |
 
 ## Provider port
 

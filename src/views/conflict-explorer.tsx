@@ -30,7 +30,10 @@ export function ConflictExplorerDialog({ gameId, onClose }: { gameId: string; on
 	const [query, setQuery] = useState("");
 	const [copies, setCopies] = useState("all");
 	const [busy, setBusy] = useState<string | null>(null);
-	const [preview, setPreview] = useState<{ path: string; families: Array<{ id: string; name: string }> } | null>(null);
+	const [preview, setPreview] = useState<{
+		path: string;
+		families: Array<{ id: string; name: string }>;
+	} | null>(null);
 	const viewport = useRef<HTMLDivElement>(null);
 	const deferred = useDeferredValue(query);
 	const explorer = useLoad(`conflicts:${gameId}:${version}`, () => unwrap(commands.conflictExplorer(gameId)));
@@ -93,7 +96,13 @@ export function ConflictExplorerDialog({ gameId, onClose }: { gameId: string; on
 							<div
 								key={entry.path}
 								className="border-b px-3 py-2"
-								style={{ position: "absolute", top: item.start, left: 0, right: 0, height: item.size }}
+								style={{
+									position: "absolute",
+									top: item.start,
+									left: 0,
+									right: 0,
+									height: item.size,
+								}}
 							>
 								<div className="flex items-center gap-3">
 									<div className="grid min-w-0 flex-1 gap-0.5">
@@ -115,7 +124,10 @@ export function ConflictExplorerDialog({ gameId, onClose }: { gameId: string; on
 										onClick={() =>
 											setPreview({
 												path: entry.path,
-												families: [entry.winner, ...entry.losers].map((id) => ({ id, name: nameOf(id) })),
+												families: [entry.winner, ...entry.losers].map((id) => ({
+													id,
+													name: nameOf(id),
+												})),
 											})
 										}
 									>
@@ -178,7 +190,10 @@ export function ConflictExplorerDialog({ gameId, onClose }: { gameId: string; on
 							</SelectContent>
 						</Select>
 						<span className="text-muted-foreground text-sm tabular-nums">
-							{t("conflicts.showing", { shown: filtered.length, total: explorer?.total ?? 0 })}
+							{t("conflicts.showing", {
+								shown: filtered.length,
+								total: explorer?.total ?? 0,
+							})}
 						</span>
 					</div>
 				)}

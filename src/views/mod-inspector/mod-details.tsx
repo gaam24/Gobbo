@@ -110,7 +110,10 @@ export function ModDetails({
 
 	const [details, setDetails] = useState<ModDetailsData | null>(null);
 	// Keyed by folder so a check that finishes after a selection change never shows another mod's result.
-	const [integrity, setIntegrity] = useState<{ folder: string; status: IntegrityStatus } | null>(null);
+	const [integrity, setIntegrity] = useState<{
+		folder: string;
+		status: IntegrityStatus;
+	} | null>(null);
 	const [verifying, setVerifying] = useState(false);
 	const loaded = details?.folder === mod.folder;
 	const extras = details?.folder === mod.folder ? details.extras : null;

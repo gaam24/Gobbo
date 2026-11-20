@@ -135,7 +135,13 @@ export function userGroups(mods: readonly Mod[], groups: readonly ModGroup[]): U
 		const parts = mods.filter((mod) => members.has(mod.id));
 
 		if (parts.length < 2) continue;
-		result.push({ source: "user", id: groupRowId(group.id), name: group.name, parts, group });
+		result.push({
+			source: "user",
+			id: groupRowId(group.id),
+			name: group.name,
+			parts,
+			group,
+		});
 	}
 
 	return result;
@@ -178,7 +184,13 @@ function groupsOf(items: readonly ListItem[], stored: readonly ModGroup[]): Map<
 		if (next - at >= 2) {
 			const mods = items.slice(at, next).flatMap((entry) => (entry.kind === "mod" ? [entry.mod] : []));
 			const page = pageGroupOf(pageId, mods);
-			const group: Group = { source: "page", id: page.id, name: page.name, parts: mods, page };
+			const group: Group = {
+				source: "page",
+				id: page.id,
+				name: page.name,
+				parts: mods,
+				page,
+			};
 
 			for (const mod of mods) byId.set(mod.id, group);
 			at = next;
@@ -240,7 +252,14 @@ export function tableItems(rows: ListItem[], foldedPages: ReadonlySet<string> = 
 		items.push(group.page ? { kind: "page", id: group.id, page: group.page } : { kind: "group", id: group.id, group });
 
 		if (!foldedPages.has(group.id)) {
-			for (const mod of group.parts) items.push({ kind: "mod", id: mod.id, mod, nested: true, groupKey: key });
+			for (const mod of group.parts)
+				items.push({
+					kind: "mod",
+					id: mod.id,
+					mod,
+					nested: true,
+					groupKey: key,
+				});
 		}
 
 		at += 1;
@@ -296,7 +315,11 @@ export function gridItems(table: readonly TableItem[], columns: number): GridIte
 /// those can be folded.
 export function foldedPageParts(mods: readonly Mod[], foldedPages: ReadonlySet<string>, groups: readonly ModGroup[] = []): Set<string> {
 	if (foldedPages.size === 0) return new Set();
-	const items: ListItem[] = mods.map((mod) => ({ kind: "mod", id: mod.id, mod }));
+	const items: ListItem[] = mods.map((mod) => ({
+		kind: "mod",
+		id: mod.id,
+		mod,
+	}));
 	const byId = groupsOf(items, groups);
 	const hidden = new Set<string>();
 	const done = new Set<string>();
@@ -344,7 +367,11 @@ export function listItems(mods: Mod[], separators: Separator[]): ListItem[] {
 		}
 	}
 
-	const header = (separator: Separator): ListItem => ({ kind: "separator", id: separator.id, name: separator.name });
+	const header = (separator: Separator): ListItem => ({
+		kind: "separator",
+		id: separator.id,
+		name: separator.name,
+	});
 	const items: ListItem[] = [];
 
 	for (const mod of mods) {
@@ -523,7 +550,15 @@ function cached<T>(cache: Map<string, T>, locale: string, make: () => T): T {
 /// A file size: whole kilobytes below a megabyte, one decimal place above, and gigabytes from a gigabyte up.
 export function formatSize(kb: number, locale: string): string {
 	if (kb < 1024) return `${cached(plainNumbers, locale, () => new Intl.NumberFormat(locale)).format(kb)} KB`;
-	const decimal = cached(megabytes, locale, () => new Intl.NumberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 }));
+	const decimal = cached(
+		megabytes,
+		locale,
+		() =>
+			new Intl.NumberFormat(locale, {
+				minimumFractionDigits: 1,
+				maximumFractionDigits: 1,
+			}),
+	);
 	if (kb < 1024 * 1024) return `${decimal.format(kb / 1024)} MB`;
 	return `${decimal.format(kb / (1024 * 1024))} GB`;
 }
@@ -531,7 +566,12 @@ export function formatSize(kb: number, locale: string): string {
 const durations = new Map<string, Record<"second" | "minute" | "hour", Intl.NumberFormat>>();
 
 function durationUnit(locale: string, unit: string): Intl.NumberFormat {
-	return new Intl.NumberFormat(locale, { style: "unit", unit, unitDisplay: "short", maximumFractionDigits: 0 });
+	return new Intl.NumberFormat(locale, {
+		style: "unit",
+		unit,
+		unitDisplay: "short",
+		maximumFractionDigits: 0,
+	});
 }
 
 /// A rough time left, in the largest unit that fits: "45 s", "3 min", "2 h".
@@ -695,7 +735,15 @@ const counts = new Map<string, Intl.NumberFormat>();
 
 /// A big count, short: "12K", "4.1M" (in the interface language).
 export function formatCount(value: number, locale: string): string {
-	return cached(counts, locale, () => new Intl.NumberFormat(locale, { notation: "compact", maximumFractionDigits: 1 })).format(value);
+	return cached(
+		counts,
+		locale,
+		() =>
+			new Intl.NumberFormat(locale, {
+				notation: "compact",
+				maximumFractionDigits: 1,
+			}),
+	).format(value);
 }
 
 /// Calendar date, formatted in the interface language.
@@ -705,7 +753,15 @@ export function formatDate(ms: number, locale: string): string {
 
 /// Calendar date and time of a notice, formatted in the interface language.
 export function formatDateTime(ms: number, locale: string): string {
-	return cached(mediumDateTimes, locale, () => new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" })).format(ms);
+	return cached(
+		mediumDateTimes,
+		locale,
+		() =>
+			new Intl.DateTimeFormat(locale, {
+				dateStyle: "medium",
+				timeStyle: "short",
+			}),
+	).format(ms);
 }
 
 /// The date of a check: "today" when it happened on the current day, otherwise the date.

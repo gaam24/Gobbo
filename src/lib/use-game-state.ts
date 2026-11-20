@@ -115,5 +115,11 @@ export function useGameState(
 		reloadKey: runningTick,
 	});
 
-	return { status, setStatus, gameRunning: running ?? false, statusError: statusFailure, retryStatus: retry };
+	return {
+		status,
+		setStatus,
+		gameRunning: running ?? false,
+		statusError: statusFailure,
+		retryStatus: retry,
+	};
 }

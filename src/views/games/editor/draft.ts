@@ -421,7 +421,10 @@ function cleanShared(shared: SharedDraft): Record<string, unknown> {
 }
 
 function cleanExecutable(executable: ExecutableDraft): Record<string, unknown> {
-	const out: Record<string, unknown> = { name: executable.name.trim() || executable.path.trim(), path: executable.path.trim() };
+	const out: Record<string, unknown> = {
+		name: executable.name.trim() || executable.path.trim(),
+		path: executable.path.trim(),
+	};
 	putText(out, "path_linux", executable.path_linux);
 	const args = cleanLines(executable.args);
 
@@ -430,7 +433,10 @@ function cleanExecutable(executable: ExecutableDraft): Record<string, unknown> {
 }
 
 function cleanUserData(set: UserDataDraft): Record<string, unknown> {
-	const out: Record<string, unknown> = { id: set.id.trim(), path: set.path.trim() };
+	const out: Record<string, unknown> = {
+		id: set.id.trim(),
+		path: set.path.trim(),
+	};
 
 	if (set.kind && set.kind !== "user-data") out.kind = set.kind;
 	putText(out, "path_linux", set.path_linux);
@@ -444,7 +450,10 @@ function cleanUserData(set: UserDataDraft): Record<string, unknown> {
 }
 
 function cleanLoadOrder(order: LoadOrderDraft): Record<string, unknown> {
-	const out: Record<string, unknown> = { format: order.format, file: order.file.trim() };
+	const out: Record<string, unknown> = {
+		format: order.format,
+		file: order.file.trim(),
+	};
 
 	if (order.priority_min !== undefined && order.priority_min !== 1) out.priority_min = order.priority_min;
 
@@ -453,7 +462,10 @@ function cleanLoadOrder(order: LoadOrderDraft): Record<string, unknown> {
 }
 
 function cleanRequirement(requirement: RequirementDraft): Record<string, unknown> {
-	const out: Record<string, unknown> = { name: requirement.name.trim(), path: requirement.path.trim() };
+	const out: Record<string, unknown> = {
+		name: requirement.name.trim(),
+		path: requirement.path.trim(),
+	};
 	putText(out, "url", requirement.url);
 	return out;
 }
@@ -469,7 +481,10 @@ function cleanTool(tool: ToolDraft): Record<string, unknown> {
 	if (detect) out.detect = detect;
 
 	if (tool.source?.provider.trim() && tool.source.mod_id.trim()) {
-		out.source = { provider: tool.source.provider.trim(), mod_id: tool.source.mod_id.trim() };
+		out.source = {
+			provider: tool.source.provider.trim(),
+			mod_id: tool.source.mod_id.trim(),
+		};
 	}
 
 	const prerequisites = keepFilled(tool.prerequisites, (entry) => entry.name.trim() !== "" && entry.url.trim() !== "", cleanPrerequisite);

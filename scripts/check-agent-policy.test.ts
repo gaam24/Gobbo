@@ -26,10 +26,18 @@ test("production code may not unwrap or panic", () => {
 });
 
 test("a test module is left alone", () => {
-	expect(scan({ "a.rs": "fn f() {}\n#[cfg(test)]\nmod tests { fn t() { g().unwrap(); } }\n" })).toEqual([]);
+	expect(
+		scan({
+			"a.rs": "fn f() {}\n#[cfg(test)]\nmod tests { fn t() { g().unwrap(); } }\n",
+		}),
+	).toEqual([]);
 });
 
 test("an allow needs a reason", () => {
 	expect(scan({ "a.rs": "#[allow(dead_code)]\nfn f() {}\n" })).toEqual(["a.rs: #[allow] has no reason ="]);
-	expect(scan({ "a.rs": '#[allow(dead_code, reason = "a test hook")]\nfn f() {}\n' })).toEqual([]);
+	expect(
+		scan({
+			"a.rs": '#[allow(dead_code, reason = "a test hook")]\nfn f() {}\n',
+		}),
+	).toEqual([]);
 });

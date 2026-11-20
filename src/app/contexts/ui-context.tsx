@@ -9,7 +9,12 @@ import type { UpdateTarget } from "@/sources/update-targets";
 /// A modal that belongs to the app shell rather than to one screen. A discriminated union keeps the payload next to the
 /// kind, so a dialog cannot be opened with the wrong data.
 export type AppDialog =
-	| { kind: "deploy"; launch: boolean; executable: string | null; request: number }
+	| {
+			kind: "deploy";
+			launch: boolean;
+			executable: string | null;
+			request: number;
+	  }
 	| { kind: "overwrite" }
 	| { kind: "pack-export" }
 	| { kind: "pack-import"; path: string }

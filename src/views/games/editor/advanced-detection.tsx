@@ -91,7 +91,12 @@ export function AdvancedDetection({ draft, onChange }: { draft: GameDraft; onCha
 					<h3 className="text-sm font-semibold">{t("editor.detection.executables")}</h3>
 					<AddRowButton
 						label={t("editor.detection.addExecutable")}
-						onClick={() => onChange({ ...draft, executables: [...draft.executables, { name: "", path: "" }] })}
+						onClick={() =>
+							onChange({
+								...draft,
+								executables: [...draft.executables, { name: "", path: "" }],
+							})
+						}
 					/>
 				</div>
 				<div className="grid gap-3">
@@ -99,7 +104,12 @@ export function AdvancedDetection({ draft, onChange }: { draft: GameDraft; onCha
 						<RepeatRow
 							key={`${executable.name}-${executable.path}`}
 							title={executable.name || executable.path || t("editor.detection.executable")}
-							onRemove={() => onChange({ ...draft, executables: draft.executables.filter((_, at) => at !== index) })}
+							onRemove={() =>
+								onChange({
+									...draft,
+									executables: draft.executables.filter((_, at) => at !== index),
+								})
+							}
 						>
 							<div className="grid gap-4 md:grid-cols-2">
 								<EditorField id={`editor-exe-name-${index}`} label={t("editor.detection.executableName")}>

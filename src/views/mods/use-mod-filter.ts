@@ -65,5 +65,17 @@ export function useModFilter({
 		setTagFilter(null);
 	};
 
-	return { filter, setFilter, query, setQuery, tagFilter, setTagFilter, filtering, allTags, visible, counts, clearFilters };
+	return {
+		filter,
+		setFilter,
+		query,
+		setQuery,
+		tagFilter,
+		setTagFilter,
+		filtering,
+		allTags,
+		visible,
+		counts,
+		clearFilters,
+	};
 }

@@ -20,7 +20,9 @@ const AUTO_WIDTH = "clamp(340px, 22vw, 480px)";
 /// The width as a CSS variable. React's style type has no custom properties.
 function widthVariable(width: number | null): CSSProperties {
 	const style: CSSProperties = {};
-	return Object.assign(style, { "--inspector-width": width === null ? AUTO_WIDTH : `${width}px` });
+	return Object.assign(style, {
+		"--inspector-width": width === null ? AUTO_WIDTH : `${width}px`,
+	});
 }
 
 /// Inspector on the right. No selection: the deployment. One mod: its details. Several: the batch panel.

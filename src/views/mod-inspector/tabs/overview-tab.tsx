@@ -78,25 +78,49 @@ export function OverviewTab({
 	const countText = (value: number | null | undefined) => (value == null ? null : formatCount(value, i18n.language));
 
 	const facts = [
-		fact(t("mods.info.author"), author ?? t("common.none"), { className: "truncate" }),
-		source?.uploader !== author ? fact(t("mods.info.uploader"), source?.uploader, { className: "truncate" }) : null,
+		fact(t("mods.info.author"), author ?? t("common.none"), {
+			className: "truncate",
+		}),
+		source?.uploader !== author
+			? fact(t("mods.info.uploader"), source?.uploader, {
+					className: "truncate",
+				})
+			: null,
 		fact(t("mods.info.category"), source?.category, { className: "truncate" }),
-		fact(t("mods.info.endorsements"), countText(source?.endorsements), { className: "tabular-nums" }),
-		fact(t("mods.info.downloads"), countText(source?.downloads), { className: "tabular-nums" }),
-		fact(t("mods.info.size"), formatSize(mod.size_kb, i18n.language), { className: "font-mono tabular-nums" }),
+		fact(t("mods.info.endorsements"), countText(source?.endorsements), {
+			className: "tabular-nums",
+		}),
+		fact(t("mods.info.downloads"), countText(source?.downloads), {
+			className: "tabular-nums",
+		}),
+		fact(t("mods.info.size"), formatSize(mod.size_kb, i18n.language), {
+			className: "font-mono tabular-nums",
+		}),
 		fact(t("mods.col.sourceName"), source?.name, { className: "truncate" }),
-		fact(t("mods.info.page"), mod.page_name ?? mod.page_id, { className: "truncate" }),
+		fact(t("mods.info.page"), mod.page_name ?? mod.page_id, {
+			className: "truncate",
+		}),
 		fact(t("mods.info.part"), mod.part_name, { className: "truncate" }),
 		fact(t("mods.info.partCategory"), mod.part_category),
-		fact(t("mods.col.uniqueDownloads"), countText(source?.unique_downloads), { className: "tabular-nums" }),
+		fact(t("mods.col.uniqueDownloads"), countText(source?.unique_downloads), {
+			className: "tabular-nums",
+		}),
 		fact(t("mods.col.adult"), source?.adult ? t("mods.col.adultYes") : null),
 		fact(t("mods.col.sourceStatus"), source?.status ? statusWord(source.status) : null),
-		fact(t("mods.col.sourceCreated"), dateText(source?.created_at), { className: "tabular-nums" }),
-		fact(t("mods.col.sourceUpdated"), dateText(source?.updated_at), { className: "tabular-nums" }),
-		fact(t("mods.col.checked"), dateText(source?.checked_at), { className: "tabular-nums" }),
+		fact(t("mods.col.sourceCreated"), dateText(source?.created_at), {
+			className: "tabular-nums",
+		}),
+		fact(t("mods.col.sourceUpdated"), dateText(source?.updated_at), {
+			className: "tabular-nums",
+		}),
+		fact(t("mods.col.checked"), dateText(source?.checked_at), {
+			className: "tabular-nums",
+		}),
 		fact(t("mods.col.sourceTags"), source?.tags.join(", ")),
 		fact(t("mods.col.summary"), source?.summary),
-		fact(t("mods.col.installed"), dateText(installedAt), { className: "tabular-nums" }),
+		fact(t("mods.col.installed"), dateText(installedAt), {
+			className: "tabular-nums",
+		}),
 		fact(t("mods.col.choices"), mod.fomod.length > 0 ? choicesText(mod.fomod) : null, { className: "truncate" }),
 		fact(t("mods.col.profiles"), mod.profiles.join(", ")),
 	];
@@ -110,11 +134,22 @@ export function OverviewTab({
 		}),
 		fact(t("mods.col.sourceFile"), mod.sources.find((entry) => entry.file_id)?.file_id, { className: "tabular-nums" }),
 		fact(t("mods.info.part"), mod.part_id, { className: "tabular-nums" }),
-		fact(t("mods.col.folder"), mod.folder, { className: "truncate font-mono text-xs", title: mod.folder }),
-		fact(t("mods.col.archiveFile"), mod.archive_file, { className: "truncate font-mono text-xs", title: mod.archive_file ?? undefined }),
-		fact(t("mods.col.slot"), mod.slot, { className: "truncate font-mono text-xs" }),
+		fact(t("mods.col.folder"), mod.folder, {
+			className: "truncate font-mono text-xs",
+			title: mod.folder,
+		}),
+		fact(t("mods.col.archiveFile"), mod.archive_file, {
+			className: "truncate font-mono text-xs",
+			title: mod.archive_file ?? undefined,
+		}),
+		fact(t("mods.col.slot"), mod.slot, {
+			className: "truncate font-mono text-xs",
+		}),
 		fact(t("mods.col.requirementsRead"), dateText(mod.source_sync[0]?.checked_at), { className: "tabular-nums" }),
-		fact(t("mods.col.id"), mod.id, { className: "truncate font-mono text-xs", title: mod.id }),
+		fact(t("mods.col.id"), mod.id, {
+			className: "truncate font-mono text-xs",
+			title: mod.id,
+		}),
 	];
 
 	return (

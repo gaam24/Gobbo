@@ -37,7 +37,10 @@ export interface SeededGame {
 export async function seedGame(options: GameOptions, settings: Partial<Settings> = {}): Promise<SeededGame> {
 	await cleanupGame(options.id);
 	const fixture = prepareGame(options);
-	await invoke<ManagedGame[]>("add_game", { game: options.id, gameRoot: fixture.root });
+	await invoke<ManagedGame[]>("add_game", {
+		game: options.id,
+		gameRoot: fixture.root,
+	});
 	const status = await saveSettings(options.id, {
 		settings_dir: options.loadOrder ? path.join(fixture.root, "settings") : "",
 		mods_root: "",
@@ -69,7 +72,11 @@ export function syncProfiles(game: string): Promise<Status> {
 }
 
 export function rowsFor(status: Status, enabled: (mod: Status["mods"][number], index: number) => boolean = () => true) {
-	return status.mods.map((mod, index) => ({ folder: mod.folder, enabled: enabled(mod, index), separator: null }));
+	return status.mods.map((mod, index) => ({
+		folder: mod.folder,
+		enabled: enabled(mod, index),
+		separator: null,
+	}));
 }
 
 /// Imports one or more archives through the same command the import button uses. `source` links the archive to a
@@ -77,7 +84,11 @@ export function rowsFor(status: Status, enabled: (mod: Status["mods"][number], i
 export async function importMods(
 	game: string,
 	paths: string[],
-	source: { provider: string; mod_id: string; part_id?: string | null } | null = null,
+	source: {
+		provider: string;
+		mod_id: string;
+		part_id?: string | null;
+	} | null = null,
 ): Promise<ImportView[]> {
 	const imported: ImportView[] = [];
 
@@ -115,7 +126,12 @@ export async function apply(game: string): Promise<ApplyView> {
 export function createProfile(game: string, name: string, copyFrom: string | null = null): Promise<Status> {
 	// The command now requires the explicit copy-data flag. The suite creates empty profiles, as it did before the flag
 	// was added, so copying a source profile's data stays off.
-	return invoke<Status>("create_profile", { game, name, copyFrom, copyData: false });
+	return invoke<Status>("create_profile", {
+		game,
+		name,
+		copyFrom,
+		copyData: false,
+	});
 }
 
 export function switchProfile(game: string, id: string): Promise<Status> {

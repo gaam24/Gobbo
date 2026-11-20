@@ -109,7 +109,11 @@ export function stage(bundleDir: string, outDir: string, platform: InstallerPlat
 	const file = path.basename(archive).replace(/\s+/g, "-");
 	mkdirSync(outDir, { recursive: true });
 	copyFileSync(archive, path.join(outDir, file));
-	const fragment: Fragment = { platform, file, signature: signatureOf(archive) };
+	const fragment: Fragment = {
+		platform,
+		file,
+		signature: signatureOf(archive),
+	};
 	writeFragment(outDir, fragment);
 	return fragment;
 }
@@ -123,7 +127,11 @@ export function stageArchive(archive: string, outDir: string, platform: Portable
 		throw new Error(`${file} has a space in its name; GitHub would rename the asset`);
 	}
 
-	const fragment: Fragment = { platform, file, signature: signatureOf(archive) };
+	const fragment: Fragment = {
+		platform,
+		file,
+		signature: signatureOf(archive),
+	};
 	writeFragment(outDir, fragment);
 	return fragment;
 }

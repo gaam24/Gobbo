@@ -29,7 +29,14 @@ const openNothing = () => {
 };
 
 test("a removed game shows its size and the restore and delete actions", () => {
-	const usage: GameDataUsage[] = [{ id: game.id, path: "/data/games/slot.removed", removed: true, size_kb: 2048 }];
+	const usage: GameDataUsage[] = [
+		{
+			id: game.id,
+			path: "/data/games/slot.removed",
+			removed: true,
+			size_kb: 2048,
+		},
+	];
 	const html = page(
 		<StorageView
 			games={[game]}

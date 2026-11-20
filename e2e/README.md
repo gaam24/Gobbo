@@ -51,23 +51,23 @@ its definitions, its roots and its output; it also restores the write bit on fol
 
 ## Specs
 
-| File           | Covers                                                                                                     |
-| -------------- | ---------------------------------------------------------------------------------------------------------- |
-| `00-first-run` | empty app, first-run Games page, shared settings, custom data folder                                       |
-| `10-games`     | locate/add, Steam scan, remove/restore/delete, broken definitions, verified badges, deployed-game guard    |
-| `15-commands`  | stable `AppError` codes, recovery actions, stale mod/profile state, optional reads                         |
-| `20-import`    | UI import, several archives, wrapper/multi-mod shape, invalid/traversal archives, source, versions         |
-| `30-mods-list` | search/filter, selection and Space, table/grid, columns and reload, tags/note, delete                      |
-| `40-profiles`  | create/duplicate, rename/switch/delete, undo/redo, bisect, compare, reload                                 |
-| `50-deploy`    | overlay apply and undo, conflict winner, load-order file, a game file the overlay covers                  |
-| `60-launch`    | launch and report, arguments/environment, stop while running, crash prompt, console                        |
-| `70-packs`     | export with archives, missing archives, import profile, pack-link refusal                                  |
-| `75-deep-links`| a provider link that arrives while the app is running reaches the download queue                           |
-| `80-fomod`     | wizard from the Import button, validation, skip confirmation, unknown choice, change installer             |
+| File                  | Covers                                                                                                                     |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `00-first-run`        | empty app, first-run Games page, shared settings, custom data folder                                                       |
+| `10-games`            | locate/add, Steam scan, remove/restore/delete, broken definitions, verified badges, deployed-game guard                    |
+| `15-commands`         | stable `AppError` codes, recovery actions, stale mod/profile state, optional reads                                         |
+| `20-import`           | UI import, several archives, wrapper/multi-mod shape, invalid/traversal archives, source, versions                         |
+| `30-mods-list`        | search/filter, selection and Space, table/grid, columns and reload, tags/note, delete                                      |
+| `40-profiles`         | create/duplicate, rename/switch/delete, undo/redo, bisect, compare, reload                                                 |
+| `50-deploy`           | overlay apply and undo, conflict winner, load-order file, a game file the overlay covers                                   |
+| `60-launch`           | launch and report, arguments/environment, stop while running, crash prompt, console                                        |
+| `70-packs`            | export with archives, missing archives, import profile, pack-link refusal                                                  |
+| `75-deep-links`       | a provider link that arrives while the app is running reaches the download queue                                           |
+| `80-fomod`            | wizard from the Import button, validation, skip confirmation, unknown choice, change installer                             |
 | `85-background-tasks` | a task stays in Working across a game switch; Stop and Open act on its own game (events through the real registry adapter) |
-| `90-settings`  | app settings, language switch and reload, window setting, support bundle, game settings, per-profile files |
-| `95-ui`        | command palette, shortcut list, details/console shortcuts, narrow window                                   |
-| `99-recovery`  | page and whole-window error boundaries, damaged settings/profiles, interrupted apply, moved game folder    |
+| `90-settings`         | app settings, language switch and reload, window setting, support bundle, game settings, per-profile files                 |
+| `95-ui`               | command palette, shortcut list, details/console shortcuts, narrow window                                                   |
+| `99-recovery`         | page and whole-window error boundaries, damaged settings/profiles, interrupted apply, moved game folder                    |
 
 ## Test-only seams
 

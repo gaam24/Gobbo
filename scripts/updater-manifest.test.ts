@@ -20,7 +20,10 @@ const VERSION = releaseVersion();
 
 function workspace() {
 	const root = mkdtempSync(join(tmpdir(), "updater-manifest-"));
-	return { root, cleanup: () => rmSync(root, { recursive: true, force: true }) };
+	return {
+		root,
+		cleanup: () => rmSync(root, { recursive: true, force: true }),
+	};
 }
 
 /// A bundle folder shaped like Tauri's output: the archive with a space in its name, and its signature beside it.
@@ -38,10 +41,26 @@ function bundleWith(root: string, folder: string, name: string, signature: strin
 
 function fragments(): Fragment[] {
 	return [
-		{ platform: "windows-x86_64", file: `Gobbo-${VERSION}-setup.exe`, signature: "SIG-WIN" },
-		{ platform: "linux-x86_64", file: `Gobbo_${VERSION}_amd64.AppImage`, signature: "SIG-LIN" },
-		{ platform: "windows-x86_64-portable", file: `gobbo-${VERSION}-windows-x64-portable.zip`, signature: "SIG-WIN-P" },
-		{ platform: "linux-x86_64-portable", file: `gobbo-${VERSION}-linux-x64-portable.zip`, signature: "SIG-LIN-P" },
+		{
+			platform: "windows-x86_64",
+			file: `Gobbo-${VERSION}-setup.exe`,
+			signature: "SIG-WIN",
+		},
+		{
+			platform: "linux-x86_64",
+			file: `Gobbo_${VERSION}_amd64.AppImage`,
+			signature: "SIG-LIN",
+		},
+		{
+			platform: "windows-x86_64-portable",
+			file: `gobbo-${VERSION}-windows-x64-portable.zip`,
+			signature: "SIG-WIN-P",
+		},
+		{
+			platform: "linux-x86_64-portable",
+			file: `gobbo-${VERSION}-linux-x64-portable.zip`,
+			signature: "SIG-LIN-P",
+		},
 	];
 }
 

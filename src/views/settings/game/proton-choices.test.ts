@@ -3,8 +3,14 @@ import { expect, test } from "bun:test";
 import type { ProtonBuild } from "@/bindings";
 import { protonChoices } from "@/views/settings/game/proton-choices";
 
-const ge: ProtonBuild = { name: "GE-Proton9-20", folder: "/steam/compatibilitytools.d/GE-Proton9-20" };
-const proton: ProtonBuild = { name: "Proton 9.0", folder: "/library/steamapps/common/Proton 9.0" };
+const ge: ProtonBuild = {
+	name: "GE-Proton9-20",
+	folder: "/steam/compatibilitytools.d/GE-Proton9-20",
+};
+const proton: ProtonBuild = {
+	name: "Proton 9.0",
+	folder: "/library/steamapps/common/Proton 9.0",
+};
 const builds = [ge, proton];
 
 test("Steam's choice lists the detected builds as they are", () => {

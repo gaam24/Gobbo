@@ -85,7 +85,10 @@ export function SourceRequirements({ mod }: { mod: FullMod }) {
 			</div>
 			{older?.older_version ? (
 				<p className="text-muted-foreground text-xs">
-					{t("mods.relations.sourceOlder", { provider: sourceName(older.provider), version: older.older_version })}
+					{t("mods.relations.sourceOlder", {
+						provider: sourceName(older.provider),
+						version: older.older_version,
+					})}
 				</p>
 			) : null}
 			{requirements.length > 0 ? (
@@ -218,7 +221,9 @@ function RequirementRow({
 	const Icon = STATE_ICON[item.state];
 	const name = item.name;
 	const from = item.from_source
-		? t("mods.relations.requirementFromSource", { provider: sourceName(item.source.provider) })
+		? t("mods.relations.requirementFromSource", {
+				provider: sourceName(item.source.provider),
+			})
 		: t("mods.relations.requirementAddedManually");
 
 	return (

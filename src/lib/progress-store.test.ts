@@ -98,7 +98,13 @@ test("an import entry is copied only when it changes", () => {
 });
 
 test("the import map of one game survives another game's switch and is cleared only for its own game", () => {
-	const state = { stage: "copying", percent: 90, name: "a.zip", index: 1, total: 1 } as const;
+	const state = {
+		stage: "copying",
+		percent: 90,
+		name: "a.zip",
+		index: 1,
+		total: 1,
+	} as const;
 	setImportProgress("a.zip", state, GAME);
 	setActiveGame(OTHER);
 	expect(progressSnapshot().importing.size).toBe(0);

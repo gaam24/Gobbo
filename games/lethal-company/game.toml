@@ -14,7 +14,10 @@ loader = "bepinex"
 [detect]
 steam_app_ids = [1966720]
 steam_install_dirs = ["Lethal Company"]
-markers = ["Lethal Company.exe", "Lethal Company_Data/Managed/Assembly-CSharp.dll"]
+markers = [
+  "Lethal Company.exe",
+  "Lethal Company_Data/Managed/Assembly-CSharp.dll",
+]
 
 [[executables]]
 name = "Lethal Company"

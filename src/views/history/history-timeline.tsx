@@ -66,13 +66,18 @@ export function HistoryTimeline({
 									<div className="flex flex-wrap items-baseline justify-between gap-2">
 										<ItemTitle className="tabular-nums">{formatHistoryTime(entry.at, locale)}</ItemTitle>
 										<span className="text-muted-foreground text-xs tabular-nums" title={t("history.stateBefore")}>
-											{t("history.state", { enabled: entry.enabled, total: entry.total })}
+											{t("history.state", {
+												enabled: entry.enabled,
+												total: entry.total,
+											})}
 										</span>
 									</div>
 									<div className="flex flex-wrap gap-1">
 										{parts.map((part) => (
 											<Badge key={part.kind} variant="secondary">
-												{t(`history.change.${part.kind}`, { count: part.count })}
+												{t(`history.change.${part.kind}`, {
+													count: part.count,
+												})}
 											</Badge>
 										))}
 										{entry.summary !== null && parts.length === 0 && (

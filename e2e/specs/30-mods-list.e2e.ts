@@ -111,7 +111,10 @@ describe("mod list", () => {
 		const mod = status.mods.find((item) => item.folder === `list-${id}-a`);
 		assert.ok(mod, "the mod is missing");
 		assert.deepEqual(mod.tags, ["e2e-tag"]);
-		const extras = await invoke<ModExtras[]>("mod_extras", { game: id, folders: [mod.folder] });
+		const extras = await invoke<ModExtras[]>("mod_extras", {
+			game: id,
+			folders: [mod.folder],
+		});
 		assert.equal(extras[0]?.notes, "note from e2e");
 		await cleanup(id, fixture);
 	});

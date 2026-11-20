@@ -53,7 +53,9 @@ async function ensureEnglish(): Promise<void> {
 	const settings = await appSettings();
 
 	if (settings.language === "en") return;
-	await invoke("save_app_settings", { settings: { ...settings, language: "en" } });
+	await invoke("save_app_settings", {
+		settings: { ...settings, language: "en" },
+	});
 	await reloadWindow();
 }
 

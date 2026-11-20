@@ -50,13 +50,23 @@ export function PackImportDialog({
 			<>
 				{preview.info.description && <p className="whitespace-pre-wrap">{preview.info.description}</p>}
 				<p className="text-muted-foreground">
-					{t("pack.summary", { total: preview.total, have: preview.have, bundled: preview.bundled, missing: preview.missing.length })}
+					{t("pack.summary", {
+						total: preview.total,
+						have: preview.have,
+						bundled: preview.bundled,
+						missing: preview.missing.length,
+					})}
 				</p>
 				{preview.updates.length > 0 && (
 					<BoxList>
 						{preview.updates.map((update) => (
 							<BoxListRow key={update.profile} className="flex-col items-stretch gap-1">
-								<ItemTitle>{t("pack.update", { profile: update.profile, from: update.from || "?" })}</ItemTitle>
+								<ItemTitle>
+									{t("pack.update", {
+										profile: update.profile,
+										from: update.from || "?",
+									})}
+								</ItemTitle>
 								{(["added", "removed", "updated"] as const).map((key) =>
 									update[key].length > 0 ? (
 										<ItemDescription key={key}>{`${t(`preview.${key}`)}: ${update[key].join(", ")}`}</ItemDescription>

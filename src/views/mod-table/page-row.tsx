@@ -90,7 +90,10 @@ export function PageRow({
 	const conflicts = mods.reduce(
 		(total, mod) => {
 			const active = activeConflicts(mod);
-			return { wins: total.wins + active.wins, loses: total.loses + active.loses };
+			return {
+				wins: total.wins + active.wins,
+				loses: total.loses + active.loses,
+			};
 		},
 		{ wins: 0, loses: 0 },
 	);

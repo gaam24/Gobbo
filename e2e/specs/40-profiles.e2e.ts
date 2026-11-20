@@ -134,7 +134,11 @@ describe("profiles", () => {
 		assert.ok(otherProfile);
 		await invoke("save_profile", {
 			game: game.id,
-			rows: other.mods.map((mod) => ({ folder: mod.folder, enabled: mod.folder.endsWith("-b"), separator: null })),
+			rows: other.mods.map((mod) => ({
+				folder: mod.folder,
+				enabled: mod.folder.endsWith("-b"),
+				separator: null,
+			})),
 			known: null,
 		});
 		await reloadWindow();

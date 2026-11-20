@@ -57,7 +57,10 @@ export function ProfileSwitcher({
 					<ChevronDown className="shrink-0" />
 					{active && (
 						<span className="text-subtle-foreground shrink-0 text-xs tabular-nums">
-							{t("profiles.enabledCount", { enabled: active.enabled_count, total: active.mod_count })}
+							{t("profiles.enabledCount", {
+								enabled: active.enabled_count,
+								total: active.mod_count,
+							})}
 						</span>
 					)}
 				</Button>
@@ -79,7 +82,10 @@ export function ProfileSwitcher({
 						{profile.deployed && <span aria-hidden className="bg-applied size-2 shrink-0 rounded-full" />}
 						{profile.name}
 						<span className="text-subtle-foreground ml-auto text-xs tabular-nums">
-							{t("profiles.enabledCount", { enabled: profile.enabled_count, total: profile.mod_count })}
+							{t("profiles.enabledCount", {
+								enabled: profile.enabled_count,
+								total: profile.mod_count,
+							})}
 						</span>
 					</DropdownMenuItem>
 				))}

@@ -37,7 +37,12 @@ to = "archive/pc/mod"
 id = "redscript"
 phase = "before_start"
 program = "engine/tools/scc.exe"
-args = ["-compile", "{game}/r6/scripts", "-outputCacheFile", "{game}/r6/cache/final.redscripts"]
+args = [
+  "-compile",
+  "{game}/r6/scripts",
+  "-outputCacheFile",
+  "{game}/r6/cache/final.redscripts",
+]
 when_dir = "r6/scripts"
 clean = ["r6/cache/final.redscripts"]
 outputs = ["r6/cache/final.redscripts"]

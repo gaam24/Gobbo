@@ -25,7 +25,10 @@ describe("desktop deep links", () => {
 
 			await browser.waitUntil(
 				async () => (await invoke<DownloadView[]>("list_downloads")).some((entry) => entry.source?.mod_id === "4242"),
-				{ timeout: 10_000, timeoutMsg: "the link never reached the download queue" },
+				{
+					timeout: 10_000,
+					timeoutMsg: "the link never reached the download queue",
+				},
 			);
 			const queued = (await invoke<DownloadView[]>("list_downloads")).find((entry) => entry.source?.mod_id === "4242");
 			assert.ok(queued, "the queued link disappeared");

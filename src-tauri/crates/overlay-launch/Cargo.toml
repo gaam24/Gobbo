@@ -15,16 +15,19 @@ path = "src/bin/inject32.rs"
 # Used only by the Windows-gated `static_imports` module, which parses the program's PE imports.
 gobbo-overlay-pe.workspace = true
 # Decodes the first instructions of a loader stub. The same crate is already in the lock file through `detour`.
-iced-x86 = { version = "1.22", default-features = false, features = ["std", "decoder"] }
+iced-x86 = { version = "1.22", default-features = false, features = [
+  "std",
+  "decoder",
+] }
 windows-sys = { workspace = true, features = [
-    "Win32_Foundation",
-    "Win32_Globalization",
-    "Win32_Security",
-    "Win32_System_Diagnostics_Debug",
-    "Win32_System_Kernel",
-    "Win32_System_LibraryLoader",
-    "Win32_System_Memory",
-    "Win32_System_Threading",
+  "Win32_Foundation",
+  "Win32_Globalization",
+  "Win32_Security",
+  "Win32_System_Diagnostics_Debug",
+  "Win32_System_Kernel",
+  "Win32_System_LibraryLoader",
+  "Win32_System_Memory",
+  "Win32_System_Threading",
 ] }
 
 # The overlay crates deliberately stay out of the workspace lint groups: the hook is Win32 code and the pedantic/nursery

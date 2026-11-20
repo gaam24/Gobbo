@@ -124,18 +124,18 @@ Unknown keys are errors. Paths are relative to the game folder (or to the deploy
 
 ### Top level
 
-| Key            | Meaning                                                                                                                       |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `schema`       | `1`.                                                                                                                          |
-| `id`           | Lowercase letters, digits and `-`; the folder name.                                                                           |
-| `name`         | The name shown to the user.                                                                                                   |
-| `providers`    | Tables per external provider the game is on, for example `[providers.nexus]`. A provider without an entry is not offered.     |
-| `loader`       | A shared preset from `loaders/<id>.toml`: a string for its default variant, or `{ id = "...", variant = "..." }`.             |
-| `requires`     | Files the game needs before mods work, with no display name or page. A mod can provide them. Requirement paths are required too. |
+| Key            | Meaning                                                                                                                                                                  |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `schema`       | `1`.                                                                                                                                                                     |
+| `id`           | Lowercase letters, digits and `-`; the folder name.                                                                                                                      |
+| `name`         | The name shown to the user.                                                                                                                                              |
+| `providers`    | Tables per external provider the game is on, for example `[providers.nexus]`. A provider without an entry is not offered.                                                |
+| `loader`       | A shared preset from `loaders/<id>.toml`: a string for its default variant, or `{ id = "...", variant = "..." }`.                                                        |
+| `requires`     | Files the game needs before mods work, with no display name or page. A mod can provide them. Requirement paths are required too.                                         |
 | `requirements` | Files the game needs, with a display name and a download page. The setup check shows the name and offers **Get**. Each `path` is required; no `requires` line is needed. |
-| `profile_data` | Path templates of files and folders kept per profile by copying: simple one-file entries. The order file is added on its own. |
-| `user_data`    | Folders the game keeps outside its own folder: saves, settings, config. Each profile can share or isolate one.                |
-| `logs`         | Logs the game itself writes, shown in the console after a launch. Mod `.log` files are discovered automatically.               |
+| `profile_data` | Path templates of files and folders kept per profile by copying: simple one-file entries. The order file is added on its own.                                            |
+| `user_data`    | Folders the game keeps outside its own folder: saves, settings, config. Each profile can share or isolate one.                                                           |
+| `logs`         | Logs the game itself writes, shown in the console after a launch. Mod `.log` files are discovered automatically.                                                         |
 
 ### `[providers.<id>]`
 
@@ -202,16 +202,16 @@ These keys are the game's **mod layout**, not a choice of deployment method: ove
 `slots`, `mirror` and `full_root` decide where files land; `shared`, `root_files`, `protected`, `aliases`, `move` and
 `resource_names` refine that rule. A game usually needs one placement rule and at most one or two refinements.
 
-| Key              | Meaning                                                                                                                                                                             |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `root`           | The deployment root as a template, `{game}` by default. It may lie inside the game (`{game}/Data`) or outside it (`{appdata}/Game`); overlay covers either.                          |
-| `root_linux`     | The root of a native Linux install, which has no Proton prefix. Falls back to `root`.                                                                                               |
-| `root_files`     | Bare file names that keep their name in the deployment folder, for example a loader's proxy `winhttp.dll`. Overlay keeps them in the mod layer.                                     |
-| `resource_names` | `true`: the game resolves loose files by file name, so two files with the same name conflict even in different folders. Use only for a game with one global override tree.          |
-| `protected`      | Game folders an archive may place files into only through a mirror. |                                                                                                                       |
-| `aliases`        | Archive folder names that stand for a game folder, as a table: `plugins = "BepInEx/plugins"`. The name is one folder, case is ignored, and the target lies inside a slot or mirror. |
+| Key              | Meaning                                                                                                                                                                                                                              |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `root`           | The deployment root as a template, `{game}` by default. It may lie inside the game (`{game}/Data`) or outside it (`{appdata}/Game`); overlay covers either.                                                                          |
+| `root_linux`     | The root of a native Linux install, which has no Proton prefix. Falls back to `root`.                                                                                                                                                |
+| `root_files`     | Bare file names that keep their name in the deployment folder, for example a loader's proxy `winhttp.dll`. Overlay keeps them in the mod layer.                                                                                      |
+| `resource_names` | `true`: the game resolves loose files by file name, so two files with the same name conflict even in different folders. Use only for a game with one global override tree.                                                           |
+| `protected`      | Game folders an archive may place files into only through a mirror.                                                                                                                                                                  |     |
+| `aliases`        | Archive folder names that stand for a game folder, as a table: `plugins = "BepInEx/plugins"`. The name is one folder, case is ignored, and the target lies inside a slot or mirror.                                                  |
 | `full_root`      | `true`: the whole deployment root is the mod layout. Every archive path is a game path; a file the game already has is covered by the layer, and the game folder stays untouched. Bare files still need `root_files` or a move rule. |
-| `move`           | Bare files at the archive root with these extensions move to `to`, keeping their name. It is the MO2-style rule for a game that loads loose archives from one folder. |
+| `move`           | Bare files at the archive root with these extensions move to `to`, keeping their name. It is the MO2-style rule for a game that loads loose archives from one folder.                                                                |
 
 Overlay is the only deployment method. It covers the deployment root, including a root outside the game folder; there
 is no fallback that writes the game folder. A `full_root` game needs no mirror for a loader or a framework: a new
@@ -266,13 +266,13 @@ layer is listed automatically, so a new mod, a newer RED4ext or a different load
 interface translates the universal `kind` (`script`, `loader`, `console`, `crash`, `mod` or `game`); a definition never
 carries user-visible text.
 
-| Key         | Meaning                                                                                                                       |
-| ----------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `kind`      | `script`, `loader`, `console`, `crash`, `mod` or `game`; the frontend translates it.                                          |
-| `path`      | A file or a folder, relative to the game folder. `.` is the game folder itself.                                               |
-| `pattern`   | The file name pattern used when `path` is a folder; `*` is the only wildcard, matching ignores ASCII case. Default `*.log`.    |
-| `limit`     | How many of the newest matching files a folder contributes. Default 4, from 1 to 20.                                          |
-| `recursive` | Whether a folder is searched below its subfolders too. Default true; set false for the game folder itself.                     |
+| Key         | Meaning                                                                                                                     |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `kind`      | `script`, `loader`, `console`, `crash`, `mod` or `game`; the frontend translates it.                                        |
+| `path`      | A file or a folder, relative to the game folder. `.` is the game folder itself.                                             |
+| `pattern`   | The file name pattern used when `path` is a folder; `*` is the only wildcard, matching ignores ASCII case. Default `*.log`. |
+| `limit`     | How many of the newest matching files a folder contributes. Default 4, from 1 to 20.                                        |
+| `recursive` | Whether a folder is searched below its subfolders too. Default true; set false for the game folder itself.                  |
 
 A file is read from the profile's overwrite layer first, then the mod layer, then the game folder. A missing file is
 simply left out, so a definition may name a log before the first launch writes it.
@@ -309,7 +309,7 @@ folders are the ones Windows programs see inside the prefix. `..` is refused.
 | Unreal Engine `.pak` mods             | Flat slot `<Game>/Content/Paks/~mods` with `extensions` and `root_extensions` for `.pak`, or a `loaders/ue4ss.toml` preset when the loader layout is shared.                                                                           |
 | A mods tree inside the game (`Data/`) | `root = "{game}/Data"` and a mirror per folder (`meshes`, `textures` ...); overlay still works. Plugins at the archive root and a plugin order file are not covered yet.                                                               |
 | One global override tree              | A flat slot (`Data/Override`, `flat = true`) with `root_extensions` and `root_folder_extensions`, plus mirrors for path-sensitive folders; `resource_names = true` makes equal file names conflict across all of them (The Witcher 1). |
-| Mods in the user's data folder        | `root = "{appdata}/<Game>"` (and `root_linux`); overlay covers that root and the game folder stays clean.                                                                                                             |
+| Mods in the user's data folder        | `root = "{appdata}/<Game>"` (and `root_linux`); overlay covers that root and the game folder stays clean.                                                                                                                              |
 | Loaders next to the executable        | `full_root = true` takes a new loader file or folder with no entry; a mirror is only for replacing a file the game ships.                                                                                                              |
 | Mods packed with a root loader folder | `[deploy.aliases]` maps the folder to its game folder, for example `plugins` to `BepInEx/plugins` (LethalLib in Lethal Company). The game folder still needs its slot or mirror.                                                       |
 
@@ -319,7 +319,7 @@ folders are the ones Windows programs see inside the prefix. `..` is refused.
 | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
 | The Witcher: Enhanced Edition     | flat slot `Data/Override`; mirrors `Data/Music`, `Data/Movies`, `Data/Cutscenes`, `Data/Dialogues`, `Data/voices`, `Data/Scripts`, `Data/Templates`, `Data/Meshes`; `resource_names`; user data `{documents}/The Witcher` | no     |
 | The Witcher 3: Wild Hunt          | slot `Mods` (marker `content`), mirrors `DLC`, `bin/config`, `bin/x64_dx12`; `mods.settings`; user data `{documents}/The Witcher 3`                                                                                       | yes    |
-| Cyberpunk 2077                    | `full_root`; loose `.archive`/`.xl` moved to `archive/pc/mod`; the redscript step; crash report logs, with every mod `.log` discovered automatically                                                                       | yes    |
+| Cyberpunk 2077                    | `full_root`; loose `.archive`/`.xl` moved to `archive/pc/mod`; the redscript step; crash report logs, with every mod `.log` discovered automatically                                                                      | yes    |
 | TCG Card Shop Simulator           | `loader = "bepinex"`; Nexus and Thunderstore                                                                                                                                                                              | yes    |
 | Lethal Company                    | `loader = "bepinex"`; Nexus and Thunderstore                                                                                                                                                                              | yes    |
 | Tainted Grail: The Fall of Avalon | `loader = { id = "bepinex", variant = "6" }`; Nexus                                                                                                                                                                       | yes    |

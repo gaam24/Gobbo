@@ -154,7 +154,13 @@ export function filterCounts(
 	items: readonly CollectionItem_Serialize[],
 	statuses: Partial<Record<string, CollectionItemStatus>>,
 ): Record<MemberFilter, number> {
-	const counts: Record<MemberFilter, number> = { all: 0, todo: 0, done: 0, optional: 0, issues: 0 };
+	const counts: Record<MemberFilter, number> = {
+		all: 0,
+		todo: 0,
+		done: 0,
+		optional: 0,
+		issues: 0,
+	};
 
 	for (const item of items) {
 		for (const filter of MEMBER_FILTERS) {

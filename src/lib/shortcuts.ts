@@ -39,7 +39,11 @@ export interface ShortcutDefinition {
 }
 
 const definitions: Record<ShortcutId, ShortcutDefinition> = {
-	palette: { context: "general", labelKey: "shortcuts.items.palette", keys: [{ modifiers: ["Ctrl"], key: "K" }] },
+	palette: {
+		context: "general",
+		labelKey: "shortcuts.items.palette",
+		keys: [{ modifiers: ["Ctrl"], key: "K" }],
+	},
 	help: {
 		context: "general",
 		labelKey: "shortcuts.items.help",
@@ -48,10 +52,26 @@ const definitions: Record<ShortcutId, ShortcutDefinition> = {
 			{ modifiers: [], key: "F1" },
 		],
 	},
-	search: { context: "general", labelKey: "shortcuts.items.search", keys: [{ modifiers: ["Ctrl"], key: "F" }] },
-	details: { context: "general", labelKey: "shortcuts.items.details", keys: [{ modifiers: ["Ctrl"], key: "I" }] },
-	console: { context: "general", labelKey: "shortcuts.items.console", keys: [{ modifiers: ["Ctrl"], key: "J" }] },
-	rescan: { context: "general", labelKey: "shortcuts.items.rescan", keys: [{ modifiers: [], key: "F5" }] },
+	search: {
+		context: "general",
+		labelKey: "shortcuts.items.search",
+		keys: [{ modifiers: ["Ctrl"], key: "F" }],
+	},
+	details: {
+		context: "general",
+		labelKey: "shortcuts.items.details",
+		keys: [{ modifiers: ["Ctrl"], key: "I" }],
+	},
+	console: {
+		context: "general",
+		labelKey: "shortcuts.items.console",
+		keys: [{ modifiers: ["Ctrl"], key: "J" }],
+	},
+	rescan: {
+		context: "general",
+		labelKey: "shortcuts.items.rescan",
+		keys: [{ modifiers: [], key: "F5" }],
+	},
 	move: {
 		context: "list",
 		labelKey: "shortcuts.items.move",
@@ -68,10 +88,26 @@ const definitions: Record<ShortcutId, ShortcutDefinition> = {
 			{ modifiers: [], key: "End" },
 		],
 	},
-	select: { context: "list", labelKey: "shortcuts.items.select", keys: [{ modifiers: ["Ctrl"], key: "Click" }] },
-	range: { context: "list", labelKey: "shortcuts.items.range", keys: [{ modifiers: ["Shift"], key: "Click" }] },
-	all: { context: "list", labelKey: "shortcuts.items.all", keys: [{ modifiers: ["Ctrl"], key: "A" }] },
-	toggle: { context: "list", labelKey: "shortcuts.items.toggle", keys: [{ modifiers: [], key: "Space" }] },
+	select: {
+		context: "list",
+		labelKey: "shortcuts.items.select",
+		keys: [{ modifiers: ["Ctrl"], key: "Click" }],
+	},
+	range: {
+		context: "list",
+		labelKey: "shortcuts.items.range",
+		keys: [{ modifiers: ["Shift"], key: "Click" }],
+	},
+	all: {
+		context: "list",
+		labelKey: "shortcuts.items.all",
+		keys: [{ modifiers: ["Ctrl"], key: "A" }],
+	},
+	toggle: {
+		context: "list",
+		labelKey: "shortcuts.items.toggle",
+		keys: [{ modifiers: [], key: "Space" }],
+	},
 	reorder: {
 		context: "list",
 		labelKey: "shortcuts.items.reorder",
@@ -80,8 +116,16 @@ const definitions: Record<ShortcutId, ShortcutDefinition> = {
 			{ modifiers: ["Alt"], key: "↓" },
 		],
 	},
-	clear: { context: "list", labelKey: "shortcuts.items.clear", keys: [{ modifiers: [], key: "Esc" }] },
-	undo: { context: "list", labelKey: "shortcuts.items.undo", keys: [{ modifiers: ["Ctrl"], key: "Z" }] },
+	clear: {
+		context: "list",
+		labelKey: "shortcuts.items.clear",
+		keys: [{ modifiers: [], key: "Esc" }],
+	},
+	undo: {
+		context: "list",
+		labelKey: "shortcuts.items.undo",
+		keys: [{ modifiers: ["Ctrl"], key: "Z" }],
+	},
 	redo: {
 		context: "list",
 		labelKey: "shortcuts.items.redo",

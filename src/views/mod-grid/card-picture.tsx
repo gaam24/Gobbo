@@ -15,7 +15,11 @@ export interface CardSignal {
 	text: string;
 }
 
-const SIGNAL_TONE: Record<CardSignal["kind"], StatusTone> = { missing: "danger", update: "update", installed: "neutral" };
+const SIGNAL_TONE: Record<CardSignal["kind"], StatusTone> = {
+	missing: "danger",
+	update: "update",
+	installed: "neutral",
+};
 
 interface CardPictureProps {
 	gameId: string;

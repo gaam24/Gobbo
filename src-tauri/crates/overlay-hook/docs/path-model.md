@@ -51,8 +51,9 @@ The path layer is the most important part of the crate. Do not add another ad-ho
    game folder.
 7. A name that cannot be resolved returns `None`. Writes/deletes/renames then fail closed through `check_parent` and
    `copy_up`; reads may pass through or return the Windows error, never a guessed path.
-7. Long paths: `probe::verbatim_wide` adds `\\?\`/`\\?\UNC\` for an absolute path over `MAX_PATH`; `absolute` keeps an
+8. Long paths: `probe::verbatim_wide` adds `\\?\`/`\\?\UNC\` for an absolute path over `MAX_PATH`; `absolute` keeps an
    absolute name as it came. A path the program already gave is never rewritten into another spelling.
+
 - **Name folding.** Every comparison of a name (a prefix of a mount, a whiteout key, a listing duplicate, a rename onto
   itself) uses one rule, `gobbo_overlay_core::fold_char` / `fold_unit` / `fold_key` / `fold_key_into` / `same_folded`:
   the hot whiteout and listing checks fold into a stack buffer (`fold_key_into`, `fold_child_into`,

@@ -23,7 +23,10 @@ export function ProviderLinkSetting({
 			title={t("providers.links.title")}
 			htmlFor={id}
 			hint={toggle}
-			help={t("providers.links.hint", { name: provider.name, scheme: provider.schemes.join(", ") })}
+			help={t("providers.links.hint", {
+				name: provider.name,
+				scheme: provider.schemes.join(", "),
+			})}
 		>
 			<Switch id={id} aria-label={toggle} checked={on} onCheckedChange={(checked) => void onChange(checked)} />
 		</SettingRow>

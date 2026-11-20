@@ -25,7 +25,10 @@ export function SnapshotDialog({ gameId, onClose }: { gameId: string; onClose: (
 	const [busy, setBusy] = useState<string | null>(null);
 	const [failure, setFailure] = useState<string | null>(null);
 	const [notice, setNotice] = useState<string | null>(null);
-	const [pending, setPending] = useState<{ snapshot: SnapshotView; preview: RestorePreview } | null>(null);
+	const [pending, setPending] = useState<{
+		snapshot: SnapshotView;
+		preview: RestorePreview;
+	} | null>(null);
 	const [deleting, setDeleting] = useState<SnapshotView | null>(null);
 	const snapshots = useLoad(`snapshots:${gameId}:${version}`, () => unwrap(commands.snapshots(gameId)));
 
@@ -77,7 +80,10 @@ export function SnapshotDialog({ gameId, onClose }: { gameId: string; onClose: (
 			const outcome = await unwrap(commands.restoreSnapshot(gameId, pending.snapshot.id));
 			setPending(null);
 			return outcome.profile_created
-				? t("snapshots.restoredProfile", { profile: pending.snapshot.profile_name, files: outcome.files })
+				? t("snapshots.restoredProfile", {
+						profile: pending.snapshot.profile_name,
+						files: outcome.files,
+					})
 				: t("snapshots.restored", { files: outcome.files });
 		});
 	};
@@ -168,11 +174,17 @@ export function SnapshotDialog({ gameId, onClose }: { gameId: string; onClose: (
 							})}
 						</p>
 						<p className="text-muted-foreground text-xs">
-							{t("snapshots.previewSize", { size: formatSize(Math.ceil(pending.preview.bytes / 1024), i18n.language) })}
+							{t("snapshots.previewSize", {
+								size: formatSize(Math.ceil(pending.preview.bytes / 1024), i18n.language),
+							})}
 						</p>
 						<p className="text-muted-foreground text-xs">{t("snapshots.previewProfile", { mods: pending.preview.mods })}</p>
 						{pending.preview.recreates_profile && (
-							<p className="text-sm">{t("snapshots.recreatesProfile", { profile: pending.snapshot.profile_name })}</p>
+							<p className="text-sm">
+								{t("snapshots.recreatesProfile", {
+									profile: pending.snapshot.profile_name,
+								})}
+							</p>
 						)}
 						{!pending.preview.enough_space && (
 							<FieldError>

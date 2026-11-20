@@ -164,14 +164,22 @@ function DownloadRow({ download, gameName, showMods, locale, onInstall, onRemove
 			if (received === 0) return t("downloads.waiting");
 			const parts = [
 				total > 0
-					? t("downloads.progress", { received: formatSize(received, locale), total: formatSize(total, locale) })
+					? t("downloads.progress", {
+							received: formatSize(received, locale),
+							total: formatSize(total, locale),
+						})
 					: formatSize(received, locale),
 			];
 
 			if (speed > 0) {
 				parts.push(t("downloads.speed", { speed: formatSize(speed, locale) }));
 
-				if (total > received) parts.push(t("downloads.left", { time: formatDuration((total - received) / speed, locale) }));
+				if (total > received)
+					parts.push(
+						t("downloads.left", {
+							time: formatDuration((total - received) / speed, locale),
+						}),
+					);
 			}
 
 			return parts.join(" · ");

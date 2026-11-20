@@ -32,7 +32,16 @@ export function AdvancedProfiles({ draft, onChange }: { draft: GameDraft; onChan
 				onAdd={() =>
 					onChange({
 						...draft,
-						user_data: [...sets, { id: "", kind: "saves", path: "{documents}/", mode: "redirect", default: "shared" }],
+						user_data: [
+							...sets,
+							{
+								id: "",
+								kind: "saves",
+								path: "{documents}/",
+								mode: "redirect",
+								default: "shared",
+							},
+						],
 					})
 				}
 			>
@@ -40,7 +49,12 @@ export function AdvancedProfiles({ draft, onChange }: { draft: GameDraft; onChan
 					<RepeatRow
 						key={`user-data-${set.id}`}
 						title={set.id || t("editor.profiles.userData")}
-						onRemove={() => onChange({ ...draft, user_data: sets.filter((_, at) => at !== index) })}
+						onRemove={() =>
+							onChange({
+								...draft,
+								user_data: sets.filter((_, at) => at !== index),
+							})
+						}
 					>
 						<div className="grid gap-4 md:grid-cols-2">
 							<EditorField id={`editor-user-data-id-${index}`} label={t("editor.profiles.id")} hint={t("editor.profiles.idHint")}>

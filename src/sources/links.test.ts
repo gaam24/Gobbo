@@ -1,7 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { lostLinkProviders, lostLinkSchemes } from "@/sources/links";
 
-const status = (provider: string, scheme: string, registered: boolean) => ({ provider, scheme, registered });
+const status = (provider: string, scheme: string, registered: boolean) => ({
+	provider,
+	scheme,
+	registered,
+});
 
 describe("lost link handlers", () => {
 	test("a registered scheme names no provider", () => {

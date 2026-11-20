@@ -21,7 +21,12 @@ function makeMod(index: number): Status_Serialize["mods"][number] {
 		archive: null,
 		archive_file: null,
 		skipped: 0,
-		info: { name: `Mod ${index}`, version: "1.0", author: "Author", description: null },
+		info: {
+			name: `Mod ${index}`,
+			version: "1.0",
+			author: "Author",
+			description: null,
+		},
 		source: null,
 		sources: [],
 		page_id: null,

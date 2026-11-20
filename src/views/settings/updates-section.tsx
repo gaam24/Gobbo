@@ -82,7 +82,11 @@ export function UpdatesSection() {
 		setState({ kind: "installing", applying: false });
 		const progress = newProgressChannel<PortableUpdateStep>((step) => {
 			if (step.step === "downloading") {
-				setState({ kind: "installing", applying: false, percent: step.percent ?? undefined });
+				setState({
+					kind: "installing",
+					applying: false,
+					percent: step.percent ?? undefined,
+				});
 			} else {
 				setState({ kind: "installing", applying: true });
 			}
@@ -101,12 +105,28 @@ export function UpdatesSection() {
 		try {
 			if (channel === "portable") {
 				const found = await unwrap(commands.portableUpdateCheck());
-				setState(found ? { kind: "available", version: found.version, install: () => void installPortable() } : { kind: "current" });
+				setState(
+					found
+						? {
+								kind: "available",
+								version: found.version,
+								install: () => void installPortable(),
+							}
+						: { kind: "current" },
+				);
 				return;
 			}
 
 			const update = await check();
-			setState(update ? { kind: "available", version: update.version, install: () => void installUpdate(update) } : { kind: "current" });
+			setState(
+				update
+					? {
+							kind: "available",
+							version: update.version,
+							install: () => void installUpdate(update),
+						}
+					: { kind: "current" },
+			);
 		} catch (failure) {
 			setState({ kind: "failed", detail: messageOf(failure) });
 		}

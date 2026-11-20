@@ -81,8 +81,13 @@ export function SourceSection({
 	const checkedText = () => {
 		if (checkedAt === undefined) return t("mods.sources.neverChecked");
 
-		if (isToday(checkedAt)) return t("mods.sources.checkedToday", { time: formatTime(checkedAt, i18n.language) });
-		return t("mods.sources.checkedOn", { date: formatDate(checkedAt, i18n.language) });
+		if (isToday(checkedAt))
+			return t("mods.sources.checkedToday", {
+				time: formatTime(checkedAt, i18n.language),
+			});
+		return t("mods.sources.checkedOn", {
+			date: formatDate(checkedAt, i18n.language),
+		});
 	};
 	const openUpdate =
 		update?.has_update && update.latest && !update.latest_installed ? () => openSource(update.provider, update.mod_id, "files") : undefined;

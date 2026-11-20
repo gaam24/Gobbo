@@ -88,7 +88,9 @@ export function ArchiveCheck({ text }: { text: string }) {
 					</ul>
 					{preview.skipped_examples.length > 0 && (
 						<p className="text-muted-foreground text-xs">
-							{t("editor.archive.skippedExamples", { files: preview.skipped_examples.join(", ") })}
+							{t("editor.archive.skippedExamples", {
+								files: preview.skipped_examples.join(", "),
+							})}
 						</p>
 					)}
 				</div>

@@ -54,7 +54,13 @@ export function InfoSection({
 						variant="outline"
 						size="sm"
 						disabled={!changed}
-						onClick={() => save({ name: name.trim() || null, version: version.trim() || null, author: author.trim() || null })}
+						onClick={() =>
+							save({
+								name: name.trim() || null,
+								version: version.trim() || null,
+								author: author.trim() || null,
+							})
+						}
 					>
 						{t("mods.edit.save")}
 					</Button>

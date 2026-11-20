@@ -110,7 +110,12 @@ function duringBusy(presentation: GamePresentation, busy: Exclude<GameRuntime["b
 		canApply: action === "apply" ? false : presentation.canApply,
 		canPlay: action === "play" ? false : presentation.canPlay,
 		canPlayWithoutMods: action === "play" ? false : presentation.canPlayWithoutMods,
-		nextStep: presentation.nextStep ? { ...presentation.nextStep, action: disable(presentation.nextStep.action) } : undefined,
+		nextStep: presentation.nextStep
+			? {
+					...presentation.nextStep,
+					action: disable(presentation.nextStep.action),
+				}
+			: undefined,
 	};
 }
 
@@ -158,7 +163,10 @@ function statusPresentation(status: Status): GamePresentation {
 			};
 		}
 		case "empty": {
-			const play: GameAction = { id: "play", labelKey: "header.playWithoutMods" };
+			const play: GameAction = {
+				id: "play",
+				labelKey: "header.playWithoutMods",
+			};
 			return {
 				tone: "neutral",
 				stateKey: "header.empty",
@@ -193,7 +201,14 @@ function statusPresentation(status: Status): GamePresentation {
 				stateKey: deployedElsewhere ? "header.deployedElsewhere" : "header.notDeployed",
 				stateParams: deployedElsewhere ? { name: deployedElsewhere } : undefined,
 				primary,
-				menu: [{ id: "apply", labelKey: "header.deployWithoutLaunch", disabled: blockedReason !== undefined, reasonKey: blockedReason }],
+				menu: [
+					{
+						id: "apply",
+						labelKey: "header.deployWithoutLaunch",
+						disabled: blockedReason !== undefined,
+						reasonKey: blockedReason,
+					},
+				],
 				canApply: true,
 				canPlay: true,
 				canPlayWithoutMods: true,
@@ -210,7 +225,12 @@ function statusPresentation(status: Status): GamePresentation {
 				stateHintKey: "header.draftHint",
 				primary,
 				menu: [
-					{ id: "apply", labelKey: "header.deployWithoutLaunch", disabled: blockedReason !== undefined, reasonKey: blockedReason },
+					{
+						id: "apply",
+						labelKey: "header.deployWithoutLaunch",
+						disabled: blockedReason !== undefined,
+						reasonKey: blockedReason,
+					},
 					{ id: "discard", labelKey: "header.discard" },
 				],
 				canApply: true,
@@ -277,21 +297,38 @@ function nextStepOf(status: Status, action: GameAction): GameNextStep | undefine
 		case "set_game_folder":
 		case "set_settings_folder":
 		case "set_mods_folder":
-			return { titleKey: "start.setup.title", bodyKey: "start.setup.hint", action };
+			return {
+				titleKey: "start.setup.title",
+				bodyKey: "start.setup.hint",
+				action,
+			};
 		case "fix_problems":
 			return { titleKey: "start.fix.title", bodyKey: "start.fix.hint", action };
 		case "import_mods":
 			return { titleKey: "start.add.title", bodyKey: "start.add.hint", action };
 		case "enable_mods":
-			return { titleKey: "start.enable.title", bodyKey: "start.enable.hint", action };
+			return {
+				titleKey: "start.enable.title",
+				bodyKey: "start.enable.hint",
+				action,
+			};
 		case "apply": {
 			const stage = status.stage;
 
 			if (stage.kind === "draft") {
-				return { titleKey: "start.changes.title", bodyKey: "start.changes.hint", params: { count: stage.changes }, action };
+				return {
+					titleKey: "start.changes.title",
+					bodyKey: "start.changes.hint",
+					params: { count: stage.changes },
+					action,
+				};
 			}
 
-			return { titleKey: "start.deploy.title", bodyKey: "start.deploy.hint", action };
+			return {
+				titleKey: "start.deploy.title",
+				bodyKey: "start.deploy.hint",
+				action,
+			};
 		}
 		case "play":
 			return undefined;

@@ -118,7 +118,11 @@ export function FileWinners({ modId, conflicts, status, canChoose, onSetWinner }
 							<ItemContent className="gap-1">
 								<PathText path={conflict.path} />
 								<span className="text-muted-foreground text-xs">
-									{wins ? t("mods.winners.wins") : t("mods.winners.loses", { name: nameOf(conflict.winner) })}
+									{wins
+										? t("mods.winners.wins")
+										: t("mods.winners.loses", {
+												name: nameOf(conflict.winner),
+											})}
 								</span>
 								{canChoose && (
 									<div className="flex flex-wrap gap-2">

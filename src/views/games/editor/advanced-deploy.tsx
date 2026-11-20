@@ -26,13 +26,21 @@ export function AdvancedDeploy({
 
 	const update = (patch: Partial<DeployDraft>) => onChange({ ...draft, deploy: { ...deploy, ...patch } });
 	const updateSlot = (index: number, patch: Partial<SlotDraft>) =>
-		update({ slots: slots.map((slot, at) => (at === index ? { ...slot, ...patch } : slot)) });
+		update({
+			slots: slots.map((slot, at) => (at === index ? { ...slot, ...patch } : slot)),
+		});
 	const updateMirror = (index: number, patch: Partial<MirrorDraft>) =>
-		update({ mirror: mirrors.map((mirror, at) => (at === index ? { ...mirror, ...patch } : mirror)) });
+		update({
+			mirror: mirrors.map((mirror, at) => (at === index ? { ...mirror, ...patch } : mirror)),
+		});
 	const updateShared = (index: number, patch: Partial<SharedDraft>) =>
-		update({ shared: shared.map((entry, at) => (at === index ? { ...entry, ...patch } : entry)) });
+		update({
+			shared: shared.map((entry, at) => (at === index ? { ...entry, ...patch } : entry)),
+		});
 	const updateMove = (index: number, patch: Partial<MoveDraft>) =>
-		update({ move: moves.map((entry, at) => (at === index ? { ...entry, ...patch } : entry)) });
+		update({
+			move: moves.map((entry, at) => (at === index ? { ...entry, ...patch } : entry)),
+		});
 
 	const aliasRows = (next: Record<string, string>) => update({ aliases: next });
 	const setAlias = (index: number, name: string, target: string) => {

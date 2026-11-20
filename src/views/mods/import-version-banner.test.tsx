@@ -10,7 +10,15 @@ await applyLanguage("en");
 test("the imported version banner names the mod and offers the choice", () => {
 	const html = renderToString(
 		<ImportVersionBanner
-			mods={[{ family: "mod-id", sha256: "sha", folder: "Mod 2.0", name: "Mod", version: "2.0" }]}
+			mods={[
+				{
+					family: "mod-id",
+					sha256: "sha",
+					folder: "Mod 2.0",
+					name: "Mod",
+					version: "2.0",
+				},
+			]}
 			onUse={() => {
 				// The action is not part of the structure check.
 			}}

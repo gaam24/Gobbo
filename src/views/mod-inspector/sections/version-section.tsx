@@ -81,8 +81,12 @@ export function VersionSection({
 								<Button
 									variant="ghost"
 									size="icon-sm"
-									aria-label={t("mods.version.delete", { version: versionName(version) })}
-									title={t("mods.version.delete", { version: versionName(version) })}
+									aria-label={t("mods.version.delete", {
+										version: versionName(version),
+									})}
+									title={t("mods.version.delete", {
+										version: versionName(version),
+									})}
 									onClick={() => onDeleteVersion(mod.id, version.folder)}
 								>
 									<Trash2 />

@@ -31,7 +31,13 @@ let noticeCount = 0;
 /// kept only by the durable path that passes one.
 export function newNotice(kind: Notice["kind"], text: string, detail?: string, action?: NoticeAction): Notice {
 	noticeCount += 1;
-	const notice: Notice = { id: `${SESSION}-${noticeCount}`, kind, text, at: Date.now(), read: false };
+	const notice: Notice = {
+		id: `${SESSION}-${noticeCount}`,
+		kind,
+		text,
+		at: Date.now(),
+		read: false,
+	};
 	const withDetail = detail && detail !== text ? { ...notice, detail } : notice;
 	return action ? { ...withDetail, action } : withDetail;
 }
@@ -47,7 +53,10 @@ export function readAll(list: Notice[]): Notice[] {
 /// How many notices are unread, and whether one of those is an error: the bell shows an error in red.
 export function unreadSummary(notices: Notice[]) {
 	const unread = notices.filter((notice) => !notice.read);
-	return { count: unread.length, error: unread.some((notice) => notice.kind === "error") };
+	return {
+		count: unread.length,
+		error: unread.some((notice) => notice.kind === "error"),
+	};
 }
 
 /// Notices that say the same thing one after another, shown as one row. `notice` is the newest of them; `ids` lists all of

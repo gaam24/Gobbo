@@ -417,7 +417,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 				// A typed key is only a check before saving. The saved key decides the update behavior, so its result alone
 				// becomes the account this session uses.
 				if (key === null) rememberSourceAccount(provider, account);
-				return { ok: true, text: t(account.premium ? "providers.check.okPremium" : "providers.check.ok", { name: account.name }) };
+				return {
+					ok: true,
+					text: t(account.premium ? "providers.check.okPremium" : "providers.check.ok", { name: account.name }),
+				};
 			} catch (failure) {
 				return { ok: false, text: messageOf(failure) };
 			}
@@ -427,7 +430,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
 	/// A deployment shows its preview first. `launch` starts the game after it, with `executable` (the default when null).
 	const deploy = useCallback(() => {
-		openDialog({ kind: "deploy", launch: false, executable: null, request: Date.now() });
+		openDialog({
+			kind: "deploy",
+			launch: false,
+			executable: null,
+			request: Date.now(),
+		});
 	}, [openDialog]);
 	const launch = useCallback(
 		async (executable: string | null, applyDraft = false) => {
@@ -436,7 +444,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 			const needsPreview = applyDraft && status !== null && (!status.deployed || status.draft_changes > 0);
 
 			if (needsPreview) {
-				openDialog({ kind: "deploy", launch: true, executable, request: Date.now() });
+				openDialog({
+					kind: "deploy",
+					launch: true,
+					executable,
+					request: Date.now(),
+				});
 				return;
 			}
 

@@ -24,8 +24,14 @@ async function points(fromSelector: string, fromIndex: number, toSelector: strin
 
 			if (!(from && to)) return null;
 			return {
-				from: { x: Math.round(from.left + from.width / 2), y: Math.round(from.top + from.height / 2) },
-				to: { x: Math.round(to.left + to.width / 2), y: Math.round(to.top + to.height / 2) },
+				from: {
+					x: Math.round(from.left + from.width / 2),
+					y: Math.round(from.top + from.height / 2),
+				},
+				to: {
+					x: Math.round(to.left + to.width / 2),
+					y: Math.round(to.top + to.height / 2),
+				},
 			};
 		},
 		fromSelector,
@@ -131,7 +137,10 @@ describe("drag in a virtualized mod list", () => {
 
 				if (!element) return null;
 				const box = element.getBoundingClientRect();
-				return { x: Math.round(box.left + box.width / 2), bottom: Math.round(box.bottom) };
+				return {
+					x: Math.round(box.left + box.width / 2),
+					bottom: Math.round(box.bottom),
+				};
 			})) as { x: number; bottom: number } | null;
 			assert.ok(edge, "the scroll container was not found");
 			const { from } = await points("[aria-label^='Drag to reorder']", 0, "[aria-label^='Drag to reorder']", 0);

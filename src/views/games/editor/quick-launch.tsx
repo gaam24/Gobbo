@@ -16,7 +16,10 @@ export function QuickLaunch({ draft, onChange, inspection }: QuickProps) {
 
 	const setExecutable = (path: string) => {
 		const name = path.split(PATH_SEPARATOR).at(-1)?.replace(EXE_SUFFIX, "") ?? "";
-		onChange({ ...draft, executables: [{ name, path }, ...executables.slice(1)] });
+		onChange({
+			...draft,
+			executables: [{ name, path }, ...executables.slice(1)],
+		});
 	};
 
 	return (
@@ -40,7 +43,10 @@ export function QuickLaunch({ draft, onChange, inspection }: QuickProps) {
 						placeholder={t("editor.quick.executableNamePlaceholder")}
 						onChange={(event) => {
 							const next = [...executables];
-							next[0] = { ...(next[0] ?? { name: "", path: "" }), name: event.currentTarget.value };
+							next[0] = {
+								...(next[0] ?? { name: "", path: "" }),
+								name: event.currentTarget.value,
+							};
 							onChange({ ...draft, executables: next });
 						}}
 					/>

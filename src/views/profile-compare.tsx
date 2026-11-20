@@ -35,7 +35,10 @@ export function ProfileCompareDialog({
 	const pair = open && otherId !== null ? `${active.id}:${otherId}` : null;
 	const answer = useLoad(pair, async () => {
 		try {
-			return { result: await unwrap(commands.compareProfiles(gameId, active.id, otherId ?? "")), failed: false };
+			return {
+				result: await unwrap(commands.compareProfiles(gameId, active.id, otherId ?? "")),
+				failed: false,
+			};
 		} catch {
 			return { result: null, failed: true };
 		}
@@ -80,7 +83,10 @@ export function ProfileCompareDialog({
 			{result && result.rows.length > 0 && (
 				<>
 					<p className="text-muted-foreground text-sm tabular-nums">
-						{t("profiles.compare.summary", { same: result.same, different: result.rows.length })}
+						{t("profiles.compare.summary", {
+							same: result.same,
+							different: result.rows.length,
+						})}
 					</p>
 					{onlyFirst.length > 0 && (
 						<CompareList

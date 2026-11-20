@@ -48,7 +48,10 @@ export function OverwriteDialog({
 				<>
 					<div className="flex items-center gap-2">
 						<span className="text-muted-foreground flex-1">
-							{t("overwrite.count", { count: view.files.length, size: formatSize(total, locale) })}
+							{t("overwrite.count", {
+								count: view.files.length,
+								size: formatSize(total, locale),
+							})}
 						</span>
 						<Button variant="ghost" size="sm" onClick={() => void onOpenFolder(view.folder)}>
 							<FolderOpen /> {t("overwrite.open")}

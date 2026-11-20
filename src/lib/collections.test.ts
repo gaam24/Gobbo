@@ -14,7 +14,12 @@ function item(key: string, optional = false, size = 10): CollectionItem_Serializ
 		picture_url: null,
 		optional,
 		phase: 0,
-		source: { kind: "provider", provider: "example", mod_id: key, file_id: "1" },
+		source: {
+			kind: "provider",
+			provider: "example",
+			mod_id: key,
+			file_id: "1",
+		},
 		file_name: null,
 		size_kb: size,
 		md5: null,
@@ -60,18 +65,36 @@ describe("collections", () => {
 			c: { kind: "skipped" },
 			d: { kind: "unsupported" },
 		};
-		expect(filterCounts(items, statuses)).toEqual({ all: 4, todo: 1, done: 1, optional: 1, issues: 1 });
+		expect(filterCounts(items, statuses)).toEqual({
+			all: 4,
+			todo: 1,
+			done: 1,
+			optional: 1,
+			issues: 1,
+		});
 	});
 
 	test("only selected members that need a download count toward the size", () => {
 		const items = [item("a", false, 100), item("b", false, 50), item("c", false, 25)];
-		const statuses: Record<string, CollectionItemStatus> = { a: { kind: "installed" }, b: { kind: "missing" }, c: { kind: "missing" } };
+		const statuses: Record<string, CollectionItemStatus> = {
+			a: { kind: "installed" },
+			b: { kind: "missing" },
+			c: { kind: "missing" },
+		};
 		expect(downloadSizeKb(items, statuses, new Set(["a", "b"]))).toBe(50);
 	});
 
 	test("a waiting member is named with its version so two files of one page differ", () => {
-		const first = { ...item("first"), name: "Placeholder addon", version: "1.0" };
-		const second = { ...item("second"), name: "Placeholder main", version: "2.0" };
+		const first = {
+			...item("first"),
+			name: "Placeholder addon",
+			version: "1.0",
+		};
+		const second = {
+			...item("second"),
+			name: "Placeholder main",
+			version: "2.0",
+		};
 		expect(collectionItemLabel([first, second], "second")).toBe("Placeholder main 2.0");
 		expect(collectionItemLabel([first], "missing")).toBe("missing");
 	});

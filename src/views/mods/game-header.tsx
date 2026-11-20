@@ -295,7 +295,9 @@ export function GameHeader({ gameId, status }: { gameId: string; status: Status 
 			<ConfirmDialog
 				open={discardOpen}
 				onOpenChange={setDiscardOpen}
-				title={t("header.discardConfirm.title", { count: status.draft_changes })}
+				title={t("header.discardConfirm.title", {
+					count: status.draft_changes,
+				})}
 				description={t("header.discardConfirm.body")}
 				confirmLabel={t("header.discard")}
 				onConfirm={discardChanges}

@@ -53,7 +53,11 @@ interface GameBusy {
 	updateModName: string | null;
 }
 
-const IDLE_BUSY: GameBusy = { busy: null, updateKind: "update", updateModName: null };
+const IDLE_BUSY: GameBusy = {
+	busy: null,
+	updateKind: "update",
+	updateModName: null,
+};
 
 export function useGameActions({
 	gameId: id,
@@ -140,7 +144,10 @@ export function useGameActions({
 	);
 	/// The queue-shaped handle the workspace uses for `idle()`. With no id it waits every game's queue; with an id only
 	/// that game's, so an import for game B does not wait for a long edit of game A.
-	const profileQueue = { run: queueProfile, idle: (gameId?: string) => gameQueues.idle(gameId) };
+	const profileQueue = {
+		run: queueProfile,
+		idle: (gameId?: string) => gameQueues.idle(gameId),
+	};
 	/// Settings saves and the changes to a settings list (a Proton switch, the profile data) share one queue, apart from
 	/// profile edits. Each one reads the newest settings when its turn comes, so a save never sends a list that an earlier
 	/// change has already moved on from.
@@ -404,7 +411,13 @@ export function useGameActions({
 				const name = statusNow?.(game)?.tools.find((item) => item.id === tool)?.name ?? tool;
 
 				if (cancelled) notifyNow(translateNow("notice.toolCancelled", { name }));
-				else notifyNow(translateNow(code === 0 ? "notice.toolDone" : "notice.toolFailed", { name, code: code ?? -1 }));
+				else
+					notifyNow(
+						translateNow(code === 0 ? "notice.toolDone" : "notice.toolFailed", {
+							name,
+							code: code ?? -1,
+						}),
+					);
 				void reloadNow(game);
 			}),
 		]);
@@ -414,7 +427,13 @@ export function useGameActions({
 	const undo = () =>
 		queued(async (gameId) => {
 			const warnings = await unwrap(commands.undo(gameId));
-			notify(warnings.length > 0 ? t("notice.undoneWarnings", { warnings: translateJoin(warnings, "; ") }) : t("notice.undone"));
+			notify(
+				warnings.length > 0
+					? t("notice.undoneWarnings", {
+							warnings: translateJoin(warnings, "; "),
+						})
+					: t("notice.undone"),
+			);
 			await reloadAfter(gameId);
 		});
 
@@ -501,7 +520,11 @@ export function useGameActions({
 	/// The busy state of an update or a requirement install. The progress of an earlier run is cleared first. The game
 	/// id is captured by the caller before its first await, so a switch cannot mix two runs' presentation.
 	const beginUpdate = (gameId: string, kind: "update" | "requirement", name: string | null) => {
-		setBusyOf(gameId, { updateKind: kind, updateModName: name, busy: "updating" });
+		setBusyOf(gameId, {
+			updateKind: kind,
+			updateModName: name,
+			busy: "updating",
+		});
 		setUpdateProgress(null, gameId);
 		setUpdateAllProgress(null, gameId);
 	};
@@ -546,7 +569,10 @@ export function useGameActions({
 			const text = t("notice.modUpdated", { name });
 			const undoAction =
 				previous && selected && previous !== selected
-					? { label: t("notice.undo"), onClick: () => undoUpdate(gameId, modId, previous) }
+					? {
+							label: t("notice.undo"),
+							onClick: () => undoUpdate(gameId, modId, previous),
+						}
 					: undefined;
 			if (undoAction) notifyDurable(text, undoAction);
 			else notify(text);
@@ -583,7 +609,12 @@ export function useGameActions({
 			if (result.updated > 0) {
 				const text = t("notice.modsUpdated", { count: result.updated });
 				const undoAction =
-					result.changes.length > 0 ? { label: t("notice.undo"), onClick: () => undoUpdateAll(gameId, result.changes) } : undefined;
+					result.changes.length > 0
+						? {
+								label: t("notice.undo"),
+								onClick: () => undoUpdateAll(gameId, result.changes),
+							}
+						: undefined;
 				if (undoAction) notifyDurable(text, undoAction);
 				else notify(text);
 			}
@@ -608,7 +639,11 @@ export function useGameActions({
 	};
 
 	const finishRequirement = (gameId: string) => {
-		setBusyOf(gameId, { busy: null, updateKind: "update", updateModName: null });
+		setBusyOf(gameId, {
+			busy: null,
+			updateKind: "update",
+			updateModName: null,
+		});
 		setUpdateProgress(null, gameId);
 	};
 
@@ -664,7 +699,12 @@ export function useGameActions({
 			}
 
 			if (result.other_versions.length > 0) {
-				notifyError(t("notice.communityVersions", { count: result.other_versions.length }), result.other_versions.join(", "));
+				notifyError(
+					t("notice.communityVersions", {
+						count: result.other_versions.length,
+					}),
+					result.other_versions.join(", "),
+				);
 			}
 
 			imported = true;
@@ -828,7 +868,9 @@ export function useGameActions({
 		const applied = status?.deployed === true && status.deployed_list.some((row) => row.folder === folder);
 		return changeQueued(
 			(gameId) => commands.reinstallMod(gameId, folder, choices ?? null),
-			t(applied ? "notice.modReinstalledApply" : "notice.modReinstalled", { name }),
+			t(applied ? "notice.modReinstalledApply" : "notice.modReinstalled", {
+				name,
+			}),
 		);
 	};
 
@@ -916,7 +958,12 @@ export function useGameActions({
 			const report = await unwrap(commands.importMo2List(gameId, path));
 			await reload(gameId);
 			setSelection([]);
-			notify(t("notice.mo2Imported", { mods: report.mods, separators: report.separators }));
+			notify(
+				t("notice.mo2Imported", {
+					mods: report.mods,
+					separators: report.separators,
+				}),
+			);
 
 			if (report.missing.length > 0) {
 				notifyError(t("notice.mo2Missing", { count: report.missing.length }), report.missing.join(", "));

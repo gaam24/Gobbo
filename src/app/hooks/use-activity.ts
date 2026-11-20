@@ -341,7 +341,16 @@ export function updateTasks(checkingGames: readonly string[], games: Array<{ id:
 }
 
 function storageTasks(scanning: boolean, t: Translate): Task[] {
-	return scanning ? [{ id: "storage", kind: "scan", title: t("tasks.scanningStorage"), state: "running" }] : [];
+	return scanning
+		? [
+				{
+					id: "storage",
+					kind: "scan",
+					title: t("tasks.scanningStorage"),
+					state: "running",
+				},
+			]
+		: [];
 }
 
 function importTasks(importing: ReadonlyMap<string, ImportState>, gameId: string | undefined, gameName: string, t: Translate): Task[] {

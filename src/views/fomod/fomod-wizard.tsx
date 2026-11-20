@@ -182,7 +182,10 @@ export function FomodWizard({
 				<div className="grid min-h-0 flex-1 grid-cols-[200px_minmax(0,1fr)] overflow-hidden">
 					<aside className="grid content-start gap-3 overflow-y-auto border-r px-4 py-5">
 						<p className="text-subtle-foreground font-mono text-xs">
-							{t("fomod.stepCounter", { current: position + 1, total: visible.length })}
+							{t("fomod.stepCounter", {
+								current: position + 1,
+								total: visible.length,
+							})}
 						</p>
 						<ol className="grid gap-1">
 							{visible.map((index, at) => {

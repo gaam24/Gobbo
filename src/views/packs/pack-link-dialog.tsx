@@ -47,8 +47,14 @@ export function PackLinkDialog({ gameId, link: initial, onClose }: { gameId: str
 			detail: wanted,
 			percent: 0,
 			state: "running",
-			cancel: { label: t("common.cancel"), run: () => void commands.cancelPackLink(gameId, wanted) },
-			open: { label: t("tasks.openWindow"), run: () => openForGame(gameId, { kind: "pack-link", link: wanted }) },
+			cancel: {
+				label: t("common.cancel"),
+				run: () => void commands.cancelPackLink(gameId, wanted),
+			},
+			open: {
+				label: t("tasks.openWindow"),
+				run: () => openForGame(gameId, { kind: "pack-link", link: wanted }),
+			},
 			source: "local",
 		});
 		const progress = new Channel<PackLinkProgress>();

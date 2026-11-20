@@ -151,7 +151,9 @@ export function CollectionMemberList({
 									</StatusBadge>
 								) : (
 									<StatusBadge tone={statusTone(status)} dot className="shrink-0">
-										{t(statusLabelKey(status), { version: statusVersion(status) })}
+										{t(statusLabelKey(status), {
+											version: statusVersion(status),
+										})}
 									</StatusBadge>
 								)}
 								<span className="text-subtle-foreground w-16 shrink-0 text-right font-mono text-xs tabular-nums">

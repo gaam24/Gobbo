@@ -30,15 +30,32 @@ export function PackExportDialog({
 }) {
 	const { t } = useTranslation();
 	const active = profiles.find((profile) => profile.active) ?? profiles[0];
-	const [info, setInfo] = useState({ name: active?.name ?? "", version: "1.0", author: "", description: "" });
+	const [info, setInfo] = useState({
+		name: active?.name ?? "",
+		version: "1.0",
+		author: "",
+		description: "",
+	});
 	const [chosen, setChosen] = useState<string[]>(active ? [active.id] : []);
 	const [archives, setArchives] = useState<PackArchives>("unlisted");
-	const [failure, setFailure] = useState<{ key: string; message: string } | null>(null);
+	const [failure, setFailure] = useState<{
+		key: string;
+		message: string;
+	} | null>(null);
 	const [exporting, setExporting] = useState(false);
-	const options: PackOptions = { info: { id: "", ...info }, profiles: chosen, archives };
+	const options: PackOptions = {
+		info: { id: "", ...info },
+		profiles: chosen,
+		archives,
+	};
 	// The backend check only looks at the name, the version, the profiles and the archives. Author and description do
 	// not change its answer, so editing them does not start another check.
-	const checkKey = JSON.stringify({ name: info.name, version: info.version, profiles: chosen, archives });
+	const checkKey = JSON.stringify({
+		name: info.name,
+		version: info.version,
+		profiles: chosen,
+		archives,
+	});
 	const checkFailure = failure?.key === checkKey ? failure.message : null;
 	const issues = useLoad(checkKey, () => unwrap(commands.checkPack(gameId, options)), {
 		onError: (error) => setFailure({ key: checkKey, message: messageOf(error) }),

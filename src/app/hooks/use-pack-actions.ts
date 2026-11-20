@@ -42,7 +42,10 @@ export function usePackActions({
 	/// A task's Open can be clicked while another game is shown. A switch closes every shell dialog, so remember the
 	/// dialog and open it after the task's game becomes active. This hook stays mounted, unlike the dialog that started
 	/// the task. The ref keeps the registered callback fresh.
-	const { defer: deferOpen } = useDeferredOpen<{ gameId: string; dialog: AppDialog }>(
+	const { defer: deferOpen } = useDeferredOpen<{
+		gameId: string;
+		dialog: AppDialog;
+	}>(
 		activeGameId,
 		(pending) => pending.gameId === activeGameId,
 		(pending) => openDialog(pending.dialog),
@@ -85,7 +88,13 @@ export function usePackActions({
 			if (!path) return;
 			closeDialog();
 			const result = await unwrap(commands.exportPack(gameId, path, options));
-			notify(t("notice.packExported", { path, mods: result.mods, archives: result.archives }));
+			notify(
+				t("notice.packExported", {
+					path,
+					mods: result.mods,
+					archives: result.archives,
+				}),
+			);
 		});
 
 	const pickPack = () => {
@@ -116,7 +125,10 @@ export function usePackActions({
 				percent: 0,
 				state: "running",
 				cancel: { label: t("common.cancel"), run: onCancel },
-				open: { label: t("tasks.openWindow"), run: () => openFromTask(gameId, path) },
+				open: {
+					label: t("tasks.openWindow"),
+					run: () => openFromTask(gameId, path),
+				},
 				source: "local",
 				dedupe: { Pack: { game: gameId, path } },
 			});
@@ -173,13 +185,19 @@ export function usePackActions({
 				percent: 0,
 				state: "running",
 				cancel: { label: t("common.cancel"), run: onCancel },
-				open: { label: t("tasks.openWindow"), run: () => openFromTask(gameId, path) },
+				open: {
+					label: t("tasks.openWindow"),
+					run: () => openFromTask(gameId, path),
+				},
 				source: "local",
 				dedupe: { Pack: { game: gameId, path } },
 			});
 			const progress = newProgressChannel<PackDownload>((step) => {
 				setProgress(path, { stage: "downloading", ...step }, gameId);
-				updateTask(id, { percent: step.percent, detail: `${step.name} · ${step.index}/${step.total}` });
+				updateTask(id, {
+					percent: step.percent,
+					detail: `${step.name} · ${step.index}/${step.total}`,
+				});
 			});
 			// The bar goes however the download ends; `unwrap` then reports a failure. No `finally`: React Compiler
 			// would skip the whole component.
@@ -200,5 +218,12 @@ export function usePackActions({
 			void fillSourceInfo(gameId);
 		});
 
-	return { exportPack, pickPack, pickPackLink, importPack, downloadPack, openForGame };
+	return {
+		exportPack,
+		pickPack,
+		pickPackLink,
+		importPack,
+		downloadPack,
+		openForGame,
+	};
 }

@@ -58,7 +58,12 @@ describe("the game definition draft", () => {
 					inherit: true,
 				},
 			],
-			load_order: { format: "mods_settings", file: "{documents}/Game/mods.settings", priority_min: 1, priority_max: 9999 },
+			load_order: {
+				format: "mods_settings",
+				file: "{documents}/Game/mods.settings",
+				priority_min: 1,
+				priority_max: 9999,
+			},
 		});
 		expect(text).not.toContain("kind =");
 		expect(text).not.toContain("mode =");
@@ -80,7 +85,10 @@ describe("the game definition draft", () => {
 			id: "game",
 			name: "Game",
 			executables: [{ name: "Game", path: "Game.exe" }],
-			deploy: { full_root: true, move: [{ extensions: [".archive", ".xl"], to: "archive/pc/mod" }] },
+			deploy: {
+				full_root: true,
+				move: [{ extensions: [".archive", ".xl"], to: "archive/pc/mod" }],
+			},
 		});
 		expect(text).toContain("full_root = true");
 		expect(text).toContain("[[deploy.move]]");
@@ -118,7 +126,13 @@ describe("the game definition draft", () => {
 			name: "Game",
 			logs: [
 				{ kind: "script", path: "r6/logs", pattern: "*CURRENT.log", limit: 1 },
-				{ kind: "crash", path: ".", pattern: "*.txt", limit: 1, recursive: false },
+				{
+					kind: "crash",
+					path: ".",
+					pattern: "*.txt",
+					limit: 1,
+					recursive: false,
+				},
 			],
 		});
 		expect(text).toContain("[[logs]]");
@@ -133,6 +147,11 @@ describe("the game definition draft", () => {
 		expect(inferLayout({ ...EMPTY_DRAFT, loader: "bepinex" })).toBe("loader");
 		expect(inferLayout({ ...EMPTY_DRAFT, deploy: { slots: [{ dir: "Mods" }] } })).toBe("slot");
 		expect(inferLayout({ ...EMPTY_DRAFT, deploy: { mirror: [{ dir: "Data" }] } })).toBe("mirror");
-		expect(inferLayout({ ...EMPTY_DRAFT, deploy: { slots: [{ dir: "Mods" }], mirror: [{ dir: "Data" }] } })).toBe("custom");
+		expect(
+			inferLayout({
+				...EMPTY_DRAFT,
+				deploy: { slots: [{ dir: "Mods" }], mirror: [{ dir: "Data" }] },
+			}),
+		).toBe("custom");
 	});
 });

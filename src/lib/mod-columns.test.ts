@@ -19,7 +19,10 @@ test("a new list shows the columns a player reads first, and pins the switch and
 });
 
 test("a saved layout without an order gets the default one, and a pinned column is never hidden", () => {
-	const restored = restoreLayout({ widths: { version: 200 }, hidden: ["mod", "author"] });
+	const restored = restoreLayout({
+		widths: { version: 200 },
+		hidden: ["mod", "author"],
+	});
 	expect(restored.order).toEqual(DEFAULT_LAYOUT.order);
 	expect(restored.hidden).toEqual(["author"]);
 	expect(restored.widths).toEqual({ version: 200 });
@@ -32,7 +35,11 @@ test("a saved width below the column minimum is raised to the minimum", () => {
 });
 
 test("columns the saved order does not name come last, each once", () => {
-	const restored = restoreLayout({ widths: {}, hidden: [], order: ["version", "mod"] });
+	const restored = restoreLayout({
+		widths: {},
+		hidden: [],
+		order: ["version", "mod"],
+	});
 	expect(restored.order.slice(0, 2)).toEqual(["version", "mod"]);
 	expect(new Set(restored.order).size).toBe(DEFAULT_LAYOUT.order.length);
 	expect(restored.order).toHaveLength(DEFAULT_LAYOUT.order.length);

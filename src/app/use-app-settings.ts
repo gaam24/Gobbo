@@ -160,11 +160,22 @@ export function useAppSettings({
 		(
 			report: SourceLinksReport,
 			names: SourceProviderInfo[],
-			{ lostMessage, repeat }: { lostMessage: "notice.sourceLinksLost" | "notice.sourceLinksStillLost"; repeat: boolean },
+			{
+				lostMessage,
+				repeat,
+			}: {
+				lostMessage: "notice.sourceLinksLost" | "notice.sourceLinksStillLost";
+				repeat: boolean;
+			},
 		) => {
 			setLinkStatus(report.statuses);
 
-			if (report.repaired.length > 0) notify(t("notice.sourceLinksRepaired", { names: namesOf(names, report.repaired) }));
+			if (report.repaired.length > 0)
+				notify(
+					t("notice.sourceLinksRepaired", {
+						names: namesOf(names, report.repaired),
+					}),
+				);
 			const lost = lostLinkProviders(report.statuses);
 			const key = lostKey(report.statuses);
 			const changed = key !== reportedLost.current;
@@ -189,7 +200,10 @@ export function useAppSettings({
 				setLinkStatus(report.statuses);
 			} else {
 				startupLinks.current = true;
-				applyLinkReport(report, list, { lostMessage: "notice.sourceLinksLost", repeat: true });
+				applyLinkReport(report, list, {
+					lostMessage: "notice.sourceLinksLost",
+					repeat: true,
+				});
 			}
 
 			const saved = await Promise.all(
@@ -220,7 +234,10 @@ export function useAppSettings({
 	const ensureSourceLinks = useCallback(() => {
 		void attempt(async () => {
 			const report = await unwrap(commands.ensureSourceLinks());
-			applyLinkReport(report, providers, { lostMessage: "notice.sourceLinksStillLost", repeat: true });
+			applyLinkReport(report, providers, {
+				lostMessage: "notice.sourceLinksStillLost",
+				repeat: true,
+			});
 		});
 	}, [applyLinkReport, attempt, providers]);
 
@@ -229,7 +246,10 @@ export function useAppSettings({
 	const checkSourceLinksOnFocus = useCallback(() => {
 		void attempt(async () => {
 			const report = await unwrap(commands.ensureSourceLinks());
-			applyLinkReport(report, providers, { lostMessage: "notice.sourceLinksLost", repeat: false });
+			applyLinkReport(report, providers, {
+				lostMessage: "notice.sourceLinksLost",
+				repeat: false,
+			});
 		});
 	}, [applyLinkReport, attempt, providers]);
 	useLinkFocus(checkSourceLinksOnFocus);
@@ -252,7 +272,11 @@ export function useAppSettings({
 			await unwrap(commands.saveSourceKey(provider, key));
 			setKeysSaved((saved) => ({ ...saved, [provider]: Boolean(key) }));
 			forgetSourceAccount(provider);
-			notify(t(key ? "notice.sourceKeySaved" : "notice.sourceKeyRemoved", { name: namesOf(providers, [provider]) }));
+			notify(
+				t(key ? "notice.sourceKeySaved" : "notice.sourceKeyRemoved", {
+					name: namesOf(providers, [provider]),
+				}),
+			);
 			await refreshProviders();
 			// Wait for validation and the route refresh too: an update click right after saving must see the cached tier.
 			if (key) await refreshSourceAccount(provider, key);

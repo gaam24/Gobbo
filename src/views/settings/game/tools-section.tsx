@@ -57,7 +57,9 @@ export function ToolsSection({
 									{tool.missing.length > 0 && (
 										<ConfirmButton
 											label={t("settings.tools.installPrerequisites")}
-											title={t("settings.tools.installPrerequisitesTitle", { name: tool.name })}
+											title={t("settings.tools.installPrerequisitesTitle", {
+												name: tool.name,
+											})}
 											description={t("settings.tools.installPrerequisitesDescription", { names: tool.missing.join(", ") })}
 											confirmLabel={t("settings.tools.installPrerequisites")}
 											destructive={false}

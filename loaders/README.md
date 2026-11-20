@@ -90,17 +90,17 @@ The order is:
 loader base  ->  loader variant  ->  game.toml
 ```
 
-| Field                       | Merge                                                                                                  |
-| --------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `requires`                  | Added, no duplicates (case-insensitive path key). Loader first, then the game. Every requirement path is added too. |
+| Field                       | Merge                                                                                                                           |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `requires`                  | Added, no duplicates (case-insensitive path key). Loader first, then the game. Every requirement path is added too.             |
 | `requirements`              | Keyed by `path`, case-insensitive. A higher layer replaces the name and URL; new entries are appended. Each `path` is required. |
-| `deploy.root_files`         | Added, no duplicates. Loader first, then the game.                                                     |
-| `deploy.slots`              | Keyed by `dir`, case-insensitive. A higher layer replaces the whole slot. New slots are appended.      |
-| `deploy.mirror`             | Keyed by `dir`, case-insensitive. A higher layer replaces the whole mirror. New mirrors are appended.  |
-| `deploy.aliases`            | Keyed by alias name, case-insensitive. A higher layer replaces the target.                             |
-| `deploy.protected`          | Added, no duplicates.                                                                                  |
-| `deploy.shared`             | Appended: loader entries first, then the game's.                                                       |
-| `deploy.root`, `root_linux` | Only the game. A loader that sets them is invalid.                                                     |
+| `deploy.root_files`         | Added, no duplicates. Loader first, then the game.                                                                              |
+| `deploy.slots`              | Keyed by `dir`, case-insensitive. A higher layer replaces the whole slot. New slots are appended.                               |
+| `deploy.mirror`             | Keyed by `dir`, case-insensitive. A higher layer replaces the whole mirror. New mirrors are appended.                           |
+| `deploy.aliases`            | Keyed by alias name, case-insensitive. A higher layer replaces the target.                                                      |
+| `deploy.protected`          | Added, no duplicates.                                                                                                           |
+| `deploy.shared`             | Appended: loader entries first, then the game's.                                                                                |
+| `deploy.root`, `root_linux` | Only the game. A loader that sets them is invalid.                                                                              |
 
 A requirement implies its file: a file in `requirements` is required without a matching `requires` entry. Use `requires`
 only for a file with no name or download page to show. A game's own requirements are implied the same way.

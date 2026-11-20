@@ -31,9 +31,7 @@
     "shortDescription": "Mod manager for PC games",
     "longDescription": "Imports mod archives, keeps a mod list for each profile and deploys mods through an overlay layer. Windows and Linux.",
     "homepage": "https://github.com/gaam24/Gobbo",
-    "targets": [
-      "nsis"
-    ],
+    "targets": ["nsis"],
     "resources": {
       "../games": "games",
       "../loaders": "loaders"
@@ -55,11 +53,7 @@
     },
     "deep-link": {
       "desktop": {
-        "schemes": [
-          "nxm",
-          "ror2mm",
-          "gobbo"
-        ]
+        "schemes": ["nxm", "ror2mm", "gobbo"]
       }
     }
   }

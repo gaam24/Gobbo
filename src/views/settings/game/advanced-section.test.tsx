@@ -33,7 +33,12 @@ function render(loader: GameView["loader"]) {
 }
 
 test("the definition shows the loader name, id and variant", () => {
-	const html = render({ id: "bepinex", name: "BepInEx", variant: "5", default_variant: true });
+	const html = render({
+		id: "bepinex",
+		name: "BepInEx",
+		variant: "5",
+		default_variant: true,
+	});
 	expect(html).toContain("BepInEx");
 	expect(html).toContain("bepinex");
 	expect(html).toContain("Loader variant");

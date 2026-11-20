@@ -160,7 +160,9 @@ export function useCollectionInstalls({ onOpen }: UseCollectionInstallsOptions):
 			const hasPrompt = install.prompts.choice !== null || install.prompts.manual !== null || install.prompts.waiting !== null;
 			// A hand-picked file the download will supply is a passive wait, not a choice the user has to make.
 			const waitingOnly = install.prompts.waiting !== null && install.prompts.choice === null && install.prompts.manual === null;
-			let title = t("tasks.collectionInstalling", { name: install.identity.name });
+			let title = t("tasks.collectionInstalling", {
+				name: install.identity.name,
+			});
 
 			if (hasPrompt) title = t("tasks.collectionWaiting");
 
@@ -173,7 +175,10 @@ export function useCollectionInstalls({ onOpen }: UseCollectionInstallsOptions):
 				detail: t("collection.install.progress", { done, total, pending }),
 				percent,
 				state: hasPrompt ? "waiting" : "running",
-				cancel: { label: t("tasks.collectionStop"), run: () => stopRef.current(key) },
+				cancel: {
+					label: t("tasks.collectionStop"),
+					run: () => stopRef.current(key),
+				},
 				open: { label: t("tasks.collectionOpen"), run: () => onOpen(key) },
 				source: "local",
 				dedupe: {
@@ -417,7 +422,11 @@ export function useCollectionInstalls({ onOpen }: UseCollectionInstallsOptions):
 			const choice = installsRef.current.get(key)?.prompts.choice;
 
 			if (!choice) return;
-			await resolve(key, choice.key, { kind: "choice", path: choice.path, choices });
+			await resolve(key, choice.key, {
+				kind: "choice",
+				path: choice.path,
+				choices,
+			});
 		},
 		[resolve],
 	);

@@ -121,13 +121,25 @@ function Summary({ counts }: { counts: TaskCounts }) {
 	const parts: Array<{ key: string; text: string; className: string }> = [];
 
 	if (counts.running > 0)
-		parts.push({ key: "running", text: t("tasks.summary.running", { count: counts.running }), className: "text-foreground" });
+		parts.push({
+			key: "running",
+			text: t("tasks.summary.running", { count: counts.running }),
+			className: "text-foreground",
+		});
 
 	if (counts.waiting > 0)
-		parts.push({ key: "waiting", text: t("tasks.summary.waiting", { count: counts.waiting }), className: "text-draft" });
+		parts.push({
+			key: "waiting",
+			text: t("tasks.summary.waiting", { count: counts.waiting }),
+			className: "text-draft",
+		});
 
 	if (counts.failed > 0)
-		parts.push({ key: "failed", text: t("tasks.summary.failed", { count: counts.failed }), className: "text-destructive" });
+		parts.push({
+			key: "failed",
+			text: t("tasks.summary.failed", { count: counts.failed }),
+			className: "text-destructive",
+		});
 
 	return (
 		<p className="flex min-w-0 flex-wrap items-center text-sm font-medium">
@@ -215,7 +227,9 @@ function TaskRow({ task }: { task: Task }) {
 /// one in full colour, so the track reads without colour too.
 function StageTrack({ stages, state, label }: { stages: TaskStages; state: TaskState; label: string }) {
 	const { names, current } = stages;
-	const columns = { gridTemplateColumns: `repeat(${names.length}, minmax(0, 1fr))` };
+	const columns = {
+		gridTemplateColumns: `repeat(${names.length}, minmax(0, 1fr))`,
+	};
 	return (
 		<div className="grid gap-1">
 			<div

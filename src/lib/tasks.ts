@@ -196,7 +196,11 @@ function compareGames(a: TaskGameGroup, b: TaskGameGroup): -1 | 0 | 1 {
 }
 
 /// The order of rows inside one game: work in progress first, then work that waits for the user, then failures.
-const ROW_STATE_ORDER: Record<TaskState, number> = { running: 0, waiting: 1, failed: 2 };
+const ROW_STATE_ORDER: Record<TaskState, number> = {
+	running: 0,
+	waiting: 1,
+	failed: 2,
+};
 
 function compareRows(a: Task, b: Task): number {
 	return ROW_STATE_ORDER[a.state] - ROW_STATE_ORDER[b.state] || compareTasks(a, b);
@@ -220,7 +224,12 @@ export function groupedTasks(tasks: readonly Task[]): TaskGameGroup[] {
 
 	for (const [game, rows] of byGame) {
 		const sorted = rows.toSorted(compareRows);
-		games.push({ game, gameName: sorted.find((row) => Boolean(row.gameName))?.gameName, count: sorted.length, tasks: sorted });
+		games.push({
+			game,
+			gameName: sorted.find((row) => Boolean(row.gameName))?.gameName,
+			count: sorted.length,
+			tasks: sorted,
+		});
 	}
 
 	return games.toSorted(compareGames);

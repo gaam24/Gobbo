@@ -32,7 +32,10 @@ async function waitForInspector(label: string): Promise<void> {
 				(wanted: string) => [...document.querySelectorAll("[aria-label]")].some((element) => element.getAttribute("aria-label") === wanted),
 				label,
 			),
-		{ timeout: 30_000, timeoutMsg: `the inspector toggle ${label} did not appear` },
+		{
+			timeout: 30_000,
+			timeoutMsg: `the inspector toggle ${label} did not appear`,
+		},
 	);
 }
 

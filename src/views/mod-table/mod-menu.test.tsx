@@ -74,9 +74,22 @@ function mod(id: string, name: string): Status_Serialize["mods"][number] {
 const alpha = mod("alpha", "Alpha");
 const beta = mod("beta", "Beta");
 
-const bundle: Status_Serialize["groups"] = [{ id: "grp1", name: "Quality tweaks", members: [alpha.id, beta.id], kind: "bundle" }];
+const bundle: Status_Serialize["groups"] = [
+	{
+		id: "grp1",
+		name: "Quality tweaks",
+		members: [alpha.id, beta.id],
+		kind: "bundle",
+	},
+];
 const translation: Status_Serialize["groups"] = [
-	{ id: "grp2", name: "German pack", members: [alpha.id, beta.id], kind: "translation", language: "German" },
+	{
+		id: "grp2",
+		name: "German pack",
+		members: [alpha.id, beta.id],
+		kind: "translation",
+		language: "German",
+	},
 ];
 
 function menuFor(target: Mod, groups: Status_Serialize["groups"], selection: string[] = []): string {
@@ -155,8 +168,18 @@ test("a mod outside a group keeps the single-mod menu", () => {
 
 test("a right click on one of several selected mods describes that mod's own group", () => {
 	const separate: Status_Serialize["groups"] = [
-		{ id: "g1", name: "First pair", members: [alpha.id, "gamma"], kind: "bundle" },
-		{ id: "g2", name: "Second pair", members: [beta.id, "delta"], kind: "bundle" },
+		{
+			id: "g1",
+			name: "First pair",
+			members: [alpha.id, "gamma"],
+			kind: "bundle",
+		},
+		{
+			id: "g2",
+			name: "Second pair",
+			members: [beta.id, "delta"],
+			kind: "bundle",
+		},
 	];
 	const html = menuFor(alpha, separate, [alpha.id, beta.id]);
 	expect(html).toContain("First pair");

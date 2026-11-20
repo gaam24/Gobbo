@@ -27,7 +27,10 @@ run("bun", ["run", "build:overlay-hook", "--release"]);
 run("bun", ["run", "build:web"]);
 // Tauri copies `games/` into the target directory but never removes a folder a rename left behind. Start empty so the
 // release run and any later package read one definition per game, under its current id.
-rmSync(path.join(targetDir, "release", "games"), { recursive: true, force: true });
+rmSync(path.join(targetDir, "release", "games"), {
+	recursive: true,
+	force: true,
+});
 // Tauri's build script writes `resource.lib` under `target/release/build`. A `cargo clean -p` of another package can
 // remove that folder while Cargo still considers the app fingerprint fresh, and the linker then fails on the missing
 // file; remove the app fingerprint so the build script runs again.

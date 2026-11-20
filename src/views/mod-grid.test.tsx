@@ -81,7 +81,11 @@ function listed(overrides: Partial<Mod> = {}): Mod {
 	};
 }
 
-const alpha = listed({ id: "alpha", folder: "Alpha", info: { name: "Alpha", version: null, author: null, description: null } });
+const alpha = listed({
+	id: "alpha",
+	folder: "Alpha",
+	info: { name: "Alpha", version: null, author: null, description: null },
+});
 const beta = listed({
 	id: "beta",
 	folder: "Beta",
@@ -229,13 +233,24 @@ test("the page header tri-state follows its parts", () => {
 	const mixed = renderToString(<ModGrid {...gridProps({ rows: pageRows })} />);
 	expect(mixed).toContain('aria-checked="mixed"');
 	const all = renderToString(
-		<ModGrid {...gridProps({ rows: rowsOf([pagePart("nexus:225", "Base"), pagePart("nexus:225#200", "Addon")]) })} />,
+		<ModGrid
+			{...gridProps({
+				rows: rowsOf([pagePart("nexus:225", "Base"), pagePart("nexus:225#200", "Addon")]),
+			})}
+		/>,
 	);
 	expect(all).toContain('aria-checked="true"');
 });
 
 test("a folded page keeps its header and hides its cards", () => {
-	const html = renderToString(<ModGrid {...gridProps({ rows: pageRows, foldedPages: new Set([pageRowId("nexus:225")]) })} />);
+	const html = renderToString(
+		<ModGrid
+			{...gridProps({
+				rows: pageRows,
+				foldedPages: new Set([pageRowId("nexus:225")]),
+			})}
+		/>,
+	);
 	expect(html).toContain("AudioXL");
 	expect(html).toContain('aria-expanded="false"');
 	expect(html).not.toContain('data-mod="nexus:225"');
@@ -248,7 +263,14 @@ test("a page with one visible part stays a plain card", () => {
 	expect(html).toContain('data-mod="nexus:225"');
 });
 
-const bundle: ModGroup[] = [{ id: "g1", name: "Quality tweaks", members: [alpha.id, beta.id], kind: "bundle" }];
+const bundle: ModGroup[] = [
+	{
+		id: "g1",
+		name: "Quality tweaks",
+		members: [alpha.id, beta.id],
+		kind: "bundle",
+	},
+];
 
 test("two mods of a user group get one compact header with a mod count and their cards together", () => {
 	const html = renderToString(<ModGrid {...gridProps({ rows: rowsOf([alpha, beta]), groups: bundle })} />);
@@ -263,7 +285,13 @@ test("two mods of a user group get one compact header with a mod count and their
 
 test("a folded user group keeps its compact header and hides its cards", () => {
 	const html = renderToString(
-		<ModGrid {...gridProps({ rows: rowsOf([alpha, beta]), groups: bundle, foldedPages: new Set([groupRowId("g1")]) })} />,
+		<ModGrid
+			{...gridProps({
+				rows: rowsOf([alpha, beta]),
+				groups: bundle,
+				foldedPages: new Set([groupRowId("g1")]),
+			})}
+		/>,
 	);
 	expect(html).toContain("Quality tweaks");
 	expect(html).not.toContain('data-mod="alpha"');
@@ -271,7 +299,15 @@ test("a folded user group keeps its compact header and hides its cards", () => {
 });
 
 test("a translation group shows its language in the compact header", () => {
-	const groups: ModGroup[] = [{ id: "g2", name: "German pack", members: [alpha.id, beta.id], kind: "translation", language: "German" }];
+	const groups: ModGroup[] = [
+		{
+			id: "g2",
+			name: "German pack",
+			members: [alpha.id, beta.id],
+			kind: "translation",
+			language: "German",
+		},
+	];
 	const html = renderToString(<ModGrid {...gridProps({ rows: rowsOf([alpha, beta]), groups })} />);
 	expect(html).toContain("German pack");
 	expect(html).toContain("German");

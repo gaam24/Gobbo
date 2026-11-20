@@ -28,7 +28,11 @@ export function BisectBar({
 				<h2 className="font-semibold">{t("bisect.title")}</h2>
 				{bisect.found === null ? (
 					<span className="text-muted-foreground">
-						{t("bisect.step", { step: bisect.step, left: bisect.steps_left, suspects: bisect.suspects })}
+						{t("bisect.step", {
+							step: bisect.step,
+							left: bisect.steps_left,
+							suspects: bisect.suspects,
+						})}
 					</span>
 				) : (
 					<span>{t("bisect.found", { name: bisect.found })}</span>

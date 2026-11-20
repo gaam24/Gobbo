@@ -10,16 +10,16 @@ window in `src/` calls the Tauri commands in `src-tauri/src/commands/`. Layout: 
 
 ## 1. Route before you read
 
-| Task                                                   | Open next — only this                                                                                                      |
-| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
-| anything user-visible, docs or config                  | `CHANGELOG.md` → **Unreleased**; [docs/README.md](docs/README.md) for the documentation map                                 |
-| React window, a screen, a shared component             | [src/AGENTS.md](src/AGENTS.md); for visual work also [DESIGN.md](DESIGN.md) and [docs/ux/glossary.md](docs/ux/glossary.md) |
-| Rust app, a command, an IPC type                       | [src-tauri/AGENTS.md](src-tauri/AGENTS.md)                                                                                  |
-| anything under `src-tauri/crates/overlay-hook/`        | [ARCHITECTURE.md](src-tauri/crates/overlay-hook/ARCHITECTURE.md) — read it **first**; it is the binding contract for the hook |
-| a game or a loader definition                          | [games/README.md](games/README.md) and [loaders/README.md](loaders/README.md)                                              |
-| game state, the primary action or a long-running task  | [docs/state-machines.md](docs/state-machines.md)                                                                           |
-| a Windows/Linux difference                             | [PLATFORMS.md](PLATFORMS.md) and the platform rules in the area guide                                                       |
-| seeing or measuring the real window                    | load the `gobbo-run-app` skill; runbook in [docs/agent/run-app.md](docs/agent/run-app.md)                                   |
+| Task                                                  | Open next — only this                                                                                                         |
+| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| anything user-visible, docs or config                 | `CHANGELOG.md` → **Unreleased**; [docs/README.md](docs/README.md) for the documentation map                                   |
+| React window, a screen, a shared component            | [src/AGENTS.md](src/AGENTS.md); for visual work also [DESIGN.md](DESIGN.md) and [docs/ux/glossary.md](docs/ux/glossary.md)    |
+| Rust app, a command, an IPC type                      | [src-tauri/AGENTS.md](src-tauri/AGENTS.md)                                                                                    |
+| anything under `src-tauri/crates/overlay-hook/`       | [ARCHITECTURE.md](src-tauri/crates/overlay-hook/ARCHITECTURE.md) — read it **first**; it is the binding contract for the hook |
+| a game or a loader definition                         | [games/README.md](games/README.md) and [loaders/README.md](loaders/README.md)                                                 |
+| game state, the primary action or a long-running task | [docs/state-machines.md](docs/state-machines.md)                                                                              |
+| a Windows/Linux difference                            | [PLATFORMS.md](PLATFORMS.md) and the platform rules in the area guide                                                         |
+| seeing or measuring the real window                   | load the `gobbo-run-app` skill; runbook in [docs/agent/run-app.md](docs/agent/run-app.md)                                     |
 
 A narrower guide can point to further docs; follow only the part you touch. If two files disagree, the more specific
 contract wins for its area (the hook's `ARCHITECTURE.md` wins for the hook) — fix the stale one in the same change.

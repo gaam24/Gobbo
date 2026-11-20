@@ -50,7 +50,15 @@ describe("matchesUpdateDownload", () => {
 	});
 
 	test("another file of the same mod does not match", () => {
-		expect(matchesUpdateDownload(target(), download({ source: { provider: "nexus", mod_id: "7", file_id: "100" } }), "game")).toBe(false);
+		expect(
+			matchesUpdateDownload(
+				target(),
+				download({
+					source: { provider: "nexus", mod_id: "7", file_id: "100" },
+				}),
+				"game",
+			),
+		).toBe(false);
 	});
 
 	test("a provider without file ids matches on the mod", () => {
@@ -61,8 +69,14 @@ describe("matchesUpdateDownload", () => {
 
 	test("a download of another game or provider does not match", () => {
 		expect(matchesUpdateDownload(target(), download({ game: "other" }), "game")).toBe(false);
-		expect(matchesUpdateDownload(target(), download({ source: { provider: "thunderstore", mod_id: "7", file_id: "200" } }), "game")).toBe(
-			false,
-		);
+		expect(
+			matchesUpdateDownload(
+				target(),
+				download({
+					source: { provider: "thunderstore", mod_id: "7", file_id: "200" },
+				}),
+				"game",
+			),
+		).toBe(false);
 	});
 });

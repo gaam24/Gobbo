@@ -4,566 +4,1348 @@ import { invoke as __TAURI_INVOKE, Channel } from "@tauri-apps/api/core";
 
 /** Commands */
 export const commands = {
-	/**
-	 *  Lists the tasks the window can see in the global Working panel. It answers with the same `CommandResult` shape as
-	 *  the other read commands, so a reload can hydrate the panel through the shared IPC helper.
-	 */
-	listTasks: () => typedError<TaskView_Serialize[], AppError_Serialize>(__TAURI_INVOKE("list_tasks")),
-	/**
-	 *  Stops a task by the id it was registered with. The id is the key of the stored cancellation flag, so the specific
-	 *  cancel commands and this generic one share the same mechanism.
-	 */
-	cancelTask: (id: string) => __TAURI_INVOKE<void>("cancel_task", { id }),
-	/**  Forgets a failed or waiting task the user dismissed in the Working panel. */
-	dismissTask: (id: string) => __TAURI_INVOKE<void>("dismiss_task", { id }),
-	/**
-	 *  Every game from the bundled and user definition folders, with invalid user files reported. The frontend gets only
-	 *  what the UI shows.
-	 */
-	listGames: () => typedError<GameCatalog_Serialize, AppError_Serialize>(__TAURI_INVOKE("list_games")),
-	/**  The game icon from `games/<id>/icon.webp` (or `icon.png`) as a data URL. `None` when there is no icon. */
-	gameIcon: (game: string) => typedError<string | null, AppError_Serialize>(__TAURI_INVOKE("game_icon", { game })),
-	/**  Writes a shareable zip with the definition and its icon. */
-	exportDefinition: (game: string, path: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("export_definition", { game, path })),
-	/**  Reads a game folder and suggests a name, id, programs, markers, loader and store ids for the editor. Read-only. */
-	inspectGameFolder: (path: string) => typedError<FolderInspection_Serialize, AppError_Serialize>(__TAURI_INVOKE("inspect_game_folder", { path })),
-	/**  The loader presets the editor offers, including the user's own files under `definitions/loaders/`. */
-	loaderPresets: () => typedError<LoaderPresetView_Serialize[], AppError_Serialize>(__TAURI_INVOKE("loader_presets")),
-	/**  The definition text of a game, for the editor. A user definition wins over a bundled one with the same id. */
-	definitionSource: (id: string) => typedError<DefinitionSource, AppError_Serialize>(__TAURI_INVOKE("definition_source", { id })),
-	/**  Checks a draft without writing anything: parses it, merges its loader and validates the result. */
-	validateDefinition: (text: string) => typedError<DefinitionCheck_Serialize, AppError_Serialize>(__TAURI_INVOKE("validate_definition", { text })),
-	/**
-	 *  Writes a valid draft under `<data>/definitions/games/<id>/`. A bundled id is refused; `overwrite` replaces a user
-	 *  definition with the same id.
-	 */
-	saveDefinition: (text: string, overwrite: boolean) => typedError<SavedDefinition, AppError_Serialize>(__TAURI_INVOKE("save_definition", { text, overwrite })),
-	/**
-	 *  Reads a definition package for the import dialog. A mod archive is reported as `games.package_empty`, so a dropped
-	 *  mod can fall back to the normal import.
-	 */
-	inspectDefinitionPackage: (path: string) => typedError<DefinitionPackagePreview_Serialize, AppError_Serialize>(__TAURI_INVOKE("inspect_definition_package", { path })),
-	/**  Writes a valid definition package into the user definitions. An existing user game or loader needs `overwrite`. */
-	importDefinitionPackage: (path: string, overwrite: boolean) => typedError<ImportedDefinitionPackage, AppError_Serialize>(__TAURI_INVOKE("import_definition_package", { path, overwrite })),
-	/**
-	 *  Places the files of an archive with a draft definition and writes nothing. The window shows the result in the
-	 *  editor, so a new definition can be checked before it is saved.
-	 */
-	previewDefinition: (text: string, path: string) => typedError<DefinitionPreview, AppError_Serialize>(__TAURI_INVOKE("preview_definition", { text, path })),
-	getStatus: (game: string) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_status", { game })),
-	/**
-	 *  Brings every profile in step with the library and answers the fresh status. A change, not a query: it saves
-	 *  the profiles when the library gained or lost a mod.
-	 */
-	syncProfiles: (game: string) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("sync_profiles", { game })),
-	/**  What the game needs before the first apply: folders, loader, overlay support and free space. */
-	preflight: (game: string) => typedError<PreflightReport_Serialize, AppError_Serialize>(__TAURI_INVOKE("preflight", { game })),
-	/**  One list of the things that block an apply and the warnings that do not, with the next action for each. */
-	healthCheck: (game: string) => typedError<HealthReport_Serialize, AppError_Serialize>(__TAURI_INVOKE("health_check", { game })),
-	/**  Saves the settings of a game. */
-	saveSettings: (game: string, settings: Settings_Deserialize) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("save_settings", { game, settings })),
-	/**  Switches one Proton option on or off. The newest saved list is changed, so a quick second switch keeps the first. */
-	setProtonOption: (game: string, option: string, on: boolean) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("set_proton_option", { game, option, on })),
-	/**  Adds a file or folder to the profile data of a game. A path already listed changes nothing. */
-	addProfileData: (game: string, path: string) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("add_profile_data", { game, path })),
-	/**  Removes a file or folder from the profile data of a game. */
-	removeProfileData: (game: string, path: string) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("remove_profile_data", { game, path })),
-	modDetails: (game: string, folder: string) => typedError<ModDetails_Serialize, AppError_Serialize>(__TAURI_INVOKE("mod_details", { game, folder })),
-	/**
-	 *  The page text, notes and relation details of the rows in the table's viewport. The list row keeps only what it
-	 *  draws, so the optional columns and the inspector ask for the rest here.
-	 */
-	modExtras: (game: string, folders: string[]) => typedError<ModExtras_Serialize[], AppError_Serialize>(__TAURI_INVOKE("mod_extras", { game, folders })),
-	/**  Every installed version of a mod family, for the table's version picker. */
-	modVersions: (game: string, folder: string) => typedError<VersionView_Serialize[], AppError_Serialize>(__TAURI_INVOKE("mod_versions", { game, folder })),
-	/**
-	 *  Import runs in the background, so the window does not freeze. Progress goes through a channel to the window.
-	 *  `choices` are the choices from the FOMOD wizard; `None` is a normal, full import, while an empty list is an
-	 *  installer with nothing to pick (its required options still decide the files). `source` names the provider file a
-	 *  download came from; without it the sidecar or the archive name may name one. A download of the queue shows its
-	 *  import there too.
-	 */
-	importZip: (game: string, path: string, choices: Choice_Deserialize[] | null, source: SourceRef_Deserialize | null, progress: Channel<ImportProgress>) => typedError<ImportView_Serialize, AppError_Serialize>(__TAURI_INVOKE("import_zip", { game, path, choices, source, progress })),
-	/**  Stops a loose import at the next chunk or file. A stopped import commits nothing. */
-	cancelImport: (game: string, path: string) => __TAURI_INVOKE<void>("cancel_import", { game, path }),
-	/**
-	 *  Saves the active list. When the window sends the row revisions it holds, the answer carries only the rows that
-	 *  changed.
-	 */
-	saveProfile: (game: string, rows: Row_Deserialize[], known: KnownRows | null) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("save_profile", { game, rows, known })),
-	/**  Saves the active profile's mod groups. Stale members and groups left with fewer than two members are dropped. */
-	saveModGroups: (game: string, groups: ModGroup_Deserialize[]) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("save_mod_groups", { game, groups })),
-	/**
-	 *  Moves the block containing `id` (a page run or a stored group) directly above or below the block containing
-	 *  `target`. `side` is `above` or `below`.
-	 */
-	moveMod: (game: string, id: string, target: string, side: string) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("move_mod", { game, id, target, side })),
-	/**  Enables or disables every part of the page or group header `id`. */
-	setModEnabled: (game: string, id: string, enabled: boolean) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("set_mod_enabled", { game, id, enabled })),
-	/**  Sorts the active list alphabetically by mod name, moving groups as one block. */
-	sortListByName: (game: string) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("sort_list_by_name", { game })),
-	/**  Sorts the active list so every mod stands above the mods it overrides, using the same rules as `sort_by_rules`. */
-	sortList: (game: string) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("sort_list", { game })),
-	/**  Creates one group from the listed mod ids. A selection of fewer than two mods is refused. */
-	groupMods: (game: string, ids: string[]) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("group_mods", { game, ids })),
-	/**  Removes a group, leaving its mods where they are on the list. */
-	ungroupMods: (game: string, groupId: string) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("ungroup_mods", { game, groupId })),
-	/**  Adds a separator above the block containing `id`, or renames the separator `id`. */
-	setSeparator: (game: string, id: string, name: string) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("set_separator", { game, id, name })),
-	/**  Puts a mod into a group or takes it out of every group with `None`. */
-	setModGroup: (game: string, id: string, groupId: string | null) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("set_mod_group", { game, id, groupId })),
-	/**
-	 *  Makes the active profile's list the one of a Mod Organizer 2 `modlist.txt` at `path`. The answer names what was left
-	 *  out.
-	 */
-	importMo2List: (game: string, path: string) => typedError<Mo2Import, AppError_Serialize>(__TAURI_INVOKE("import_mo2_list", { game, path })),
-	/**  Reads an r2modman or Gale profile (`mods.yml`) and matches its packages against the library. Nothing is written. */
-	inspectCommunityProfile: (game: string, path: string) => typedError<CommunityProfilePreview_Serialize, AppError_Serialize>(__TAURI_INVOKE("inspect_community_profile", { game, path })),
-	/**  Creates a normal profile from an r2modman or Gale profile. The new profile becomes active. */
-	importCommunityProfile: (game: string, path: string, name: string) => typedError<CommunityProfileImport_Serialize, AppError_Serialize>(__TAURI_INVOKE("import_community_profile", { game, path, name })),
-	/**
-	 *  Applies the active profile to the game. The progress channel receives the phase and the number of files written,
-	 *  so the window can show the real percent.
-	 */
-	apply: (game: string, progress: Channel<DeployProgress>) => typedError<ApplyView, AppError_Serialize>(__TAURI_INVOKE("apply", { game, progress })),
-	/**  What a deployment of the active profile would do, before it does anything. */
-	previewDeployment: (game: string) => typedError<DeployPreview, AppError_Serialize>(__TAURI_INVOKE("preview_deployment", { game })),
-	/**  Every shared file of the active profile, its winner, its losers and the size of the winning copy. */
-	conflictExplorer: (game: string) => typedError<ConflictExplorer, AppError_Serialize>(__TAURI_INVOKE("conflict_explorer", { game })),
-	/**  One copy of a conflicting file, as a data URL when the window can show its format. */
-	conflictFilePreview: (game: string, path: string, family: string) => typedError<ConflictPreview_Serialize, AppError_Serialize>(__TAURI_INVOKE("conflict_file_preview", { game, path, family })),
-	/**  Takes the deployment of the active profile out of the game. The answer lists what could not be undone. */
-	undo: (game: string) => typedError<Message[], AppError_Serialize>(__TAURI_INVOKE("undo", { game })),
-	createProfile: (game: string, name: string, copyFrom: string | null, copyData: boolean) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("create_profile", { game, name, copyFrom, copyData })),
-	/**  Copies another profile's list and data into this one. The target's earlier data is kept as a snapshot. */
-	copyProfileData: (game: string, source: string, target: string) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("copy_profile_data", { game, source, target })),
-	renameProfile: (game: string, id: string, name: string) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("rename_profile", { game, id, name })),
-	switchProfile: (game: string, id: string) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("switch_profile", { game, id })),
-	deleteProfile: (game: string, id: string) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("delete_profile", { game, id })),
-	/**  Sets whether the profile keeps a user-data set of the game separate. */
-	setProfileUserData: (game: string, profile: string, set: string, isolated: boolean) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("set_profile_user_data", { game, profile, set, isolated })),
-	/**  Moves an isolated redirect set back into the game's folder and makes it shared again. */
-	moveProfileUserData: (game: string, profile: string, set: string) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("move_profile_user_data", { game, profile, set })),
-	/**  The size of the profile's own data for one user-data set, in whole kilobytes. */
-	userDataSize: (game: string, profile: string, set: string) => typedError<number, AppError_Serialize>(__TAURI_INVOKE("user_data_size", { game, profile, set })),
-	rescanLibrary: (game: string) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("rescan_library", { game })),
-	/**  Profiles that use a mod family, with the selected version and whether a prepared deployment contains it. */
-	modUsage: (game: string, id: string) => typedError<ModUsage_Serialize, AppError_Serialize>(__TAURI_INVOKE("mod_usage", { game, id })),
-	deleteMod: (game: string, id: string) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("delete_mod", { game, id })),
-	/**  Removes every part of the source page the family belongs to. */
-	deleteModPage: (game: string, id: string) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("delete_mod_page", { game, id })),
-	/**  Switches the version of one mod in the active profile. */
-	setModVersion: (game: string, id: string, folder: string) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("set_mod_version", { game, id, folder })),
-	/**
-	 *  Removes one installed version. `replacement` takes over in every profile that used it; without one a used
-	 *  version must be the last of its family, which removes the whole mod.
-	 */
-	deleteModVersion: (game: string, folder: string, replacement: string | null) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("delete_mod_version", { game, folder, replacement })),
-	/**
-	 *  Unpacks one mod again from its archive copy. `choices` are new FOMOD answers; `None` keeps the saved ones. The
-	 *  index keeps the user's data for it.
-	 */
-	reinstallMod: (game: string, folder: string, choices: Choice_Deserialize[] | null) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("reinstall_mod", { game, folder, choices })),
-	/**  Reads the FOMOD steps of a version's archive copy, for the "change installer options" wizard. */
-	reinstallInspect: (game: string, folder: string) => typedError<ZipInspect_Serialize, AppError_Serialize>(__TAURI_INVOKE("reinstall_inspect", { game, folder })),
-	/**  Compares the installed folder with its archive copy and lists what the import left out. */
-	archiveReport: (game: string, folder: string) => typedError<ArchiveReport, AppError_Serialize>(__TAURI_INVOKE("archive_report", { game, folder })),
-	/**
-	 *  Checks one installed version against the checksum recorded at import. The first check of an older version
-	 *  records the current files as the baseline.
-	 */
-	verifyIntegrity: (game: string, folder: string) => typedError<IntegrityStatus, AppError_Serialize>(__TAURI_INVOKE("verify_integrity", { game, folder })),
-	/**  Removes every version that no profile selects. */
-	deleteUnusedVersions: (game: string) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("delete_unused_versions", { game })),
-	/**  Saves the mod's tags (given by the user, for filtering the list). */
-	setModTags: (game: string, id: string, tags: string[]) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("set_mod_tags", { game, id, tags })),
-	/**  Saves the user's note about the mod. */
-	setModNote: (game: string, id: string, note: string) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("set_mod_note", { game, id, note })),
-	/**  Starts the search for the mod that breaks the game: half of the enabled mods go off for the first test. */
-	bisectStart: (game: string) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("bisect_start", { game })),
-	/**  Answers a test of the search: whether the problem was there with this half of the mods. */
-	bisectAnswer: (game: string, broken: boolean) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("bisect_answer", { game, broken })),
-	/**  Ends the search and puts the list back. With `disable_found`, the mod found stays off. */
-	bisectStop: (game: string, disableFound: boolean) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("bisect_stop", { game, disableFound })),
-	/**  The files the game and its tools wrote into the overlay of the active profile. */
-	overwriteFiles: (game: string) => typedError<OverwriteView, AppError_Serialize>(__TAURI_INVOKE("overwrite_files", { game })),
-	/**  Turns the files the game wrote into a new mod, enabled at the top of the list. */
-	overwriteToMod: (game: string, name: string) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("overwrite_to_mod", { game, name })),
-	/**  Removes the files the game wrote into the overlay of the active profile. */
-	clearOverwrite: (game: string) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("clear_overwrite", { game })),
-	/**
-	 *  Runs a tool of the game in the overlay. Registers a task and returns as soon as the program has started; the
-	 *  `tool-exited` event carries its exit code when it ends. The run can be stopped from the Working panel with
-	 *  `cancel_task` before the program starts.
-	 */
-	runTool: (game: string, tool: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("run_tool", { game, tool })),
-	/**
-	 *  Installs the prerequisites of a tool into the game's Proton prefix. Runs as a task, so the Working panel shows it
-	 *  for its whole duration and `cancel_task` can stop it before it begins.
-	 */
-	installToolPrerequisites: (game: string, tool: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("install_tool_prerequisites", { game, tool })),
-	/**  Saves the load priority the user set for a mod, or clears it with `null`. */
-	setModPriority: (game: string, id: string, priority: number | null) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("set_mod_priority", { game, id, priority })),
-	/**  Games added to Gobbo, with the game folder and whether that folder exists. Games outside this list have no tabs. */
-	managedGames: () => typedError<ManagedGame[], AppError_Serialize>(__TAURI_INVOKE("managed_games")),
-	/**  Looks for supported games in the Steam libraries on this computer. Read-only; nothing changes. */
-	scanGames: () => typedError<GameScan_Serialize[], AppError_Serialize>(__TAURI_INVOKE("scan_games")),
-	/**
-	 *  Opens the page a game definition names for a required file, for example the `BepInEx` releases page. The URL comes
-	 *  from the definition, so the window cannot open an arbitrary address.
-	 */
-	openRequirementPage: (game: string, path: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("open_requirement_page", { game, path })),
-	/**  Adds a game with its folder. Answers the games added to Gobbo. */
-	addGame: (game: string, gameRoot: string) => typedError<ManagedGame[], AppError_Serialize>(__TAURI_INVOKE("add_game", { game, gameRoot })),
-	/**  Checks a folder for a game before the game is added. The result is the marker file the folder has, if the game names one. */
-	checkGameFolder: (game: string, gameRoot: string) => typedError<string | null, AppError_Serialize>(__TAURI_INVOKE("check_game_folder", { game, gameRoot })),
-	/**  Removes a game from Gobbo. Its data stays in `games/<id>.removed`. Answers the games that are left. */
-	removeGame: (game: string) => typedError<ManagedGame[], AppError_Serialize>(__TAURI_INVOKE("remove_game", { game })),
-	/**  Restores the data of a removed game and adds it to the list again. */
-	restoreGame: (game: string) => typedError<ManagedGame[], AppError_Serialize>(__TAURI_INVOKE("restore_game", { game })),
-	/**  Deletes the data of a removed game. The active data folder of the same game is not touched. */
-	deleteRemovedGame: (game: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("delete_removed_game", { game })),
-	/**  Every game data folder with its size, active and removed, for the storage page. */
-	storageUsage: () => typedError<GameDataUsage[], AppError_Serialize>(__TAURI_INVOKE("storage_usage")),
-	/**
-	 *  Launches the game's executable (through Proton on Linux). `executable` is the name from the game definition,
-	 *  `None` = the default. `apply_draft` applies the current list first; otherwise a clean deployment starts as it
-	 *  is. Returns `true` when the game starts with mods, that is, when the deployment is prepared.
-	 * 
-	 *  When the game ends, the command sends `game-exited` with its id, so the running check stops at once instead of
-	 *  waiting for the next poll.
-	 */
-	launchGame: (game: string, executable: string | null, applyDraft: boolean) => typedError<boolean, AppError_Serialize>(__TAURI_INVOKE("launch_game", { game, executable, applyDraft })),
-	/**
-	 *  Whether the game runs now, from Gobbo or from Steam. Deploying and launching wait while it does; editing does
-	 *  not.
-	 */
-	gameRunning: (game: string) => typedError<boolean, AppError_Serialize>(__TAURI_INVOKE("game_running", { game })),
-	/**  Stops the game and records that the user asked for it, so the last run is not treated as a crash. */
-	stopGame: (game: string) => typedError<boolean, AppError_Serialize>(__TAURI_INVOKE("stop_game", { game })),
-	/**  The operating system: `windows`, `linux` or `macos`. The interface hides what does not apply to it, such as Proton. */
-	platform: () => __TAURI_INVOKE<string>("platform"),
-	/**  The Proton builds on this computer, for the game settings to offer. Empty on Windows, where there is no Proton. */
-	protonBuilds: () => typedError<ProtonBuild[], AppError_Serialize>(__TAURI_INVOKE("proton_builds")),
-	/**  The Proton options the game settings can switch on, on this computer. Empty on Windows, where there is no Proton. */
-	protonOptions: () => __TAURI_INVOKE<string[]>("proton_options"),
-	/**
-	 *  Stops every process of the game, also one started outside Gobbo. Returns `true` when a process was stopped.
-	 *  The last launch of a game: its steps and how the game ended. `None` before the first launch from Gobbo.
-	 */
-	lastRun: (game: string) => typedError<RunReport_Serialize | null, AppError_Serialize>(__TAURI_INVOKE("last_run", { game })),
-	/**  App settings shared by all games, for example the interface language. */
-	appSettings: () => typedError<AppSettings_Serialize, AppError_Serialize>(__TAURI_INVOKE("app_settings")),
-	/**  The data folder, shown in the global settings. */
-	dataFolder: () => __TAURI_INVOKE<string>("data_folder"),
-	/**  The storage mode, the data folder and the file that records the choice. */
-	storageInfo: () => typedError<StorageInfo, AppError_Serialize>(__TAURI_INVOKE("storage_info")),
-	/**  Replaces the tray's words after the interface language changes. */
-	setTrayLabels: (labels: TrayLabels) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("set_tray_labels", { labels })),
-	/**
-	 *  Tells the tray which game the window shows and what it is busy with. The tray keeps the last value when the window
-	 *  closes, so its status remains meaningful while work continues in the background.
-	 */
-	setTrayContext: (game: string | null, busy: string | null) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("set_tray_context", { game, busy })),
-	/**  The update path of this copy. */
-	updateChannel: () => typedError<UpdateChannel, AppError_Serialize>(__TAURI_INVOKE("update_channel")),
-	/**  Looks for a newer portable version. The manifest is read through the updater plugin, with its own key. */
-	portableUpdateCheck: () => typedError<PortableUpdate | null, AppError_Serialize>(__TAURI_INVOKE("portable_update_check")),
-	/**
-	 *  Downloads the newer portable version, checks its signature, replaces the program files and starts the new copy.
-	 *  The data folder is not touched. The command returns only when it fails: on success the app restarts.
-	 */
-	portableUpdateInstall: (progress: Channel<PortableUpdateStep_Deserialize>) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("portable_update_install", { progress })),
-	/**
-	 *  Opens a folder in the system file manager, or reveals a file in its folder. Only paths that belong
-	 *  to Gobbo's data folder or to the configured game folders are accepted, so the webview cannot ask
-	 *  the system to open an arbitrary file or program.
-	 */
-	openPath: (game: string | null, path: string, reveal: boolean) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("open_path", { game, path, reveal })),
-	/**  Opens a mod's page on any provider the game has a key for. */
-	openSourcePage: (provider: string, gameKey: string, modId: string, tab: string | null) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("open_source_page", { provider, gameKey, modId, tab })),
-	/**
-	 *  Opens the files page of a mod the library knows. The page URL comes from the provider, the mod id from the library and
-	 *  the game key from the game definition.
-	 */
-	openUpdatePage: (game: string, id: string, provider: string, tab: string | null) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("open_update_page", { game, id, provider, tab })),
-	/**
-	 *  Reads a mod's page from its provider and saves the common metadata. Requires the provider's saved key when it
-	 *  needs one.
-	 */
-	refreshSourceMeta: (game: string, provider: string, modId: string) => typedError<SourceMeta_Serialize, AppError_Serialize>(__TAURI_INVOKE("refresh_source_meta", { game, provider, modId })),
-	/**
-	 *  Saves the app settings. Each provider in `source_links` makes Gobbo the system's handler of its deep links; a provider
-	 *  left out gives its links up, when Gobbo has them.
-	 */
-	saveAppSettings: (settings: AppSettings_Deserialize) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("save_app_settings", { settings })),
-	/**
-	 *  The system's handler for each download-link scheme the settings take, and whether it is this Gobbo. Nothing is
-	 *  changed.
-	 */
-	sourceLinkStatus: () => typedError<SourceLinkStatus[], AppError_Serialize>(__TAURI_INVOKE("source_link_status")),
-	/**
-	 *  Takes back the download links of every provider the settings take, when another program has them. Answers what the
-	 *  system uses now, and which providers Gobbo registered again.
-	 */
-	ensureSourceLinks: () => typedError<SourceLinksReport, AppError_Serialize>(__TAURI_INVOKE("ensure_source_links")),
-	/**  Every provider this build knows, in the order the settings list them. */
-	sourceProviders: () => __TAURI_INVOKE<SourceProviderInfo[]>("source_providers"),
-	/**  Opens the page where the user makes a provider's key, in the browser. The provider owns the URL. */
-	openSourceKeyPage: (provider: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("open_source_key_page", { provider })),
-	/**  Whether a provider key is saved. A provider that needs no key answers `true`. */
-	sourceKeySaved: (provider: string) => typedError<boolean, AppError_Serialize>(__TAURI_INVOKE("source_key_saved", { provider })),
-	/**  Stores (or clears) a provider key in the OS credential store. */
-	saveSourceKey: (provider: string, key: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("save_source_key", { provider, key })),
-	/**  Checks a provider key at the source; without an argument it checks the saved one. */
-	validateSourceKey: (provider: string, apiKey: string | null) => typedError<SourceAccount, AppError_Serialize>(__TAURI_INVOKE("validate_source_key", { provider, apiKey })),
-	/**
-	 *  Checks every source of the game for updates through its provider. Requires the provider's saved key when it
-	 *  needs one.
-	 */
-	checkUpdates: (game: string) => typedError<UpdateReport_Serialize[], AppError_Serialize>(__TAURI_INVOKE("check_updates", { game })),
-	/**
-	 *  Starts the backend-owned browser step for `targets` and answers the first view. The command asks the window to open
-	 *  the first provider page with [`MANUAL_PAGE_EVENT`]; the window only renders the view and reports finished downloads.
-	 */
-	startManualUpdates: (game: string, targets: ManualTarget_Deserialize[]) => __TAURI_INVOKE<ManualUpdateView_Serialize>("start_manual_updates", { game, targets }),
-	/**  The current view of one browser run. A window that reloads or switches back reads the run without losing it. */
-	manualUpdateStatus: (game: string) => __TAURI_INVOKE<ManualUpdateView_Serialize>("manual_update_status", { game }),
-	/**  Reports a transient download step for a target that has not settled yet. */
-	manualUpdateStep: (game: string, id: string, step: ManualStep) => __TAURI_INVOKE<ManualUpdateView_Serialize>("manual_update_step", { game, id, step }),
-	/**
-	 *  The window reports that one target's download finished and imported. The backend selects the new version, settles
-	 *  the target and asks for the next page. A selection failure is kept on the target as a translatable error code.
-	 */
-	manualUpdateDownloadDone: (game: string, id: string) => typedError<ManualUpdateView_Serialize, AppError_Serialize>(__TAURI_INVOKE("manual_update_download_done", { game, id })),
-	/**  Skips the target the run is waiting on and asks for the next provider page. */
-	manualUpdateNext: (game: string) => __TAURI_INVOKE<ManualUpdateView_Serialize>("manual_update_next", { game }),
-	/**  Ends a browser run and hands back one undo for every version it selected, plus the failures it kept. */
-	manualUpdateFinish: (game: string) => __TAURI_INVOKE<ManualUpdateFinish>("manual_update_finish", { game }),
-	/**  Stops a run without a finish handoff. Downloads already started import themselves, as before. */
-	manualUpdateCancel: (game: string) => __TAURI_INVOKE<void>("manual_update_cancel", { game }),
-	/**  Asks the window to reopen the current page after a game switch. */
-	manualUpdateReopen: (game: string) => __TAURI_INVOKE<ManualPageRequest | null>("manual_update_reopen", { game }),
-	/**
-	 *  Downloads the newest file of one source, installs it and selects it in the active profile. The channel carries the
-	 *  download and import progress; the answer is the fresh status.
-	 */
-	updateMod: (game: string, id: string, provider: string, progress: Channel<UpdateProgress>) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("update_mod", { game, id, provider, progress })),
-	/**
-	 *  Updates every mod with a saved newer version, or only the mods `ids` names, one after another. It ends with the fresh
-	 *  status and the failures.
-	 */
-	updateAll: (game: string, ids: string[] | null, progress: Channel<UpdateAllProgress>) => typedError<UpdateAllView_Serialize, AppError_Serialize>(__TAURI_INVOKE("update_all", { game, ids, progress })),
-	/**  Selects the installed version that matches the provider's newest file, after the user downloaded it by hand. */
-	selectUpdateVersion: (game: string, id: string, provider: string) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("select_update_version", { game, id, provider })),
-	/**
-	 *  Stops the bulk update at the next mod, or in the middle of the download of the current one. The mods already
-	 *  updated stay updated.
-	 */
-	cancelUpdateAll: (game: string) => __TAURI_INVOKE<void>("cancel_update_all", { game }),
-	/**  Installs or enables a requirement of the selected mod, then answers with the fresh status. */
-	installRequirement: (game: string, source: SourceRef_Deserialize, progress: Channel<UpdateProgress>) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("install_requirement", { game, source, progress })),
-	/**
-	 *  The requirement closure of the selected mod version: direct requirements, transitive ones the library knows,
-	 *  alternatives, cycles and the reason a step is blocked. Nothing is downloaded.
-	 */
-	previewRequirements: (game: string, folder: string) => typedError<RequirementPlan_Serialize, AppError_Serialize>(__TAURI_INVOKE("preview_requirements", { game, folder })),
-	/**  Installs every step the plan can install and saves the profile list once, so the whole closure is one undo. */
-	installRequirements: (game: string, folder: string, progress: Channel<UpdateProgress>) => typedError<RequirementInstallView_Serialize, AppError_Serialize>(__TAURI_INVOKE("install_requirements", { game, folder, progress })),
-	/**
-	 *  Reads the page of each source that never had it read: name, author, category, description and picture. Without a
-	 *  provider key it does nothing. Answers how many mods got their page; the window then reads the status again.
-	 */
-	fillSourceInfo: (game: string) => typedError<number, AppError_Serialize>(__TAURI_INVOKE("fill_source_info", { game })),
-	/**  A mod's saved page picture as a data URL. `None` when the file is gone. */
-	sourcePicture: (game: string, provider: string, file: string) => typedError<string | null, AppError_Serialize>(__TAURI_INVOKE("source_picture", { game, provider, file })),
-	/**
-	 *  Checks every source of one mod for updates through its provider. Requires the provider's saved key when it needs
-	 *  one.
-	 */
-	checkModUpdate: (game: string, id: string) => typedError<UpdateReport_Serialize, AppError_Serialize>(__TAURI_INVOKE("check_mod_update", { game, id })),
-	/**  Saves the source id the user typed for a mod. `None` removes that provider's entry. */
-	setModSource: (game: string, id: string, provider: string, modId: string | null) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("set_mod_source", { game, id, provider, modId })),
-	/**  Hides the version the provider lists now, until the provider lists another one. */
-	ignoreVersion: (game: string, id: string, provider: string) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("ignore_version", { game, id, provider })),
-	/**  Shows the ignored version again. */
-	unignoreVersion: (game: string, id: string, provider: string) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("unignore_version", { game, id, provider })),
-	/**  Saves the name, version and author typed for one version of a mod. An empty field goes back to `info.json`. */
-	setModInfo: (game: string, id: string, folder: string, info: ModInfoEdit_Deserialize) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("set_mod_info", { game, id, folder, info })),
-	/**  Compares two profiles of the game: the mods that differ between them and how many are the same. */
-	compareProfiles: (game: string, first: string, second: string) => typedError<ProfileCompare_Serialize, AppError_Serialize>(__TAURI_INVOKE("compare_profiles", { game, first, second })),
-	/**  Saves the instructions for players of a mod. An empty text removes them. */
-	setModInstructions: (game: string, id: string, text: string) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("set_mod_instructions", { game, id, text })),
-	/**  Saves the mods a mod requires, the mods it does not work with, and the mods it overrides. */
-	setModRelations: (game: string, id: string, relations: Relations_Deserialize) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("set_mod_relations", { game, id, relations })),
-	/**  Adds one mod to a relation list of a mod. A relation already listed is left as it is. */
-	addRelation: (game: string, id: string, kind: RelationKind, other: string) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("add_relation", { game, id, kind, other })),
-	/**  Removes one mod from a relation list of a mod. */
-	removeRelation: (game: string, id: string, kind: RelationKind, other: string) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("remove_relation", { game, id, kind, other })),
-	/**  Adds one requirement to a mod. A mod already listed under the same provider and id is left as it is. */
-	addRequirement: (game: string, id: string, requirement: SourceRequirement_Deserialize) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("add_requirement", { game, id, requirement })),
-	/**  Removes the requirement for one provider mod from a mod. */
-	removeRequirement: (game: string, id: string, provider: string, reqModId: string) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("remove_requirement", { game, id, provider, reqModId })),
-	/**  Sets whether the requirement for one provider mod is ignored. */
-	setRequirementIgnored: (game: string, id: string, provider: string, reqModId: string, ignored: boolean) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("set_requirement_ignored", { game, id, provider, reqModId, ignored })),
-	/**  What sorting by the rules would move. Nothing is written. */
-	previewSort: (game: string) => typedError<SortPreview, AppError_Serialize>(__TAURI_INVOKE("preview_sort", { game })),
-	/**
-	 *  Sorts the active list so every mod stands above the mods it overrides. The rest keeps its order. The previous
-	 *  order is one history entry, so the sort is one undo.
-	 */
-	sortByRules: (game: string) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("sort_by_rules", { game })),
-	/**  The earlier states of the active list, newest first. */
-	listHistory: (game: string) => typedError<HistoryEntry_Serialize[], AppError_Serialize>(__TAURI_INVOKE("list_history", { game })),
-	/**  What restoring an earlier state of the active list would change. Nothing is written. */
-	previewRestore: (game: string, id: number) => typedError<HistoryPreview_Serialize, AppError_Serialize>(__TAURI_INVOKE("preview_restore", { game, id })),
-	/**  Takes the last change of the active list back. */
-	undoList: (game: string) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("undo_list", { game })),
-	/**  Brings back the change the last undo took away. */
-	redoList: (game: string) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("redo_list", { game })),
-	/**  Restores an earlier state of the active list. The restore itself can be undone. */
-	restoreList: (game: string, id: number) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("restore_list", { game, id })),
-	/**  Chooses which mod's copy of a file wins in the active profile. `family` `None` goes back to the list order. */
-	setFileWinner: (game: string, path: string, family: string | null) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("set_file_winner", { game, path, family })),
-	/**  Chooses the winning mod for several file paths at once, as one undoable change. */
-	setFileWinners: (game: string, paths: string[], family: string) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("set_file_winners", { game, paths, family })),
-	/**
-	 *  Writes the chosen profiles as a mod pack: a recipe of the mods, their files and choices, with the archives the
-	 *  options ask for.
-	 */
-	exportPack: (game: string, path: string, options: PackOptions_Deserialize) => typedError<PackExportView, AppError_Serialize>(__TAURI_INVOKE("export_pack", { game, path, options })),
-	/**  What stands in the way of sharing the chosen profiles as a pack. */
-	checkPack: (game: string, options: PackOptions_Deserialize) => typedError<PackIssue[], AppError_Serialize>(__TAURI_INVOKE("check_pack", { game, options })),
-	/**  Reads a pack and says what an import would do: the mods it has, the ones to get, and the profiles it updates. */
-	inspectPack: (game: string, path: string) => typedError<PackPreview_Serialize, AppError_Serialize>(__TAURI_INVOKE("inspect_pack", { game, path })),
-	/**  Imports a pack: the archives inside it, then its profiles, made new or updated from an earlier version. */
-	importPack: (game: string, path: string) => typedError<PackImportView_Serialize, AppError_Serialize>(__TAURI_INVOKE("import_pack", { game, path })),
-	/**  Imports a pack with progress and a cancel flag. The command owns the flag; `cancel_pack_import` sets it. */
-	importPackWithProgress: (game: string, path: string, progress: Channel<ImportProgress>) => typedError<PackImportView_Serialize, AppError_Serialize>(__TAURI_INVOKE("import_pack_with_progress", { game, path, progress })),
-	/**
-	 *  Marks a running pack import or download for cancellation. It stops between batches; a committed batch stays in the
-	 *  library.
-	 */
-	cancelPackImport: (game: string, path: string) => __TAURI_INVOKE<void>("cancel_pack_import", { game, path }),
-	/**
-	 *  Stops a running pack mod download at the next batch. The download and the import it runs share one flag, so the
-	 *  whole operation stops; a separate pack import of the same file keeps running.
-	 */
-	cancelPackDownload: (game: string, path: string) => __TAURI_INVOKE<void>("cancel_pack_download", { game, path }),
-	/**  Saves the steps a mod asks for. Each step must be one the game defines for that phase. */
-	setModSteps: (game: string, folder: string, beforeStart: string[], afterEnd: string[]) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("set_mod_steps", { game, folder, beforeStart, afterEnd })),
-	/**  Preview of an archive: a plain zip, or a FOMOD installer with the steps for the wizard. */
-	inspectZip: (game: string, path: string) => typedError<ZipInspect_Serialize, AppError_Serialize>(__TAURI_INVOKE("inspect_zip", { game, path })),
-	/**
-	 *  The FOMOD wizard's answer for an archive's installer under the user's picks: the visible steps, the group rules,
-	 *  the option kinds and the picks the import takes. `null` gives the default selection. Read like `inspect_zip`.
-	 */
-	fomodState: (game: string, path: string, selection: Choice_Deserialize[] | null) => typedError<FomodState_Serialize, AppError_Serialize>(__TAURI_INVOKE("fomod_state", { game, path, selection })),
-	/**  The same answer for a version's archive copy, for the "change installer options" wizard. */
-	reinstallFomodState: (game: string, folder: string, selection: Choice_Deserialize[] | null) => typedError<FomodState_Serialize, AppError_Serialize>(__TAURI_INVOKE("reinstall_fomod_state", { game, folder, selection })),
-	/**
-	 *  The wizard's answer after one option click. The backend applies the group rules to the current picks and answers
-	 *  with a fresh view; the window only renders it. Read-only: nothing is saved until the wizard confirms the install.
-	 */
-	fomodTogglePick: (game: string, source: FomodSource, selection: Choice_Deserialize[], step: number, group: number, option: string) => typedError<FomodState_Serialize, AppError_Serialize>(__TAURI_INVOKE("fomod_toggle_pick", { game, source, selection, step, group, option })),
-	/**
-	 *  The wizard's answer when a reinstall starts from saved choices: the saved answers laid over the installer
-	 *  defaults, with the same validation a click applies. Read-only until the wizard saves.
-	 */
-	fomodSelectionFromChoices: (game: string, source: FomodSource, choices: Choice_Deserialize[]) => typedError<FomodState_Serialize, AppError_Serialize>(__TAURI_INVOKE("fomod_selection_from_choices", { game, source, choices })),
-	/**  The download queue: what comes in from the providers, what waits for its import, and what this run installed. */
-	listDownloads: () => __TAURI_INVOKE<DownloadView_Serialize[]>("list_downloads"),
-	/**  Takes a finished download of a link for its automatic install. `None` when it was taken already. */
-	claimDownload: (id: number) => __TAURI_INVOKE<DownloadView_Serialize | null>("claim_download", { id }),
-	/**  Stops a running download, or deletes a downloaded file, and takes it off the queue. */
-	removeDownload: (id: number) => typedError<DownloadView_Serialize[], AppError_Serialize>(__TAURI_INVOKE("remove_download", { id })),
-	/**  Downloads a failed link again. The key in a link expires after a while; then only a new click on the provider helps. */
-	retryDownload: (id: number) => __TAURI_INVOKE<DownloadView_Serialize[]>("retry_download", { id }),
-	/**  Takes the installed and the failed downloads off the queue. */
-	clearDownloads: () => __TAURI_INVOKE<DownloadView_Serialize[]>("clear_downloads"),
-	/**
-	 *  Downloads the mods of a pack that the library lacks (premium accounts only), then imports the pack. Its own task
-	 *  key lets `cancel_pack_download` stop the download and the batches that follow it as one operation.
-	 */
-	downloadPackMods: (game: string, path: string, progress: Channel<PackDownload>) => typedError<PackImportView_Serialize, AppError_Serialize>(__TAURI_INVOKE("download_pack_mods", { game, path, progress })),
-	/**  Downloads a pack link after checking its hash, so the existing pack preview can inspect the file. */
-	downloadPackLink: (game: string, link: string, progress: Channel<PackLinkProgress>) => typedError<PackLinkDownload, AppError_Serialize>(__TAURI_INVOKE("download_pack_link", { game, link, progress })),
-	/**  Stops a pack link download at the next chunk. */
-	cancelPackLink: (game: string, link: string) => __TAURI_INVOKE<void>("cancel_pack_link", { game, link }),
-	/**  Takes the pending pack link, if a deep link arrived before the window asked for it. */
-	takePackLink: () => __TAURI_INVOKE<string | null>("take_pack_link"),
-	/**  Opens a collection link and returns the plan and the active profile's statuses. */
-	inspectCollection: (game: string, link: string, revision: number | null) => typedError<CollectionPreview_Serialize, AppError_Serialize>(__TAURI_INVOKE("inspect_collection", { game, link, revision })),
-	/**
-	 *  Drives one full automatic round of a collection install and answers the fresh session together with the single
-	 *  prompt that pauses it. The backend owns the loop; the window calls this once and then only sends a decision.
-	 */
-	collectionRunRound: (game: string, profile: string, collection: string, progress: Channel<CollectionProgress_Deserialize>) => typedError<CollectionRoundView_Serialize, AppError_Serialize>(__TAURI_INVOKE("collection_run_round", { game, profile, collection, progress })),
-	/**
-	 *  Resolves the prompt a round paused on and drives the next round. `item` is the member the prompt named; the
-	 *  decision carries only the wizard choices, the picked path or the skip.
-	 */
-	collectionResolvePrompt: (game: string, profile: string, collection: string, item: string, decision: CollectionDecision_Deserialize, progress: Channel<CollectionProgress_Deserialize>) => typedError<CollectionRoundView_Serialize, AppError_Serialize>(__TAURI_INVOKE("collection_resolve_prompt", { game, profile, collection, item, decision, progress })),
-	/**
-	 *  Stops the running collection round at the next member or download chunk. The round owns the same task flag as the
-	 *  one-command install, so this is the stop action of the Working row.
-	 */
-	collectionStop: (game: string, profile: string, collection: string) => __TAURI_INVOKE<void>("collection_stop", { game, profile, collection }),
-	/**  Creates or updates the profile of a collection and returns its live session. */
-	startCollection: (game: string, request: CollectionInstallRequest_Deserialize) => typedError<CollectionSessionView_Serialize, AppError_Serialize>(__TAURI_INVOKE("start_collection", { game, request })),
-	/**  The live status of one collection in one profile. */
-	collectionStatus: (game: string, profile: string, collection: string) => typedError<CollectionSessionView_Serialize, AppError_Serialize>(__TAURI_INVOKE("collection_status", { game, profile, collection })),
-	/**  Reads the current revision of every collection in a profile and records the newest each provider reports. */
-	checkCollectionUpdates: (game: string, profile: string) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("check_collection_updates", { game, profile })),
-	/**  Settles the imported members, records the families the collection added and orders its block. One profile edit. */
-	finishCollection: (game: string, profile: string, collection: string) => typedError<CollectionSessionView_Serialize, AppError_Serialize>(__TAURI_INVOKE("finish_collection", { game, profile, collection })),
-	/**  Permanently skips one member. A temporary skip is the window's queue, not a profile change. */
-	skipCollectionItem: (game: string, profile: string, collection: string, item: string, permanent: boolean) => typedError<CollectionSessionView_Serialize, AppError_Serialize>(__TAURI_INVOKE("skip_collection_item", { game, profile, collection, item, permanent })),
-	/**
-	 *  Installs the selected members automatically. A FOMOD without stored choices is returned in `needs_choice`; the
-	 *  window imports it with its wizard and calls the command again until the list is empty.
-	 */
-	installCollection: (game: string, profile: string, collection: string, progress: Channel<CollectionProgress_Deserialize>) => typedError<CollectionInstallView_Serialize, AppError_Serialize>(__TAURI_INVOKE("install_collection", { game, profile, collection, progress })),
-	/**  The guided flow's next member: a Nexus file page, an automatic bundle/direct install, or a manual instruction. */
-	prepareCollectionItem: (game: string, profile: string, collection: string, item: string) => typedError<CollectionItemAction_Serialize, AppError_Serialize>(__TAURI_INVOKE("prepare_collection_item", { game, profile, collection, item })),
-	/**  Imports a file the user picked for one member, with the wizard's choices when the archive is a FOMOD. */
-	importCollectionFile: (game: string, profile: string, collection: string, item: string, path: string, choices: Choice_Deserialize[] | null) => typedError<CollectionSessionView_Serialize, AppError_Serialize>(__TAURI_INVOKE("import_collection_file", { game, profile, collection, item, path, choices })),
-	/**  Opens the collection page of one profile origin. */
-	openCollectionPage: (game: string, profile: string, collection: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("open_collection_page", { game, profile, collection })),
-	/**  Marks a manual or browse member as installed by hand. */
-	markCollectionItem: (game: string, profile: string, collection: string, item: string) => typedError<CollectionSessionView_Serialize, AppError_Serialize>(__TAURI_INVOKE("mark_collection_item", { game, profile, collection, item })),
-	/**  Removes a collection from a profile. The library and the archives stay. */
-	removeCollection: (game: string, profile: string, collection: string) => typedError<CollectionSessionView_Serialize, AppError_Serialize>(__TAURI_INVOKE("remove_collection", { game, profile, collection })),
-	/**  Takes the pending collection link, if a deep link arrived before the window asked for it. */
-	takeCollectionLink: () => __TAURI_INVOKE<string | null>("take_collection_link"),
-	/**  Drops a collection download expectation when the user skips or cancels the member. */
-	forgetCollectionDownload: (owner: string) => __TAURI_INVOKE<void>("forget_collection_download", { owner }),
-	/**  Runs the x64 and x86 overlay probes in the active session and returns their checks. */
-	runOverlayProbe: (game: string) => typedError<OverlayProbeReport[], AppError_Serialize>(__TAURI_INVOKE("run_overlay_probe", { game })),
-	/**  The state folder of the active overlay session, for the "open folder" button. */
-	overlayState: (game: string) => typedError<string | null, AppError_Serialize>(__TAURI_INVOKE("overlay_state", { game })),
-	/**  The mounts of one game and the user-data layers no profile uses any more. */
-	mountDiagnostics: (game: string) => typedError<MountDiagnostics, AppError_Serialize>(__TAURI_INVOKE("mount_diagnostics", { game })),
-	/**  Removes the orphaned layers the user confirmed, after checking they are still orphans. */
-	cleanOrphanLayers: (game: string, paths: string[]) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("clean_orphan_layers", { game, paths })),
-	/**  Writes a support bundle with the log, version and, when a game is selected, its definition, setup check and last run. */
-	createSupportBundle: (game: string | null) => typedError<string, AppError_Serialize>(__TAURI_INVOKE("create_support_bundle", { game })),
-	/**  Records a render error or an unhandled rejection from the webview in the same log as the backend. */
-	logFrontendError: (message: string, detail: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("log_frontend_error", { message, detail })),
-	/**  Every snapshot of the game, newest first. */
-	snapshots: (game: string) => typedError<SnapshotView[], AppError_Serialize>(__TAURI_INVOKE("snapshots", { game })),
-	/**  Saves the profile's stored data now. The game must not be running. */
-	createSnapshot: (game: string, profile: string) => typedError<SnapshotView, AppError_Serialize>(__TAURI_INVOKE("create_snapshot", { game, profile })),
-	/**  What restoring a snapshot would change. Nothing is written. */
-	previewSnapshotRestore: (game: string, id: string) => typedError<RestorePreview, AppError_Serialize>(__TAURI_INVOKE("preview_snapshot_restore", { game, id })),
-	/**  Restores a snapshot after writing a fresh backup. The game must not be running. */
-	restoreSnapshot: (game: string, id: string) => typedError<RestoreOutcome_Serialize, AppError_Serialize>(__TAURI_INVOKE("restore_snapshot", { game, id })),
-	/**  Removes a snapshot folder. */
-	deleteSnapshot: (game: string, id: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("delete_snapshot", { game, id })),
+  /**
+   *  Lists the tasks the window can see in the global Working panel. It answers with the same `CommandResult` shape as
+   *  the other read commands, so a reload can hydrate the panel through the shared IPC helper.
+   */
+  listTasks: () =>
+    typedError<TaskView_Serialize[], AppError_Serialize>(
+      __TAURI_INVOKE("list_tasks"),
+    ),
+  /**
+   *  Stops a task by the id it was registered with. The id is the key of the stored cancellation flag, so the specific
+   *  cancel commands and this generic one share the same mechanism.
+   */
+  cancelTask: (id: string) => __TAURI_INVOKE<void>("cancel_task", { id }),
+  /**  Forgets a failed or waiting task the user dismissed in the Working panel. */
+  dismissTask: (id: string) => __TAURI_INVOKE<void>("dismiss_task", { id }),
+  /**
+   *  Every game from the bundled and user definition folders, with invalid user files reported. The frontend gets only
+   *  what the UI shows.
+   */
+  listGames: () =>
+    typedError<GameCatalog_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("list_games"),
+    ),
+  /**  The game icon from `games/<id>/icon.webp` (or `icon.png`) as a data URL. `None` when there is no icon. */
+  gameIcon: (game: string) =>
+    typedError<string | null, AppError_Serialize>(
+      __TAURI_INVOKE("game_icon", { game }),
+    ),
+  /**  Writes a shareable zip with the definition and its icon. */
+  exportDefinition: (game: string, path: string) =>
+    typedError<null, AppError_Serialize>(
+      __TAURI_INVOKE("export_definition", { game, path }),
+    ),
+  /**  Reads a game folder and suggests a name, id, programs, markers, loader and store ids for the editor. Read-only. */
+  inspectGameFolder: (path: string) =>
+    typedError<FolderInspection_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("inspect_game_folder", { path }),
+    ),
+  /**  The loader presets the editor offers, including the user's own files under `definitions/loaders/`. */
+  loaderPresets: () =>
+    typedError<LoaderPresetView_Serialize[], AppError_Serialize>(
+      __TAURI_INVOKE("loader_presets"),
+    ),
+  /**  The definition text of a game, for the editor. A user definition wins over a bundled one with the same id. */
+  definitionSource: (id: string) =>
+    typedError<DefinitionSource, AppError_Serialize>(
+      __TAURI_INVOKE("definition_source", { id }),
+    ),
+  /**  Checks a draft without writing anything: parses it, merges its loader and validates the result. */
+  validateDefinition: (text: string) =>
+    typedError<DefinitionCheck_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("validate_definition", { text }),
+    ),
+  /**
+   *  Writes a valid draft under `<data>/definitions/games/<id>/`. A bundled id is refused; `overwrite` replaces a user
+   *  definition with the same id.
+   */
+  saveDefinition: (text: string, overwrite: boolean) =>
+    typedError<SavedDefinition, AppError_Serialize>(
+      __TAURI_INVOKE("save_definition", { text, overwrite }),
+    ),
+  /**
+   *  Reads a definition package for the import dialog. A mod archive is reported as `games.package_empty`, so a dropped
+   *  mod can fall back to the normal import.
+   */
+  inspectDefinitionPackage: (path: string) =>
+    typedError<DefinitionPackagePreview_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("inspect_definition_package", { path }),
+    ),
+  /**  Writes a valid definition package into the user definitions. An existing user game or loader needs `overwrite`. */
+  importDefinitionPackage: (path: string, overwrite: boolean) =>
+    typedError<ImportedDefinitionPackage, AppError_Serialize>(
+      __TAURI_INVOKE("import_definition_package", { path, overwrite }),
+    ),
+  /**
+   *  Places the files of an archive with a draft definition and writes nothing. The window shows the result in the
+   *  editor, so a new definition can be checked before it is saved.
+   */
+  previewDefinition: (text: string, path: string) =>
+    typedError<DefinitionPreview, AppError_Serialize>(
+      __TAURI_INVOKE("preview_definition", { text, path }),
+    ),
+  getStatus: (game: string) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("get_status", { game }),
+    ),
+  /**
+   *  Brings every profile in step with the library and answers the fresh status. A change, not a query: it saves
+   *  the profiles when the library gained or lost a mod.
+   */
+  syncProfiles: (game: string) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("sync_profiles", { game }),
+    ),
+  /**  What the game needs before the first apply: folders, loader, overlay support and free space. */
+  preflight: (game: string) =>
+    typedError<PreflightReport_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("preflight", { game }),
+    ),
+  /**  One list of the things that block an apply and the warnings that do not, with the next action for each. */
+  healthCheck: (game: string) =>
+    typedError<HealthReport_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("health_check", { game }),
+    ),
+  /**  Saves the settings of a game. */
+  saveSettings: (game: string, settings: Settings_Deserialize) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("save_settings", { game, settings }),
+    ),
+  /**  Switches one Proton option on or off. The newest saved list is changed, so a quick second switch keeps the first. */
+  setProtonOption: (game: string, option: string, on: boolean) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("set_proton_option", { game, option, on }),
+    ),
+  /**  Adds a file or folder to the profile data of a game. A path already listed changes nothing. */
+  addProfileData: (game: string, path: string) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("add_profile_data", { game, path }),
+    ),
+  /**  Removes a file or folder from the profile data of a game. */
+  removeProfileData: (game: string, path: string) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("remove_profile_data", { game, path }),
+    ),
+  modDetails: (game: string, folder: string) =>
+    typedError<ModDetails_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("mod_details", { game, folder }),
+    ),
+  /**
+   *  The page text, notes and relation details of the rows in the table's viewport. The list row keeps only what it
+   *  draws, so the optional columns and the inspector ask for the rest here.
+   */
+  modExtras: (game: string, folders: string[]) =>
+    typedError<ModExtras_Serialize[], AppError_Serialize>(
+      __TAURI_INVOKE("mod_extras", { game, folders }),
+    ),
+  /**  Every installed version of a mod family, for the table's version picker. */
+  modVersions: (game: string, folder: string) =>
+    typedError<VersionView_Serialize[], AppError_Serialize>(
+      __TAURI_INVOKE("mod_versions", { game, folder }),
+    ),
+  /**
+   *  Import runs in the background, so the window does not freeze. Progress goes through a channel to the window.
+   *  `choices` are the choices from the FOMOD wizard; `None` is a normal, full import, while an empty list is an
+   *  installer with nothing to pick (its required options still decide the files). `source` names the provider file a
+   *  download came from; without it the sidecar or the archive name may name one. A download of the queue shows its
+   *  import there too.
+   */
+  importZip: (
+    game: string,
+    path: string,
+    choices: Choice_Deserialize[] | null,
+    source: SourceRef_Deserialize | null,
+    progress: Channel<ImportProgress>,
+  ) =>
+    typedError<ImportView_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("import_zip", { game, path, choices, source, progress }),
+    ),
+  /**  Stops a loose import at the next chunk or file. A stopped import commits nothing. */
+  cancelImport: (game: string, path: string) =>
+    __TAURI_INVOKE<void>("cancel_import", { game, path }),
+  /**
+   *  Saves the active list. When the window sends the row revisions it holds, the answer carries only the rows that
+   *  changed.
+   */
+  saveProfile: (
+    game: string,
+    rows: Row_Deserialize[],
+    known: KnownRows | null,
+  ) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("save_profile", { game, rows, known }),
+    ),
+  /**  Saves the active profile's mod groups. Stale members and groups left with fewer than two members are dropped. */
+  saveModGroups: (game: string, groups: ModGroup_Deserialize[]) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("save_mod_groups", { game, groups }),
+    ),
+  /**
+   *  Moves the block containing `id` (a page run or a stored group) directly above or below the block containing
+   *  `target`. `side` is `above` or `below`.
+   */
+  moveMod: (game: string, id: string, target: string, side: string) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("move_mod", { game, id, target, side }),
+    ),
+  /**  Enables or disables every part of the page or group header `id`. */
+  setModEnabled: (game: string, id: string, enabled: boolean) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("set_mod_enabled", { game, id, enabled }),
+    ),
+  /**  Sorts the active list alphabetically by mod name, moving groups as one block. */
+  sortListByName: (game: string) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("sort_list_by_name", { game }),
+    ),
+  /**  Sorts the active list so every mod stands above the mods it overrides, using the same rules as `sort_by_rules`. */
+  sortList: (game: string) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("sort_list", { game }),
+    ),
+  /**  Creates one group from the listed mod ids. A selection of fewer than two mods is refused. */
+  groupMods: (game: string, ids: string[]) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("group_mods", { game, ids }),
+    ),
+  /**  Removes a group, leaving its mods where they are on the list. */
+  ungroupMods: (game: string, groupId: string) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("ungroup_mods", { game, groupId }),
+    ),
+  /**  Adds a separator above the block containing `id`, or renames the separator `id`. */
+  setSeparator: (game: string, id: string, name: string) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("set_separator", { game, id, name }),
+    ),
+  /**  Puts a mod into a group or takes it out of every group with `None`. */
+  setModGroup: (game: string, id: string, groupId: string | null) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("set_mod_group", { game, id, groupId }),
+    ),
+  /**
+   *  Makes the active profile's list the one of a Mod Organizer 2 `modlist.txt` at `path`. The answer names what was left
+   *  out.
+   */
+  importMo2List: (game: string, path: string) =>
+    typedError<Mo2Import, AppError_Serialize>(
+      __TAURI_INVOKE("import_mo2_list", { game, path }),
+    ),
+  /**  Reads an r2modman or Gale profile (`mods.yml`) and matches its packages against the library. Nothing is written. */
+  inspectCommunityProfile: (game: string, path: string) =>
+    typedError<CommunityProfilePreview_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("inspect_community_profile", { game, path }),
+    ),
+  /**  Creates a normal profile from an r2modman or Gale profile. The new profile becomes active. */
+  importCommunityProfile: (game: string, path: string, name: string) =>
+    typedError<CommunityProfileImport_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("import_community_profile", { game, path, name }),
+    ),
+  /**
+   *  Applies the active profile to the game. The progress channel receives the phase and the number of files written,
+   *  so the window can show the real percent.
+   */
+  apply: (game: string, progress: Channel<DeployProgress>) =>
+    typedError<ApplyView, AppError_Serialize>(
+      __TAURI_INVOKE("apply", { game, progress }),
+    ),
+  /**  What a deployment of the active profile would do, before it does anything. */
+  previewDeployment: (game: string) =>
+    typedError<DeployPreview, AppError_Serialize>(
+      __TAURI_INVOKE("preview_deployment", { game }),
+    ),
+  /**  Every shared file of the active profile, its winner, its losers and the size of the winning copy. */
+  conflictExplorer: (game: string) =>
+    typedError<ConflictExplorer, AppError_Serialize>(
+      __TAURI_INVOKE("conflict_explorer", { game }),
+    ),
+  /**  One copy of a conflicting file, as a data URL when the window can show its format. */
+  conflictFilePreview: (game: string, path: string, family: string) =>
+    typedError<ConflictPreview_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("conflict_file_preview", { game, path, family }),
+    ),
+  /**  Takes the deployment of the active profile out of the game. The answer lists what could not be undone. */
+  undo: (game: string) =>
+    typedError<Message[], AppError_Serialize>(__TAURI_INVOKE("undo", { game })),
+  createProfile: (
+    game: string,
+    name: string,
+    copyFrom: string | null,
+    copyData: boolean,
+  ) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("create_profile", { game, name, copyFrom, copyData }),
+    ),
+  /**  Copies another profile's list and data into this one. The target's earlier data is kept as a snapshot. */
+  copyProfileData: (game: string, source: string, target: string) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("copy_profile_data", { game, source, target }),
+    ),
+  renameProfile: (game: string, id: string, name: string) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("rename_profile", { game, id, name }),
+    ),
+  switchProfile: (game: string, id: string) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("switch_profile", { game, id }),
+    ),
+  deleteProfile: (game: string, id: string) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("delete_profile", { game, id }),
+    ),
+  /**  Sets whether the profile keeps a user-data set of the game separate. */
+  setProfileUserData: (
+    game: string,
+    profile: string,
+    set: string,
+    isolated: boolean,
+  ) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("set_profile_user_data", { game, profile, set, isolated }),
+    ),
+  /**  Moves an isolated redirect set back into the game's folder and makes it shared again. */
+  moveProfileUserData: (game: string, profile: string, set: string) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("move_profile_user_data", { game, profile, set }),
+    ),
+  /**  The size of the profile's own data for one user-data set, in whole kilobytes. */
+  userDataSize: (game: string, profile: string, set: string) =>
+    typedError<number, AppError_Serialize>(
+      __TAURI_INVOKE("user_data_size", { game, profile, set }),
+    ),
+  rescanLibrary: (game: string) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("rescan_library", { game }),
+    ),
+  /**  Profiles that use a mod family, with the selected version and whether a prepared deployment contains it. */
+  modUsage: (game: string, id: string) =>
+    typedError<ModUsage_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("mod_usage", { game, id }),
+    ),
+  deleteMod: (game: string, id: string) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("delete_mod", { game, id }),
+    ),
+  /**  Removes every part of the source page the family belongs to. */
+  deleteModPage: (game: string, id: string) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("delete_mod_page", { game, id }),
+    ),
+  /**  Switches the version of one mod in the active profile. */
+  setModVersion: (game: string, id: string, folder: string) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("set_mod_version", { game, id, folder }),
+    ),
+  /**
+   *  Removes one installed version. `replacement` takes over in every profile that used it; without one a used
+   *  version must be the last of its family, which removes the whole mod.
+   */
+  deleteModVersion: (
+    game: string,
+    folder: string,
+    replacement: string | null,
+  ) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("delete_mod_version", { game, folder, replacement }),
+    ),
+  /**
+   *  Unpacks one mod again from its archive copy. `choices` are new FOMOD answers; `None` keeps the saved ones. The
+   *  index keeps the user's data for it.
+   */
+  reinstallMod: (
+    game: string,
+    folder: string,
+    choices: Choice_Deserialize[] | null,
+  ) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("reinstall_mod", { game, folder, choices }),
+    ),
+  /**  Reads the FOMOD steps of a version's archive copy, for the "change installer options" wizard. */
+  reinstallInspect: (game: string, folder: string) =>
+    typedError<ZipInspect_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("reinstall_inspect", { game, folder }),
+    ),
+  /**  Compares the installed folder with its archive copy and lists what the import left out. */
+  archiveReport: (game: string, folder: string) =>
+    typedError<ArchiveReport, AppError_Serialize>(
+      __TAURI_INVOKE("archive_report", { game, folder }),
+    ),
+  /**
+   *  Checks one installed version against the checksum recorded at import. The first check of an older version
+   *  records the current files as the baseline.
+   */
+  verifyIntegrity: (game: string, folder: string) =>
+    typedError<IntegrityStatus, AppError_Serialize>(
+      __TAURI_INVOKE("verify_integrity", { game, folder }),
+    ),
+  /**  Removes every version that no profile selects. */
+  deleteUnusedVersions: (game: string) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("delete_unused_versions", { game }),
+    ),
+  /**  Saves the mod's tags (given by the user, for filtering the list). */
+  setModTags: (game: string, id: string, tags: string[]) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("set_mod_tags", { game, id, tags }),
+    ),
+  /**  Saves the user's note about the mod. */
+  setModNote: (game: string, id: string, note: string) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("set_mod_note", { game, id, note }),
+    ),
+  /**  Starts the search for the mod that breaks the game: half of the enabled mods go off for the first test. */
+  bisectStart: (game: string) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("bisect_start", { game }),
+    ),
+  /**  Answers a test of the search: whether the problem was there with this half of the mods. */
+  bisectAnswer: (game: string, broken: boolean) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("bisect_answer", { game, broken }),
+    ),
+  /**  Ends the search and puts the list back. With `disable_found`, the mod found stays off. */
+  bisectStop: (game: string, disableFound: boolean) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("bisect_stop", { game, disableFound }),
+    ),
+  /**  The files the game and its tools wrote into the overlay of the active profile. */
+  overwriteFiles: (game: string) =>
+    typedError<OverwriteView, AppError_Serialize>(
+      __TAURI_INVOKE("overwrite_files", { game }),
+    ),
+  /**  Turns the files the game wrote into a new mod, enabled at the top of the list. */
+  overwriteToMod: (game: string, name: string) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("overwrite_to_mod", { game, name }),
+    ),
+  /**  Removes the files the game wrote into the overlay of the active profile. */
+  clearOverwrite: (game: string) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("clear_overwrite", { game }),
+    ),
+  /**
+   *  Runs a tool of the game in the overlay. Registers a task and returns as soon as the program has started; the
+   *  `tool-exited` event carries its exit code when it ends. The run can be stopped from the Working panel with
+   *  `cancel_task` before the program starts.
+   */
+  runTool: (game: string, tool: string) =>
+    typedError<null, AppError_Serialize>(
+      __TAURI_INVOKE("run_tool", { game, tool }),
+    ),
+  /**
+   *  Installs the prerequisites of a tool into the game's Proton prefix. Runs as a task, so the Working panel shows it
+   *  for its whole duration and `cancel_task` can stop it before it begins.
+   */
+  installToolPrerequisites: (game: string, tool: string) =>
+    typedError<null, AppError_Serialize>(
+      __TAURI_INVOKE("install_tool_prerequisites", { game, tool }),
+    ),
+  /**  Saves the load priority the user set for a mod, or clears it with `null`. */
+  setModPriority: (game: string, id: string, priority: number | null) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("set_mod_priority", { game, id, priority }),
+    ),
+  /**  Games added to Gobbo, with the game folder and whether that folder exists. Games outside this list have no tabs. */
+  managedGames: () =>
+    typedError<ManagedGame[], AppError_Serialize>(
+      __TAURI_INVOKE("managed_games"),
+    ),
+  /**  Looks for supported games in the Steam libraries on this computer. Read-only; nothing changes. */
+  scanGames: () =>
+    typedError<GameScan_Serialize[], AppError_Serialize>(
+      __TAURI_INVOKE("scan_games"),
+    ),
+  /**
+   *  Opens the page a game definition names for a required file, for example the `BepInEx` releases page. The URL comes
+   *  from the definition, so the window cannot open an arbitrary address.
+   */
+  openRequirementPage: (game: string, path: string) =>
+    typedError<null, AppError_Serialize>(
+      __TAURI_INVOKE("open_requirement_page", { game, path }),
+    ),
+  /**  Adds a game with its folder. Answers the games added to Gobbo. */
+  addGame: (game: string, gameRoot: string) =>
+    typedError<ManagedGame[], AppError_Serialize>(
+      __TAURI_INVOKE("add_game", { game, gameRoot }),
+    ),
+  /**  Checks a folder for a game before the game is added. The result is the marker file the folder has, if the game names one. */
+  checkGameFolder: (game: string, gameRoot: string) =>
+    typedError<string | null, AppError_Serialize>(
+      __TAURI_INVOKE("check_game_folder", { game, gameRoot }),
+    ),
+  /**  Removes a game from Gobbo. Its data stays in `games/<id>.removed`. Answers the games that are left. */
+  removeGame: (game: string) =>
+    typedError<ManagedGame[], AppError_Serialize>(
+      __TAURI_INVOKE("remove_game", { game }),
+    ),
+  /**  Restores the data of a removed game and adds it to the list again. */
+  restoreGame: (game: string) =>
+    typedError<ManagedGame[], AppError_Serialize>(
+      __TAURI_INVOKE("restore_game", { game }),
+    ),
+  /**  Deletes the data of a removed game. The active data folder of the same game is not touched. */
+  deleteRemovedGame: (game: string) =>
+    typedError<null, AppError_Serialize>(
+      __TAURI_INVOKE("delete_removed_game", { game }),
+    ),
+  /**  Every game data folder with its size, active and removed, for the storage page. */
+  storageUsage: () =>
+    typedError<GameDataUsage[], AppError_Serialize>(
+      __TAURI_INVOKE("storage_usage"),
+    ),
+  /**
+   *  Launches the game's executable (through Proton on Linux). `executable` is the name from the game definition,
+   *  `None` = the default. `apply_draft` applies the current list first; otherwise a clean deployment starts as it
+   *  is. Returns `true` when the game starts with mods, that is, when the deployment is prepared.
+   *
+   *  When the game ends, the command sends `game-exited` with its id, so the running check stops at once instead of
+   *  waiting for the next poll.
+   */
+  launchGame: (game: string, executable: string | null, applyDraft: boolean) =>
+    typedError<boolean, AppError_Serialize>(
+      __TAURI_INVOKE("launch_game", { game, executable, applyDraft }),
+    ),
+  /**
+   *  Whether the game runs now, from Gobbo or from Steam. Deploying and launching wait while it does; editing does
+   *  not.
+   */
+  gameRunning: (game: string) =>
+    typedError<boolean, AppError_Serialize>(
+      __TAURI_INVOKE("game_running", { game }),
+    ),
+  /**  Stops the game and records that the user asked for it, so the last run is not treated as a crash. */
+  stopGame: (game: string) =>
+    typedError<boolean, AppError_Serialize>(
+      __TAURI_INVOKE("stop_game", { game }),
+    ),
+  /**  The operating system: `windows`, `linux` or `macos`. The interface hides what does not apply to it, such as Proton. */
+  platform: () => __TAURI_INVOKE<string>("platform"),
+  /**  The Proton builds on this computer, for the game settings to offer. Empty on Windows, where there is no Proton. */
+  protonBuilds: () =>
+    typedError<ProtonBuild[], AppError_Serialize>(
+      __TAURI_INVOKE("proton_builds"),
+    ),
+  /**  The Proton options the game settings can switch on, on this computer. Empty on Windows, where there is no Proton. */
+  protonOptions: () => __TAURI_INVOKE<string[]>("proton_options"),
+  /**
+   *  Stops every process of the game, also one started outside Gobbo. Returns `true` when a process was stopped.
+   *  The last launch of a game: its steps and how the game ended. `None` before the first launch from Gobbo.
+   */
+  lastRun: (game: string) =>
+    typedError<RunReport_Serialize | null, AppError_Serialize>(
+      __TAURI_INVOKE("last_run", { game }),
+    ),
+  /**  App settings shared by all games, for example the interface language. */
+  appSettings: () =>
+    typedError<AppSettings_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("app_settings"),
+    ),
+  /**  The data folder, shown in the global settings. */
+  dataFolder: () => __TAURI_INVOKE<string>("data_folder"),
+  /**  The storage mode, the data folder and the file that records the choice. */
+  storageInfo: () =>
+    typedError<StorageInfo, AppError_Serialize>(__TAURI_INVOKE("storage_info")),
+  /**  Replaces the tray's words after the interface language changes. */
+  setTrayLabels: (labels: TrayLabels) =>
+    typedError<null, AppError_Serialize>(
+      __TAURI_INVOKE("set_tray_labels", { labels }),
+    ),
+  /**
+   *  Tells the tray which game the window shows and what it is busy with. The tray keeps the last value when the window
+   *  closes, so its status remains meaningful while work continues in the background.
+   */
+  setTrayContext: (game: string | null, busy: string | null) =>
+    typedError<null, AppError_Serialize>(
+      __TAURI_INVOKE("set_tray_context", { game, busy }),
+    ),
+  /**  The update path of this copy. */
+  updateChannel: () =>
+    typedError<UpdateChannel, AppError_Serialize>(
+      __TAURI_INVOKE("update_channel"),
+    ),
+  /**  Looks for a newer portable version. The manifest is read through the updater plugin, with its own key. */
+  portableUpdateCheck: () =>
+    typedError<PortableUpdate | null, AppError_Serialize>(
+      __TAURI_INVOKE("portable_update_check"),
+    ),
+  /**
+   *  Downloads the newer portable version, checks its signature, replaces the program files and starts the new copy.
+   *  The data folder is not touched. The command returns only when it fails: on success the app restarts.
+   */
+  portableUpdateInstall: (progress: Channel<PortableUpdateStep_Deserialize>) =>
+    typedError<null, AppError_Serialize>(
+      __TAURI_INVOKE("portable_update_install", { progress }),
+    ),
+  /**
+   *  Opens a folder in the system file manager, or reveals a file in its folder. Only paths that belong
+   *  to Gobbo's data folder or to the configured game folders are accepted, so the webview cannot ask
+   *  the system to open an arbitrary file or program.
+   */
+  openPath: (game: string | null, path: string, reveal: boolean) =>
+    typedError<null, AppError_Serialize>(
+      __TAURI_INVOKE("open_path", { game, path, reveal }),
+    ),
+  /**  Opens a mod's page on any provider the game has a key for. */
+  openSourcePage: (
+    provider: string,
+    gameKey: string,
+    modId: string,
+    tab: string | null,
+  ) =>
+    typedError<null, AppError_Serialize>(
+      __TAURI_INVOKE("open_source_page", { provider, gameKey, modId, tab }),
+    ),
+  /**
+   *  Opens the files page of a mod the library knows. The page URL comes from the provider, the mod id from the library and
+   *  the game key from the game definition.
+   */
+  openUpdatePage: (
+    game: string,
+    id: string,
+    provider: string,
+    tab: string | null,
+  ) =>
+    typedError<null, AppError_Serialize>(
+      __TAURI_INVOKE("open_update_page", { game, id, provider, tab }),
+    ),
+  /**
+   *  Reads a mod's page from its provider and saves the common metadata. Requires the provider's saved key when it
+   *  needs one.
+   */
+  refreshSourceMeta: (game: string, provider: string, modId: string) =>
+    typedError<SourceMeta_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("refresh_source_meta", { game, provider, modId }),
+    ),
+  /**
+   *  Saves the app settings. Each provider in `source_links` makes Gobbo the system's handler of its deep links; a provider
+   *  left out gives its links up, when Gobbo has them.
+   */
+  saveAppSettings: (settings: AppSettings_Deserialize) =>
+    typedError<null, AppError_Serialize>(
+      __TAURI_INVOKE("save_app_settings", { settings }),
+    ),
+  /**
+   *  The system's handler for each download-link scheme the settings take, and whether it is this Gobbo. Nothing is
+   *  changed.
+   */
+  sourceLinkStatus: () =>
+    typedError<SourceLinkStatus[], AppError_Serialize>(
+      __TAURI_INVOKE("source_link_status"),
+    ),
+  /**
+   *  Takes back the download links of every provider the settings take, when another program has them. Answers what the
+   *  system uses now, and which providers Gobbo registered again.
+   */
+  ensureSourceLinks: () =>
+    typedError<SourceLinksReport, AppError_Serialize>(
+      __TAURI_INVOKE("ensure_source_links"),
+    ),
+  /**  Every provider this build knows, in the order the settings list them. */
+  sourceProviders: () =>
+    __TAURI_INVOKE<SourceProviderInfo[]>("source_providers"),
+  /**  Opens the page where the user makes a provider's key, in the browser. The provider owns the URL. */
+  openSourceKeyPage: (provider: string) =>
+    typedError<null, AppError_Serialize>(
+      __TAURI_INVOKE("open_source_key_page", { provider }),
+    ),
+  /**  Whether a provider key is saved. A provider that needs no key answers `true`. */
+  sourceKeySaved: (provider: string) =>
+    typedError<boolean, AppError_Serialize>(
+      __TAURI_INVOKE("source_key_saved", { provider }),
+    ),
+  /**  Stores (or clears) a provider key in the OS credential store. */
+  saveSourceKey: (provider: string, key: string) =>
+    typedError<null, AppError_Serialize>(
+      __TAURI_INVOKE("save_source_key", { provider, key }),
+    ),
+  /**  Checks a provider key at the source; without an argument it checks the saved one. */
+  validateSourceKey: (provider: string, apiKey: string | null) =>
+    typedError<SourceAccount, AppError_Serialize>(
+      __TAURI_INVOKE("validate_source_key", { provider, apiKey }),
+    ),
+  /**
+   *  Checks every source of the game for updates through its provider. Requires the provider's saved key when it
+   *  needs one.
+   */
+  checkUpdates: (game: string) =>
+    typedError<UpdateReport_Serialize[], AppError_Serialize>(
+      __TAURI_INVOKE("check_updates", { game }),
+    ),
+  /**
+   *  Starts the backend-owned browser step for `targets` and answers the first view. The command asks the window to open
+   *  the first provider page with [`MANUAL_PAGE_EVENT`]; the window only renders the view and reports finished downloads.
+   */
+  startManualUpdates: (game: string, targets: ManualTarget_Deserialize[]) =>
+    __TAURI_INVOKE<ManualUpdateView_Serialize>("start_manual_updates", {
+      game,
+      targets,
+    }),
+  /**  The current view of one browser run. A window that reloads or switches back reads the run without losing it. */
+  manualUpdateStatus: (game: string) =>
+    __TAURI_INVOKE<ManualUpdateView_Serialize>("manual_update_status", {
+      game,
+    }),
+  /**  Reports a transient download step for a target that has not settled yet. */
+  manualUpdateStep: (game: string, id: string, step: ManualStep) =>
+    __TAURI_INVOKE<ManualUpdateView_Serialize>("manual_update_step", {
+      game,
+      id,
+      step,
+    }),
+  /**
+   *  The window reports that one target's download finished and imported. The backend selects the new version, settles
+   *  the target and asks for the next page. A selection failure is kept on the target as a translatable error code.
+   */
+  manualUpdateDownloadDone: (game: string, id: string) =>
+    typedError<ManualUpdateView_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("manual_update_download_done", { game, id }),
+    ),
+  /**  Skips the target the run is waiting on and asks for the next provider page. */
+  manualUpdateNext: (game: string) =>
+    __TAURI_INVOKE<ManualUpdateView_Serialize>("manual_update_next", { game }),
+  /**  Ends a browser run and hands back one undo for every version it selected, plus the failures it kept. */
+  manualUpdateFinish: (game: string) =>
+    __TAURI_INVOKE<ManualUpdateFinish>("manual_update_finish", { game }),
+  /**  Stops a run without a finish handoff. Downloads already started import themselves, as before. */
+  manualUpdateCancel: (game: string) =>
+    __TAURI_INVOKE<void>("manual_update_cancel", { game }),
+  /**  Asks the window to reopen the current page after a game switch. */
+  manualUpdateReopen: (game: string) =>
+    __TAURI_INVOKE<ManualPageRequest | null>("manual_update_reopen", { game }),
+  /**
+   *  Downloads the newest file of one source, installs it and selects it in the active profile. The channel carries the
+   *  download and import progress; the answer is the fresh status.
+   */
+  updateMod: (
+    game: string,
+    id: string,
+    provider: string,
+    progress: Channel<UpdateProgress>,
+  ) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("update_mod", { game, id, provider, progress }),
+    ),
+  /**
+   *  Updates every mod with a saved newer version, or only the mods `ids` names, one after another. It ends with the fresh
+   *  status and the failures.
+   */
+  updateAll: (
+    game: string,
+    ids: string[] | null,
+    progress: Channel<UpdateAllProgress>,
+  ) =>
+    typedError<UpdateAllView_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("update_all", { game, ids, progress }),
+    ),
+  /**  Selects the installed version that matches the provider's newest file, after the user downloaded it by hand. */
+  selectUpdateVersion: (game: string, id: string, provider: string) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("select_update_version", { game, id, provider }),
+    ),
+  /**
+   *  Stops the bulk update at the next mod, or in the middle of the download of the current one. The mods already
+   *  updated stay updated.
+   */
+  cancelUpdateAll: (game: string) =>
+    __TAURI_INVOKE<void>("cancel_update_all", { game }),
+  /**  Installs or enables a requirement of the selected mod, then answers with the fresh status. */
+  installRequirement: (
+    game: string,
+    source: SourceRef_Deserialize,
+    progress: Channel<UpdateProgress>,
+  ) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("install_requirement", { game, source, progress }),
+    ),
+  /**
+   *  The requirement closure of the selected mod version: direct requirements, transitive ones the library knows,
+   *  alternatives, cycles and the reason a step is blocked. Nothing is downloaded.
+   */
+  previewRequirements: (game: string, folder: string) =>
+    typedError<RequirementPlan_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("preview_requirements", { game, folder }),
+    ),
+  /**  Installs every step the plan can install and saves the profile list once, so the whole closure is one undo. */
+  installRequirements: (
+    game: string,
+    folder: string,
+    progress: Channel<UpdateProgress>,
+  ) =>
+    typedError<RequirementInstallView_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("install_requirements", { game, folder, progress }),
+    ),
+  /**
+   *  Reads the page of each source that never had it read: name, author, category, description and picture. Without a
+   *  provider key it does nothing. Answers how many mods got their page; the window then reads the status again.
+   */
+  fillSourceInfo: (game: string) =>
+    typedError<number, AppError_Serialize>(
+      __TAURI_INVOKE("fill_source_info", { game }),
+    ),
+  /**  A mod's saved page picture as a data URL. `None` when the file is gone. */
+  sourcePicture: (game: string, provider: string, file: string) =>
+    typedError<string | null, AppError_Serialize>(
+      __TAURI_INVOKE("source_picture", { game, provider, file }),
+    ),
+  /**
+   *  Checks every source of one mod for updates through its provider. Requires the provider's saved key when it needs
+   *  one.
+   */
+  checkModUpdate: (game: string, id: string) =>
+    typedError<UpdateReport_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("check_mod_update", { game, id }),
+    ),
+  /**  Saves the source id the user typed for a mod. `None` removes that provider's entry. */
+  setModSource: (
+    game: string,
+    id: string,
+    provider: string,
+    modId: string | null,
+  ) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("set_mod_source", { game, id, provider, modId }),
+    ),
+  /**  Hides the version the provider lists now, until the provider lists another one. */
+  ignoreVersion: (game: string, id: string, provider: string) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("ignore_version", { game, id, provider }),
+    ),
+  /**  Shows the ignored version again. */
+  unignoreVersion: (game: string, id: string, provider: string) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("unignore_version", { game, id, provider }),
+    ),
+  /**  Saves the name, version and author typed for one version of a mod. An empty field goes back to `info.json`. */
+  setModInfo: (
+    game: string,
+    id: string,
+    folder: string,
+    info: ModInfoEdit_Deserialize,
+  ) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("set_mod_info", { game, id, folder, info }),
+    ),
+  /**  Compares two profiles of the game: the mods that differ between them and how many are the same. */
+  compareProfiles: (game: string, first: string, second: string) =>
+    typedError<ProfileCompare_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("compare_profiles", { game, first, second }),
+    ),
+  /**  Saves the instructions for players of a mod. An empty text removes them. */
+  setModInstructions: (game: string, id: string, text: string) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("set_mod_instructions", { game, id, text }),
+    ),
+  /**  Saves the mods a mod requires, the mods it does not work with, and the mods it overrides. */
+  setModRelations: (
+    game: string,
+    id: string,
+    relations: Relations_Deserialize,
+  ) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("set_mod_relations", { game, id, relations }),
+    ),
+  /**  Adds one mod to a relation list of a mod. A relation already listed is left as it is. */
+  addRelation: (game: string, id: string, kind: RelationKind, other: string) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("add_relation", { game, id, kind, other }),
+    ),
+  /**  Removes one mod from a relation list of a mod. */
+  removeRelation: (
+    game: string,
+    id: string,
+    kind: RelationKind,
+    other: string,
+  ) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("remove_relation", { game, id, kind, other }),
+    ),
+  /**  Adds one requirement to a mod. A mod already listed under the same provider and id is left as it is. */
+  addRequirement: (
+    game: string,
+    id: string,
+    requirement: SourceRequirement_Deserialize,
+  ) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("add_requirement", { game, id, requirement }),
+    ),
+  /**  Removes the requirement for one provider mod from a mod. */
+  removeRequirement: (
+    game: string,
+    id: string,
+    provider: string,
+    reqModId: string,
+  ) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("remove_requirement", { game, id, provider, reqModId }),
+    ),
+  /**  Sets whether the requirement for one provider mod is ignored. */
+  setRequirementIgnored: (
+    game: string,
+    id: string,
+    provider: string,
+    reqModId: string,
+    ignored: boolean,
+  ) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("set_requirement_ignored", {
+        game,
+        id,
+        provider,
+        reqModId,
+        ignored,
+      }),
+    ),
+  /**  What sorting by the rules would move. Nothing is written. */
+  previewSort: (game: string) =>
+    typedError<SortPreview, AppError_Serialize>(
+      __TAURI_INVOKE("preview_sort", { game }),
+    ),
+  /**
+   *  Sorts the active list so every mod stands above the mods it overrides. The rest keeps its order. The previous
+   *  order is one history entry, so the sort is one undo.
+   */
+  sortByRules: (game: string) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("sort_by_rules", { game }),
+    ),
+  /**  The earlier states of the active list, newest first. */
+  listHistory: (game: string) =>
+    typedError<HistoryEntry_Serialize[], AppError_Serialize>(
+      __TAURI_INVOKE("list_history", { game }),
+    ),
+  /**  What restoring an earlier state of the active list would change. Nothing is written. */
+  previewRestore: (game: string, id: number) =>
+    typedError<HistoryPreview_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("preview_restore", { game, id }),
+    ),
+  /**  Takes the last change of the active list back. */
+  undoList: (game: string) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("undo_list", { game }),
+    ),
+  /**  Brings back the change the last undo took away. */
+  redoList: (game: string) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("redo_list", { game }),
+    ),
+  /**  Restores an earlier state of the active list. The restore itself can be undone. */
+  restoreList: (game: string, id: number) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("restore_list", { game, id }),
+    ),
+  /**  Chooses which mod's copy of a file wins in the active profile. `family` `None` goes back to the list order. */
+  setFileWinner: (game: string, path: string, family: string | null) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("set_file_winner", { game, path, family }),
+    ),
+  /**  Chooses the winning mod for several file paths at once, as one undoable change. */
+  setFileWinners: (game: string, paths: string[], family: string) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("set_file_winners", { game, paths, family }),
+    ),
+  /**
+   *  Writes the chosen profiles as a mod pack: a recipe of the mods, their files and choices, with the archives the
+   *  options ask for.
+   */
+  exportPack: (game: string, path: string, options: PackOptions_Deserialize) =>
+    typedError<PackExportView, AppError_Serialize>(
+      __TAURI_INVOKE("export_pack", { game, path, options }),
+    ),
+  /**  What stands in the way of sharing the chosen profiles as a pack. */
+  checkPack: (game: string, options: PackOptions_Deserialize) =>
+    typedError<PackIssue[], AppError_Serialize>(
+      __TAURI_INVOKE("check_pack", { game, options }),
+    ),
+  /**  Reads a pack and says what an import would do: the mods it has, the ones to get, and the profiles it updates. */
+  inspectPack: (game: string, path: string) =>
+    typedError<PackPreview_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("inspect_pack", { game, path }),
+    ),
+  /**  Imports a pack: the archives inside it, then its profiles, made new or updated from an earlier version. */
+  importPack: (game: string, path: string) =>
+    typedError<PackImportView_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("import_pack", { game, path }),
+    ),
+  /**  Imports a pack with progress and a cancel flag. The command owns the flag; `cancel_pack_import` sets it. */
+  importPackWithProgress: (
+    game: string,
+    path: string,
+    progress: Channel<ImportProgress>,
+  ) =>
+    typedError<PackImportView_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("import_pack_with_progress", { game, path, progress }),
+    ),
+  /**
+   *  Marks a running pack import or download for cancellation. It stops between batches; a committed batch stays in the
+   *  library.
+   */
+  cancelPackImport: (game: string, path: string) =>
+    __TAURI_INVOKE<void>("cancel_pack_import", { game, path }),
+  /**
+   *  Stops a running pack mod download at the next batch. The download and the import it runs share one flag, so the
+   *  whole operation stops; a separate pack import of the same file keeps running.
+   */
+  cancelPackDownload: (game: string, path: string) =>
+    __TAURI_INVOKE<void>("cancel_pack_download", { game, path }),
+  /**  Saves the steps a mod asks for. Each step must be one the game defines for that phase. */
+  setModSteps: (
+    game: string,
+    folder: string,
+    beforeStart: string[],
+    afterEnd: string[],
+  ) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("set_mod_steps", { game, folder, beforeStart, afterEnd }),
+    ),
+  /**  Preview of an archive: a plain zip, or a FOMOD installer with the steps for the wizard. */
+  inspectZip: (game: string, path: string) =>
+    typedError<ZipInspect_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("inspect_zip", { game, path }),
+    ),
+  /**
+   *  The FOMOD wizard's answer for an archive's installer under the user's picks: the visible steps, the group rules,
+   *  the option kinds and the picks the import takes. `null` gives the default selection. Read like `inspect_zip`.
+   */
+  fomodState: (
+    game: string,
+    path: string,
+    selection: Choice_Deserialize[] | null,
+  ) =>
+    typedError<FomodState_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("fomod_state", { game, path, selection }),
+    ),
+  /**  The same answer for a version's archive copy, for the "change installer options" wizard. */
+  reinstallFomodState: (
+    game: string,
+    folder: string,
+    selection: Choice_Deserialize[] | null,
+  ) =>
+    typedError<FomodState_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("reinstall_fomod_state", { game, folder, selection }),
+    ),
+  /**
+   *  The wizard's answer after one option click. The backend applies the group rules to the current picks and answers
+   *  with a fresh view; the window only renders it. Read-only: nothing is saved until the wizard confirms the install.
+   */
+  fomodTogglePick: (
+    game: string,
+    source: FomodSource,
+    selection: Choice_Deserialize[],
+    step: number,
+    group: number,
+    option: string,
+  ) =>
+    typedError<FomodState_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("fomod_toggle_pick", {
+        game,
+        source,
+        selection,
+        step,
+        group,
+        option,
+      }),
+    ),
+  /**
+   *  The wizard's answer when a reinstall starts from saved choices: the saved answers laid over the installer
+   *  defaults, with the same validation a click applies. Read-only until the wizard saves.
+   */
+  fomodSelectionFromChoices: (
+    game: string,
+    source: FomodSource,
+    choices: Choice_Deserialize[],
+  ) =>
+    typedError<FomodState_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("fomod_selection_from_choices", { game, source, choices }),
+    ),
+  /**  The download queue: what comes in from the providers, what waits for its import, and what this run installed. */
+  listDownloads: () =>
+    __TAURI_INVOKE<DownloadView_Serialize[]>("list_downloads"),
+  /**  Takes a finished download of a link for its automatic install. `None` when it was taken already. */
+  claimDownload: (id: number) =>
+    __TAURI_INVOKE<DownloadView_Serialize | null>("claim_download", { id }),
+  /**  Stops a running download, or deletes a downloaded file, and takes it off the queue. */
+  removeDownload: (id: number) =>
+    typedError<DownloadView_Serialize[], AppError_Serialize>(
+      __TAURI_INVOKE("remove_download", { id }),
+    ),
+  /**  Downloads a failed link again. The key in a link expires after a while; then only a new click on the provider helps. */
+  retryDownload: (id: number) =>
+    __TAURI_INVOKE<DownloadView_Serialize[]>("retry_download", { id }),
+  /**  Takes the installed and the failed downloads off the queue. */
+  clearDownloads: () =>
+    __TAURI_INVOKE<DownloadView_Serialize[]>("clear_downloads"),
+  /**
+   *  Downloads the mods of a pack that the library lacks (premium accounts only), then imports the pack. Its own task
+   *  key lets `cancel_pack_download` stop the download and the batches that follow it as one operation.
+   */
+  downloadPackMods: (
+    game: string,
+    path: string,
+    progress: Channel<PackDownload>,
+  ) =>
+    typedError<PackImportView_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("download_pack_mods", { game, path, progress }),
+    ),
+  /**  Downloads a pack link after checking its hash, so the existing pack preview can inspect the file. */
+  downloadPackLink: (
+    game: string,
+    link: string,
+    progress: Channel<PackLinkProgress>,
+  ) =>
+    typedError<PackLinkDownload, AppError_Serialize>(
+      __TAURI_INVOKE("download_pack_link", { game, link, progress }),
+    ),
+  /**  Stops a pack link download at the next chunk. */
+  cancelPackLink: (game: string, link: string) =>
+    __TAURI_INVOKE<void>("cancel_pack_link", { game, link }),
+  /**  Takes the pending pack link, if a deep link arrived before the window asked for it. */
+  takePackLink: () => __TAURI_INVOKE<string | null>("take_pack_link"),
+  /**  Opens a collection link and returns the plan and the active profile's statuses. */
+  inspectCollection: (game: string, link: string, revision: number | null) =>
+    typedError<CollectionPreview_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("inspect_collection", { game, link, revision }),
+    ),
+  /**
+   *  Drives one full automatic round of a collection install and answers the fresh session together with the single
+   *  prompt that pauses it. The backend owns the loop; the window calls this once and then only sends a decision.
+   */
+  collectionRunRound: (
+    game: string,
+    profile: string,
+    collection: string,
+    progress: Channel<CollectionProgress_Deserialize>,
+  ) =>
+    typedError<CollectionRoundView_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("collection_run_round", {
+        game,
+        profile,
+        collection,
+        progress,
+      }),
+    ),
+  /**
+   *  Resolves the prompt a round paused on and drives the next round. `item` is the member the prompt named; the
+   *  decision carries only the wizard choices, the picked path or the skip.
+   */
+  collectionResolvePrompt: (
+    game: string,
+    profile: string,
+    collection: string,
+    item: string,
+    decision: CollectionDecision_Deserialize,
+    progress: Channel<CollectionProgress_Deserialize>,
+  ) =>
+    typedError<CollectionRoundView_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("collection_resolve_prompt", {
+        game,
+        profile,
+        collection,
+        item,
+        decision,
+        progress,
+      }),
+    ),
+  /**
+   *  Stops the running collection round at the next member or download chunk. The round owns the same task flag as the
+   *  one-command install, so this is the stop action of the Working row.
+   */
+  collectionStop: (game: string, profile: string, collection: string) =>
+    __TAURI_INVOKE<void>("collection_stop", { game, profile, collection }),
+  /**  Creates or updates the profile of a collection and returns its live session. */
+  startCollection: (
+    game: string,
+    request: CollectionInstallRequest_Deserialize,
+  ) =>
+    typedError<CollectionSessionView_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("start_collection", { game, request }),
+    ),
+  /**  The live status of one collection in one profile. */
+  collectionStatus: (game: string, profile: string, collection: string) =>
+    typedError<CollectionSessionView_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("collection_status", { game, profile, collection }),
+    ),
+  /**  Reads the current revision of every collection in a profile and records the newest each provider reports. */
+  checkCollectionUpdates: (game: string, profile: string) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("check_collection_updates", { game, profile }),
+    ),
+  /**  Settles the imported members, records the families the collection added and orders its block. One profile edit. */
+  finishCollection: (game: string, profile: string, collection: string) =>
+    typedError<CollectionSessionView_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("finish_collection", { game, profile, collection }),
+    ),
+  /**  Permanently skips one member. A temporary skip is the window's queue, not a profile change. */
+  skipCollectionItem: (
+    game: string,
+    profile: string,
+    collection: string,
+    item: string,
+    permanent: boolean,
+  ) =>
+    typedError<CollectionSessionView_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("skip_collection_item", {
+        game,
+        profile,
+        collection,
+        item,
+        permanent,
+      }),
+    ),
+  /**
+   *  Installs the selected members automatically. A FOMOD without stored choices is returned in `needs_choice`; the
+   *  window imports it with its wizard and calls the command again until the list is empty.
+   */
+  installCollection: (
+    game: string,
+    profile: string,
+    collection: string,
+    progress: Channel<CollectionProgress_Deserialize>,
+  ) =>
+    typedError<CollectionInstallView_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("install_collection", {
+        game,
+        profile,
+        collection,
+        progress,
+      }),
+    ),
+  /**  The guided flow's next member: a Nexus file page, an automatic bundle/direct install, or a manual instruction. */
+  prepareCollectionItem: (
+    game: string,
+    profile: string,
+    collection: string,
+    item: string,
+  ) =>
+    typedError<CollectionItemAction_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("prepare_collection_item", {
+        game,
+        profile,
+        collection,
+        item,
+      }),
+    ),
+  /**  Imports a file the user picked for one member, with the wizard's choices when the archive is a FOMOD. */
+  importCollectionFile: (
+    game: string,
+    profile: string,
+    collection: string,
+    item: string,
+    path: string,
+    choices: Choice_Deserialize[] | null,
+  ) =>
+    typedError<CollectionSessionView_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("import_collection_file", {
+        game,
+        profile,
+        collection,
+        item,
+        path,
+        choices,
+      }),
+    ),
+  /**  Opens the collection page of one profile origin. */
+  openCollectionPage: (game: string, profile: string, collection: string) =>
+    typedError<null, AppError_Serialize>(
+      __TAURI_INVOKE("open_collection_page", { game, profile, collection }),
+    ),
+  /**  Marks a manual or browse member as installed by hand. */
+  markCollectionItem: (
+    game: string,
+    profile: string,
+    collection: string,
+    item: string,
+  ) =>
+    typedError<CollectionSessionView_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("mark_collection_item", {
+        game,
+        profile,
+        collection,
+        item,
+      }),
+    ),
+  /**  Removes a collection from a profile. The library and the archives stay. */
+  removeCollection: (game: string, profile: string, collection: string) =>
+    typedError<CollectionSessionView_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("remove_collection", { game, profile, collection }),
+    ),
+  /**  Takes the pending collection link, if a deep link arrived before the window asked for it. */
+  takeCollectionLink: () =>
+    __TAURI_INVOKE<string | null>("take_collection_link"),
+  /**  Drops a collection download expectation when the user skips or cancels the member. */
+  forgetCollectionDownload: (owner: string) =>
+    __TAURI_INVOKE<void>("forget_collection_download", { owner }),
+  /**  Runs the x64 and x86 overlay probes in the active session and returns their checks. */
+  runOverlayProbe: (game: string) =>
+    typedError<OverlayProbeReport[], AppError_Serialize>(
+      __TAURI_INVOKE("run_overlay_probe", { game }),
+    ),
+  /**  The state folder of the active overlay session, for the "open folder" button. */
+  overlayState: (game: string) =>
+    typedError<string | null, AppError_Serialize>(
+      __TAURI_INVOKE("overlay_state", { game }),
+    ),
+  /**  The mounts of one game and the user-data layers no profile uses any more. */
+  mountDiagnostics: (game: string) =>
+    typedError<MountDiagnostics, AppError_Serialize>(
+      __TAURI_INVOKE("mount_diagnostics", { game }),
+    ),
+  /**  Removes the orphaned layers the user confirmed, after checking they are still orphans. */
+  cleanOrphanLayers: (game: string, paths: string[]) =>
+    typedError<Status_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("clean_orphan_layers", { game, paths }),
+    ),
+  /**  Writes a support bundle with the log, version and, when a game is selected, its definition, setup check and last run. */
+  createSupportBundle: (game: string | null) =>
+    typedError<string, AppError_Serialize>(
+      __TAURI_INVOKE("create_support_bundle", { game }),
+    ),
+  /**  Records a render error or an unhandled rejection from the webview in the same log as the backend. */
+  logFrontendError: (message: string, detail: string) =>
+    typedError<null, AppError_Serialize>(
+      __TAURI_INVOKE("log_frontend_error", { message, detail }),
+    ),
+  /**  Every snapshot of the game, newest first. */
+  snapshots: (game: string) =>
+    typedError<SnapshotView[], AppError_Serialize>(
+      __TAURI_INVOKE("snapshots", { game }),
+    ),
+  /**  Saves the profile's stored data now. The game must not be running. */
+  createSnapshot: (game: string, profile: string) =>
+    typedError<SnapshotView, AppError_Serialize>(
+      __TAURI_INVOKE("create_snapshot", { game, profile }),
+    ),
+  /**  What restoring a snapshot would change. Nothing is written. */
+  previewSnapshotRestore: (game: string, id: string) =>
+    typedError<RestorePreview, AppError_Serialize>(
+      __TAURI_INVOKE("preview_snapshot_restore", { game, id }),
+    ),
+  /**  Restores a snapshot after writing a fresh backup. The game must not be running. */
+  restoreSnapshot: (game: string, id: string) =>
+    typedError<RestoreOutcome_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("restore_snapshot", { game, id }),
+    ),
+  /**  Removes a snapshot folder. */
+  deleteSnapshot: (game: string, id: string) =>
+    typedError<null, AppError_Serialize>(
+      __TAURI_INVOKE("delete_snapshot", { game, id }),
+    ),
 };
 
 /* Constants */
-export const TASK_KINDS = ["import","update","update-all","requirement","apply","pack","pack-link","collection","launch","install"] as const;
+export const TASK_KINDS = [
+  "import",
+  "update",
+  "update-all",
+  "requirement",
+  "apply",
+  "pack",
+  "pack-link",
+  "collection",
+  "launch",
+  "install",
+] as const;
 
 /* Types */
 /**  An error returned by a command. */
@@ -571,20 +1353,20 @@ export type AppError = AppError_Serialize | AppError_Deserialize;
 
 /**  An error returned by a command. */
 export type AppError_Deserialize = {
-	code: string,
-	params: { [key in string]: string },
-	kind: ErrorKind,
-	/**  The step the user can take next. Omitted when the message is enough. */
-	recovery?: Recovery_Deserialize | null,
+  code: string;
+  params: { [key in string]: string };
+  kind: ErrorKind;
+  /**  The step the user can take next. Omitted when the message is enough. */
+  recovery?: Recovery_Deserialize | null;
 };
 
 /**  An error returned by a command. */
 export type AppError_Serialize = {
-	code: string,
-	params: { [key in string]: string },
-	kind: ErrorKind,
-	/**  The step the user can take next. Omitted when the message is enough. */
-	recovery?: Recovery_Serialize,
+  code: string;
+  params: { [key in string]: string };
+  kind: ErrorKind;
+  /**  The step the user can take next. Omitted when the message is enough. */
+  recovery?: Recovery_Serialize;
 };
 
 /**
@@ -598,32 +1380,32 @@ export type AppSettings = AppSettings_Serialize | AppSettings_Deserialize;
  *  here, so they are never written to disk in plaintext.
  */
 export type AppSettings_Deserialize = {
-	language?: Language,
-	/**  The right inspector is hidden, so the mod list has more room. */
-	inspector_collapsed?: boolean,
-	/**
-	 *  The providers, by id, whose download links Gobbo takes (for example `nexus` for `nxm://`), so a provider's "Mod
-	 *  Manager Download" button sends the file here. Empty by default, because only one program on the computer can take
-	 *  the links.
-	 */
-	source_links?: string[],
-	/**  The main window opens with the size and place it had when it was closed. Off, it opens at the default size. */
-	remember_window?: boolean,
-	/**
-	 *  Closing the window hides it in the system tray instead of ending the app. Background work keeps running and the
-	 *  tray stays available as the only way back in. On from the start.
-	 */
-	minimize_to_tray?: boolean,
-	/**
-	 *  Windows 11 Efficiency mode: off, only while the window is in the background, or always. Other systems keep it
-	 *  off because they have no equivalent.
-	 */
-	efficiency_mode?: EfficiencyMode,
-	/**
-	 *  Asks the saved providers for newer revisions of the active profile's collections when a game opens. One read
-	 *  per collection, on the same budget as every other provider read. On from the start.
-	 */
-	check_collections_on_launch?: boolean,
+  language?: Language;
+  /**  The right inspector is hidden, so the mod list has more room. */
+  inspector_collapsed?: boolean;
+  /**
+   *  The providers, by id, whose download links Gobbo takes (for example `nexus` for `nxm://`), so a provider's "Mod
+   *  Manager Download" button sends the file here. Empty by default, because only one program on the computer can take
+   *  the links.
+   */
+  source_links?: string[];
+  /**  The main window opens with the size and place it had when it was closed. Off, it opens at the default size. */
+  remember_window?: boolean;
+  /**
+   *  Closing the window hides it in the system tray instead of ending the app. Background work keeps running and the
+   *  tray stays available as the only way back in. On from the start.
+   */
+  minimize_to_tray?: boolean;
+  /**
+   *  Windows 11 Efficiency mode: off, only while the window is in the background, or always. Other systems keep it
+   *  off because they have no equivalent.
+   */
+  efficiency_mode?: EfficiencyMode;
+  /**
+   *  Asks the saved providers for newer revisions of the active profile's collections when a game opens. One read
+   *  per collection, on the same budget as every other provider read. On from the start.
+   */
+  check_collections_on_launch?: boolean;
 };
 
 /**
@@ -631,55 +1413,55 @@ export type AppSettings_Deserialize = {
  *  here, so they are never written to disk in plaintext.
  */
 export type AppSettings_Serialize = {
-	language: Language,
-	/**  The right inspector is hidden, so the mod list has more room. */
-	inspector_collapsed: boolean,
-	/**
-	 *  The providers, by id, whose download links Gobbo takes (for example `nexus` for `nxm://`), so a provider's "Mod
-	 *  Manager Download" button sends the file here. Empty by default, because only one program on the computer can take
-	 *  the links.
-	 */
-	source_links: string[],
-	/**  The main window opens with the size and place it had when it was closed. Off, it opens at the default size. */
-	remember_window: boolean,
-	/**
-	 *  Closing the window hides it in the system tray instead of ending the app. Background work keeps running and the
-	 *  tray stays available as the only way back in. On from the start.
-	 */
-	minimize_to_tray: boolean,
-	/**
-	 *  Windows 11 Efficiency mode: off, only while the window is in the background, or always. Other systems keep it
-	 *  off because they have no equivalent.
-	 */
-	efficiency_mode: EfficiencyMode,
-	/**
-	 *  Asks the saved providers for newer revisions of the active profile's collections when a game opens. One read
-	 *  per collection, on the same budget as every other provider read. On from the start.
-	 */
-	check_collections_on_launch: boolean,
+  language: Language;
+  /**  The right inspector is hidden, so the mod list has more room. */
+  inspector_collapsed: boolean;
+  /**
+   *  The providers, by id, whose download links Gobbo takes (for example `nexus` for `nxm://`), so a provider's "Mod
+   *  Manager Download" button sends the file here. Empty by default, because only one program on the computer can take
+   *  the links.
+   */
+  source_links: string[];
+  /**  The main window opens with the size and place it had when it was closed. Off, it opens at the default size. */
+  remember_window: boolean;
+  /**
+   *  Closing the window hides it in the system tray instead of ending the app. Background work keeps running and the
+   *  tray stays available as the only way back in. On from the start.
+   */
+  minimize_to_tray: boolean;
+  /**
+   *  Windows 11 Efficiency mode: off, only while the window is in the background, or always. Other systems keep it
+   *  off because they have no equivalent.
+   */
+  efficiency_mode: EfficiencyMode;
+  /**
+   *  Asks the saved providers for newer revisions of the active profile's collections when a game opens. One read
+   *  per collection, on the same budget as every other provider read. On from the start.
+   */
+  check_collections_on_launch: boolean;
 };
 
 export type ApplyView = {
-	files: number,
+  files: number;
 };
 
 /**  What an archive holds against what its installed folder holds now. */
 export type ArchiveReport = {
-	folder: string,
-	/**  The file name of the archive copy in `archives/`. */
-	archive: string,
-	/**  Every entry that the current rules and FOMOD choices do not unpack. */
-	skipped: SkippedFile[],
-	/**  Entries no rule takes. */
-	skipped_total: number,
-	/**  Files the rules place but the installed folder does not have. */
-	missing: string[],
-	/**  Files in the installed folder that the archive does not place. */
-	extra: string[],
-	/**  Files whose size on disk differs from the archive entry. */
-	changed: string[],
-	expected: number,
-	installed: number,
+  folder: string;
+  /**  The file name of the archive copy in `archives/`. */
+  archive: string;
+  /**  Every entry that the current rules and FOMOD choices do not unpack. */
+  skipped: SkippedFile[];
+  /**  Entries no rule takes. */
+  skipped_total: number;
+  /**  Files the rules place but the installed folder does not have. */
+  missing: string[];
+  /**  Files in the installed folder that the archive does not place. */
+  extra: string[];
+  /**  Files whose size on disk differs from the archive entry. */
+  changed: string[];
+  expected: number;
+  installed: number;
 };
 
 /**  The search in the view. */
@@ -687,42 +1469,42 @@ export type BisectView = BisectView_Serialize | BisectView_Deserialize;
 
 /**  The search in the view. */
 export type BisectView_Deserialize = {
-	/**  The test now, from 1. */
-	step: number,
-	/**  About how many tests are left, at most. */
-	steps_left: number,
-	suspects: number,
-	/**  The names of the suspects switched on in this test. */
-	testing: string[],
-	/**  The mod that holds the problem, once one is left. */
-	found?: string | null,
+  /**  The test now, from 1. */
+  step: number;
+  /**  About how many tests are left, at most. */
+  steps_left: number;
+  suspects: number;
+  /**  The names of the suspects switched on in this test. */
+  testing: string[];
+  /**  The mod that holds the problem, once one is left. */
+  found?: string | null;
 };
 
 /**  The search in the view. */
 export type BisectView_Serialize = {
-	/**  The test now, from 1. */
-	step: number,
-	/**  About how many tests are left, at most. */
-	steps_left: number,
-	suspects: number,
-	/**  The names of the suspects switched on in this test. */
-	testing: string[],
-	/**  The mod that holds the problem, once one is left. */
-	found: string | null,
+  /**  The test now, from 1. */
+  step: number;
+  /**  About how many tests are left, at most. */
+  steps_left: number;
+  suspects: number;
+  /**  The names of the suspects switched on in this test. */
+  testing: string[];
+  /**  The mod that holds the problem, once one is left. */
+  found: string | null;
 };
 
 /**  Why an apply cannot run yet. The window only translates this value; it does not re-derive the reason from folders. */
-export type BlockerKey = 
-/**  Both the game folder and the settings folder are missing. */
-"game_and_settings" | 
-/**  The game folder is missing. */
-"game_folder" | 
-/**  The external mods folder is missing. */
-"mods_folder" | 
-/**  The deployment plan has problems. */
-"problems" | 
-/**  The library is empty or nothing is enabled. */
-"no_mods";
+export type BlockerKey =
+  /**  Both the game folder and the settings folder are missing. */
+  | "game_and_settings"
+  /**  The game folder is missing. */
+  | "game_folder"
+  /**  The external mods folder is missing. */
+  | "mods_folder"
+  /**  The deployment plan has problems. */
+  | "problems"
+  /**  The library is empty or nothing is enabled. */
+  | "no_mods";
 
 export type ChangeKind = "created" | "modified" | "removed";
 
@@ -740,14 +1522,14 @@ export type Choice = Choice_Serialize | Choice_Deserialize;
  *  repeat, so the position — not the name — decides which group the choice belongs to.
  */
 export type Choice_Deserialize = {
-	/**  The step in `ModuleConfig.xml`, counted from zero. */
-	step?: number,
-	/**  The group inside that step, counted from zero. */
-	group_index?: number,
-	/**  The group's name, kept for the list that shows the choice. */
-	group: string,
-	/**  The chosen option's name. */
-	option: string,
+  /**  The step in `ModuleConfig.xml`, counted from zero. */
+  step?: number;
+  /**  The group inside that step, counted from zero. */
+  group_index?: number;
+  /**  The group's name, kept for the list that shows the choice. */
+  group: string;
+  /**  The chosen option's name. */
+  option: string;
 };
 
 /**
@@ -755,448 +1537,478 @@ export type Choice_Deserialize = {
  *  repeat, so the position — not the name — decides which group the choice belongs to.
  */
 export type Choice_Serialize = {
-	/**  The step in `ModuleConfig.xml`, counted from zero. */
-	step: number,
-	/**  The group inside that step, counted from zero. */
-	group_index: number,
-	/**  The group's name, kept for the list that shows the choice. */
-	group: string,
-	/**  The chosen option's name. */
-	option: string,
+  /**  The step in `ModuleConfig.xml`, counted from zero. */
+  step: number;
+  /**  The group inside that step, counted from zero. */
+  group_index: number;
+  /**  The group's name, kept for the list that shows the choice. */
+  group: string;
+  /**  The chosen option's name. */
+  option: string;
 };
 
 /**  The small collection marker a profile view carries. The full origin stays in the profile. */
 export type CollectionBadge = {
-	provider: string,
-	game_key: string,
-	slug: string,
-	revision: number,
-	revision_label: string,
-	name: string,
-	url: string,
-	/**  The profile families that belong to this collection. */
-	families: string[],
-	/**  Whether the provider reported a newer revision than the one installed in this profile. */
-	update: boolean,
+  provider: string;
+  game_key: string;
+  slug: string;
+  revision: number;
+  revision_label: string;
+  name: string;
+  url: string;
+  /**  The profile families that belong to this collection. */
+  families: string[];
+  /**  Whether the provider reported a newer revision than the one installed in this profile. */
+  update: boolean;
 };
 
 /**  One collection item whose archive needs FOMOD choices before it can be imported. */
-export type CollectionChoiceNeeded = CollectionChoiceNeeded_Serialize | CollectionChoiceNeeded_Deserialize;
+export type CollectionChoiceNeeded =
+  CollectionChoiceNeeded_Serialize | CollectionChoiceNeeded_Deserialize;
 
 /**  One collection item whose archive needs FOMOD choices before it can be imported. */
 export type CollectionChoiceNeeded_Deserialize = {
-	key: string,
-	name: string,
-	path: string,
-	module_name: string,
-	steps: FomodStepView_Deserialize[],
+  key: string;
+  name: string;
+  path: string;
+  module_name: string;
+  steps: FomodStepView_Deserialize[];
 };
 
 /**  One collection item whose archive needs FOMOD choices before it can be imported. */
 export type CollectionChoiceNeeded_Serialize = {
-	key: string,
-	name: string,
-	path: string,
-	module_name: string,
-	steps: FomodStepView_Serialize[],
+  key: string;
+  name: string;
+  path: string;
+  module_name: string;
+  steps: FomodStepView_Serialize[];
 };
 
 /**  The counts the preview and the session header show. One item counts once. */
 export type CollectionCounts = {
-	total: number,
-	required: number,
-	optional: number,
-	installed: number,
-	pending: number,
-	skipped: number,
-	manual: number,
-	unsupported: number,
+  total: number;
+  required: number;
+  optional: number;
+  installed: number;
+  pending: number;
+  skipped: number;
+  manual: number;
+  unsupported: number;
 };
 
 /**
  *  The answer to a [`CollectionPrompt`]. `item` names the member the prompt referred to; it is an identifier the
  *  window echoes, not loop state. The archive `path` is the one the prompt named or the file the user picked.
  */
-export type CollectionDecision = CollectionDecision_Serialize | CollectionDecision_Deserialize;
+export type CollectionDecision =
+  CollectionDecision_Serialize | CollectionDecision_Deserialize;
 
 /**
  *  The answer to a [`CollectionPrompt`]. `item` names the member the prompt referred to; it is an identifier the
  *  window echoes, not loop state. The archive `path` is the one the prompt named or the file the user picked.
  */
-export type CollectionDecision_Deserialize = 
-/**  Import the prompted archive with the wizard's FOMOD choices. */
-{ kind: "choice"; path: string; choices: Choice_Deserialize[] } | 
-/**  Import a file the user picked for a manual or waiting member. */
-{ kind: "file"; path: string } | 
-/**  Mark a manual or browse member installed by hand. */
-{ kind: "mark_done" } | 
-/**  Skip the member, permanently when `permanent` (then the profile origin excludes it). */
-{ kind: "skip"; permanent: boolean };
+export type CollectionDecision_Deserialize =
+  /**  Import the prompted archive with the wizard's FOMOD choices. */
+  | { kind: "choice"; path: string; choices: Choice_Deserialize[] }
+  /**  Import a file the user picked for a manual or waiting member. */
+  | { kind: "file"; path: string }
+  /**  Mark a manual or browse member installed by hand. */
+  | { kind: "mark_done" }
+  /**  Skip the member, permanently when `permanent` (then the profile origin excludes it). */
+  | { kind: "skip"; permanent: boolean };
 
 /**
  *  The answer to a [`CollectionPrompt`]. `item` names the member the prompt referred to; it is an identifier the
  *  window echoes, not loop state. The archive `path` is the one the prompt named or the file the user picked.
  */
-export type CollectionDecision_Serialize = 
-/**  Import the prompted archive with the wizard's FOMOD choices. */
-{ kind: "choice"; path: string; choices: Choice_Serialize[] } | 
-/**  Import a file the user picked for a manual or waiting member. */
-{ kind: "file"; path: string } | 
-/**  Mark a manual or browse member installed by hand. */
-{ kind: "mark_done" } | 
-/**  Skip the member, permanently when `permanent` (then the profile origin excludes it). */
-{ kind: "skip"; permanent: boolean };
+export type CollectionDecision_Serialize =
+  /**  Import the prompted archive with the wizard's FOMOD choices. */
+  | { kind: "choice"; path: string; choices: Choice_Serialize[] }
+  /**  Import a file the user picked for a manual or waiting member. */
+  | { kind: "file"; path: string }
+  /**  Mark a manual or browse member installed by hand. */
+  | { kind: "mark_done" }
+  /**  Skip the member, permanently when `permanent` (then the profile origin excludes it). */
+  | { kind: "skip"; permanent: boolean };
 
 /**  One collection item that an install round could not install, with the error the window shows. */
-export type CollectionFailure = CollectionFailure_Serialize | CollectionFailure_Deserialize;
+export type CollectionFailure =
+  CollectionFailure_Serialize | CollectionFailure_Deserialize;
 
 /**  One collection item that an install round could not install, with the error the window shows. */
 export type CollectionFailure_Deserialize = {
-	key: string,
-	name: string,
-	error: AppError_Deserialize,
+  key: string;
+  name: string;
+  error: AppError_Deserialize;
 };
 
 /**  One collection item that an install round could not install, with the error the window shows. */
 export type CollectionFailure_Serialize = {
-	key: string,
-	name: string,
-	error: AppError_Serialize,
+  key: string;
+  name: string;
+  error: AppError_Serialize;
 };
 
 /**  The stable fields of one collection revision, as the preview and the cache keep them. */
-export type CollectionInfo = CollectionInfo_Serialize | CollectionInfo_Deserialize;
+export type CollectionInfo =
+  CollectionInfo_Serialize | CollectionInfo_Deserialize;
 
 /**  The stable fields of one collection revision, as the preview and the cache keep them. */
 export type CollectionInfo_Deserialize = {
-	provider: string,
-	game_key: string,
-	slug: string,
-	revision: number,
-	latest_revision: number,
-	/**
-	 *  The revision as the provider names it: `r49` on Nexus, `v1.2.3` on Thunderstore. The number orders revisions;
-	 *  the label is what the user reads.
-	 */
-	revision_label?: string,
-	name: string,
-	author?: string | null,
-	summary: string,
-	description: string,
-	instructions: string,
-	picture_url?: string | null,
-	adult: boolean,
-	/**  The total size of the mod downloads in KB. It fits in `u32` for every real collection; a larger number saturates. */
-	total_size_kb: number,
-	mod_count: number,
-	game_versions: string[],
-	changelog?: string | null,
-	url: string,
+  provider: string;
+  game_key: string;
+  slug: string;
+  revision: number;
+  latest_revision: number;
+  /**
+   *  The revision as the provider names it: `r49` on Nexus, `v1.2.3` on Thunderstore. The number orders revisions;
+   *  the label is what the user reads.
+   */
+  revision_label?: string;
+  name: string;
+  author?: string | null;
+  summary: string;
+  description: string;
+  instructions: string;
+  picture_url?: string | null;
+  adult: boolean;
+  /**  The total size of the mod downloads in KB. It fits in `u32` for every real collection; a larger number saturates. */
+  total_size_kb: number;
+  mod_count: number;
+  game_versions: string[];
+  changelog?: string | null;
+  url: string;
 };
 
 /**  The stable fields of one collection revision, as the preview and the cache keep them. */
 export type CollectionInfo_Serialize = {
-	provider: string,
-	game_key: string,
-	slug: string,
-	revision: number,
-	latest_revision: number,
-	/**
-	 *  The revision as the provider names it: `r49` on Nexus, `v1.2.3` on Thunderstore. The number orders revisions;
-	 *  the label is what the user reads.
-	 */
-	revision_label: string,
-	name: string,
-	author: string | null,
-	summary: string,
-	description: string,
-	instructions: string,
-	picture_url: string | null,
-	adult: boolean,
-	/**  The total size of the mod downloads in KB. It fits in `u32` for every real collection; a larger number saturates. */
-	total_size_kb: number,
-	mod_count: number,
-	game_versions: string[],
-	changelog: string | null,
-	url: string,
+  provider: string;
+  game_key: string;
+  slug: string;
+  revision: number;
+  latest_revision: number;
+  /**
+   *  The revision as the provider names it: `r49` on Nexus, `v1.2.3` on Thunderstore. The number orders revisions;
+   *  the label is what the user reads.
+   */
+  revision_label: string;
+  name: string;
+  author: string | null;
+  summary: string;
+  description: string;
+  instructions: string;
+  picture_url: string | null;
+  adult: boolean;
+  /**  The total size of the mod downloads in KB. It fits in `u32` for every real collection; a larger number saturates. */
+  total_size_kb: number;
+  mod_count: number;
+  game_versions: string[];
+  changelog: string | null;
+  url: string;
 };
 
 /**  What the preview dialog sends when the user starts an install. */
-export type CollectionInstallRequest = CollectionInstallRequest_Serialize | CollectionInstallRequest_Deserialize;
+export type CollectionInstallRequest =
+  CollectionInstallRequest_Serialize | CollectionInstallRequest_Deserialize;
 
 /**  What the preview dialog sends when the user starts an install. */
 export type CollectionInstallRequest_Deserialize = {
-	/**  The collection URL or `nxm://` link the preview was opened with. */
-	link: string,
-	revision?: number | null,
-	/**  `None` creates a profile. */
-	profile?: string | null,
-	/**  The name of a new profile. Ignored when `profile` names one. */
-	profile_name: string,
-	/**  The selected item keys. Required items left out are treated as skipped. */
-	selected: string[],
-	position: CollectionPosition,
-	/**  Switch to the new profile when the install ends. */
-	activate: boolean,
+  /**  The collection URL or `nxm://` link the preview was opened with. */
+  link: string;
+  revision?: number | null;
+  /**  `None` creates a profile. */
+  profile?: string | null;
+  /**  The name of a new profile. Ignored when `profile` names one. */
+  profile_name: string;
+  /**  The selected item keys. Required items left out are treated as skipped. */
+  selected: string[];
+  position: CollectionPosition;
+  /**  Switch to the new profile when the install ends. */
+  activate: boolean;
 };
 
 /**  What the preview dialog sends when the user starts an install. */
 export type CollectionInstallRequest_Serialize = {
-	/**  The collection URL or `nxm://` link the preview was opened with. */
-	link: string,
-	revision: number | null,
-	/**  `None` creates a profile. */
-	profile: string | null,
-	/**  The name of a new profile. Ignored when `profile` names one. */
-	profile_name: string,
-	/**  The selected item keys. Required items left out are treated as skipped. */
-	selected: string[],
-	position: CollectionPosition,
-	/**  Switch to the new profile when the install ends. */
-	activate: boolean,
+  /**  The collection URL or `nxm://` link the preview was opened with. */
+  link: string;
+  revision: number | null;
+  /**  `None` creates a profile. */
+  profile: string | null;
+  /**  The name of a new profile. Ignored when `profile` names one. */
+  profile_name: string;
+  /**  The selected item keys. Required items left out are treated as skipped. */
+  selected: string[];
+  position: CollectionPosition;
+  /**  Switch to the new profile when the install ends. */
+  activate: boolean;
 };
 
 /**  What one automatic install round did. The window repeats the round while `needs_choice` is not empty. */
-export type CollectionInstallView = CollectionInstallView_Serialize | CollectionInstallView_Deserialize;
+export type CollectionInstallView =
+  CollectionInstallView_Serialize | CollectionInstallView_Deserialize;
 
 /**  What one automatic install round did. The window repeats the round while `needs_choice` is not empty. */
 export type CollectionInstallView_Deserialize = {
-	profile: string,
-	installed: string[],
-	failed: CollectionFailure_Deserialize[],
-	needs_choice: CollectionChoiceNeeded_Deserialize[],
-	needs_user: string[],
-	skipped: string[],
-	warnings: Message[],
-	cancelled: boolean,
-	session: CollectionSessionView_Deserialize,
+  profile: string;
+  installed: string[];
+  failed: CollectionFailure_Deserialize[];
+  needs_choice: CollectionChoiceNeeded_Deserialize[];
+  needs_user: string[];
+  skipped: string[];
+  warnings: Message[];
+  cancelled: boolean;
+  session: CollectionSessionView_Deserialize;
 };
 
 /**  What one automatic install round did. The window repeats the round while `needs_choice` is not empty. */
 export type CollectionInstallView_Serialize = {
-	profile: string,
-	installed: string[],
-	failed: CollectionFailure_Serialize[],
-	needs_choice: CollectionChoiceNeeded_Serialize[],
-	needs_user: string[],
-	skipped: string[],
-	warnings: Message[],
-	cancelled: boolean,
-	session: CollectionSessionView_Serialize,
+  profile: string;
+  installed: string[];
+  failed: CollectionFailure_Serialize[];
+  needs_choice: CollectionChoiceNeeded_Serialize[];
+  needs_user: string[];
+  skipped: string[];
+  warnings: Message[];
+  cancelled: boolean;
+  session: CollectionSessionView_Serialize;
 };
 
 /**  Something the user should know before or during the install. */
-export type CollectionIssue = CollectionIssue_Serialize | CollectionIssue_Deserialize;
+export type CollectionIssue =
+  CollectionIssue_Serialize | CollectionIssue_Deserialize;
 
 export type CollectionIssueSeverity = "warning" | "unsupported";
 
 /**  Something the user should know before or during the install. */
 export type CollectionIssue_Deserialize = {
-	severity: CollectionIssueSeverity,
-	/**  The member the issue belongs to, when it belongs to one. */
-	item?: string | null,
-	message: Message,
+  severity: CollectionIssueSeverity;
+  /**  The member the issue belongs to, when it belongs to one. */
+  item?: string | null;
+  message: Message;
 };
 
 /**  Something the user should know before or during the install. */
 export type CollectionIssue_Serialize = {
-	severity: CollectionIssueSeverity,
-	/**  The member the issue belongs to, when it belongs to one. */
-	item: string | null,
-	message: Message,
+  severity: CollectionIssueSeverity;
+  /**  The member the issue belongs to, when it belongs to one. */
+  item: string | null;
+  message: Message;
 };
 
 /**  One member of a collection. */
-export type CollectionItem = CollectionItem_Serialize | CollectionItem_Deserialize;
+export type CollectionItem =
+  CollectionItem_Serialize | CollectionItem_Deserialize;
 
 /**  What the guided flow does with one member. */
-export type CollectionItemAction = CollectionItemAction_Serialize | CollectionItemAction_Deserialize;
+export type CollectionItemAction =
+  CollectionItemAction_Serialize | CollectionItemAction_Deserialize;
 
 /**  What the guided flow does with one member. */
-export type CollectionItemAction_Deserialize = 
-/**  Already in the profile, or just imported from a bundle or a direct URL. */
-{ kind: "installed" } | 
-/**  The exact file is already in the library, so no download is needed. The user enables it from the mod list. */
-{ kind: "already_in_library"; name: string } | 
-/**  The file page is open. The download with this owner is the member's file. */
-{ kind: "waiting"; owner: string; url: string } | 
-/**  The user has to download this resource and import it or mark it done. */
-{ kind: "needs_user"; url?: string | null; instructions: string } | 
-/**  The archive needs FOMOD choices before it can be imported. */
-{ kind: "needs_choice"; path: string; module_name: string; steps: FomodStepView_Deserialize[] } | 
-/**  The source cannot be installed automatically; the reason is shown. */
-{ kind: "unsupported"; reason: Message } | { kind: "failed"; error: AppError_Deserialize };
+export type CollectionItemAction_Deserialize =
+  /**  Already in the profile, or just imported from a bundle or a direct URL. */
+  | { kind: "installed" }
+  /**  The exact file is already in the library, so no download is needed. The user enables it from the mod list. */
+  | { kind: "already_in_library"; name: string }
+  /**  The file page is open. The download with this owner is the member's file. */
+  | { kind: "waiting"; owner: string; url: string }
+  /**  The user has to download this resource and import it or mark it done. */
+  | { kind: "needs_user"; url?: string | null; instructions: string }
+  /**  The archive needs FOMOD choices before it can be imported. */
+  | {
+      kind: "needs_choice";
+      path: string;
+      module_name: string;
+      steps: FomodStepView_Deserialize[];
+    }
+  /**  The source cannot be installed automatically; the reason is shown. */
+  | { kind: "unsupported"; reason: Message }
+  | { kind: "failed"; error: AppError_Deserialize };
 
 /**  What the guided flow does with one member. */
-export type CollectionItemAction_Serialize = 
-/**  Already in the profile, or just imported from a bundle or a direct URL. */
-{ kind: "installed" } | 
-/**  The exact file is already in the library, so no download is needed. The user enables it from the mod list. */
-{ kind: "already_in_library"; name: string } | 
-/**  The file page is open. The download with this owner is the member's file. */
-{ kind: "waiting"; owner: string; url: string } | 
-/**  The user has to download this resource and import it or mark it done. */
-{ kind: "needs_user"; url: string | null; instructions: string } | 
-/**  The archive needs FOMOD choices before it can be imported. */
-{ kind: "needs_choice"; path: string; module_name: string; steps: FomodStepView_Serialize[] } | 
-/**  The source cannot be installed automatically; the reason is shown. */
-{ kind: "unsupported"; reason: Message } | { kind: "failed"; error: AppError_Serialize };
+export type CollectionItemAction_Serialize =
+  /**  Already in the profile, or just imported from a bundle or a direct URL. */
+  | { kind: "installed" }
+  /**  The exact file is already in the library, so no download is needed. The user enables it from the mod list. */
+  | { kind: "already_in_library"; name: string }
+  /**  The file page is open. The download with this owner is the member's file. */
+  | { kind: "waiting"; owner: string; url: string }
+  /**  The user has to download this resource and import it or mark it done. */
+  | { kind: "needs_user"; url: string | null; instructions: string }
+  /**  The archive needs FOMOD choices before it can be imported. */
+  | {
+      kind: "needs_choice";
+      path: string;
+      module_name: string;
+      steps: FomodStepView_Serialize[];
+    }
+  /**  The source cannot be installed automatically; the reason is shown. */
+  | { kind: "unsupported"; reason: Message }
+  | { kind: "failed"; error: AppError_Serialize };
 
 /**  The step an automatic collection install is at for one member, or why it stopped. */
-export type CollectionItemState = "downloading" | "importing" | "patching" | "installed" | "failed" | "needs_choice" | "needs_user" | "skipped";
+export type CollectionItemState =
+  | "downloading"
+  | "importing"
+  | "patching"
+  | "installed"
+  | "failed"
+  | "needs_choice"
+  | "needs_user"
+  | "skipped";
 
 /**  Where a member stands against the library and one profile. The interface draws this; the feature computes it. */
-export type CollectionItemStatus = 
-/**  Not in the library and not waiting. */
-{ kind: "missing" } | 
-/**  Waiting in the profile for its download or import. */
-{ kind: "queued" } | 
-/**  In the library, but not in the profile. */
-{ kind: "in_library" } | 
-/**  In the profile with the pinned version. */
-{ kind: "installed" } | 
-/**  In the profile with a version the collection's `latest` or `prefer` policy accepts. */
-{ kind: "satisfied"; current: string } | 
-/**  In the profile with another version or file of the same mod. */
-{ kind: "different_version"; current: string } | 
-/**  In the library with another version or file of the same mod. */
-{ kind: "in_library_different_version"; current: string } | 
-/**  The user chose not to install it. */
-{ kind: "skipped" } | 
-/**  Completed without a library source, or marked done by the user. */
-{ kind: "manual" } | 
-/**  The source cannot be installed automatically. */
-{ kind: "unsupported" };
+export type CollectionItemStatus =
+  /**  Not in the library and not waiting. */
+  | { kind: "missing" }
+  /**  Waiting in the profile for its download or import. */
+  | { kind: "queued" }
+  /**  In the library, but not in the profile. */
+  | { kind: "in_library" }
+  /**  In the profile with the pinned version. */
+  | { kind: "installed" }
+  /**  In the profile with a version the collection's `latest` or `prefer` policy accepts. */
+  | { kind: "satisfied"; current: string }
+  /**  In the profile with another version or file of the same mod. */
+  | { kind: "different_version"; current: string }
+  /**  In the library with another version or file of the same mod. */
+  | { kind: "in_library_different_version"; current: string }
+  /**  The user chose not to install it. */
+  | { kind: "skipped" }
+  /**  Completed without a library source, or marked done by the user. */
+  | { kind: "manual" }
+  /**  The source cannot be installed automatically. */
+  | { kind: "unsupported" };
 
 /**  One member of a collection. */
 export type CollectionItem_Deserialize = {
-	/**  A stable key across revisions: `<provider>:<mod>`, `bundle:<tag>`, `direct:<url>` or `manual:<name>`. */
-	key: string,
-	name: string,
-	version?: string | null,
-	author?: string | null,
-	category?: string | null,
-	summary: string,
-	picture_url?: string | null,
-	optional: boolean,
-	phase: number,
-	source: CollectionSource_Deserialize,
-	file_name?: string | null,
-	size_kb: number,
-	md5?: string | null,
-	update_policy: CollectionUpdatePolicy,
-	/**  The installer choices the curator made. Several entries in one group mean a multi-select group. */
-	choices: Choice_Deserialize[],
-	/**  File path -> CRC32 of the file the patch expects, as the collection stores it. */
-	patches: { [key in string]: string },
-	instructions: string,
-	adult: boolean,
+  /**  A stable key across revisions: `<provider>:<mod>`, `bundle:<tag>`, `direct:<url>` or `manual:<name>`. */
+  key: string;
+  name: string;
+  version?: string | null;
+  author?: string | null;
+  category?: string | null;
+  summary: string;
+  picture_url?: string | null;
+  optional: boolean;
+  phase: number;
+  source: CollectionSource_Deserialize;
+  file_name?: string | null;
+  size_kb: number;
+  md5?: string | null;
+  update_policy: CollectionUpdatePolicy;
+  /**  The installer choices the curator made. Several entries in one group mean a multi-select group. */
+  choices: Choice_Deserialize[];
+  /**  File path -> CRC32 of the file the patch expects, as the collection stores it. */
+  patches: { [key in string]: string };
+  instructions: string;
+  adult: boolean;
 };
 
 /**  One member of a collection. */
 export type CollectionItem_Serialize = {
-	/**  A stable key across revisions: `<provider>:<mod>`, `bundle:<tag>`, `direct:<url>` or `manual:<name>`. */
-	key: string,
-	name: string,
-	version: string | null,
-	author: string | null,
-	category: string | null,
-	summary: string,
-	picture_url: string | null,
-	optional: boolean,
-	phase: number,
-	source: CollectionSource_Serialize,
-	file_name: string | null,
-	size_kb: number,
-	md5: string | null,
-	update_policy: CollectionUpdatePolicy,
-	/**  The installer choices the curator made. Several entries in one group mean a multi-select group. */
-	choices: Choice_Serialize[],
-	/**  File path -> CRC32 of the file the patch expects, as the collection stores it. */
-	patches: { [key in string]: string },
-	instructions: string,
-	adult: boolean,
+  /**  A stable key across revisions: `<provider>:<mod>`, `bundle:<tag>`, `direct:<url>` or `manual:<name>`. */
+  key: string;
+  name: string;
+  version: string | null;
+  author: string | null;
+  category: string | null;
+  summary: string;
+  picture_url: string | null;
+  optional: boolean;
+  phase: number;
+  source: CollectionSource_Serialize;
+  file_name: string | null;
+  size_kb: number;
+  md5: string | null;
+  update_policy: CollectionUpdatePolicy;
+  /**  The installer choices the curator made. Several entries in one group mean a multi-select group. */
+  choices: Choice_Serialize[];
+  /**  File path -> CRC32 of the file the patch expects, as the collection stores it. */
+  patches: { [key in string]: string };
+  instructions: string;
+  adult: boolean;
 };
 
 /**  The profile provenance of one installed collection. A profile can hold several. */
-export type CollectionOrigin = CollectionOrigin_Serialize | CollectionOrigin_Deserialize;
+export type CollectionOrigin =
+  CollectionOrigin_Serialize | CollectionOrigin_Deserialize;
 
 /**  The profile provenance of one installed collection. A profile can hold several. */
 export type CollectionOrigin_Deserialize = {
-	provider: string,
-	game_key: string,
-	slug: string,
-	revision: number,
-	/**
-	 *  The newest revision the provider reported at the last install or check. `0` for an origin saved before Gobbo
-	 *  kept it, so an old profile never claims an update it cannot name.
-	 */
-	latest_revision?: number,
-	revision_label?: string,
-	name: string,
-	author?: string | null,
-	url: string,
-	/**  Item keys the user chose not to install. */
-	excluded?: string[],
-	/**  Item keys completed without a library source (bundles, direct links and manual entries). */
-	manual?: string[],
-	/**
-	 *  Family keys this collection added to the profile. Removing the collection removes these, unless another
-	 *  collection of the profile uses them.
-	 */
-	added?: string[],
-	/**
-	 *  Every family of the profile that is a member of this collection, including mods the list already had. The
-	 *  mod list shows the collection on these rows; removing the collection never touches the ones not in `added`.
-	 */
-	families?: string[],
-	/**
-	 *  Family keys an update switched off because a newer revision removed them. A mod the user switched off by hand
-	 *  is not recorded here, so installing again does not change it. A later revision that lists one again switches it
-	 *  back on and drops the key from this set.
-	 */
-	disabled?: string[],
-	/**  Unix time in seconds of the last install or update. */
-	installed_at?: number,
+  provider: string;
+  game_key: string;
+  slug: string;
+  revision: number;
+  /**
+   *  The newest revision the provider reported at the last install or check. `0` for an origin saved before Gobbo
+   *  kept it, so an old profile never claims an update it cannot name.
+   */
+  latest_revision?: number;
+  revision_label?: string;
+  name: string;
+  author?: string | null;
+  url: string;
+  /**  Item keys the user chose not to install. */
+  excluded?: string[];
+  /**  Item keys completed without a library source (bundles, direct links and manual entries). */
+  manual?: string[];
+  /**
+   *  Family keys this collection added to the profile. Removing the collection removes these, unless another
+   *  collection of the profile uses them.
+   */
+  added?: string[];
+  /**
+   *  Every family of the profile that is a member of this collection, including mods the list already had. The
+   *  mod list shows the collection on these rows; removing the collection never touches the ones not in `added`.
+   */
+  families?: string[];
+  /**
+   *  Family keys an update switched off because a newer revision removed them. A mod the user switched off by hand
+   *  is not recorded here, so installing again does not change it. A later revision that lists one again switches it
+   *  back on and drops the key from this set.
+   */
+  disabled?: string[];
+  /**  Unix time in seconds of the last install or update. */
+  installed_at?: number;
 };
 
 /**  The profile provenance of one installed collection. A profile can hold several. */
 export type CollectionOrigin_Serialize = {
-	provider: string,
-	game_key: string,
-	slug: string,
-	revision: number,
-	/**
-	 *  The newest revision the provider reported at the last install or check. `0` for an origin saved before Gobbo
-	 *  kept it, so an old profile never claims an update it cannot name.
-	 */
-	latest_revision: number,
-	revision_label?: string,
-	name: string,
-	author: string | null,
-	url: string,
-	/**  Item keys the user chose not to install. */
-	excluded?: string[],
-	/**  Item keys completed without a library source (bundles, direct links and manual entries). */
-	manual?: string[],
-	/**
-	 *  Family keys this collection added to the profile. Removing the collection removes these, unless another
-	 *  collection of the profile uses them.
-	 */
-	added?: string[],
-	/**
-	 *  Every family of the profile that is a member of this collection, including mods the list already had. The
-	 *  mod list shows the collection on these rows; removing the collection never touches the ones not in `added`.
-	 */
-	families?: string[],
-	/**
-	 *  Family keys an update switched off because a newer revision removed them. A mod the user switched off by hand
-	 *  is not recorded here, so installing again does not change it. A later revision that lists one again switches it
-	 *  back on and drops the key from this set.
-	 */
-	disabled?: string[],
-	/**  Unix time in seconds of the last install or update. */
-	installed_at: number,
+  provider: string;
+  game_key: string;
+  slug: string;
+  revision: number;
+  /**
+   *  The newest revision the provider reported at the last install or check. `0` for an origin saved before Gobbo
+   *  kept it, so an old profile never claims an update it cannot name.
+   */
+  latest_revision: number;
+  revision_label?: string;
+  name: string;
+  author: string | null;
+  url: string;
+  /**  Item keys the user chose not to install. */
+  excluded?: string[];
+  /**  Item keys completed without a library source (bundles, direct links and manual entries). */
+  manual?: string[];
+  /**
+   *  Family keys this collection added to the profile. Removing the collection removes these, unless another
+   *  collection of the profile uses them.
+   */
+  added?: string[];
+  /**
+   *  Every family of the profile that is a member of this collection, including mods the list already had. The
+   *  mod list shows the collection on these rows; removing the collection never touches the ones not in `added`.
+   */
+  families?: string[];
+  /**
+   *  Family keys an update switched off because a newer revision removed them. A mod the user switched off by hand
+   *  is not recorded here, so installing again does not change it. A later revision that lists one again switches it
+   *  back on and drops the key from this set.
+   */
+  disabled?: string[];
+  /**  Unix time in seconds of the last install or update. */
+  installed_at: number;
 };
 
 /**
@@ -1204,150 +2016,180 @@ export type CollectionOrigin_Serialize = {
  *  the page through its normal source action; it never has to build a URL or guess the download's owner.
  */
 export type CollectionPageRequest = {
-	game: string,
-	profile: string,
-	collection: string,
-	item: string,
-	name: string,
-	provider: string,
-	game_key: string,
-	mod_id: string,
-	url: string,
+  game: string;
+  profile: string;
+  collection: string;
+  item: string;
+  name: string;
+  provider: string;
+  game_key: string;
+  mod_id: string;
+  url: string;
 };
 
 /**  The full recipe of one collection revision. */
-export type CollectionPlan = CollectionPlan_Serialize | CollectionPlan_Deserialize;
+export type CollectionPlan =
+  CollectionPlan_Serialize | CollectionPlan_Deserialize;
 
 /**  The full recipe of one collection revision. */
 export type CollectionPlan_Deserialize = {
-	format: number,
-	info: CollectionInfo_Deserialize,
-	items: CollectionItem_Deserialize[],
-	rules: CollectionRule[],
-	issues: CollectionIssue_Deserialize[],
-	/**  Item keys in the order they should enter the profile (first wins a file conflict). */
-	order: string[],
-	has_bundles: boolean,
-	has_patches: boolean,
-	/**  The plan came from the API metadata only: the archive was not read, so choices and rules are missing. */
-	limited: boolean,
+  format: number;
+  info: CollectionInfo_Deserialize;
+  items: CollectionItem_Deserialize[];
+  rules: CollectionRule[];
+  issues: CollectionIssue_Deserialize[];
+  /**  Item keys in the order they should enter the profile (first wins a file conflict). */
+  order: string[];
+  has_bundles: boolean;
+  has_patches: boolean;
+  /**  The plan came from the API metadata only: the archive was not read, so choices and rules are missing. */
+  limited: boolean;
 };
 
 /**  The full recipe of one collection revision. */
 export type CollectionPlan_Serialize = {
-	format: number,
-	info: CollectionInfo_Serialize,
-	items: CollectionItem_Serialize[],
-	rules: CollectionRule[],
-	issues: CollectionIssue_Serialize[],
-	/**  Item keys in the order they should enter the profile (first wins a file conflict). */
-	order: string[],
-	has_bundles: boolean,
-	has_patches: boolean,
-	/**  The plan came from the API metadata only: the archive was not read, so choices and rules are missing. */
-	limited: boolean,
+  format: number;
+  info: CollectionInfo_Serialize;
+  items: CollectionItem_Serialize[];
+  rules: CollectionRule[];
+  issues: CollectionIssue_Serialize[];
+  /**  Item keys in the order they should enter the profile (first wins a file conflict). */
+  order: string[];
+  has_bundles: boolean;
+  has_patches: boolean;
+  /**  The plan came from the API metadata only: the archive was not read, so choices and rules are missing. */
+  limited: boolean;
 };
 
 /**  Where a new collection block enters an existing list. */
 export type CollectionPosition = "top" | "bottom";
 
 /**  A collection opened for preview, with the status of the active profile. */
-export type CollectionPreview = CollectionPreview_Serialize | CollectionPreview_Deserialize;
+export type CollectionPreview =
+  CollectionPreview_Serialize | CollectionPreview_Deserialize;
 
 /**  A collection opened for preview, with the status of the active profile. */
 export type CollectionPreview_Deserialize = {
-	plan: CollectionPlan_Deserialize,
-	statuses: { [key in string]: CollectionItemStatus },
-	counts: CollectionCounts,
-	profiles: CollectionProfileView[],
-	/**  The profile the statuses were computed for. */
-	profile: string,
-	has_archive: boolean,
-	key_saved: boolean,
-	/**  The provider needs a saved key (Nexus). Thunderstore needs none, so the window shows no account notice. */
-	needs_key: boolean,
-	direct_download: boolean,
-	account?: string | null,
-	already_installed: boolean,
+  plan: CollectionPlan_Deserialize;
+  statuses: { [key in string]: CollectionItemStatus };
+  counts: CollectionCounts;
+  profiles: CollectionProfileView[];
+  /**  The profile the statuses were computed for. */
+  profile: string;
+  has_archive: boolean;
+  key_saved: boolean;
+  /**  The provider needs a saved key (Nexus). Thunderstore needs none, so the window shows no account notice. */
+  needs_key: boolean;
+  direct_download: boolean;
+  account?: string | null;
+  already_installed: boolean;
 };
 
 /**  A collection opened for preview, with the status of the active profile. */
 export type CollectionPreview_Serialize = {
-	plan: CollectionPlan_Serialize,
-	statuses: { [key in string]: CollectionItemStatus },
-	counts: CollectionCounts,
-	profiles: CollectionProfileView[],
-	/**  The profile the statuses were computed for. */
-	profile: string,
-	has_archive: boolean,
-	key_saved: boolean,
-	/**  The provider needs a saved key (Nexus). Thunderstore needs none, so the window shows no account notice. */
-	needs_key: boolean,
-	direct_download: boolean,
-	account: string | null,
-	already_installed: boolean,
+  plan: CollectionPlan_Serialize;
+  statuses: { [key in string]: CollectionItemStatus };
+  counts: CollectionCounts;
+  profiles: CollectionProfileView[];
+  /**  The profile the statuses were computed for. */
+  profile: string;
+  has_archive: boolean;
+  key_saved: boolean;
+  /**  The provider needs a saved key (Nexus). Thunderstore needs none, so the window shows no account notice. */
+  needs_key: boolean;
+  direct_download: boolean;
+  account: string | null;
+  already_installed: boolean;
 };
 
 /**  One profile, as the install dialog offers it. */
 export type CollectionProfileView = {
-	id: string,
-	name: string,
-	active: boolean,
-	/**  A pack profile cannot take a collection; a pack update would replace the list. */
-	pack: boolean,
-	collections: number,
+  id: string;
+  name: string;
+  active: boolean;
+  /**  A pack profile cannot take a collection; a pack update would replace the list. */
+  pack: boolean;
+  collections: number;
 };
 
 /**  One progress step of an automatic collection install. */
-export type CollectionProgress = CollectionProgress_Serialize | CollectionProgress_Deserialize;
+export type CollectionProgress =
+  CollectionProgress_Serialize | CollectionProgress_Deserialize;
 
 /**  One progress step of an automatic collection install. */
 export type CollectionProgress_Deserialize = {
-	key: string,
-	name: string,
-	index: number,
-	total: number,
-	percent: number,
-	state: CollectionItemState,
-	error?: AppError_Deserialize | null,
+  key: string;
+  name: string;
+  index: number;
+  total: number;
+  percent: number;
+  state: CollectionItemState;
+  error?: AppError_Deserialize | null;
 };
 
 /**  One progress step of an automatic collection install. */
 export type CollectionProgress_Serialize = {
-	key: string,
-	name: string,
-	index: number,
-	total: number,
-	percent: number,
-	state: CollectionItemState,
-	error: AppError_Serialize | null,
+  key: string;
+  name: string;
+  index: number;
+  total: number;
+  percent: number;
+  state: CollectionItemState;
+  error: AppError_Serialize | null;
 };
 
 /**
  *  The one decision the window must make before a round can continue. It is derived from the round and echoed back
  *  with the chosen answer; the controller never asks the window to pick the next member or to drive the loop.
  */
-export type CollectionPrompt = CollectionPrompt_Serialize | CollectionPrompt_Deserialize;
+export type CollectionPrompt =
+  CollectionPrompt_Serialize | CollectionPrompt_Deserialize;
 
 /**
  *  The one decision the window must make before a round can continue. It is derived from the round and echoed back
  *  with the chosen answer; the controller never asks the window to pick the next member or to drive the loop.
  */
-export type CollectionPrompt_Deserialize = 
-/**  A FOMOD archive has no stored choices; the shared wizard must supply them. */
-{ kind: "choice"; item: string; name: string; path: string; module_name: string; steps: FomodStepView_Deserialize[] } | 
-/**  A manual or browse member needs a picked file, a "mark done" or a skip. */
-{ kind: "manual"; item: string; name: string; url?: string | null; instructions: string };
+export type CollectionPrompt_Deserialize =
+  /**  A FOMOD archive has no stored choices; the shared wizard must supply them. */
+  | {
+      kind: "choice";
+      item: string;
+      name: string;
+      path: string;
+      module_name: string;
+      steps: FomodStepView_Deserialize[];
+    }
+  /**  A manual or browse member needs a picked file, a "mark done" or a skip. */
+  | {
+      kind: "manual";
+      item: string;
+      name: string;
+      url?: string | null;
+      instructions: string;
+    };
 
 /**
  *  The one decision the window must make before a round can continue. It is derived from the round and echoed back
  *  with the chosen answer; the controller never asks the window to pick the next member or to drive the loop.
  */
-export type CollectionPrompt_Serialize = 
-/**  A FOMOD archive has no stored choices; the shared wizard must supply them. */
-{ kind: "choice"; item: string; name: string; path: string; module_name: string; steps: FomodStepView_Serialize[] } | 
-/**  A manual or browse member needs a picked file, a "mark done" or a skip. */
-{ kind: "manual"; item: string; name: string; url: string | null; instructions: string };
+export type CollectionPrompt_Serialize =
+  /**  A FOMOD archive has no stored choices; the shared wizard must supply them. */
+  | {
+      kind: "choice";
+      item: string;
+      name: string;
+      path: string;
+      module_name: string;
+      steps: FomodStepView_Serialize[];
+    }
+  /**  A manual or browse member needs a picked file, a "mark done" or a skip. */
+  | {
+      kind: "manual";
+      item: string;
+      name: string;
+      url: string | null;
+      instructions: string;
+    };
 
 /**
  *  What one backend-driven round did. `install` carries the fresh session and the round's notices; `prompt` is the
@@ -1355,7 +2197,8 @@ export type CollectionPrompt_Serialize =
  *  expected, and `finished` says the round has no pending members left. A waiting round needs no user decision: the
  *  backend imports the matching download and continues on its own.
  */
-export type CollectionRoundView = CollectionRoundView_Serialize | CollectionRoundView_Deserialize;
+export type CollectionRoundView =
+  CollectionRoundView_Serialize | CollectionRoundView_Deserialize;
 
 /**
  *  What one backend-driven round did. `install` carries the fresh session and the round's notices; `prompt` is the
@@ -1364,10 +2207,10 @@ export type CollectionRoundView = CollectionRoundView_Serialize | CollectionRoun
  *  backend imports the matching download and continues on its own.
  */
 export type CollectionRoundView_Deserialize = {
-	install: CollectionInstallView_Deserialize,
-	prompt?: CollectionPrompt_Deserialize | null,
-	waiting?: CollectionPageRequest | null,
-	finished: boolean,
+  install: CollectionInstallView_Deserialize;
+  prompt?: CollectionPrompt_Deserialize | null;
+  waiting?: CollectionPageRequest | null;
+  finished: boolean;
 };
 
 /**
@@ -1377,180 +2220,196 @@ export type CollectionRoundView_Deserialize = {
  *  backend imports the matching download and continues on its own.
  */
 export type CollectionRoundView_Serialize = {
-	install: CollectionInstallView_Serialize,
-	prompt: CollectionPrompt_Serialize | null,
-	waiting: CollectionPageRequest | null,
-	finished: boolean,
+  install: CollectionInstallView_Serialize;
+  prompt: CollectionPrompt_Serialize | null;
+  waiting: CollectionPageRequest | null;
+  finished: boolean;
 };
 
 /**  One rule between two collection members. */
 export type CollectionRule = {
-	kind: CollectionRuleKind,
-	/**  The item key of the source. */
-	source: string,
-	/**  The item key of the reference. */
-	reference: string,
+  kind: CollectionRuleKind;
+  /**  The item key of the source. */
+  source: string;
+  /**  The item key of the reference. */
+  reference: string;
 };
 
-export type CollectionRuleKind = "before" | "after" | "requires" | "conflicts" | "recommends" | "provides";
+export type CollectionRuleKind =
+  "before" | "after" | "requires" | "conflicts" | "recommends" | "provides";
 
 /**  A collection attached to a profile, with its live statuses. */
-export type CollectionSessionView = CollectionSessionView_Serialize | CollectionSessionView_Deserialize;
+export type CollectionSessionView =
+  CollectionSessionView_Serialize | CollectionSessionView_Deserialize;
 
 /**  A collection attached to a profile, with its live statuses. */
 export type CollectionSessionView_Deserialize = {
-	profile: string,
-	origin: CollectionOrigin_Deserialize,
-	plan: CollectionPlan_Deserialize,
-	statuses: { [key in string]: CollectionItemStatus },
-	counts: CollectionCounts,
-	/**  The first member that still needs work. */
-	next?: string | null,
-	/**  Whether the provider has a newer revision than the one installed in this profile. */
-	update: boolean,
+  profile: string;
+  origin: CollectionOrigin_Deserialize;
+  plan: CollectionPlan_Deserialize;
+  statuses: { [key in string]: CollectionItemStatus };
+  counts: CollectionCounts;
+  /**  The first member that still needs work. */
+  next?: string | null;
+  /**  Whether the provider has a newer revision than the one installed in this profile. */
+  update: boolean;
 };
 
 /**  A collection attached to a profile, with its live statuses. */
 export type CollectionSessionView_Serialize = {
-	profile: string,
-	origin: CollectionOrigin_Serialize,
-	plan: CollectionPlan_Serialize,
-	statuses: { [key in string]: CollectionItemStatus },
-	counts: CollectionCounts,
-	/**  The first member that still needs work. */
-	next: string | null,
-	/**  Whether the provider has a newer revision than the one installed in this profile. */
-	update: boolean,
+  profile: string;
+  origin: CollectionOrigin_Serialize;
+  plan: CollectionPlan_Serialize;
+  statuses: { [key in string]: CollectionItemStatus };
+  counts: CollectionCounts;
+  /**  The first member that still needs work. */
+  next: string | null;
+  /**  Whether the provider has a newer revision than the one installed in this profile. */
+  update: boolean;
 };
 
 /**  The kind of source one collection member names. */
-export type CollectionSource = CollectionSource_Serialize | CollectionSource_Deserialize;
+export type CollectionSource =
+  CollectionSource_Serialize | CollectionSource_Deserialize;
 
 /**  The kind of source one collection member names. */
-export type CollectionSource_Deserialize = 
-/**  A file of a registered provider: a Nexus file or a Thunderstore package version. The provider downloads it. */
-{ kind: "provider"; provider: string; mod_id: string; file_id: string; 
-/**  The persistent part id (a Nexus `mod_file_id`), when the manifest already names it. */
-part_id?: string | null } | 
-/**  A folder inside the collection archive, under `bundled/<path>`. */
-{ kind: "bundle"; path: string; tag?: string | null } | 
-/**  A direct URL outside Nexus. */
-{ kind: "direct"; url: string } | 
-/**  A page the user has to visit and download from. */
-{ kind: "browse"; url: string } | 
-/**  Instructions only; the user installs it. */
-{ kind: "manual" } | 
-/**  A source type this build does not know. It is shown and refused, never installed by guesswork. */
-{ kind: "unsupported"; source_kind: string };
+export type CollectionSource_Deserialize =
+  /**  A file of a registered provider: a Nexus file or a Thunderstore package version. The provider downloads it. */
+  | {
+      kind: "provider";
+      provider: string;
+      mod_id: string;
+      file_id: string;
+      /**  The persistent part id (a Nexus `mod_file_id`), when the manifest already names it. */
+      part_id?: string | null;
+    }
+  /**  A folder inside the collection archive, under `bundled/<path>`. */
+  | { kind: "bundle"; path: string; tag?: string | null }
+  /**  A direct URL outside Nexus. */
+  | { kind: "direct"; url: string }
+  /**  A page the user has to visit and download from. */
+  | { kind: "browse"; url: string }
+  /**  Instructions only; the user installs it. */
+  | { kind: "manual" }
+  /**  A source type this build does not know. It is shown and refused, never installed by guesswork. */
+  | { kind: "unsupported"; source_kind: string };
 
 /**  The kind of source one collection member names. */
-export type CollectionSource_Serialize = 
-/**  A file of a registered provider: a Nexus file or a Thunderstore package version. The provider downloads it. */
-{ kind: "provider"; provider: string; mod_id: string; file_id: string; 
-/**  The persistent part id (a Nexus `mod_file_id`), when the manifest already names it. */
-part_id?: string } | 
-/**  A folder inside the collection archive, under `bundled/<path>`. */
-{ kind: "bundle"; path: string; tag?: string } | 
-/**  A direct URL outside Nexus. */
-{ kind: "direct"; url: string } | 
-/**  A page the user has to visit and download from. */
-{ kind: "browse"; url: string } | 
-/**  Instructions only; the user installs it. */
-{ kind: "manual" } | 
-/**  A source type this build does not know. It is shown and refused, never installed by guesswork. */
-{ kind: "unsupported"; source_kind: string };
+export type CollectionSource_Serialize =
+  /**  A file of a registered provider: a Nexus file or a Thunderstore package version. The provider downloads it. */
+  | {
+      kind: "provider";
+      provider: string;
+      mod_id: string;
+      file_id: string;
+      /**  The persistent part id (a Nexus `mod_file_id`), when the manifest already names it. */
+      part_id?: string;
+    }
+  /**  A folder inside the collection archive, under `bundled/<path>`. */
+  | { kind: "bundle"; path: string; tag?: string }
+  /**  A direct URL outside Nexus. */
+  | { kind: "direct"; url: string }
+  /**  A page the user has to visit and download from. */
+  | { kind: "browse"; url: string }
+  /**  Instructions only; the user installs it. */
+  | { kind: "manual" }
+  /**  A source type this build does not know. It is shown and refused, never installed by guesswork. */
+  | { kind: "unsupported"; source_kind: string };
 
 /**  How a member matches an already installed version. */
-export type CollectionUpdatePolicy = 
-/**  The pinned file is the one the collection was made with. */
-"exact" | 
-/**  Any version of the same mod satisfies the member; the pinned file is downloaded when none is installed. */
-"latest" | 
-/**  Use the pinned file when it is installed, any other version otherwise. */
-"prefer";
+export type CollectionUpdatePolicy =
+  /**  The pinned file is the one the collection was made with. */
+  | "exact"
+  /**  Any version of the same mod satisfies the member; the pinned file is downloaded when none is installed. */
+  | "latest"
+  /**  Use the pinned file when it is installed, any other version otherwise. */
+  | "prefer";
 
 /**  Where a package stands in the library. */
-export type CommunityMatch = 
-/**  The exact version is installed. */
-"matched" | 
-/**  The package is installed, but the profile file names another version. The library's default version is selected. */
-"other_version" | 
-/**  No family of the library has this Thunderstore package. */
-"missing";
+export type CommunityMatch =
+  /**  The exact version is installed. */
+  | "matched"
+  /**  The package is installed, but the profile file names another version. The library's default version is selected. */
+  | "other_version"
+  /**  No family of the library has this Thunderstore package. */
+  | "missing";
 
 /**  The profile made from a community profile file and the packages that could not be matched. */
-export type CommunityProfileImport = CommunityProfileImport_Serialize | CommunityProfileImport_Deserialize;
+export type CommunityProfileImport =
+  CommunityProfileImport_Serialize | CommunityProfileImport_Deserialize;
 
 /**  The profile made from a community profile file and the packages that could not be matched. */
 export type CommunityProfileImport_Deserialize = {
-	status: Status_Deserialize,
-	profile: string,
-	mods: number,
-	missing: string[],
-	other_versions: string[],
+  status: Status_Deserialize;
+  profile: string;
+  mods: number;
+  missing: string[];
+  other_versions: string[];
 };
 
 /**  The profile made from a community profile file and the packages that could not be matched. */
 export type CommunityProfileImport_Serialize = {
-	status: Status_Serialize,
-	profile: string,
-	mods: number,
-	missing: string[],
-	other_versions: string[],
+  status: Status_Serialize;
+  profile: string;
+  mods: number;
+  missing: string[];
+  other_versions: string[];
 };
 
 /**  One package of a community profile, with how it stands in the library and the version a profile would select. */
-export type CommunityProfileMod = CommunityProfileMod_Serialize | CommunityProfileMod_Deserialize;
+export type CommunityProfileMod =
+  CommunityProfileMod_Serialize | CommunityProfileMod_Deserialize;
 
 /**  One package of a community profile, with how it stands in the library and the version a profile would select. */
 export type CommunityProfileMod_Deserialize = {
-	name: string,
-	version: string,
-	enabled: boolean,
-	state: CommunityMatch,
-	family?: string | null,
-	/**  The version folder a normal profile would select. */
-	folder?: string | null,
-	/**  The version that folder holds, when the library knows it. */
-	selected_version?: string | null,
+  name: string;
+  version: string;
+  enabled: boolean;
+  state: CommunityMatch;
+  family?: string | null;
+  /**  The version folder a normal profile would select. */
+  folder?: string | null;
+  /**  The version that folder holds, when the library knows it. */
+  selected_version?: string | null;
 };
 
 /**  One package of a community profile, with how it stands in the library and the version a profile would select. */
 export type CommunityProfileMod_Serialize = {
-	name: string,
-	version: string,
-	enabled: boolean,
-	state: CommunityMatch,
-	family: string | null,
-	/**  The version folder a normal profile would select. */
-	folder: string | null,
-	/**  The version that folder holds, when the library knows it. */
-	selected_version: string | null,
+  name: string;
+  version: string;
+  enabled: boolean;
+  state: CommunityMatch;
+  family: string | null;
+  /**  The version folder a normal profile would select. */
+  folder: string | null;
+  /**  The version that folder holds, when the library knows it. */
+  selected_version: string | null;
 };
 
 /**  What a community profile file holds before it is imported, with its packages and config folder. */
-export type CommunityProfilePreview = CommunityProfilePreview_Serialize | CommunityProfilePreview_Deserialize;
+export type CommunityProfilePreview =
+  CommunityProfilePreview_Serialize | CommunityProfilePreview_Deserialize;
 
 /**  What a community profile file holds before it is imported, with its packages and config folder. */
 export type CommunityProfilePreview_Deserialize = {
-	/**  The name taken from the profile folder, before the user edits it. */
-	profile: string,
-	mods: CommunityProfileMod_Deserialize[],
-	missing: number,
-	other_versions: number,
-	/**  The profile folder has a `BepInEx/config` (or `config`) folder. Those files are not part of the import. */
-	has_configs: boolean,
+  /**  The name taken from the profile folder, before the user edits it. */
+  profile: string;
+  mods: CommunityProfileMod_Deserialize[];
+  missing: number;
+  other_versions: number;
+  /**  The profile folder has a `BepInEx/config` (or `config`) folder. Those files are not part of the import. */
+  has_configs: boolean;
 };
 
 /**  What a community profile file holds before it is imported, with its packages and config folder. */
 export type CommunityProfilePreview_Serialize = {
-	/**  The name taken from the profile folder, before the user edits it. */
-	profile: string,
-	mods: CommunityProfileMod_Serialize[],
-	missing: number,
-	other_versions: number,
-	/**  The profile folder has a `BepInEx/config` (or `config`) folder. Those files are not part of the import. */
-	has_configs: boolean,
+  /**  The name taken from the profile folder, before the user edits it. */
+  profile: string;
+  mods: CommunityProfileMod_Serialize[];
+  missing: number;
+  other_versions: number;
+  /**  The profile folder has a `BepInEx/config` (or `config`) folder. Those files are not part of the import. */
+  has_configs: boolean;
 };
 
 /**  A mod that differs between the two profiles. A side is `None` when its profile does not list the mod. */
@@ -1558,18 +2417,18 @@ export type CompareRow = CompareRow_Serialize | CompareRow_Deserialize;
 
 /**  A mod that differs between the two profiles. A side is `None` when its profile does not list the mod. */
 export type CompareRow_Deserialize = {
-	id: string,
-	name: string,
-	first?: CompareSide_Deserialize | null,
-	second?: CompareSide_Deserialize | null,
+  id: string;
+  name: string;
+  first?: CompareSide_Deserialize | null;
+  second?: CompareSide_Deserialize | null;
 };
 
 /**  A mod that differs between the two profiles. A side is `None` when its profile does not list the mod. */
 export type CompareRow_Serialize = {
-	id: string,
-	name: string,
-	first: CompareSide_Serialize | null,
-	second: CompareSide_Serialize | null,
+  id: string;
+  name: string;
+  first: CompareSide_Serialize | null;
+  second: CompareSide_Serialize | null;
 };
 
 /**  One profile's side of a mod: the version folder it selects, its version as the mod says it, and whether it is on. */
@@ -1577,54 +2436,55 @@ export type CompareSide = CompareSide_Serialize | CompareSide_Deserialize;
 
 /**  One profile's side of a mod: the version folder it selects, its version as the mod says it, and whether it is on. */
 export type CompareSide_Deserialize = {
-	folder: string,
-	version?: string | null,
-	enabled: boolean,
+  folder: string;
+  version?: string | null;
+  enabled: boolean;
 };
 
 /**  One profile's side of a mod: the version folder it selects, its version as the mod says it, and whether it is on. */
 export type CompareSide_Serialize = {
-	folder: string,
-	version: string | null,
-	enabled: boolean,
+  folder: string;
+  version: string | null;
+  enabled: boolean;
 };
 
 export type ConflictEntry = {
-	/**  Relative to the deployment root, with `/`. */
-	path: string,
-	/**  The family that wins this path. */
-	winner: string,
-	/**  The families whose copy is overwritten. */
-	losers: string[],
-	/**  The size of the winning copy in the library. */
-	bytes: number,
-	/**  How many enabled mods write this path. */
-	copies: number,
+  /**  Relative to the deployment root, with `/`. */
+  path: string;
+  /**  The family that wins this path. */
+  winner: string;
+  /**  The families whose copy is overwritten. */
+  losers: string[];
+  /**  The size of the winning copy in the library. */
+  bytes: number;
+  /**  How many enabled mods write this path. */
+  copies: number;
 };
 
 export type ConflictExplorer = {
-	total: number,
-	/**  The paths in path order, so the window can group neighbours without sorting 10k rows itself. */
-	entries: ConflictEntry[],
+  total: number;
+  /**  The paths in path order, so the window can group neighbours without sorting 10k rows itself. */
+  entries: ConflictEntry[];
 };
 
 /**
  *  One image the window can show, read from a mod in the library. A file whose format the window cannot display has no
  *  `data_url`, while `extension` and `bytes` still describe it.
  */
-export type ConflictPreview = ConflictPreview_Serialize | ConflictPreview_Deserialize;
+export type ConflictPreview =
+  ConflictPreview_Serialize | ConflictPreview_Deserialize;
 
 /**
  *  One image the window can show, read from a mod in the library. A file whose format the window cannot display has no
  *  `data_url`, while `extension` and `bytes` still describe it.
  */
 export type ConflictPreview_Deserialize = {
-	/**  Lower-case extension of the file, without the dot. */
-	extension: string,
-	/**  Size of the file in the library. */
-	bytes: number,
-	/**  A `data:` URL with the file bytes, for the formats the window can render. */
-	data_url?: string | null,
+  /**  Lower-case extension of the file, without the dot. */
+  extension: string;
+  /**  Size of the file in the library. */
+  bytes: number;
+  /**  A `data:` URL with the file bytes, for the formats the window can render. */
+  data_url?: string | null;
 };
 
 /**
@@ -1632,37 +2492,38 @@ export type ConflictPreview_Deserialize = {
  *  `data_url`, while `extension` and `bytes` still describe it.
  */
 export type ConflictPreview_Serialize = {
-	/**  Lower-case extension of the file, without the dot. */
-	extension: string,
-	/**  Size of the file in the library. */
-	bytes: number,
-	/**  A `data:` URL with the file bytes, for the formats the window can render. */
-	data_url: string | null,
+  /**  Lower-case extension of the file, without the dot. */
+  extension: string;
+  /**  Size of the file in the library. */
+  bytes: number;
+  /**  A `data:` URL with the file bytes, for the formats the window can render. */
+  data_url: string | null;
 };
 
 /**  One contested file path, the mod that wins it and the mods that lose it. */
 export type ConflictView = {
-	path: string,
-	winner: string,
-	losers: string[],
+  path: string;
+  winner: string;
+  losers: string[];
 };
 
 /**
  *  What the editor gets after it checks a draft: whether it can be saved, the problems, and what the definition will
  *  do once the loader preset is merged under it.
  */
-export type DefinitionCheck = DefinitionCheck_Serialize | DefinitionCheck_Deserialize;
+export type DefinitionCheck =
+  DefinitionCheck_Serialize | DefinitionCheck_Deserialize;
 
 /**
  *  What the editor gets after it checks a draft: whether it can be saved, the problems, and what the definition will
  *  do once the loader preset is merged under it.
  */
 export type DefinitionCheck_Deserialize = {
-	ok: boolean,
-	id: string,
-	name: string,
-	problems: DefinitionProblemView[],
-	summary?: DefinitionSummary_Deserialize | null,
+  ok: boolean;
+  id: string;
+  name: string;
+  problems: DefinitionProblemView[];
+  summary?: DefinitionSummary_Deserialize | null;
 };
 
 /**
@@ -1670,107 +2531,110 @@ export type DefinitionCheck_Deserialize = {
  *  do once the loader preset is merged under it.
  */
 export type DefinitionCheck_Serialize = {
-	ok: boolean,
-	id: string,
-	name: string,
-	problems: DefinitionProblemView[],
-	summary: DefinitionSummary_Serialize | null,
+  ok: boolean;
+  id: string;
+  name: string;
+  problems: DefinitionProblemView[];
+  summary: DefinitionSummary_Serialize | null;
 };
 
 /**  What the import dialog shows before anything is written. */
-export type DefinitionPackagePreview = DefinitionPackagePreview_Serialize | DefinitionPackagePreview_Deserialize;
+export type DefinitionPackagePreview =
+  DefinitionPackagePreview_Serialize | DefinitionPackagePreview_Deserialize;
 
 /**  What the import dialog shows before anything is written. */
 export type DefinitionPackagePreview_Deserialize = {
-	id: string,
-	name: string,
-	/**  The icon as a data URL, when the package has a readable one. */
-	icon?: string | null,
-	/**  The loader the game names, when it resolves. */
-	loader?: GameLoaderView_Deserialize | null,
-	/**  The files the package would write, relative to the two definition folders. */
-	files: string[],
-	/**  Problems that stop the import. */
-	problems: DefinitionProblemView[],
-	/**  Things the import accepts but the user should know, for example a skipped icon. */
-	warnings: string[],
-	/**  Existing user files the import would replace. Empty for a new definition. */
-	overwrites: string[],
+  id: string;
+  name: string;
+  /**  The icon as a data URL, when the package has a readable one. */
+  icon?: string | null;
+  /**  The loader the game names, when it resolves. */
+  loader?: GameLoaderView_Deserialize | null;
+  /**  The files the package would write, relative to the two definition folders. */
+  files: string[];
+  /**  Problems that stop the import. */
+  problems: DefinitionProblemView[];
+  /**  Things the import accepts but the user should know, for example a skipped icon. */
+  warnings: string[];
+  /**  Existing user files the import would replace. Empty for a new definition. */
+  overwrites: string[];
 };
 
 /**  What the import dialog shows before anything is written. */
 export type DefinitionPackagePreview_Serialize = {
-	id: string,
-	name: string,
-	/**  The icon as a data URL, when the package has a readable one. */
-	icon: string | null,
-	/**  The loader the game names, when it resolves. */
-	loader: GameLoaderView_Serialize | null,
-	/**  The files the package would write, relative to the two definition folders. */
-	files: string[],
-	/**  Problems that stop the import. */
-	problems: DefinitionProblemView[],
-	/**  Things the import accepts but the user should know, for example a skipped icon. */
-	warnings: string[],
-	/**  Existing user files the import would replace. Empty for a new definition. */
-	overwrites: string[],
+  id: string;
+  name: string;
+  /**  The icon as a data URL, when the package has a readable one. */
+  icon: string | null;
+  /**  The loader the game names, when it resolves. */
+  loader: GameLoaderView_Serialize | null;
+  /**  The files the package would write, relative to the two definition folders. */
+  files: string[];
+  /**  Problems that stop the import. */
+  problems: DefinitionProblemView[];
+  /**  Things the import accepts but the user should know, for example a skipped icon. */
+  warnings: string[];
+  /**  Existing user files the import would replace. Empty for a new definition. */
+  overwrites: string[];
 };
 
 /**  Where a draft definition would put the files of one archive. */
 export type DefinitionPreview = {
-	mods: PreviewMod[],
-	/**  Files no rule took, for example a readme at the archive root. */
-	skipped: number,
-	/**  The first skipped names, so the window can explain what was ignored. */
-	skipped_examples: string[],
+  mods: PreviewMod[];
+  /**  Files no rule took, for example a readme at the archive root. */
+  skipped: number;
+  /**  The first skipped names, so the window can explain what was ignored. */
+  skipped_examples: string[];
 };
 
 /**  A user definition that could not be loaded. The catalog keeps the other games; the Games page shows these paths. */
-export type DefinitionProblem = DefinitionProblem_Serialize | DefinitionProblem_Deserialize;
+export type DefinitionProblem =
+  DefinitionProblem_Serialize | DefinitionProblem_Deserialize;
 
 /**
  *  The problems reported while a definition is edited. Every problem names the section of the form that owns it, so
  *  the window can put the message beside the fields instead of at the bottom of the page.
  */
 export type DefinitionProblemView = {
-	section: string,
-	message: string,
+  section: string;
+  message: string;
 };
 
 /**  A user definition that could not be loaded. The catalog keeps the other games; the Games page shows these paths. */
 export type DefinitionProblem_Deserialize = {
-	path: string,
-	error: AppError_Deserialize,
+  path: string;
+  error: AppError_Deserialize;
 };
 
 /**  A user definition that could not be loaded. The catalog keeps the other games; the Games page shows these paths. */
 export type DefinitionProblem_Serialize = {
-	path: string,
-	error: AppError_Serialize,
+  path: string;
+  error: AppError_Serialize;
 };
 
 /**  A definition read for editing, with the folder it came from. */
 export type DefinitionSource = {
-	id: string,
-	text: string,
-	origin: GameOrigin,
+  id: string;
+  text: string;
+  origin: GameOrigin;
 };
 
 /**
  *  The effect of a definition, in the same shape the game settings show. `game` carries the places, methods, loader
  *  and providers; `requires` and `executables` are what the editor shows in its short summary.
  */
-export type DefinitionSummary = DefinitionSummary_Serialize | DefinitionSummary_Deserialize;
+export type DefinitionSummary =
+  DefinitionSummary_Serialize | DefinitionSummary_Deserialize;
 
 /**
  *  The effect of a definition, in the same shape the game settings show. `game` carries the places, methods, loader
  *  and providers; `requires` and `executables` are what the editor shows in its short summary.
  */
 export type DefinitionSummary_Deserialize = {
-	game: GameView_Deserialize,
-	requires: string[],
-	executables: ExecutableSummary[],
-	user_data: string[],
+  game: GameView_Deserialize;
+  requires: string[];
+  executables: ExecutableSummary[];
+  user_data: string[];
 };
 
 /**
@@ -1778,32 +2642,32 @@ export type DefinitionSummary_Deserialize = {
  *  and providers; `requires` and `executables` are what the editor shows in its short summary.
  */
 export type DefinitionSummary_Serialize = {
-	game: GameView_Serialize,
-	requires: string[],
-	executables: ExecutableSummary[],
-	user_data: string[],
+  game: GameView_Serialize;
+  requires: string[];
+  executables: ExecutableSummary[];
+  user_data: string[];
 };
 
 export type DeployPreview = {
-	/**  The active profile is deployed now, so the deployment replaces it. */
-	replaces: boolean,
-	/**  Files the deployment places. */
-	files: number,
-	/**  Paths that several enabled mods write; one copy of each wins. */
-	conflicts: number,
-	/**  Mod names, compared with the deployed list (or with nothing, when nothing is deployed). */
-	added: string[],
-	removed: string[],
-	/**  Mods deployed with another version now. */
-	updated: string[],
-	/**  Mods whose place in the list changed. */
-	moved: number,
-	/**  File winners chosen or cleared since the last deployment. */
-	winners_changed: number,
-	/**  What stops the deployment. Empty when it can run. */
-	problems: Message[],
-	/**  What does not stop it but is worth a look: missing requirements, mods that do not work together. */
-	warnings: Message[],
+  /**  The active profile is deployed now, so the deployment replaces it. */
+  replaces: boolean;
+  /**  Files the deployment places. */
+  files: number;
+  /**  Paths that several enabled mods write; one copy of each wins. */
+  conflicts: number;
+  /**  Mod names, compared with the deployed list (or with nothing, when nothing is deployed). */
+  added: string[];
+  removed: string[];
+  /**  Mods deployed with another version now. */
+  updated: string[];
+  /**  Mods whose place in the list changed. */
+  moved: number;
+  /**  File winners chosen or cleared since the last deployment. */
+  winners_changed: number;
+  /**  What stops the deployment. Empty when it can run. */
+  problems: Message[];
+  /**  What does not stop it but is worth a look: missing requirements, mods that do not work together. */
+  warnings: Message[];
 };
 
 /**
@@ -1811,10 +2675,10 @@ export type DeployPreview = {
  *  count is not moving (preparing the plan, writing settings, finishing).
  */
 export type DeployProgress = {
-	stage: DeployStage,
-	done: number,
-	total: number,
-	percent: number,
+  stage: DeployStage;
+  done: number;
+  total: number;
+  percent: number;
 };
 
 /**  The phase of an apply, for the progress channel. */
@@ -1822,16 +2686,16 @@ export type DeployStage = "preparing" | "writing" | "settings" | "done";
 
 /**  One enabled entry of the last deployment. It carries the family, so the UI can restore the exact selected versions. */
 export type DeployedRow = {
-	id: string,
-	folder: string,
+  id: string;
+  folder: string;
 };
 
 /**  The DLLs of one launch: what the mod layer holds, and what the launcher injects through the program's import table. */
 export type DllReport = {
-	/**  The game-relative paths of every `.dll` in the mod layer. */
-	layer: string[],
-	/**  The static imports of the program that the launcher rewrites to the mod layer. */
-	injected: InjectedDll[],
+  /**  The game-relative paths of every `.dll` in the mod layer. */
+  layer: string[];
+  /**  The static imports of the program that the launcher rewrites to the mod layer. */
+  injected: InjectedDll[];
 };
 
 /**
@@ -1841,79 +2705,79 @@ export type DllReport = {
 export type DownloadRoute = "direct" | "browser";
 
 /**  Where a download is on its way into the library. */
-export type DownloadState = 
-/**  Coming in from the provider. */
-"downloading" | 
-/**  In the downloads folder, waiting for its import. */
-"ready" | 
-/**  Going into the library. */
-"installing" | 
-/**  In the library. The downloaded file is gone. */
-"installed" | 
-/**  Stopped by the error the download carries. */
-"failed";
+export type DownloadState =
+  /**  Coming in from the provider. */
+  | "downloading"
+  /**  In the downloads folder, waiting for its import. */
+  | "ready"
+  /**  Going into the library. */
+  | "installing"
+  /**  In the library. The downloaded file is gone. */
+  | "installed"
+  /**  Stopped by the error the download carries. */
+  | "failed";
 
 /**  One download of the queue, as the window shows it. */
 export type DownloadView = DownloadView_Serialize | DownloadView_Deserialize;
 
 /**  One download of the queue, as the window shows it. */
 export type DownloadView_Deserialize = {
-	id: number,
-	/**  The game it is for. Empty until the link is read, and when the link names a game that is not added. */
-	game: string,
-	/**  The file's name on the provider, or the mod of the link until the provider answers. */
-	name: string,
-	/**  The provider, mod and file the download comes from. */
-	source?: SourceRef_Deserialize | null,
-	state: DownloadState,
-	received_kb: number,
-	/**  The size, 0 while it is not known. */
-	total_kb: number,
-	/**  The speed over the last moment, while the file comes in. */
-	speed_kb: number,
-	/**  The downloaded archive, once it is whole. */
-	path?: string | null,
-	/**
-	 *  The archive has an installer and needs the window's FOMOD wizard. The backend keeps this wait with the queue, so
-	 *  the window still finds it after a restart; `Downloads::claim` clears it once the wizard is taken.
-	 */
-	auto_install: boolean,
-	/**
-	 *  The collection session that asked for this file, when one did. An owned download is not auto-installed by the
-	 *  generic queue; the owner imports it with the collection's FOMOD choices.
-	 */
-	owner?: string | null,
-	error?: AppError_Deserialize | null,
+  id: number;
+  /**  The game it is for. Empty until the link is read, and when the link names a game that is not added. */
+  game: string;
+  /**  The file's name on the provider, or the mod of the link until the provider answers. */
+  name: string;
+  /**  The provider, mod and file the download comes from. */
+  source?: SourceRef_Deserialize | null;
+  state: DownloadState;
+  received_kb: number;
+  /**  The size, 0 while it is not known. */
+  total_kb: number;
+  /**  The speed over the last moment, while the file comes in. */
+  speed_kb: number;
+  /**  The downloaded archive, once it is whole. */
+  path?: string | null;
+  /**
+   *  The archive has an installer and needs the window's FOMOD wizard. The backend keeps this wait with the queue, so
+   *  the window still finds it after a restart; `Downloads::claim` clears it once the wizard is taken.
+   */
+  auto_install: boolean;
+  /**
+   *  The collection session that asked for this file, when one did. An owned download is not auto-installed by the
+   *  generic queue; the owner imports it with the collection's FOMOD choices.
+   */
+  owner?: string | null;
+  error?: AppError_Deserialize | null;
 };
 
 /**  One download of the queue, as the window shows it. */
 export type DownloadView_Serialize = {
-	id: number,
-	/**  The game it is for. Empty until the link is read, and when the link names a game that is not added. */
-	game: string,
-	/**  The file's name on the provider, or the mod of the link until the provider answers. */
-	name: string,
-	/**  The provider, mod and file the download comes from. */
-	source: SourceRef_Serialize | null,
-	state: DownloadState,
-	received_kb: number,
-	/**  The size, 0 while it is not known. */
-	total_kb: number,
-	/**  The speed over the last moment, while the file comes in. */
-	speed_kb: number,
-	/**  The downloaded archive, once it is whole. */
-	path: string | null,
-	/**
-	 *  The archive has an installer and needs the window's FOMOD wizard. The backend keeps this wait with the queue, so
-	 *  the window still finds it after a restart; `Downloads::claim` clears it once the wizard is taken.
-	 */
-	auto_install: boolean,
-	/**
-	 *  The collection session that asked for this file, when one did. An owned download is not auto-installed by the
-	 *  generic queue; the owner imports it with the collection's FOMOD choices.
-	 */
-	owner?: string,
-	error: AppError_Serialize | null,
+  id: number;
+  /**  The game it is for. Empty until the link is read, and when the link names a game that is not added. */
+  game: string;
+  /**  The file's name on the provider, or the mod of the link until the provider answers. */
+  name: string;
+  /**  The provider, mod and file the download comes from. */
+  source: SourceRef_Serialize | null;
+  state: DownloadState;
+  received_kb: number;
+  /**  The size, 0 while it is not known. */
+  total_kb: number;
+  /**  The speed over the last moment, while the file comes in. */
+  speed_kb: number;
+  /**  The downloaded archive, once it is whole. */
+  path: string | null;
+  /**
+   *  The archive has an installer and needs the window's FOMOD wizard. The backend keeps this wait with the queue, so
+   *  the window still finds it after a restart; `Downloads::claim` clears it once the wizard is taken.
+   */
+  auto_install: boolean;
+  /**
+   *  The collection session that asked for this file, when one did. An owned download is not auto-installed by the
+   *  generic queue; the owner imports it with the collection's FOMOD choices.
+   */
+  owner?: string;
+  error: AppError_Serialize | null;
 };
 
 /**
@@ -1923,28 +2787,28 @@ export type DownloadView_Serialize = {
 export type EfficiencyMode = "off" | "auto" | "always";
 
 /**  How the interface shows an error: a user action, a temporary failure, a permanent one, or a bug. */
-export type ErrorKind = 
-/**  The user can fix it, for example by saving a key or choosing a folder. The fix is shown next to the error. */
-"user_action" | 
-/**  Temporary: the same request may work later, for example after a network failure. */
-"retryable" | 
-/**  Fails again with the same input. */
-"permanent" | 
-/**  A Gobbo bug or an unexpected failure of the system. Shown with a pointer to the log. */
-"bug";
+export type ErrorKind =
+  /**  The user can fix it, for example by saving a key or choosing a folder. The fix is shown next to the error. */
+  | "user_action"
+  /**  Temporary: the same request may work later, for example after a network failure. */
+  | "retryable"
+  /**  Fails again with the same input. */
+  | "permanent"
+  /**  A Gobbo bug or an unexpected failure of the system. Shown with a pointer to the log. */
+  | "bug";
 
 /**  One program found in a game folder, as a suggestion for the launch step. */
 export type ExecutableSuggestion = {
-	/**  Relative to the game folder, with `/` separators. */
-	path: string,
-	/**  The file name without its folder. */
-	name: string,
+  /**  Relative to the game folder, with `/` separators. */
+  path: string;
+  /**  The file name without its folder. */
+  name: string;
 };
 
 /**  One program the game starts with. */
 export type ExecutableSummary = {
-	name: string,
-	path: string,
+  name: string;
+  path: string;
 };
 
 /**
@@ -1952,9 +2816,9 @@ export type ExecutableSummary = {
  *  predefined arguments (for example `-windowed`).
  */
 export type ExecutableView = {
-	name: string,
-	default: boolean,
-	args: string[],
+  name: string;
+  default: boolean;
+  args: string[];
 };
 
 /**  The state of a mod file with respect to conflicts. The color in the UI depends on it. */
@@ -1962,122 +2826,135 @@ export type FileState = "win" | "lose" | "none" | "disabled";
 
 /**  One file of a mod's selected version with its conflict state and the message the window shows for it. */
 export type FileView = {
-	path: string,
-	state: FileState,
-	result: Message,
+  path: string;
+  state: FileState;
+  result: Message;
 };
 
 /**  What the editor learns from a chosen game folder. Everything is read-only; the folder is never changed. */
-export type FolderInspection = FolderInspection_Serialize | FolderInspection_Deserialize;
+export type FolderInspection =
+  FolderInspection_Serialize | FolderInspection_Deserialize;
 
 /**  What the editor learns from a chosen game folder. Everything is read-only; the folder is never changed. */
 export type FolderInspection_Deserialize = {
-	/**  The folder as the user gave it. */
-	folder: string,
-	/**  The name from the Steam manifest, or the folder name. */
-	name: string,
-	/**  The id suggested from `name`; the user can change it before the first save. */
-	suggested_id: string,
-	/**  Programs that look like the game's own, best first. */
-	executables: ExecutableSuggestion[],
-	/**  Relative folders at the first two levels, for the mirror picker. */
-	directories: string[],
-	/**  The first executable path, a marker for the folder check. */
-	markers: string[],
-	steam?: SteamSuggestion_Deserialize | null,
-	/**  Loader presets whose files were found in the folder. */
-	loaders: LoaderSuggestion_Deserialize[],
-	stores: StoreIds,
+  /**  The folder as the user gave it. */
+  folder: string;
+  /**  The name from the Steam manifest, or the folder name. */
+  name: string;
+  /**  The id suggested from `name`; the user can change it before the first save. */
+  suggested_id: string;
+  /**  Programs that look like the game's own, best first. */
+  executables: ExecutableSuggestion[];
+  /**  Relative folders at the first two levels, for the mirror picker. */
+  directories: string[];
+  /**  The first executable path, a marker for the folder check. */
+  markers: string[];
+  steam?: SteamSuggestion_Deserialize | null;
+  /**  Loader presets whose files were found in the folder. */
+  loaders: LoaderSuggestion_Deserialize[];
+  stores: StoreIds;
 };
 
 /**  What the editor learns from a chosen game folder. Everything is read-only; the folder is never changed. */
 export type FolderInspection_Serialize = {
-	/**  The folder as the user gave it. */
-	folder: string,
-	/**  The name from the Steam manifest, or the folder name. */
-	name: string,
-	/**  The id suggested from `name`; the user can change it before the first save. */
-	suggested_id: string,
-	/**  Programs that look like the game's own, best first. */
-	executables: ExecutableSuggestion[],
-	/**  Relative folders at the first two levels, for the mirror picker. */
-	directories: string[],
-	/**  The first executable path, a marker for the folder check. */
-	markers: string[],
-	steam: SteamSuggestion_Serialize | null,
-	/**  Loader presets whose files were found in the folder. */
-	loaders: LoaderSuggestion_Serialize[],
-	stores: StoreIds,
+  /**  The folder as the user gave it. */
+  folder: string;
+  /**  The name from the Steam manifest, or the folder name. */
+  name: string;
+  /**  The id suggested from `name`; the user can change it before the first save. */
+  suggested_id: string;
+  /**  Programs that look like the game's own, best first. */
+  executables: ExecutableSuggestion[];
+  /**  Relative folders at the first two levels, for the mirror picker. */
+  directories: string[];
+  /**  The first executable path, a marker for the folder check. */
+  markers: string[];
+  steam: SteamSuggestion_Serialize | null;
+  /**  Loader presets whose files were found in the folder. */
+  loaders: LoaderSuggestion_Serialize[];
+  stores: StoreIds;
 };
 
 /**  One child of a FOMOD condition tree: a leaf check or a nested group with its own operator. */
-export type FomodCondition = ({ dependency: FomodDependency }) & { group?: never } | ({ group: FomodDependencies }) & { dependency?: never };
+export type FomodCondition =
+  | ({ dependency: FomodDependency } & { group?: never })
+  | ({ group: FomodDependencies } & { dependency?: never });
 
 /**  A `<visible>` condition tree. The wizard evaluates it as the user picks options, so hidden steps are skipped. */
-export type FomodDependencies = ({ all: FomodCondition[] }) & { any?: never } | ({ any: FomodCondition[] }) & { all?: never };
+export type FomodDependencies =
+  | ({ all: FomodCondition[] } & { any?: never })
+  | ({ any: FomodCondition[] } & { all?: never });
 
 /**  One leaf check of a FOMOD dependency tree: a file, a flag or the game version. */
-export type FomodDependency = ({ file: {
-	file: string,
-	active: boolean,
-} }) & { flag?: never } | ({ flag: {
-	flag: string,
-	value: string,
-} }) & { file?: never } | "game";
+export type FomodDependency =
+  | ({
+      file: {
+        file: string;
+        active: boolean;
+      };
+    } & { flag?: never })
+  | ({
+      flag: {
+        flag: string;
+        value: string;
+      };
+    } & { file?: never })
+  | "game";
 
 /**  One group of the wizard's answer: its rule, any broken rule and the state of each option. */
-export type FomodGroupState = FomodGroupState_Serialize | FomodGroupState_Deserialize;
+export type FomodGroupState =
+  FomodGroupState_Serialize | FomodGroupState_Deserialize;
 
 /**  One group of the wizard's answer: its rule, any broken rule and the state of each option. */
 export type FomodGroupState_Deserialize = {
-	/**  The group's name, so a click can name the option without another round trip to the installer. */
-	name: string,
-	/**  The rule of the group. The pick rules read this, not a copy in the window. */
-	kind: GroupKind,
-	/**  The rule the group breaks, or `None` when it is fine (or the step is hidden). */
-	problem?: GroupProblem | null,
-	/**  One entry per option of the group, in XML order. */
-	options: FomodOptionState[],
+  /**  The group's name, so a click can name the option without another round trip to the installer. */
+  name: string;
+  /**  The rule of the group. The pick rules read this, not a copy in the window. */
+  kind: GroupKind;
+  /**  The rule the group breaks, or `None` when it is fine (or the step is hidden). */
+  problem?: GroupProblem | null;
+  /**  One entry per option of the group, in XML order. */
+  options: FomodOptionState[];
 };
 
 /**  One group of the wizard's answer: its rule, any broken rule and the state of each option. */
 export type FomodGroupState_Serialize = {
-	/**  The group's name, so a click can name the option without another round trip to the installer. */
-	name: string,
-	/**  The rule of the group. The pick rules read this, not a copy in the window. */
-	kind: GroupKind,
-	/**  The rule the group breaks, or `None` when it is fine (or the step is hidden). */
-	problem: GroupProblem | null,
-	/**  One entry per option of the group, in XML order. */
-	options: FomodOptionState[],
+  /**  The group's name, so a click can name the option without another round trip to the installer. */
+  name: string;
+  /**  The rule of the group. The pick rules read this, not a copy in the window. */
+  kind: GroupKind;
+  /**  The rule the group breaks, or `None` when it is fine (or the step is hidden). */
+  problem: GroupProblem | null;
+  /**  One entry per option of the group, in XML order. */
+  options: FomodOptionState[];
 };
 
 /**  One group of a FOMOD step as the wizard shows it, with its options and selection rule. */
 export type FomodGroupView = {
-	name: string,
-	kind: GroupKind,
-	options: FomodOptionView[],
+  name: string;
+  kind: GroupKind;
+  options: FomodOptionView[];
 };
 
 /**  One option of the wizard's answer: its effective kind and whether the import installs it. */
 export type FomodOptionState = {
-	/**  The option's name, so a click can be checked against the option the installer still has. */
-	name: string,
-	/**  The kind the import applies: a `<dependencyType>` can make an option required or unusable. */
-	kind: OptionKind,
-	/**  Whether the import installs the option under this selection: required, chosen, or part of a `SelectAll` group. */
-	picked: boolean,
+  /**  The option's name, so a click can be checked against the option the installer still has. */
+  name: string;
+  /**  The kind the import applies: a `<dependencyType>` can make an option required or unusable. */
+  kind: OptionKind;
+  /**  Whether the import installs the option under this selection: required, chosen, or part of a `SelectAll` group. */
+  picked: boolean;
 };
 
 /**  One option of a FOMOD group as the wizard shows it, with its kind, flags and destinations. */
 export type FomodOptionView = {
-	name: string,
-	description: string,
-	kind: OptionKind,
-	/**  Flags this option sets when picked, from `<conditionFlags>`. */
-	flags: { [key in string]: string },
-	/**  Normalized destinations of this option's files, for `<visible>` file dependencies. */
-	destinations: string[],
+  name: string;
+  description: string;
+  kind: OptionKind;
+  /**  Flags this option sets when picked, from `<conditionFlags>`. */
+  flags: { [key in string]: string };
+  /**  Normalized destinations of this option's files, for `<visible>` file dependencies. */
+  destinations: string[];
 };
 
 /**
@@ -2085,58 +2962,59 @@ export type FomodOptionView = {
  *  version. The window passes this identity with a click so the backend can apply the group rules and answer with a
  *  fresh view.
  */
-export type FomodSource = 
-/**  A loose archive being imported. */
-{ kind: "path"; path: string } | 
-/**  The archive copy of an installed version. */
-{ kind: "folder"; folder: string };
+export type FomodSource =
+  /**  A loose archive being imported. */
+  | { kind: "path"; path: string }
+  /**  The archive copy of an installed version. */
+  | { kind: "folder"; folder: string };
 
 /**  The wizard's answer for one selection. */
 export type FomodState = FomodState_Serialize | FomodState_Deserialize;
 
 /**  The wizard's answer for one selection. */
 export type FomodState_Deserialize = {
-	/**  The indices of the steps the import shows, in XML order. */
-	visible: number[],
-	/**  One entry per step of the installer, in XML order. A hidden step is listed too, with nothing picked. */
-	steps: FomodStepState_Deserialize[],
-	/**
-	 *  The picks the import takes from the wizard: the chosen options of the visible steps, without the required and
-	 *  the unusable ones. The wizard sends it back as the selection of the install.
-	 */
-	selection: Choice_Deserialize[],
-	/**  How many options of the visible steps the import installs, required ones included. */
-	picked: number,
+  /**  The indices of the steps the import shows, in XML order. */
+  visible: number[];
+  /**  One entry per step of the installer, in XML order. A hidden step is listed too, with nothing picked. */
+  steps: FomodStepState_Deserialize[];
+  /**
+   *  The picks the import takes from the wizard: the chosen options of the visible steps, without the required and
+   *  the unusable ones. The wizard sends it back as the selection of the install.
+   */
+  selection: Choice_Deserialize[];
+  /**  How many options of the visible steps the import installs, required ones included. */
+  picked: number;
 };
 
 /**  The wizard's answer for one selection. */
 export type FomodState_Serialize = {
-	/**  The indices of the steps the import shows, in XML order. */
-	visible: number[],
-	/**  One entry per step of the installer, in XML order. A hidden step is listed too, with nothing picked. */
-	steps: FomodStepState_Serialize[],
-	/**
-	 *  The picks the import takes from the wizard: the chosen options of the visible steps, without the required and
-	 *  the unusable ones. The wizard sends it back as the selection of the install.
-	 */
-	selection: Choice_Serialize[],
-	/**  How many options of the visible steps the import installs, required ones included. */
-	picked: number,
+  /**  The indices of the steps the import shows, in XML order. */
+  visible: number[];
+  /**  One entry per step of the installer, in XML order. A hidden step is listed too, with nothing picked. */
+  steps: FomodStepState_Serialize[];
+  /**
+   *  The picks the import takes from the wizard: the chosen options of the visible steps, without the required and
+   *  the unusable ones. The wizard sends it back as the selection of the install.
+   */
+  selection: Choice_Serialize[];
+  /**  How many options of the visible steps the import installs, required ones included. */
+  picked: number;
 };
 
 /**  One step of the wizard's answer, with the state of each of its groups. */
-export type FomodStepState = FomodStepState_Serialize | FomodStepState_Deserialize;
+export type FomodStepState =
+  FomodStepState_Serialize | FomodStepState_Deserialize;
 
 /**  One step of the wizard's answer, with the state of each of its groups. */
 export type FomodStepState_Deserialize = {
-	/**  One entry per group of the step, in XML order. */
-	groups: FomodGroupState_Deserialize[],
+  /**  One entry per group of the step, in XML order. */
+  groups: FomodGroupState_Deserialize[];
 };
 
 /**  One step of the wizard's answer, with the state of each of its groups. */
 export type FomodStepState_Serialize = {
-	/**  One entry per group of the step, in XML order. */
-	groups: FomodGroupState_Serialize[],
+  /**  One entry per group of the step, in XML order. */
+  groups: FomodGroupState_Serialize[];
 };
 
 /**  One step of the FOMOD installer, with its groups, as the wizard shows it. */
@@ -2144,86 +3022,87 @@ export type FomodStepView = FomodStepView_Serialize | FomodStepView_Deserialize;
 
 /**  One step of the FOMOD installer, with its groups, as the wizard shows it. */
 export type FomodStepView_Deserialize = {
-	name: string,
-	/**  The step's `<visible>` condition. `None` means the step is always shown. */
-	visible?: FomodDependencies | null,
-	groups: FomodGroupView[],
+  name: string;
+  /**  The step's `<visible>` condition. `None` means the step is always shown. */
+  visible?: FomodDependencies | null;
+  groups: FomodGroupView[];
 };
 
 /**  One step of the FOMOD installer, with its groups, as the wizard shows it. */
 export type FomodStepView_Serialize = {
-	name: string,
-	/**  The step's `<visible>` condition. `None` means the step is always shown. */
-	visible: FomodDependencies | null,
-	groups: FomodGroupView[],
+  name: string;
+  /**  The step's `<visible>` condition. `None` means the step is always shown. */
+  visible: FomodDependencies | null;
+  groups: FomodGroupView[];
 };
 
 /**  A game found in a Steam library. */
 export type Found = {
-	/**  The game folder, for example `.../steamapps/common/The Witcher 3`. */
-	game_root: string,
-	/**  The store folder the game came from: the Steam library, or the folder a store names. */
-	library: string,
-	/**  The store that named the folder: `steam`, `gog`, `epic`, `heroic` or `lutris`. */
-	store: string,
+  /**  The game folder, for example `.../steamapps/common/The Witcher 3`. */
+  game_root: string;
+  /**  The store folder the game came from: the Steam library, or the folder a store names. */
+  library: string;
+  /**  The store that named the folder: `steam`, `gog`, `epic`, `heroic` or `lutris`. */
+  store: string;
 };
 
 export type GameCatalog = GameCatalog_Serialize | GameCatalog_Deserialize;
 
 export type GameCatalog_Deserialize = {
-	games: GameView_Deserialize[],
-	/**  Invalid or duplicate user definitions, with the reason and the file to fix. */
-	problems: DefinitionProblem_Deserialize[],
+  games: GameView_Deserialize[];
+  /**  Invalid or duplicate user definitions, with the reason and the file to fix. */
+  problems: DefinitionProblem_Deserialize[];
 };
 
 export type GameCatalog_Serialize = {
-	games: GameView_Serialize[],
-	/**  Invalid or duplicate user definitions, with the reason and the file to fix. */
-	problems: DefinitionProblem_Serialize[],
+  games: GameView_Serialize[];
+  /**  Invalid or duplicate user definitions, with the reason and the file to fix. */
+  problems: DefinitionProblem_Serialize[];
 };
 
 /**  One entry that differs between two snapshots. */
 export type GameChange = {
-	/**  The path relative to the game folder. */
-	path: string,
-	kind: ChangeKind,
+  /**  The path relative to the game folder. */
+  path: string;
+  kind: ChangeKind;
 };
 
 /**  The data folder of a game, active or removed, with its total size. */
 export type GameDataUsage = {
-	id: string,
-	/**  The data folder itself, so the interface can open it. */
-	path: string,
-	/**  `true` for `games/<id>.removed`, `false` for the active `games/<id>`. */
-	removed: boolean,
-	size_kb: number,
+  id: string;
+  /**  The data folder itself, so the interface can open it. */
+  path: string;
+  /**  `true` for `games/<id>.removed`, `false` for the active `games/<id>`. */
+  removed: boolean;
+  size_kb: number;
 };
 
 /**  The loader preset a game uses, as the interface shows it. */
-export type GameLoaderView = GameLoaderView_Serialize | GameLoaderView_Deserialize;
+export type GameLoaderView =
+  GameLoaderView_Serialize | GameLoaderView_Deserialize;
 
 /**  The loader preset a game uses, as the interface shows it. */
 export type GameLoaderView_Deserialize = {
-	/**  The preset id, the name of its file without `.toml`. */
-	id: string,
-	/**  The display name from the preset, for example `BepInEx`. */
-	name: string,
-	/**  The variant merged into the game: the one the game named, or the preset's default. */
-	variant?: string | null,
-	/**  Whether the variant came from the preset's `default_variant`, not from the game's line. */
-	default_variant: boolean,
+  /**  The preset id, the name of its file without `.toml`. */
+  id: string;
+  /**  The display name from the preset, for example `BepInEx`. */
+  name: string;
+  /**  The variant merged into the game: the one the game named, or the preset's default. */
+  variant?: string | null;
+  /**  Whether the variant came from the preset's `default_variant`, not from the game's line. */
+  default_variant: boolean;
 };
 
 /**  The loader preset a game uses, as the interface shows it. */
 export type GameLoaderView_Serialize = {
-	/**  The preset id, the name of its file without `.toml`. */
-	id: string,
-	/**  The display name from the preset, for example `BepInEx`. */
-	name: string,
-	/**  The variant merged into the game: the one the game named, or the preset's default. */
-	variant: string | null,
-	/**  Whether the variant came from the preset's `default_variant`, not from the game's line. */
-	default_variant: boolean,
+  /**  The preset id, the name of its file without `.toml`. */
+  id: string;
+  /**  The display name from the preset, for example `BepInEx`. */
+  name: string;
+  /**  The variant merged into the game: the one the game named, or the preset's default. */
+  variant: string | null;
+  /**  Whether the variant came from the preset's `default_variant`, not from the game's line. */
+  default_variant: boolean;
 };
 
 /**  One log file of the game or its mods, as the console shows it. */
@@ -2231,39 +3110,39 @@ export type GameLog = GameLog_Serialize | GameLog_Deserialize;
 
 /**  One log file of the game or its mods, as the console shows it. */
 export type GameLog_Deserialize = {
-	/**  The universal kind: `script`, `loader`, `console`, `crash`, `mod` or `game`. */
-	kind: string,
-	/**  The file relative to the game folder, with `/` separators. */
-	path: string,
-	/**  The last lines of the file, oldest first. */
-	lines: string[],
-	/**  When the file was last written, in Unix seconds. */
-	modified_at?: number | null,
+  /**  The universal kind: `script`, `loader`, `console`, `crash`, `mod` or `game`. */
+  kind: string;
+  /**  The file relative to the game folder, with `/` separators. */
+  path: string;
+  /**  The last lines of the file, oldest first. */
+  lines: string[];
+  /**  When the file was last written, in Unix seconds. */
+  modified_at?: number | null;
 };
 
 /**  One log file of the game or its mods, as the console shows it. */
 export type GameLog_Serialize = {
-	/**  The universal kind: `script`, `loader`, `console`, `crash`, `mod` or `game`. */
-	kind: string,
-	/**  The file relative to the game folder, with `/` separators. */
-	path: string,
-	/**  The last lines of the file, oldest first. */
-	lines: string[],
-	/**  When the file was last written, in Unix seconds. */
-	modified_at: number | null,
+  /**  The universal kind: `script`, `loader`, `console`, `crash`, `mod` or `game`. */
+  kind: string;
+  /**  The file relative to the game folder, with `/` separators. */
+  path: string;
+  /**  The last lines of the file, oldest first. */
+  lines: string[];
+  /**  When the file was last written, in Unix seconds. */
+  modified_at: number | null;
 };
 
 /**  Where a game definition came from. */
-export type GameOrigin = 
-/**  Shipped with Gobbo in `games/`. */
-"bundled" | 
-/**  Added by the user under `<data>/definitions/games/`. */
-"user";
+export type GameOrigin =
+  /**  Shipped with Gobbo in `games/`. */
+  | "bundled"
+  /**  Added by the user under `<data>/definitions/games/`. */
+  | "user";
 
 /**  One external provider the game is on. */
 export type GameProviderView = {
-	id: string,
-	key: string,
+  id: string;
+  key: string;
 };
 
 /**  The result of searching for one supported game. `found` is empty when the game is in no library. */
@@ -2271,59 +3150,59 @@ export type GameScan = GameScan_Serialize | GameScan_Deserialize;
 
 /**  The result of searching for one supported game. `found` is empty when the game is in no library. */
 export type GameScan_Deserialize = {
-	id: string,
-	found?: Found | null,
+  id: string;
+  found?: Found | null;
 };
 
 /**  The result of searching for one supported game. `found` is empty when the game is in no library. */
 export type GameScan_Serialize = {
-	id: string,
-	found: Found | null,
+  id: string;
+  found: Found | null;
 };
 
 /**  The state of a game, from the folders it needs to the list that is applied to it. */
 export type GameStage = GameStage_Serialize | GameStage_Deserialize;
 
 /**  The state of a game, from the folders it needs to the list that is applied to it. */
-export type GameStage_Deserialize = 
-/**  A folder the game needs is missing. `step` names the one to set. */
-{ kind: "setup"; step: SetupStep } | 
-/**  The game and the list are ready, but the deployment plan has problems to fix first. */
-{ kind: "blocked"; reasons: Message[] } | 
-/**  The library has no mods yet. */
-{ kind: "empty" } | 
-/**  The library has mods, but none is enabled. */
-{ kind: "no_enabled"; total: number } | 
-/**  A list with enabled mods that was never applied. */
-{ kind: "ready"; enabled: number; total: number } | 
-/**  The active profile is applied, and the list changed since then. */
-{ kind: "draft"; changes: number; enabled: number; total: number } | 
-/**  The active profile is applied and the list matches the deployment. */
-{ kind: "applied"; at?: number | null; enabled: number; total: number };
+export type GameStage_Deserialize =
+  /**  A folder the game needs is missing. `step` names the one to set. */
+  | { kind: "setup"; step: SetupStep }
+  /**  The game and the list are ready, but the deployment plan has problems to fix first. */
+  | { kind: "blocked"; reasons: Message[] }
+  /**  The library has no mods yet. */
+  | { kind: "empty" }
+  /**  The library has mods, but none is enabled. */
+  | { kind: "no_enabled"; total: number }
+  /**  A list with enabled mods that was never applied. */
+  | { kind: "ready"; enabled: number; total: number }
+  /**  The active profile is applied, and the list changed since then. */
+  | { kind: "draft"; changes: number; enabled: number; total: number }
+  /**  The active profile is applied and the list matches the deployment. */
+  | { kind: "applied"; at?: number | null; enabled: number; total: number };
 
 /**  The state of a game, from the folders it needs to the list that is applied to it. */
-export type GameStage_Serialize = 
-/**  A folder the game needs is missing. `step` names the one to set. */
-{ kind: "setup"; step: SetupStep } | 
-/**  The game and the list are ready, but the deployment plan has problems to fix first. */
-{ kind: "blocked"; reasons: Message[] } | 
-/**  The library has no mods yet. */
-{ kind: "empty" } | 
-/**  The library has mods, but none is enabled. */
-{ kind: "no_enabled"; total: number } | 
-/**  A list with enabled mods that was never applied. */
-{ kind: "ready"; enabled: number; total: number } | 
-/**  The active profile is applied, and the list changed since then. */
-{ kind: "draft"; changes: number; enabled: number; total: number } | 
-/**  The active profile is applied and the list matches the deployment. */
-{ kind: "applied"; at: number | null; enabled: number; total: number };
+export type GameStage_Serialize =
+  /**  A folder the game needs is missing. `step` names the one to set. */
+  | { kind: "setup"; step: SetupStep }
+  /**  The game and the list are ready, but the deployment plan has problems to fix first. */
+  | { kind: "blocked"; reasons: Message[] }
+  /**  The library has no mods yet. */
+  | { kind: "empty" }
+  /**  The library has mods, but none is enabled. */
+  | { kind: "no_enabled"; total: number }
+  /**  A list with enabled mods that was never applied. */
+  | { kind: "ready"; enabled: number; total: number }
+  /**  The active profile is applied, and the list changed since then. */
+  | { kind: "draft"; changes: number; enabled: number; total: number }
+  /**  The active profile is applied and the list matches the deployment. */
+  | { kind: "applied"; at: number | null; enabled: number; total: number };
 
 /**  A step the game defines, as the editor lists it. */
 export type GameStepView = {
-	id: string,
-	phase: Phase,
-	/**  The file name of the program the step runs, so the user sees what it is. */
-	program: string,
+  id: string;
+  phase: Phase;
+  /**  The file name of the program the step runs, so the user sees what it is. */
+  program: string;
 };
 
 /**  A game in the form the frontend gets. */
@@ -2331,85 +3210,91 @@ export type GameView = GameView_Serialize | GameView_Deserialize;
 
 /**  A game in the form the frontend gets. */
 export type GameView_Deserialize = {
-	id: string,
-	name: string,
-	/**  Whether the definition ships with Gobbo or the user added it. */
-	origin: GameOrigin,
-	/**  The test evidence from `[verified]`, when the definition has it. */
-	verified?: Verified_Deserialize | null,
-	steam_app_ids: number[],
-	/**  Places in the game where mods will end up, for example `Mods` or `archive/pc/mod`. */
-	places: string[],
-	/**  The loader preset the game uses, when it names one. */
-	loader?: GameLoaderView_Deserialize | null,
-	/**  Whether the game needs the folder of its order file (for example `mods.settings`). */
-	needs_settings_dir: boolean,
-	/**  Whether the mods live outside the game folder and the user can point to that folder. */
-	needs_mods_root: boolean,
-	/**  The external mod providers the game is on, with the provider's key for the game. */
-	providers: GameProviderView[],
+  id: string;
+  name: string;
+  /**  Whether the definition ships with Gobbo or the user added it. */
+  origin: GameOrigin;
+  /**  The test evidence from `[verified]`, when the definition has it. */
+  verified?: Verified_Deserialize | null;
+  steam_app_ids: number[];
+  /**  Places in the game where mods will end up, for example `Mods` or `archive/pc/mod`. */
+  places: string[];
+  /**  The loader preset the game uses, when it names one. */
+  loader?: GameLoaderView_Deserialize | null;
+  /**  Whether the game needs the folder of its order file (for example `mods.settings`). */
+  needs_settings_dir: boolean;
+  /**  Whether the mods live outside the game folder and the user can point to that folder. */
+  needs_mods_root: boolean;
+  /**  The external mod providers the game is on, with the provider's key for the game. */
+  providers: GameProviderView[];
 };
 
 /**  A game in the form the frontend gets. */
 export type GameView_Serialize = {
-	id: string,
-	name: string,
-	/**  Whether the definition ships with Gobbo or the user added it. */
-	origin: GameOrigin,
-	/**  The test evidence from `[verified]`, when the definition has it. */
-	verified: Verified_Serialize | null,
-	steam_app_ids: number[],
-	/**  Places in the game where mods will end up, for example `Mods` or `archive/pc/mod`. */
-	places: string[],
-	/**  The loader preset the game uses, when it names one. */
-	loader: GameLoaderView_Serialize | null,
-	/**  Whether the game needs the folder of its order file (for example `mods.settings`). */
-	needs_settings_dir: boolean,
-	/**  Whether the mods live outside the game folder and the user can point to that folder. */
-	needs_mods_root: boolean,
-	/**  The external mod providers the game is on, with the provider's key for the game. */
-	providers: GameProviderView[],
+  id: string;
+  name: string;
+  /**  Whether the definition ships with Gobbo or the user added it. */
+  origin: GameOrigin;
+  /**  The test evidence from `[verified]`, when the definition has it. */
+  verified: Verified_Serialize | null;
+  steam_app_ids: number[];
+  /**  Places in the game where mods will end up, for example `Mods` or `archive/pc/mod`. */
+  places: string[];
+  /**  The loader preset the game uses, when it names one. */
+  loader: GameLoaderView_Serialize | null;
+  /**  Whether the game needs the folder of its order file (for example `mods.settings`). */
+  needs_settings_dir: boolean;
+  /**  Whether the mods live outside the game folder and the user can point to that folder. */
+  needs_mods_root: boolean;
+  /**  The external mod providers the game is on, with the provider's key for the game. */
+  providers: GameProviderView[];
 };
 
 /**  How many options a group lets the user pick, from the `type` attribute of `<group>`. */
-export type GroupKind = "select_any" | "select_at_least_one" | "select_exactly_one" | "select_at_most_one" | "select_all";
+export type GroupKind =
+  | "select_any"
+  | "select_at_least_one"
+  | "select_exactly_one"
+  | "select_at_most_one"
+  | "select_all";
 
 /**  The rule a visible group breaks, as the wizard shows it. The import turns the same problem into its message code. */
-export type GroupProblem = 
-/**  A `SelectExactlyOne` group does not have exactly one pick. */
-"pick_one" | 
-/**  A `SelectAtLeastOne` group has no pick. */
-"pick_at_least_one" | 
-/**  A `SelectAtMostOne` group has more than one pick. */
-"pick_at_most_one";
+export type GroupProblem =
+  /**  A `SelectExactlyOne` group does not have exactly one pick. */
+  | "pick_one"
+  /**  A `SelectAtLeastOne` group has no pick. */
+  | "pick_at_least_one"
+  /**  A `SelectAtMostOne` group has more than one pick. */
+  | "pick_at_most_one";
 
 /**  The next step attached to a health item, by its kind. */
 export type HealthAction = {
-	kind: HealthActionKind,
+  kind: HealthActionKind;
 };
 
 /**  The kind of next step a health item offers, which the window turns into a button or view change. */
-export type HealthActionKind = "open_settings" | "show_mods" | "open_overwrite" | "apply";
+export type HealthActionKind =
+  "open_settings" | "show_mods" | "open_overwrite" | "apply";
 
 /**  One thing the health report shows: a problem or warning, its message and the action it offers. */
 export type HealthItem = HealthItem_Serialize | HealthItem_Deserialize;
 
 /**  One thing the health report shows: a problem or warning, its message and the action it offers. */
 export type HealthItem_Deserialize = {
-	/**  Stable within one report, for the list key. */
-	id: string,
-	severity: HealthSeverity,
-	message: Message,
-	action?: HealthAction | null,
+  /**  Stable within one report, for the list key. */
+  id: string;
+  severity: HealthSeverity;
+  message: Message;
+  action?: HealthAction | null;
 };
 
 /**  One thing the health report shows: a problem or warning, its message and the action it offers. */
 export type HealthItem_Serialize = {
-	/**  Stable within one report, for the list key. */
-	id: string,
-	severity: HealthSeverity,
-	message: Message,
-	action: HealthAction | null,
+  /**  Stable within one report, for the list key. */
+  id: string;
+  severity: HealthSeverity;
+  message: Message;
+  action: HealthAction | null;
 };
 
 /**  The items the health check found, with the time it ran, for the window to show. */
@@ -2417,14 +3302,14 @@ export type HealthReport = HealthReport_Serialize | HealthReport_Deserialize;
 
 /**  The items the health check found, with the time it ran, for the window to show. */
 export type HealthReport_Deserialize = {
-	checked_at: number,
-	items: HealthItem_Deserialize[],
+  checked_at: number;
+  items: HealthItem_Deserialize[];
 };
 
 /**  The items the health check found, with the time it ran, for the window to show. */
 export type HealthReport_Serialize = {
-	checked_at: number,
-	items: HealthItem_Serialize[],
+  checked_at: number;
+  items: HealthItem_Serialize[];
 };
 
 /**  Whether a health item blocks an apply or is only a warning the user should see. */
@@ -2435,22 +3320,22 @@ export type HistoryEntry = HistoryEntry_Serialize | HistoryEntry_Deserialize;
 
 /**  A kept state in the view: when the list left it, and what the change that left it did. */
 export type HistoryEntry_Deserialize = {
-	id: number,
-	at: number,
-	total: number,
-	enabled: number,
-	/**  What the change that left this state did. `None` for an entry written before summaries existed. */
-	summary?: HistorySummary | null,
+  id: number;
+  at: number;
+  total: number;
+  enabled: number;
+  /**  What the change that left this state did. `None` for an entry written before summaries existed. */
+  summary?: HistorySummary | null;
 };
 
 /**  A kept state in the view: when the list left it, and what the change that left it did. */
 export type HistoryEntry_Serialize = {
-	id: number,
-	at: number,
-	total: number,
-	enabled: number,
-	/**  What the change that left this state did. `None` for an entry written before summaries existed. */
-	summary: HistorySummary | null,
+  id: number;
+  at: number;
+  total: number;
+  enabled: number;
+  /**  What the change that left this state did. `None` for an entry written before summaries existed. */
+  summary: HistorySummary | null;
 };
 
 /**  One mod of the current list or a kept state, with the name and version the library gives it. */
@@ -2458,99 +3343,100 @@ export type HistoryMod = HistoryMod_Serialize | HistoryMod_Deserialize;
 
 /**  One mod of the current list or a kept state, with the name and version the library gives it. */
 export type HistoryMod_Deserialize = {
-	/**  The family id. */
-	id: string,
-	/**  The family name, or the version name when the family is gone, or the id as a last fallback. */
-	name: string,
-	/**  The selected version folder. */
-	folder: string,
-	/**  The version as the library spells it, when it has one. */
-	version?: string | null,
-	/**  Whether the list that holds this mod has it switched on. */
-	enabled: boolean,
-	/**  The kept state lists a version the library no longer has. */
-	missing: boolean,
+  /**  The family id. */
+  id: string;
+  /**  The family name, or the version name when the family is gone, or the id as a last fallback. */
+  name: string;
+  /**  The selected version folder. */
+  folder: string;
+  /**  The version as the library spells it, when it has one. */
+  version?: string | null;
+  /**  Whether the list that holds this mod has it switched on. */
+  enabled: boolean;
+  /**  The kept state lists a version the library no longer has. */
+  missing: boolean;
 };
 
 /**  One mod of the current list or a kept state, with the name and version the library gives it. */
 export type HistoryMod_Serialize = {
-	/**  The family id. */
-	id: string,
-	/**  The family name, or the version name when the family is gone, or the id as a last fallback. */
-	name: string,
-	/**  The selected version folder. */
-	folder: string,
-	/**  The version as the library spells it, when it has one. */
-	version: string | null,
-	/**  Whether the list that holds this mod has it switched on. */
-	enabled: boolean,
-	/**  The kept state lists a version the library no longer has. */
-	missing: boolean,
+  /**  The family id. */
+  id: string;
+  /**  The family name, or the version name when the family is gone, or the id as a last fallback. */
+  name: string;
+  /**  The selected version folder. */
+  folder: string;
+  /**  The version as the library spells it, when it has one. */
+  version: string | null;
+  /**  Whether the list that holds this mod has it switched on. */
+  enabled: boolean;
+  /**  The kept state lists a version the library no longer has. */
+  missing: boolean;
 };
 
 /**  What restoring a kept state changes in the active list. Nothing is written. */
-export type HistoryPreview = HistoryPreview_Serialize | HistoryPreview_Deserialize;
+export type HistoryPreview =
+  HistoryPreview_Serialize | HistoryPreview_Deserialize;
 
 /**  What restoring a kept state changes in the active list. Nothing is written. */
 export type HistoryPreview_Deserialize = {
-	/**  The kept state's id. */
-	id: number,
-	/**  When the list left the kept state. */
-	at: number,
-	/**  Mods in the kept state, and how many of them are on. */
-	total: number,
-	/**  Mods switched on in the kept state. */
-	enabled: number,
-	/**  Mods the restore brings back, in the state's order. A `missing` one no longer exists in the library. */
-	adds: HistoryMod_Deserialize[],
-	/**  Mods the restore removes, in the current order. */
-	removes: HistoryMod_Deserialize[],
-	versions: HistoryVersionChange_Deserialize[],
-	/**  Mods the restore switches on. */
-	switches_on: HistoryMod_Deserialize[],
-	/**  Mods the restore switches off. */
-	switches_off: HistoryMod_Deserialize[],
-	/**  Mods whose place in the list changes. */
-	moved: number,
-	/**  Mods whose load priority changes. */
-	priority: number,
-	/**  Separators added, removed, renamed or moved. */
-	groups: number,
-	/**  File winner choices changed. */
-	winners: number,
-	/**  Pack mods waiting for the library changed. */
-	waiting: number,
+  /**  The kept state's id. */
+  id: number;
+  /**  When the list left the kept state. */
+  at: number;
+  /**  Mods in the kept state, and how many of them are on. */
+  total: number;
+  /**  Mods switched on in the kept state. */
+  enabled: number;
+  /**  Mods the restore brings back, in the state's order. A `missing` one no longer exists in the library. */
+  adds: HistoryMod_Deserialize[];
+  /**  Mods the restore removes, in the current order. */
+  removes: HistoryMod_Deserialize[];
+  versions: HistoryVersionChange_Deserialize[];
+  /**  Mods the restore switches on. */
+  switches_on: HistoryMod_Deserialize[];
+  /**  Mods the restore switches off. */
+  switches_off: HistoryMod_Deserialize[];
+  /**  Mods whose place in the list changes. */
+  moved: number;
+  /**  Mods whose load priority changes. */
+  priority: number;
+  /**  Separators added, removed, renamed or moved. */
+  groups: number;
+  /**  File winner choices changed. */
+  winners: number;
+  /**  Pack mods waiting for the library changed. */
+  waiting: number;
 };
 
 /**  What restoring a kept state changes in the active list. Nothing is written. */
 export type HistoryPreview_Serialize = {
-	/**  The kept state's id. */
-	id: number,
-	/**  When the list left the kept state. */
-	at: number,
-	/**  Mods in the kept state, and how many of them are on. */
-	total: number,
-	/**  Mods switched on in the kept state. */
-	enabled: number,
-	/**  Mods the restore brings back, in the state's order. A `missing` one no longer exists in the library. */
-	adds: HistoryMod_Serialize[],
-	/**  Mods the restore removes, in the current order. */
-	removes: HistoryMod_Serialize[],
-	versions: HistoryVersionChange_Serialize[],
-	/**  Mods the restore switches on. */
-	switches_on: HistoryMod_Serialize[],
-	/**  Mods the restore switches off. */
-	switches_off: HistoryMod_Serialize[],
-	/**  Mods whose place in the list changes. */
-	moved: number,
-	/**  Mods whose load priority changes. */
-	priority: number,
-	/**  Separators added, removed, renamed or moved. */
-	groups: number,
-	/**  File winner choices changed. */
-	winners: number,
-	/**  Pack mods waiting for the library changed. */
-	waiting: number,
+  /**  The kept state's id. */
+  id: number;
+  /**  When the list left the kept state. */
+  at: number;
+  /**  Mods in the kept state, and how many of them are on. */
+  total: number;
+  /**  Mods switched on in the kept state. */
+  enabled: number;
+  /**  Mods the restore brings back, in the state's order. A `missing` one no longer exists in the library. */
+  adds: HistoryMod_Serialize[];
+  /**  Mods the restore removes, in the current order. */
+  removes: HistoryMod_Serialize[];
+  versions: HistoryVersionChange_Serialize[];
+  /**  Mods the restore switches on. */
+  switches_on: HistoryMod_Serialize[];
+  /**  Mods the restore switches off. */
+  switches_off: HistoryMod_Serialize[];
+  /**  Mods whose place in the list changes. */
+  moved: number;
+  /**  Mods whose load priority changes. */
+  priority: number;
+  /**  Separators added, removed, renamed or moved. */
+  groups: number;
+  /**  File winner choices changed. */
+  winners: number;
+  /**  Pack mods waiting for the library changed. */
+  waiting: number;
 };
 
 /**  One side of a version change. */
@@ -2558,32 +3444,32 @@ export type HistorySide = HistorySide_Serialize | HistorySide_Deserialize;
 
 /**  One side of a version change. */
 export type HistorySide_Deserialize = {
-	/**  The version folder. */
-	folder: string,
-	/**  The version as the library spells it, when it has one. */
-	version?: string | null,
-	/**  Whether this side of the change has the mod switched on. */
-	enabled: boolean,
-	/**  The library no longer has this version folder. */
-	missing: boolean,
+  /**  The version folder. */
+  folder: string;
+  /**  The version as the library spells it, when it has one. */
+  version?: string | null;
+  /**  Whether this side of the change has the mod switched on. */
+  enabled: boolean;
+  /**  The library no longer has this version folder. */
+  missing: boolean;
 };
 
 /**  One side of a version change. */
 export type HistorySide_Serialize = {
-	/**  The version folder. */
-	folder: string,
-	/**  The version as the library spells it, when it has one. */
-	version: string | null,
-	/**  Whether this side of the change has the mod switched on. */
-	enabled: boolean,
-	/**  The library no longer has this version folder. */
-	missing: boolean,
+  /**  The version folder. */
+  folder: string;
+  /**  The version as the library spells it, when it has one. */
+  version: string | null;
+  /**  Whether this side of the change has the mod switched on. */
+  enabled: boolean;
+  /**  The library no longer has this version folder. */
+  missing: boolean;
 };
 
 /**  Whether the active profile has a change to undo or to redo. */
 export type HistoryState = {
-	can_undo: boolean,
-	can_redo: boolean,
+  can_undo: boolean;
+  can_redo: boolean;
 };
 
 /**
@@ -2591,169 +3477,171 @@ export type HistoryState = {
  *  and it was switched at the same time; the parts describe aspects, not distinct mods.
  */
 export type HistorySummary = {
-	/**  Mods the change brought onto the list. */
-	added: number,
-	/**  Mods the change took off the list. */
-	removed: number,
-	/**  Mods whose selected version folder changed. */
-	updated: number,
-	/**  Mods that must change place so the others keep their relative order. */
-	moved: number,
-	/**  Mods the change switched on. */
-	enabled_on: number,
-	/**  Mods the change switched off. */
-	enabled_off: number,
-	/**  Mods whose load priority changed. */
-	priority: number,
-	/**  Separators added, removed, renamed or anchored above another mod. */
-	groups: number,
-	/**  File winner choices changed. */
-	winners: number,
-	/**  Pack mods waiting for the library changed. */
-	waiting: number,
+  /**  Mods the change brought onto the list. */
+  added: number;
+  /**  Mods the change took off the list. */
+  removed: number;
+  /**  Mods whose selected version folder changed. */
+  updated: number;
+  /**  Mods that must change place so the others keep their relative order. */
+  moved: number;
+  /**  Mods the change switched on. */
+  enabled_on: number;
+  /**  Mods the change switched off. */
+  enabled_off: number;
+  /**  Mods whose load priority changed. */
+  priority: number;
+  /**  Separators added, removed, renamed or anchored above another mod. */
+  groups: number;
+  /**  File winner choices changed. */
+  winners: number;
+  /**  Pack mods waiting for the library changed. */
+  waiting: number;
 };
 
 /**  A mod both lists have with another version. */
-export type HistoryVersionChange = HistoryVersionChange_Serialize | HistoryVersionChange_Deserialize;
+export type HistoryVersionChange =
+  HistoryVersionChange_Serialize | HistoryVersionChange_Deserialize;
 
 /**  A mod both lists have with another version. */
 export type HistoryVersionChange_Deserialize = {
-	id: string,
-	name: string,
-	/**  The version in the current list. */
-	from: HistorySide_Deserialize,
-	/**  The version in the kept state, which a restore selects. */
-	to: HistorySide_Deserialize,
+  id: string;
+  name: string;
+  /**  The version in the current list. */
+  from: HistorySide_Deserialize;
+  /**  The version in the kept state, which a restore selects. */
+  to: HistorySide_Deserialize;
 };
 
 /**  A mod both lists have with another version. */
 export type HistoryVersionChange_Serialize = {
-	id: string,
-	name: string,
-	/**  The version in the current list. */
-	from: HistorySide_Serialize,
-	/**  The version in the kept state, which a restore selects. */
-	to: HistorySide_Serialize,
+  id: string;
+  name: string;
+  /**  The version in the current list. */
+  from: HistorySide_Serialize;
+  /**  The version in the kept state, which a restore selects. */
+  to: HistorySide_Serialize;
 };
 
 /**  The import progress, sent to the window while it works. */
 export type ImportProgress = {
-	stage: ImportStage,
-	percent: number,
+  stage: ImportStage;
+  percent: number;
 };
 
 /**  A stage of importing one archive. Each starts at 0%. */
-export type ImportStage = 
-/**  Computing the SHA-256 sum of the source file. */
-"hashing" | 
-/**  Unpacking mods into the library. */
-"extracting" | 
-/**
- *  Copying the archive to `archives/`. An import hashes the archive while copying it into its working folder, so
- *  this stage stays in the IPC type for the frontend but is no longer reported.
- */
-"copying";
+export type ImportStage =
+  /**  Computing the SHA-256 sum of the source file. */
+  | "hashing"
+  /**  Unpacking mods into the library. */
+  | "extracting"
+  /**
+   *  Copying the archive to `archives/`. An import hashes the archive while copying it into its working folder, so
+   *  this stage stays in the IPC type for the frontend but is no longer reported.
+   */
+  | "copying";
 
 /**  The result of an import. */
 export type ImportView = ImportView_Serialize | ImportView_Deserialize;
 
 /**  The result of an import. */
 export type ImportView_Deserialize = {
-	folders: string[],
-	files: number,
-	/**  Entries no rule took. Documentation and installer metadata are not counted here. */
-	skipped: number,
-	/**  Every archive entry that was not unpacked, with the reason. */
-	skipped_files: SkippedFile[],
-	/**
-	 *  The mods the import added, with the family each one belongs to. A family that already had a version keeps its
-	 *  selected one, so the window can offer the new version instead of switching silently.
-	 */
-	mods: ImportedModView_Deserialize[],
+  folders: string[];
+  files: number;
+  /**  Entries no rule took. Documentation and installer metadata are not counted here. */
+  skipped: number;
+  /**  Every archive entry that was not unpacked, with the reason. */
+  skipped_files: SkippedFile[];
+  /**
+   *  The mods the import added, with the family each one belongs to. A family that already had a version keeps its
+   *  selected one, so the window can offer the new version instead of switching silently.
+   */
+  mods: ImportedModView_Deserialize[];
 };
 
 /**  The result of an import. */
 export type ImportView_Serialize = {
-	folders: string[],
-	files: number,
-	/**  Entries no rule took. Documentation and installer metadata are not counted here. */
-	skipped: number,
-	/**  Every archive entry that was not unpacked, with the reason. */
-	skipped_files: SkippedFile[],
-	/**
-	 *  The mods the import added, with the family each one belongs to. A family that already had a version keeps its
-	 *  selected one, so the window can offer the new version instead of switching silently.
-	 */
-	mods: ImportedModView_Serialize[],
+  folders: string[];
+  files: number;
+  /**  Entries no rule took. Documentation and installer metadata are not counted here. */
+  skipped: number;
+  /**  Every archive entry that was not unpacked, with the reason. */
+  skipped_files: SkippedFile[];
+  /**
+   *  The mods the import added, with the family each one belongs to. A family that already had a version keeps its
+   *  selected one, so the window can offer the new version instead of switching silently.
+   */
+  mods: ImportedModView_Serialize[];
 };
 
 /**  A definition package that was written. */
 export type ImportedDefinitionPackage = {
-	id: string,
-	name: string,
+  id: string;
+  name: string;
 };
 
 /**  One mod that an import added to the library. */
-export type ImportedModView = ImportedModView_Serialize | ImportedModView_Deserialize;
+export type ImportedModView =
+  ImportedModView_Serialize | ImportedModView_Deserialize;
 
 /**  One mod that an import added to the library. */
 export type ImportedModView_Deserialize = {
-	/**  Id of the mod family. A version of an existing mod shares it with the selected version. */
-	family: string,
-	/**  The digest of the archive this folder came from, so a pack can match a fresh import to its recipe. */
-	sha256: string,
-	/**  The folder of the imported version. */
-	folder: string,
-	name: string,
-	version?: string | null,
+  /**  Id of the mod family. A version of an existing mod shares it with the selected version. */
+  family: string;
+  /**  The digest of the archive this folder came from, so a pack can match a fresh import to its recipe. */
+  sha256: string;
+  /**  The folder of the imported version. */
+  folder: string;
+  name: string;
+  version?: string | null;
 };
 
 /**  One mod that an import added to the library. */
 export type ImportedModView_Serialize = {
-	/**  Id of the mod family. A version of an existing mod shares it with the selected version. */
-	family: string,
-	/**  The digest of the archive this folder came from, so a pack can match a fresh import to its recipe. */
-	sha256: string,
-	/**  The folder of the imported version. */
-	folder: string,
-	name: string,
-	version: string | null,
+  /**  Id of the mod family. A version of an existing mod shares it with the selected version. */
+  family: string;
+  /**  The digest of the archive this folder came from, so a pack can match a fresh import to its recipe. */
+  sha256: string;
+  /**  The folder of the imported version. */
+  folder: string;
+  name: string;
+  version: string | null;
 };
 
 /**  One static import the launcher points at the mod layer. */
 export type InjectedDll = {
-	/**  The name as the import table spells it, for example `WINMM.dll`. */
-	name: string,
-	/**  Its game-relative path, for example `bin/x64/winmm.dll`. */
-	path: string,
-	/**  The full path of the file in the mod layer. */
-	source: string,
+  /**  The name as the import table spells it, for example `WINMM.dll`. */
+  name: string;
+  /**  Its game-relative path, for example `bin/x64/winmm.dll`. */
+  path: string;
+  /**  The full path of the file in the mod layer. */
+  source: string;
 };
 
 /**  What one verification found. */
-export type IntegrityStatus = 
-/**  The installed files still match the checksum from the import. */
-"Matches" | 
-/**  At least one file changed, was added or was removed since the import. */
-"Changed" | 
-/**  The version had no checksum yet; the current files are now the baseline. */
-"Recorded";
+export type IntegrityStatus =
+  /**  The installed files still match the checksum from the import. */
+  | "Matches"
+  /**  At least one file changed, was added or was removed since the import. */
+  | "Changed"
+  /**  The version had no checksum yet; the current files are now the baseline. */
+  | "Recorded";
 
 /**
  *  The kind of data a set holds. The frontend translates this value once for every game; a definition never carries
  *  user-visible text.
  */
-export type Kind = 
-/**  A folder with several kinds of data, for example saves and settings together. */
-"user-data" | "settings" | "saves" | "config" | "mods";
+export type Kind =
+  /**  A folder with several kinds of data, for example saves and settings together. */
+  "user-data" | "settings" | "saves" | "config" | "mods";
 
 /**
  *  The row revisions the window holds, in its order. A mutation that answers with a patch sends back only the rows
  *  whose revision differs from these.
  */
 export type KnownRows = {
-	ids: string[],
-	revisions: string[],
+  ids: string[];
+  revisions: string[];
 };
 
 /**  Interface language. `System` follows the operating system's language list. */
@@ -2761,41 +3649,42 @@ export type Language = "system" | "en" | "pl";
 
 /**  The launcher's steps before the game's first instruction, in microseconds. */
 export type LaunchSteps = {
-	setup_us: number,
-	/**  The crash-dump monitors, part of `setup_us`. */
-	dump_us: number,
-	/**  The DLL list and its static-import read, which the report needs before the program starts. */
-	dll_report_us: number,
-	create_process_us: number,
-	detect_us: number,
-	stage0_us: number,
-	ready_event_us: number,
-	inject_us: number,
-	imports_us: number,
-	resume_us: number,
-	ready_wait_us: number,
+  setup_us: number;
+  /**  The crash-dump monitors, part of `setup_us`. */
+  dump_us: number;
+  /**  The DLL list and its static-import read, which the report needs before the program starts. */
+  dll_report_us: number;
+  create_process_us: number;
+  detect_us: number;
+  stage0_us: number;
+  ready_event_us: number;
+  inject_us: number;
+  imports_us: number;
+  resume_us: number;
+  ready_wait_us: number;
 };
 
 /**
  *  A loader preset the editor can offer. `places` and `requires` are the base rules; each variant has the rules of the
  *  preset with that variant merged over it, which is what the game would get.
  */
-export type LoaderPresetView = LoaderPresetView_Serialize | LoaderPresetView_Deserialize;
+export type LoaderPresetView =
+  LoaderPresetView_Serialize | LoaderPresetView_Deserialize;
 
 /**
  *  A loader preset the editor can offer. `places` and `requires` are the base rules; each variant has the rules of the
  *  preset with that variant merged over it, which is what the game would get.
  */
 export type LoaderPresetView_Deserialize = {
-	id: string,
-	name: string,
-	origin: GameOrigin,
-	default_variant?: string | null,
-	requires: string[],
-	places: string[],
-	root_files: string[],
-	variants: LoaderVariantView[],
-	problems: string[],
+  id: string;
+  name: string;
+  origin: GameOrigin;
+  default_variant?: string | null;
+  requires: string[];
+  places: string[];
+  root_files: string[];
+  variants: LoaderVariantView[];
+  problems: string[];
 };
 
 /**
@@ -2803,64 +3692,72 @@ export type LoaderPresetView_Deserialize = {
  *  preset with that variant merged over it, which is what the game would get.
  */
 export type LoaderPresetView_Serialize = {
-	id: string,
-	name: string,
-	origin: GameOrigin,
-	default_variant: string | null,
-	requires: string[],
-	places: string[],
-	root_files: string[],
-	variants: LoaderVariantView[],
-	problems: string[],
+  id: string;
+  name: string;
+  origin: GameOrigin;
+  default_variant: string | null;
+  requires: string[];
+  places: string[];
+  root_files: string[];
+  variants: LoaderVariantView[];
+  problems: string[];
 };
 
 /**  A loader preset that seems to be installed in a game folder. The editor preselects it. */
-export type LoaderSuggestion = LoaderSuggestion_Serialize | LoaderSuggestion_Deserialize;
+export type LoaderSuggestion =
+  LoaderSuggestion_Serialize | LoaderSuggestion_Deserialize;
 
 /**  A loader preset that seems to be installed in a game folder. The editor preselects it. */
 export type LoaderSuggestion_Deserialize = {
-	id: string,
-	name: string,
-	/**  The variant whose files were found, when the preset has variants. */
-	variant?: string | null,
+  id: string;
+  name: string;
+  /**  The variant whose files were found, when the preset has variants. */
+  variant?: string | null;
 };
 
 /**  A loader preset that seems to be installed in a game folder. The editor preselects it. */
 export type LoaderSuggestion_Serialize = {
-	id: string,
-	name: string,
-	/**  The variant whose files were found, when the preset has variants. */
-	variant: string | null,
+  id: string;
+  name: string;
+  /**  The variant whose files were found, when the preset has variants. */
+  variant: string | null;
 };
 
 /**  One variant of a loader preset. */
 export type LoaderVariantView = {
-	name: string,
-	requires: string[],
-	places: string[],
-	root_files: string[],
+  name: string;
+  requires: string[];
+  places: string[];
+  root_files: string[];
 };
 
 /**  A game added to Gobbo: id, game folder from the settings, and whether that folder still exists. */
 export type ManagedGame = {
-	id: string,
-	game_root: string,
-	ready: boolean,
+  id: string;
+  game_root: string;
+  ready: boolean;
 };
 
 /**  The page request carried by [`MANUAL_PAGE_EVENT`] and returned by the reopen command. */
 export type ManualPageRequest = {
-	game: string,
-	id: string,
-	name: string,
-	provider: string,
+  game: string;
+  id: string;
+  name: string;
+  provider: string;
 };
 
 /**
  *  The state of one target. `downloading` and `installing` are reported by the window while a download is in flight;
  *  the controller's own transitions are `waiting`, `selected`, `skipped` and `failed`.
  */
-export type ManualStep = "waiting" | "downloading" | "installing" | "selecting" | "selected" | "failed" | "skipped";
+export type ManualStep =
+  | "waiting"
+  | "downloading"
+  | "installing"
+  | "selecting"
+  | "selected"
+  | "failed"
+  | "skipped";
 
 /**
  *  One mod of a browser run. The window sends the fields it already has from its update report, so the backend can
@@ -2873,15 +3770,15 @@ export type ManualTarget = ManualTarget_Serialize | ManualTarget_Deserialize;
  *  select and undo without asking the window to keep any of the sequence state.
  */
 export type ManualTarget_Deserialize = {
-	id: string,
-	name: string,
-	provider: string,
-	mod_id: string,
-	folder: string,
-	current?: string | null,
-	latest?: string | null,
-	/**  The newest version is installed already; the run only selects it. */
-	installed: boolean,
+  id: string;
+  name: string;
+  provider: string;
+  mod_id: string;
+  folder: string;
+  current?: string | null;
+  latest?: string | null;
+  /**  The newest version is installed already; the run only selects it. */
+  installed: boolean;
 };
 
 /**
@@ -2889,67 +3786,68 @@ export type ManualTarget_Deserialize = {
  *  select and undo without asking the window to keep any of the sequence state.
  */
 export type ManualTarget_Serialize = {
-	id: string,
-	name: string,
-	provider: string,
-	mod_id: string,
-	folder: string,
-	current: string | null,
-	latest: string | null,
-	/**  The newest version is installed already; the run only selects it. */
-	installed: boolean,
+  id: string;
+  name: string;
+  provider: string;
+  mod_id: string;
+  folder: string;
+  current: string | null;
+  latest: string | null;
+  /**  The newest version is installed already; the run only selects it. */
+  installed: boolean;
 };
 
 /**  What a finished browser run hands back for the single undo: the versions it selected and the failures it kept. */
 export type ManualUpdateFinish = {
-	game: string,
-	changes: UpdateChange[],
-	failures: string[],
+  game: string;
+  changes: UpdateChange[];
+  failures: string[];
 };
 
 /**  The view the window renders for one browser run. */
-export type ManualUpdateView = ManualUpdateView_Serialize | ManualUpdateView_Deserialize;
+export type ManualUpdateView =
+  ManualUpdateView_Serialize | ManualUpdateView_Deserialize;
 
 /**  The view the window renders for one browser run. */
 export type ManualUpdateView_Deserialize = {
-	game: string,
-	active: boolean,
-	targets: ManualTarget_Deserialize[],
-	/**  The one-based place of the current target, as a portable IPC number. */
-	index: number,
-	steps: { [key in string]: ManualStep },
-	errors: { [key in string]: string },
-	percent: number,
-	current?: ManualPageRequest | null,
+  game: string;
+  active: boolean;
+  targets: ManualTarget_Deserialize[];
+  /**  The one-based place of the current target, as a portable IPC number. */
+  index: number;
+  steps: { [key in string]: ManualStep };
+  errors: { [key in string]: string };
+  percent: number;
+  current?: ManualPageRequest | null;
 };
 
 /**  The view the window renders for one browser run. */
 export type ManualUpdateView_Serialize = {
-	game: string,
-	active: boolean,
-	targets: ManualTarget_Serialize[],
-	/**  The one-based place of the current target, as a portable IPC number. */
-	index: number,
-	steps: { [key in string]: ManualStep },
-	errors: { [key in string]: string },
-	percent: number,
-	current: ManualPageRequest | null,
+  game: string;
+  active: boolean;
+  targets: ManualTarget_Serialize[];
+  /**  The one-based place of the current target, as a portable IPC number. */
+  index: number;
+  steps: { [key in string]: ManualStep };
+  errors: { [key in string]: string };
+  percent: number;
+  current: ManualPageRequest | null;
 };
 
 /**  A text for the interface, identified by a code such as `file.no_conflict`, with the values it needs. */
 export type Message = {
-	code: string,
-	params: { [key in string]: string },
+  code: string;
+  params: { [key in string]: string };
 };
 
 /**  What an import did to the active profile's list. */
 export type Mo2Import = {
-	/**  Mods now in the list. */
-	mods: number,
-	/**  Separators now in the list. */
-	separators: number,
-	/**  Names from the file that the library does not have. They are left out of the list. */
-	missing: string[],
+  /**  Mods now in the list. */
+  mods: number;
+  /**  Separators now in the list. */
+  separators: number;
+  /**  Names from the file that the library does not have. They are left out of the list. */
+  missing: string[];
 };
 
 /**  The full detail of one mod for the inspector: its sources, versions, files, conflicts and relations. */
@@ -2957,42 +3855,42 @@ export type ModDetails = ModDetails_Serialize | ModDetails_Deserialize;
 
 /**  The full detail of one mod for the inspector: its sources, versions, files, conflicts and relations. */
 export type ModDetails_Deserialize = {
-	folder: string,
-	/**  The full info of the selected version, including a description the status list only previews. */
-	info: ModInfo_Deserialize,
-	/**  The external sources of the family, with their full page data. */
-	sources: ModSourceDetails_Deserialize[],
-	/**  Every installed version of the family, newest first. The status list carries only the count. */
-	versions: VersionView_Deserialize[],
-	files: FileView[],
-	/**  Conflicts of this mod with other families, for the inspector. */
-	conflicts: ConflictView[],
-	/**  The steps the game defines, and the ones this mod asks for. */
-	steps: StepChoices,
-	/**  Whether the user can choose which copy of a shared file wins. Only the `Mirror` layout lets Gobbo decide that. */
-	file_winners: boolean,
-	/**  The page text, notes and relation details that the list row leaves out. */
-	extras: ModExtras_Deserialize,
+  folder: string;
+  /**  The full info of the selected version, including a description the status list only previews. */
+  info: ModInfo_Deserialize;
+  /**  The external sources of the family, with their full page data. */
+  sources: ModSourceDetails_Deserialize[];
+  /**  Every installed version of the family, newest first. The status list carries only the count. */
+  versions: VersionView_Deserialize[];
+  files: FileView[];
+  /**  Conflicts of this mod with other families, for the inspector. */
+  conflicts: ConflictView[];
+  /**  The steps the game defines, and the ones this mod asks for. */
+  steps: StepChoices;
+  /**  Whether the user can choose which copy of a shared file wins. Only the `Mirror` layout lets Gobbo decide that. */
+  file_winners: boolean;
+  /**  The page text, notes and relation details that the list row leaves out. */
+  extras: ModExtras_Deserialize;
 };
 
 /**  The full detail of one mod for the inspector: its sources, versions, files, conflicts and relations. */
 export type ModDetails_Serialize = {
-	folder: string,
-	/**  The full info of the selected version, including a description the status list only previews. */
-	info: ModInfo_Serialize,
-	/**  The external sources of the family, with their full page data. */
-	sources: ModSourceDetails_Serialize[],
-	/**  Every installed version of the family, newest first. The status list carries only the count. */
-	versions: VersionView_Serialize[],
-	files: FileView[],
-	/**  Conflicts of this mod with other families, for the inspector. */
-	conflicts: ConflictView[],
-	/**  The steps the game defines, and the ones this mod asks for. */
-	steps: StepChoices,
-	/**  Whether the user can choose which copy of a shared file wins. Only the `Mirror` layout lets Gobbo decide that. */
-	file_winners: boolean,
-	/**  The page text, notes and relation details that the list row leaves out. */
-	extras: ModExtras_Serialize,
+  folder: string;
+  /**  The full info of the selected version, including a description the status list only previews. */
+  info: ModInfo_Serialize;
+  /**  The external sources of the family, with their full page data. */
+  sources: ModSourceDetails_Serialize[];
+  /**  Every installed version of the family, newest first. The status list carries only the count. */
+  versions: VersionView_Serialize[];
+  files: FileView[];
+  /**  Conflicts of this mod with other families, for the inspector. */
+  conflicts: ConflictView[];
+  /**  The steps the game defines, and the ones this mod asks for. */
+  steps: StepChoices;
+  /**  Whether the user can choose which copy of a shared file wins. Only the `Mirror` layout lets Gobbo decide that. */
+  file_winners: boolean;
+  /**  The page text, notes and relation details that the list row leaves out. */
+  extras: ModExtras_Serialize;
 };
 
 /**
@@ -3006,38 +3904,38 @@ export type ModExtras = ModExtras_Serialize | ModExtras_Deserialize;
  *  the rows in the viewport, and `mod_details` carries it for one mod.
  */
 export type ModExtras_Deserialize = {
-	/**  The selected version folder, so the caller can match the answer to its row. */
-	folder: string,
-	/**  The description preview of the installed version's `info.json`. */
-	info_description?: string | null,
-	/**  The first source with page data, including the page text and counters. */
-	source?: SourceSummary_Deserialize | null,
-	/**  The user's note about the mod. */
-	notes: string,
-	/**  Mods this mod needs on any provider, with where each stands in the profile. */
-	requirements: SourceRequirementView_Deserialize[],
-	/**  DLC notes per provider: one list per requirement. */
-	source_dlcs: ProviderDlcs[],
-	/**  When each provider's requirements were read. */
-	source_sync: SourceSyncView_Deserialize[],
-	/**  The installer choices made when the selected version was installed. */
-	fomod: Choice_Deserialize[],
-	/**  The selected version came from a FOMOD installer, so its options can be changed by reinstalling. */
-	fomod_installer: boolean,
-	/**  Mods (family ids) this mod needs to work. */
-	requires: string[],
-	/**  Mods (family ids) this mod does not work with. */
-	incompatible: string[],
-	/**  The names of the mods in `incompatible`, in the same order. */
-	incompatible_names: string[],
-	/**  Mods (family ids) this mod overrides: it should stand above them in the list. */
-	overrides: string[],
-	/**  The names of the mods in `overrides`, in the same order. */
-	overrides_names: string[],
-	/**  The game steps this mod asks for before the game starts, by step id. */
-	steps_before: string[],
-	/**  The game steps this mod asks for after the game exits, by step id. */
-	steps_after: string[],
+  /**  The selected version folder, so the caller can match the answer to its row. */
+  folder: string;
+  /**  The description preview of the installed version's `info.json`. */
+  info_description?: string | null;
+  /**  The first source with page data, including the page text and counters. */
+  source?: SourceSummary_Deserialize | null;
+  /**  The user's note about the mod. */
+  notes: string;
+  /**  Mods this mod needs on any provider, with where each stands in the profile. */
+  requirements: SourceRequirementView_Deserialize[];
+  /**  DLC notes per provider: one list per requirement. */
+  source_dlcs: ProviderDlcs[];
+  /**  When each provider's requirements were read. */
+  source_sync: SourceSyncView_Deserialize[];
+  /**  The installer choices made when the selected version was installed. */
+  fomod: Choice_Deserialize[];
+  /**  The selected version came from a FOMOD installer, so its options can be changed by reinstalling. */
+  fomod_installer: boolean;
+  /**  Mods (family ids) this mod needs to work. */
+  requires: string[];
+  /**  Mods (family ids) this mod does not work with. */
+  incompatible: string[];
+  /**  The names of the mods in `incompatible`, in the same order. */
+  incompatible_names: string[];
+  /**  Mods (family ids) this mod overrides: it should stand above them in the list. */
+  overrides: string[];
+  /**  The names of the mods in `overrides`, in the same order. */
+  overrides_names: string[];
+  /**  The game steps this mod asks for before the game starts, by step id. */
+  steps_before: string[];
+  /**  The game steps this mod asks for after the game exits, by step id. */
+  steps_after: string[];
 };
 
 /**
@@ -3045,38 +3943,38 @@ export type ModExtras_Deserialize = {
  *  the rows in the viewport, and `mod_details` carries it for one mod.
  */
 export type ModExtras_Serialize = {
-	/**  The selected version folder, so the caller can match the answer to its row. */
-	folder: string,
-	/**  The description preview of the installed version's `info.json`. */
-	info_description: string | null,
-	/**  The first source with page data, including the page text and counters. */
-	source: SourceSummary_Serialize | null,
-	/**  The user's note about the mod. */
-	notes: string,
-	/**  Mods this mod needs on any provider, with where each stands in the profile. */
-	requirements: SourceRequirementView_Serialize[],
-	/**  DLC notes per provider: one list per requirement. */
-	source_dlcs: ProviderDlcs[],
-	/**  When each provider's requirements were read. */
-	source_sync: SourceSyncView_Serialize[],
-	/**  The installer choices made when the selected version was installed. */
-	fomod: Choice_Serialize[],
-	/**  The selected version came from a FOMOD installer, so its options can be changed by reinstalling. */
-	fomod_installer: boolean,
-	/**  Mods (family ids) this mod needs to work. */
-	requires: string[],
-	/**  Mods (family ids) this mod does not work with. */
-	incompatible: string[],
-	/**  The names of the mods in `incompatible`, in the same order. */
-	incompatible_names: string[],
-	/**  Mods (family ids) this mod overrides: it should stand above them in the list. */
-	overrides: string[],
-	/**  The names of the mods in `overrides`, in the same order. */
-	overrides_names: string[],
-	/**  The game steps this mod asks for before the game starts, by step id. */
-	steps_before: string[],
-	/**  The game steps this mod asks for after the game exits, by step id. */
-	steps_after: string[],
+  /**  The selected version folder, so the caller can match the answer to its row. */
+  folder: string;
+  /**  The description preview of the installed version's `info.json`. */
+  info_description: string | null;
+  /**  The first source with page data, including the page text and counters. */
+  source: SourceSummary_Serialize | null;
+  /**  The user's note about the mod. */
+  notes: string;
+  /**  Mods this mod needs on any provider, with where each stands in the profile. */
+  requirements: SourceRequirementView_Serialize[];
+  /**  DLC notes per provider: one list per requirement. */
+  source_dlcs: ProviderDlcs[];
+  /**  When each provider's requirements were read. */
+  source_sync: SourceSyncView_Serialize[];
+  /**  The installer choices made when the selected version was installed. */
+  fomod: Choice_Serialize[];
+  /**  The selected version came from a FOMOD installer, so its options can be changed by reinstalling. */
+  fomod_installer: boolean;
+  /**  Mods (family ids) this mod needs to work. */
+  requires: string[];
+  /**  Mods (family ids) this mod does not work with. */
+  incompatible: string[];
+  /**  The names of the mods in `incompatible`, in the same order. */
+  incompatible_names: string[];
+  /**  Mods (family ids) this mod overrides: it should stand above them in the list. */
+  overrides: string[];
+  /**  The names of the mods in `overrides`, in the same order. */
+  overrides_names: string[];
+  /**  The game steps this mod asks for before the game starts, by step id. */
+  steps_before: string[];
+  /**  The game steps this mod asks for after the game exits, by step id. */
+  steps_after: string[];
 };
 
 /**  A named set of families on a profile list. `members` holds family ids, not version folder names. */
@@ -3090,20 +3988,20 @@ export type ModGroupKind = "bundle" | "translation";
 
 /**  A named set of families on a profile list. `members` holds family ids, not version folder names. */
 export type ModGroup_Deserialize = {
-	id: string,
-	name: string,
-	members: string[],
-	kind: ModGroupKind,
-	language?: string | null,
+  id: string;
+  name: string;
+  members: string[];
+  kind: ModGroupKind;
+  language?: string | null;
 };
 
 /**  A named set of families on a profile list. `members` holds family ids, not version folder names. */
 export type ModGroup_Serialize = {
-	id: string,
-	name: string,
-	members: string[],
-	kind: ModGroupKind,
-	language?: string,
+  id: string;
+  name: string;
+  members: string[];
+  kind: ModGroupKind;
+  language?: string;
 };
 
 /**  Mod data from the `info.json` in the archive. Without the file, the name is the folder name. */
@@ -3120,9 +4018,9 @@ export type ModInfoEdit = ModInfoEdit_Serialize | ModInfoEdit_Deserialize;
  *  `info.json`. The edit is stored apart from the scanned info, so a rescan that reads the file again keeps it.
  */
 export type ModInfoEdit_Deserialize = {
-	name?: string | null,
-	version?: string | null,
-	author?: string | null,
+  name?: string | null;
+  version?: string | null;
+  author?: string | null;
 };
 
 /**
@@ -3130,133 +4028,135 @@ export type ModInfoEdit_Deserialize = {
  *  `info.json`. The edit is stored apart from the scanned info, so a rescan that reads the file again keeps it.
  */
 export type ModInfoEdit_Serialize = {
-	name: string | null,
-	version: string | null,
-	author: string | null,
+  name: string | null;
+  version: string | null;
+  author: string | null;
 };
 
 /**  Mod data from the `info.json` in the archive. Without the file, the name is the folder name. */
 export type ModInfo_Deserialize = {
-	name: string,
-	version?: string | null,
-	author?: string | null,
-	description?: string | null,
+  name: string;
+  version?: string | null;
+  author?: string | null;
+  description?: string | null;
 };
 
 /**  Mod data from the `info.json` in the archive. Without the file, the name is the folder name. */
 export type ModInfo_Serialize = {
-	name: string,
-	version: string | null,
-	author: string | null,
-	description: string | null,
+  name: string;
+  version: string | null;
+  author: string | null;
+  description: string | null;
 };
 
 /**  One external source of a mod in the list. It stays small: the page data belongs to the details view. */
 export type ModSource = ModSource_Serialize | ModSource_Deserialize;
 
 /**  One external source with its full page data, for the inspector. The list never carries this much text. */
-export type ModSourceDetails = ModSourceDetails_Serialize | ModSourceDetails_Deserialize;
+export type ModSourceDetails =
+  ModSourceDetails_Serialize | ModSourceDetails_Deserialize;
 
 /**  One external source with its full page data, for the inspector. The list never carries this much text. */
 export type ModSourceDetails_Deserialize = {
-	provider: string,
-	mod_id: string,
-	page_url?: string | null,
-	file_id?: string | null,
-	part_id?: string | null,
-	part_name?: string | null,
-	part_category?: string | null,
-	meta?: SourceMeta_Deserialize | null,
+  provider: string;
+  mod_id: string;
+  page_url?: string | null;
+  file_id?: string | null;
+  part_id?: string | null;
+  part_name?: string | null;
+  part_category?: string | null;
+  meta?: SourceMeta_Deserialize | null;
 };
 
 /**  One external source with its full page data, for the inspector. The list never carries this much text. */
 export type ModSourceDetails_Serialize = {
-	provider: string,
-	mod_id: string,
-	page_url: string | null,
-	file_id: string | null,
-	part_id: string | null,
-	part_name: string | null,
-	part_category: string | null,
-	meta: SourceMeta_Serialize | null,
+  provider: string;
+  mod_id: string;
+  page_url: string | null;
+  file_id: string | null;
+  part_id: string | null;
+  part_name: string | null;
+  part_category: string | null;
+  meta: SourceMeta_Serialize | null;
 };
 
 /**  One external source of a mod in the list. It stays small: the page data belongs to the details view. */
 export type ModSource_Deserialize = {
-	/**  The provider id, for example `nexus`. */
-	provider: string,
-	mod_id: string,
-	/**  The page of the mod, when the provider has one and the game has a key for it. */
-	page_url?: string | null,
-	/**  The file the selected version came from, when the provider named one. */
-	file_id?: string | null,
-	/**  The persistent part the selected version belongs to. */
-	part_id?: string | null,
-	part_name?: string | null,
-	part_category?: string | null,
+  /**  The provider id, for example `nexus`. */
+  provider: string;
+  mod_id: string;
+  /**  The page of the mod, when the provider has one and the game has a key for it. */
+  page_url?: string | null;
+  /**  The file the selected version came from, when the provider named one. */
+  file_id?: string | null;
+  /**  The persistent part the selected version belongs to. */
+  part_id?: string | null;
+  part_name?: string | null;
+  part_category?: string | null;
 };
 
 /**  One external source of a mod in the list. It stays small: the page data belongs to the details view. */
 export type ModSource_Serialize = {
-	/**  The provider id, for example `nexus`. */
-	provider: string,
-	mod_id: string,
-	/**  The page of the mod, when the provider has one and the game has a key for it. */
-	page_url: string | null,
-	/**  The file the selected version came from, when the provider named one. */
-	file_id: string | null,
-	/**  The persistent part the selected version belongs to. */
-	part_id: string | null,
-	part_name: string | null,
-	part_category: string | null,
+  /**  The provider id, for example `nexus`. */
+  provider: string;
+  mod_id: string;
+  /**  The page of the mod, when the provider has one and the game has a key for it. */
+  page_url: string | null;
+  /**  The file the selected version came from, when the provider named one. */
+  file_id: string | null;
+  /**  The persistent part the selected version belongs to. */
+  part_id: string | null;
+  part_name: string | null;
+  part_category: string | null;
 };
 
 /**  The profiles that use a mod family. The delete confirmation shows them before anything is removed. */
 export type ModUsage = ModUsage_Serialize | ModUsage_Deserialize;
 
 /**  One profile that lists a mod, with the selected version and whether its deployment uses the mod. */
-export type ModUsageProfile = ModUsageProfile_Serialize | ModUsageProfile_Deserialize;
+export type ModUsageProfile =
+  ModUsageProfile_Serialize | ModUsageProfile_Deserialize;
 
 /**  One profile that lists a mod, with the selected version and whether its deployment uses the mod. */
 export type ModUsageProfile_Deserialize = {
-	id: string,
-	name: string,
-	/**  The installed version folder the profile selects. */
-	folder: string,
-	version?: string | null,
-	enabled: boolean,
-	prepared: boolean,
-	running: boolean,
+  id: string;
+  name: string;
+  /**  The installed version folder the profile selects. */
+  folder: string;
+  version?: string | null;
+  enabled: boolean;
+  prepared: boolean;
+  running: boolean;
 };
 
 /**  One profile that lists a mod, with the selected version and whether its deployment uses the mod. */
 export type ModUsageProfile_Serialize = {
-	id: string,
-	name: string,
-	/**  The installed version folder the profile selects. */
-	folder: string,
-	version: string | null,
-	enabled: boolean,
-	prepared: boolean,
-	running: boolean,
+  id: string;
+  name: string;
+  /**  The installed version folder the profile selects. */
+  folder: string;
+  version: string | null;
+  enabled: boolean;
+  prepared: boolean;
+  running: boolean;
 };
 
 /**  The profiles that use a mod family. The delete confirmation shows them before anything is removed. */
 export type ModUsage_Deserialize = {
-	profiles: ModUsageProfile_Deserialize[],
-	/**  At least one prepared deployment contains the mod. */
-	prepared: boolean,
-	/**  The running game uses the mod. Deleting then would touch files the game may be reading. */
-	running: boolean,
+  profiles: ModUsageProfile_Deserialize[];
+  /**  At least one prepared deployment contains the mod. */
+  prepared: boolean;
+  /**  The running game uses the mod. Deleting then would touch files the game may be reading. */
+  running: boolean;
 };
 
 /**  The profiles that use a mod family. The delete confirmation shows them before anything is removed. */
 export type ModUsage_Serialize = {
-	profiles: ModUsageProfile_Serialize[],
-	/**  At least one prepared deployment contains the mod. */
-	prepared: boolean,
-	/**  The running game uses the mod. Deleting then would touch files the game may be reading. */
-	running: boolean,
+  profiles: ModUsageProfile_Serialize[];
+  /**  At least one prepared deployment contains the mod. */
+  prepared: boolean;
+  /**  The running game uses the mod. Deleting then would touch files the game may be reading. */
+  running: boolean;
 };
 
 /**  One mod of the active profile, as a row of the mod list with its selected version and counters. */
@@ -3264,314 +4164,324 @@ export type ModView = ModView_Serialize | ModView_Deserialize;
 
 /**  One mod of the active profile, as a row of the mod list with its selected version and counters. */
 export type ModView_Deserialize = {
-	/**  Id of the mod family. Every version of a mod shares it. */
-	id: string,
-	/**  The selected version folder. */
-	folder: string,
-	/**  The selected version came from a FOMOD installer, so its options can be changed by reinstalling. */
-	fomod_installer: boolean,
-	/**  How many versions of the family are installed. The list carries the count; the picker asks for the versions. */
-	version_count: number,
-	/**  Unix time in seconds of the selected version's import. */
-	installed_at: number,
-	/**  Slot id. Empty in the `mirror` layout. */
-	slot: string,
-	enabled: boolean,
-	/**  Position in the list, from 1. The list decides which copy of a shared file wins. */
-	priority: number,
-	/**  The load priority the user set, written to the game's settings file. `None` leaves the order to the game. */
-	load_priority?: number | null,
-	files: number,
-	/**  Size in KB. Specta does not export `u64` to TypeScript, and KB fit in `u32`. */
-	size_kb: number,
-	/**  How many files of this mod win a conflict, and how many are overwritten. */
-	wins: number,
-	loses: number,
-	/**  The original name of the archive the selected version was unpacked from. */
-	archive?: string | null,
-	/**  The name of the archive copy in `archives/`, for example `Mod 1.2.0.zip`. */
-	archive_file?: string | null,
-	/**  Archive entries no rule took when the version was imported. */
-	skipped: number,
-	/**  Name, version, author and description of the selected version. */
-	info: ModInfo_Deserialize,
-	/**
-	 *  The first source with page data, in provider order. The list keeps only what the row draws; the page text is
-	 *  read by `mod_extras` when a column or the inspector needs it.
-	 */
-	source?: SourcePreview_Deserialize | null,
-	/**  The external sources of the mod, one per provider. The interface can show them without knowing the provider. */
-	sources: ModSource_Deserialize[],
-	/**  The page the part belongs to, for example `nexus:225`. `None` for a local mod. */
-	page_id?: string | null,
-	/**  The page's display name, when a provider page was read. */
-	page_name?: string | null,
-	/**  The persistent part id, for example a Nexus `mod_file_id`. */
-	part_id?: string | null,
-	/**  The part's display name. */
-	part_name?: string | null,
-	/**  The provider's category for the part, for example `main` or `optional`. */
-	part_category?: string | null,
-	/**
-	 *  The last saved update check of the mod, read from the library with the version the profile selects now. `None`
-	 *  when no source was checked.
-	 */
-	update?: UpdateReport_Deserialize | null,
-	/**  Tags given to the mod in Gobbo, for filtering the list. */
-	tags: string[],
-	/**  Instructions for players, shown and exported with the mod list. */
-	instructions: string,
-	/**
-	 *  How many of the mod's requirements the profile does not meet: a required mod that is not in the library or is
-	 *  switched off, and each list of provider alternatives that none of its mods is on. Counted for every mod, on or
-	 *  off.
-	 */
-	unmet_requirements: number,
-	/**  The names of the mods in the mod's `requires`, in the same order. A mod the library does not have shows its id. */
-	requires_names: string[],
-	/**
-	 *  The names of the provider requirements, grouped as alternatives: each inner list is one requirement, and its
-	 *  names are interchangeable. It feeds the requirement column and a copied list without the full requirement data.
-	 */
-	requirement_groups: string[][],
-	/**  The names of the profiles of the game whose list has the mod, the active one among them. */
-	profiles: string[],
-	/**  The names of the active profile's collections (Nexus collections, Thunderstore modpacks) the mod belongs to. */
-	collections: string[],
+  /**  Id of the mod family. Every version of a mod shares it. */
+  id: string;
+  /**  The selected version folder. */
+  folder: string;
+  /**  The selected version came from a FOMOD installer, so its options can be changed by reinstalling. */
+  fomod_installer: boolean;
+  /**  How many versions of the family are installed. The list carries the count; the picker asks for the versions. */
+  version_count: number;
+  /**  Unix time in seconds of the selected version's import. */
+  installed_at: number;
+  /**  Slot id. Empty in the `mirror` layout. */
+  slot: string;
+  enabled: boolean;
+  /**  Position in the list, from 1. The list decides which copy of a shared file wins. */
+  priority: number;
+  /**  The load priority the user set, written to the game's settings file. `None` leaves the order to the game. */
+  load_priority?: number | null;
+  files: number;
+  /**  Size in KB. Specta does not export `u64` to TypeScript, and KB fit in `u32`. */
+  size_kb: number;
+  /**  How many files of this mod win a conflict, and how many are overwritten. */
+  wins: number;
+  loses: number;
+  /**  The original name of the archive the selected version was unpacked from. */
+  archive?: string | null;
+  /**  The name of the archive copy in `archives/`, for example `Mod 1.2.0.zip`. */
+  archive_file?: string | null;
+  /**  Archive entries no rule took when the version was imported. */
+  skipped: number;
+  /**  Name, version, author and description of the selected version. */
+  info: ModInfo_Deserialize;
+  /**
+   *  The first source with page data, in provider order. The list keeps only what the row draws; the page text is
+   *  read by `mod_extras` when a column or the inspector needs it.
+   */
+  source?: SourcePreview_Deserialize | null;
+  /**  The external sources of the mod, one per provider. The interface can show them without knowing the provider. */
+  sources: ModSource_Deserialize[];
+  /**  The page the part belongs to, for example `nexus:225`. `None` for a local mod. */
+  page_id?: string | null;
+  /**  The page's display name, when a provider page was read. */
+  page_name?: string | null;
+  /**  The persistent part id, for example a Nexus `mod_file_id`. */
+  part_id?: string | null;
+  /**  The part's display name. */
+  part_name?: string | null;
+  /**  The provider's category for the part, for example `main` or `optional`. */
+  part_category?: string | null;
+  /**
+   *  The last saved update check of the mod, read from the library with the version the profile selects now. `None`
+   *  when no source was checked.
+   */
+  update?: UpdateReport_Deserialize | null;
+  /**  Tags given to the mod in Gobbo, for filtering the list. */
+  tags: string[];
+  /**  Instructions for players, shown and exported with the mod list. */
+  instructions: string;
+  /**
+   *  How many of the mod's requirements the profile does not meet: a required mod that is not in the library or is
+   *  switched off, and each list of provider alternatives that none of its mods is on. Counted for every mod, on or
+   *  off.
+   */
+  unmet_requirements: number;
+  /**  The names of the mods in the mod's `requires`, in the same order. A mod the library does not have shows its id. */
+  requires_names: string[];
+  /**
+   *  The names of the provider requirements, grouped as alternatives: each inner list is one requirement, and its
+   *  names are interchangeable. It feeds the requirement column and a copied list without the full requirement data.
+   */
+  requirement_groups: string[][];
+  /**  The names of the profiles of the game whose list has the mod, the active one among them. */
+  profiles: string[];
+  /**  The names of the active profile's collections (Nexus collections, Thunderstore modpacks) the mod belongs to. */
+  collections: string[];
 };
 
 /**  One mod of the active profile, as a row of the mod list with its selected version and counters. */
 export type ModView_Serialize = {
-	/**  Id of the mod family. Every version of a mod shares it. */
-	id: string,
-	/**  The selected version folder. */
-	folder: string,
-	/**  The selected version came from a FOMOD installer, so its options can be changed by reinstalling. */
-	fomod_installer: boolean,
-	/**  How many versions of the family are installed. The list carries the count; the picker asks for the versions. */
-	version_count: number,
-	/**  Unix time in seconds of the selected version's import. */
-	installed_at: number,
-	/**  Slot id. Empty in the `mirror` layout. */
-	slot: string,
-	enabled: boolean,
-	/**  Position in the list, from 1. The list decides which copy of a shared file wins. */
-	priority: number,
-	/**  The load priority the user set, written to the game's settings file. `None` leaves the order to the game. */
-	load_priority: number | null,
-	files: number,
-	/**  Size in KB. Specta does not export `u64` to TypeScript, and KB fit in `u32`. */
-	size_kb: number,
-	/**  How many files of this mod win a conflict, and how many are overwritten. */
-	wins: number,
-	loses: number,
-	/**  The original name of the archive the selected version was unpacked from. */
-	archive: string | null,
-	/**  The name of the archive copy in `archives/`, for example `Mod 1.2.0.zip`. */
-	archive_file: string | null,
-	/**  Archive entries no rule took when the version was imported. */
-	skipped: number,
-	/**  Name, version, author and description of the selected version. */
-	info: ModInfo_Serialize,
-	/**
-	 *  The first source with page data, in provider order. The list keeps only what the row draws; the page text is
-	 *  read by `mod_extras` when a column or the inspector needs it.
-	 */
-	source: SourcePreview_Serialize | null,
-	/**  The external sources of the mod, one per provider. The interface can show them without knowing the provider. */
-	sources: ModSource_Serialize[],
-	/**  The page the part belongs to, for example `nexus:225`. `None` for a local mod. */
-	page_id: string | null,
-	/**  The page's display name, when a provider page was read. */
-	page_name: string | null,
-	/**  The persistent part id, for example a Nexus `mod_file_id`. */
-	part_id: string | null,
-	/**  The part's display name. */
-	part_name: string | null,
-	/**  The provider's category for the part, for example `main` or `optional`. */
-	part_category: string | null,
-	/**
-	 *  The last saved update check of the mod, read from the library with the version the profile selects now. `None`
-	 *  when no source was checked.
-	 */
-	update: UpdateReport_Serialize | null,
-	/**  Tags given to the mod in Gobbo, for filtering the list. */
-	tags: string[],
-	/**  Instructions for players, shown and exported with the mod list. */
-	instructions: string,
-	/**
-	 *  How many of the mod's requirements the profile does not meet: a required mod that is not in the library or is
-	 *  switched off, and each list of provider alternatives that none of its mods is on. Counted for every mod, on or
-	 *  off.
-	 */
-	unmet_requirements: number,
-	/**  The names of the mods in the mod's `requires`, in the same order. A mod the library does not have shows its id. */
-	requires_names: string[],
-	/**
-	 *  The names of the provider requirements, grouped as alternatives: each inner list is one requirement, and its
-	 *  names are interchangeable. It feeds the requirement column and a copied list without the full requirement data.
-	 */
-	requirement_groups: string[][],
-	/**  The names of the profiles of the game whose list has the mod, the active one among them. */
-	profiles: string[],
-	/**  The names of the active profile's collections (Nexus collections, Thunderstore modpacks) the mod belongs to. */
-	collections: string[],
+  /**  Id of the mod family. Every version of a mod shares it. */
+  id: string;
+  /**  The selected version folder. */
+  folder: string;
+  /**  The selected version came from a FOMOD installer, so its options can be changed by reinstalling. */
+  fomod_installer: boolean;
+  /**  How many versions of the family are installed. The list carries the count; the picker asks for the versions. */
+  version_count: number;
+  /**  Unix time in seconds of the selected version's import. */
+  installed_at: number;
+  /**  Slot id. Empty in the `mirror` layout. */
+  slot: string;
+  enabled: boolean;
+  /**  Position in the list, from 1. The list decides which copy of a shared file wins. */
+  priority: number;
+  /**  The load priority the user set, written to the game's settings file. `None` leaves the order to the game. */
+  load_priority: number | null;
+  files: number;
+  /**  Size in KB. Specta does not export `u64` to TypeScript, and KB fit in `u32`. */
+  size_kb: number;
+  /**  How many files of this mod win a conflict, and how many are overwritten. */
+  wins: number;
+  loses: number;
+  /**  The original name of the archive the selected version was unpacked from. */
+  archive: string | null;
+  /**  The name of the archive copy in `archives/`, for example `Mod 1.2.0.zip`. */
+  archive_file: string | null;
+  /**  Archive entries no rule took when the version was imported. */
+  skipped: number;
+  /**  Name, version, author and description of the selected version. */
+  info: ModInfo_Serialize;
+  /**
+   *  The first source with page data, in provider order. The list keeps only what the row draws; the page text is
+   *  read by `mod_extras` when a column or the inspector needs it.
+   */
+  source: SourcePreview_Serialize | null;
+  /**  The external sources of the mod, one per provider. The interface can show them without knowing the provider. */
+  sources: ModSource_Serialize[];
+  /**  The page the part belongs to, for example `nexus:225`. `None` for a local mod. */
+  page_id: string | null;
+  /**  The page's display name, when a provider page was read. */
+  page_name: string | null;
+  /**  The persistent part id, for example a Nexus `mod_file_id`. */
+  part_id: string | null;
+  /**  The part's display name. */
+  part_name: string | null;
+  /**  The provider's category for the part, for example `main` or `optional`. */
+  part_category: string | null;
+  /**
+   *  The last saved update check of the mod, read from the library with the version the profile selects now. `None`
+   *  when no source was checked.
+   */
+  update: UpdateReport_Serialize | null;
+  /**  Tags given to the mod in Gobbo, for filtering the list. */
+  tags: string[];
+  /**  Instructions for players, shown and exported with the mod list. */
+  instructions: string;
+  /**
+   *  How many of the mod's requirements the profile does not meet: a required mod that is not in the library or is
+   *  switched off, and each list of provider alternatives that none of its mods is on. Counted for every mod, on or
+   *  off.
+   */
+  unmet_requirements: number;
+  /**  The names of the mods in the mod's `requires`, in the same order. A mod the library does not have shows its id. */
+  requires_names: string[];
+  /**
+   *  The names of the provider requirements, grouped as alternatives: each inner list is one requirement, and its
+   *  names are interchangeable. It feeds the requirement column and a copied list without the full requirement data.
+   */
+  requirement_groups: string[][];
+  /**  The names of the profiles of the game whose list has the mod, the active one among them. */
+  profiles: string[];
+  /**  The names of the active profile's collections (Nexus collections, Thunderstore modpacks) the mod belongs to. */
+  collections: string[];
 };
 
 /**  How Gobbo keeps an isolated set apart. */
-export type Mode = 
-/**  The overlay hook (or overlayfs) serves the set from the profile's upper layer. No copy is made. */
-"redirect" | 
-/**  The files are copied in before a launch and copied back after it. Used when the platform cannot redirect. */
-"copy";
+export type Mode =
+  /**  The overlay hook (or overlayfs) serves the set from the profile's upper layer. No copy is made. */
+  | "redirect"
+  /**  The files are copied in before a launch and copied back after it. Used when the platform cannot redirect. */
+  | "copy";
 
 /**  What the diagnostics panel shows for one game. */
 export type MountDiagnostics = {
-	mounts: MountView[],
-	orphans: OrphanLayerView[],
-	/**  Writes that landed in the game folder during an overlay session, from the last run's report. */
-	warnings: Message[],
+  mounts: MountView[];
+  orphans: OrphanLayerView[];
+  /**  Writes that landed in the game folder during an overlay session, from the last run's report. */
+  warnings: Message[];
 };
 
 /**  One prefix the game reads through a layer of the active deployment. */
 export type MountView = {
-	/**  `game` for the game folder, or the id of a user-data set. */
-	id: string,
-	/**  The path the game sees. */
-	guest: string,
-	/**  The profile layer that receives the game's writes. */
-	upper: string,
-	/**  Whether a game process still holds this mount. */
-	active: boolean,
+  /**  `game` for the game folder, or the id of a user-data set. */
+  id: string;
+  /**  The path the game sees. */
+  guest: string;
+  /**  The profile layer that receives the game's writes. */
+  upper: string;
+  /**  Whether a game process still holds this mount. */
+  active: boolean;
 };
 
 /**  The one thing the user should do next. The frontend maps it to a label and an action. */
-export type NextAction = "set_game_folder" | "set_settings_folder" | "set_mods_folder" | "fix_problems" | "import_mods" | "enable_mods" | "apply" | "play";
+export type NextAction =
+  | "set_game_folder"
+  | "set_settings_folder"
+  | "set_mods_folder"
+  | "fix_problems"
+  | "import_mods"
+  | "enable_mods"
+  | "apply"
+  | "play";
 
 /**  The kind an option is declared with in the installer, before a `<dependencyType>` can replace it. */
-export type OptionKind = "required" | "optional" | "recommended" | "not_usable" | "could_be_usable";
+export type OptionKind =
+  "required" | "optional" | "recommended" | "not_usable" | "could_be_usable";
 
 /**  A layer folder that no current profile or definition uses. */
 export type OrphanLayerView = {
-	/**  The folder to remove, absolute and owned by this game's data. */
-	path: string,
-	/**  Why it is listed: `profile`, `set` or `recovery`. */
-	reason: string,
-	size_bytes: number,
+  /**  The folder to remove, absolute and owned by this game's data. */
+  path: string;
+  /**  Why it is listed: `profile`, `set` or `recovery`. */
+  reason: string;
+  size_bytes: number;
 };
 
 /**  A file a step wrote into the overwrite layer, with its size when it exists. */
 export type OutputInfo = {
-	path: string,
-	bytes: number,
+  path: string;
+  bytes: number;
 };
 
 /**  One decision of the overlay hook: a write, a copy-up, a whiteout, a missing file, a refusal or a pass-through. */
 export type OverlayDecision = {
-	/**  The sequence number in the process's ring, capped at `u32::MAX` for the interface. */
-	seq: number,
-	/**  The wall-clock time in seconds since the Unix epoch. */
-	time: number,
-	pid: number,
-	thread: number,
-	/**  The stable kind name: `write`, `copy_up`, `whiteout`, `missing`, `refuse` or `pass_through`. */
-	kind: string,
-	/**  The layer the decision used: `none`, `upper`, `staging` or `root`. */
-	layer: string,
-	/**  The Windows error or NT status of a refusal or a missing file, zero otherwise. */
-	error: number,
-	/**  The game-relative path, or the full path of a pass-through. */
-	path: string,
+  /**  The sequence number in the process's ring, capped at `u32::MAX` for the interface. */
+  seq: number;
+  /**  The wall-clock time in seconds since the Unix epoch. */
+  time: number;
+  pid: number;
+  thread: number;
+  /**  The stable kind name: `write`, `copy_up`, `whiteout`, `missing`, `refuse` or `pass_through`. */
+  kind: string;
+  /**  The layer the decision used: `none`, `upper`, `staging` or `root`. */
+  layer: string;
+  /**  The Windows error or NT status of a refusal or a missing file, zero otherwise. */
+  error: number;
+  /**  The game-relative path, or the full path of a pass-through. */
+  path: string;
 };
 
 /**  One line of the probe report. */
 export type OverlayProbeCheck = {
-	name: string,
-	ok: boolean,
-	detail: string,
+  name: string;
+  ok: boolean;
+  detail: string;
 };
 
 /**  The result of one probe binary (x64 or x86). */
 export type OverlayProbeReport = {
-	/**  `x64` or `x86`: the architecture of the probe and the hook it tested. */
-	arch: string,
-	/**  Whether every check passed, including the physical game folder check. */
-	ok: boolean,
-	/**  The unique folder the probe used under the game root. */
-	probe: string,
-	/**  The layers the probe ran in. */
-	layers: { [key in string]: string },
-	/**  The checks, in the order the probe ran them. */
-	checks: OverlayProbeCheck[],
+  /**  `x64` or `x86`: the architecture of the probe and the hook it tested. */
+  arch: string;
+  /**  Whether every check passed, including the physical game folder check. */
+  ok: boolean;
+  /**  The unique folder the probe used under the game root. */
+  probe: string;
+  /**  The layers the probe ran in. */
+  layers: { [key in string]: string };
+  /**  The checks, in the order the probe ran them. */
+  checks: OverlayProbeCheck[];
 };
 
 /**  One file in the overwrite layer, with its path in the game. */
 export type OverwriteFile = {
-	path: string,
-	size_kb: number,
+  path: string;
+  size_kb: number;
 };
 
 export type OverwriteView = {
-	/**  The folder of the layer, for opening it in the file manager. */
-	folder: string,
-	files: OverwriteFile[],
+  /**  The folder of the layer, for opening it in the file manager. */
+  folder: string;
+  files: OverwriteFile[];
 };
 
 /**  Which archives travel inside the pack. */
-export type PackArchives = 
-/**  None: every mod comes from an external provider. */
-"none" | 
-/**  The mods that are not on an external provider, which the receiver could not get otherwise. */
-"unlisted" | 
-/**  All of them. Only with the permission of the mods' authors. */
-"all";
+export type PackArchives =
+  /**  None: every mod comes from an external provider. */
+  | "none"
+  /**  The mods that are not on an external provider, which the receiver could not get otherwise. */
+  | "unlisted"
+  /**  All of them. Only with the permission of the mods' authors. */
+  | "all";
 
 /**  The download of one mod of a pack, for the progress bar. */
 export type PackDownload = {
-	name: string,
-	/**  Which mod of how many, from 1. */
-	index: number,
-	total: number,
-	percent: number,
+  name: string;
+  /**  Which mod of how many, from 1. */
+  index: number;
+  total: number;
+  percent: number;
 };
 
 /**  How many mods and archives a pack export wrote. */
 export type PackExportView = {
-	mods: number,
-	archives: number,
+  mods: number;
+  archives: number;
 };
 
 /**  What importing a pack did: the archives it added and the profiles it created or updated. */
-export type PackImportView = PackImportView_Serialize | PackImportView_Deserialize;
+export type PackImportView =
+  PackImportView_Serialize | PackImportView_Deserialize;
 
 /**  What importing a pack did: the archives it added and the profiles it created or updated. */
 export type PackImportView_Deserialize = {
-	/**  Archives from inside the pack that went into the library. */
-	imported: number,
-	/**  Archives from inside the pack that could not be imported, by name. */
-	failed: string[],
-	profiles_created: number,
-	profiles_updated: number,
-	/**
-	 *  Mods the library lacks. They wait in their profiles with their place and state, and join the list once the
-	 *  library has them.
-	 */
-	missing: PackMissing_Deserialize[],
+  /**  Archives from inside the pack that went into the library. */
+  imported: number;
+  /**  Archives from inside the pack that could not be imported, by name. */
+  failed: string[];
+  profiles_created: number;
+  profiles_updated: number;
+  /**
+   *  Mods the library lacks. They wait in their profiles with their place and state, and join the list once the
+   *  library has them.
+   */
+  missing: PackMissing_Deserialize[];
 };
 
 /**  What importing a pack did: the archives it added and the profiles it created or updated. */
 export type PackImportView_Serialize = {
-	/**  Archives from inside the pack that went into the library. */
-	imported: number,
-	/**  Archives from inside the pack that could not be imported, by name. */
-	failed: string[],
-	profiles_created: number,
-	profiles_updated: number,
-	/**
-	 *  Mods the library lacks. They wait in their profiles with their place and state, and join the list once the
-	 *  library has them.
-	 */
-	missing: PackMissing_Serialize[],
+  /**  Archives from inside the pack that went into the library. */
+  imported: number;
+  /**  Archives from inside the pack that could not be imported, by name. */
+  failed: string[];
+  profiles_created: number;
+  profiles_updated: number;
+  /**
+   *  Mods the library lacks. They wait in their profiles with their place and state, and join the list once the
+   *  library has them.
+   */
+  missing: PackMissing_Serialize[];
 };
 
 /**  What the pack is: shown before an import, and kept with each profile made from it. */
@@ -3579,42 +4489,42 @@ export type PackInfo = PackInfo_Serialize | PackInfo_Deserialize;
 
 /**  What the pack is: shown before an import, and kept with each profile made from it. */
 export type PackInfo_Deserialize = {
-	/**  A stable id, the same in every version of the pack. Empty on export means one made from the name. */
-	id?: string,
-	name: string,
-	version: string,
-	author?: string,
-	description?: string,
+  /**  A stable id, the same in every version of the pack. Empty on export means one made from the name. */
+  id?: string;
+  name: string;
+  version: string;
+  author?: string;
+  description?: string;
 };
 
 /**  What the pack is: shown before an import, and kept with each profile made from it. */
 export type PackInfo_Serialize = {
-	/**  A stable id, the same in every version of the pack. Empty on export means one made from the name. */
-	id: string,
-	name: string,
-	version: string,
-	author: string,
-	description: string,
+  /**  A stable id, the same in every version of the pack. Empty on export means one made from the name. */
+  id: string;
+  name: string;
+  version: string;
+  author: string;
+  description: string;
 };
 
 /**  Something to look at before a pack goes out. An error makes the pack impossible to rebuild. */
 export type PackIssue = {
-	error: boolean,
-	message: Message,
+  error: boolean;
+  message: Message;
 };
 
 /**  The pack file a link downloaded, with its local path, name and size. */
 export type PackLinkDownload = {
-	path: string,
-	name: string,
-	bytes: number,
+  path: string;
+  name: string;
+  bytes: number;
 };
 
 /**  How far a pack-link download has got, in bytes and percent. */
 export type PackLinkProgress = {
-	received: number,
-	total: number,
-	percent: number,
+  received: number;
+  total: number;
+  percent: number;
 };
 
 /**  A mod of a pack that is not in the library and not inside the pack: the user gets it from its provider. */
@@ -3622,22 +4532,22 @@ export type PackMissing = PackMissing_Serialize | PackMissing_Deserialize;
 
 /**  A mod of a pack that is not in the library and not inside the pack: the user gets it from its provider. */
 export type PackMissing_Deserialize = {
-	name: string,
-	version?: string | null,
-	/**  The provider page the user can fetch the mod from. */
-	source?: SourceRef_Deserialize | null,
-	/**  The name of the file the author installed, to pick the right one on the mod's page. */
-	archive?: string | null,
+  name: string;
+  version?: string | null;
+  /**  The provider page the user can fetch the mod from. */
+  source?: SourceRef_Deserialize | null;
+  /**  The name of the file the author installed, to pick the right one on the mod's page. */
+  archive?: string | null;
 };
 
 /**  A mod of a pack that is not in the library and not inside the pack: the user gets it from its provider. */
 export type PackMissing_Serialize = {
-	name: string,
-	version: string | null,
-	/**  The provider page the user can fetch the mod from. */
-	source: SourceRef_Serialize | null,
-	/**  The name of the file the author installed, to pick the right one on the mod's page. */
-	archive: string | null,
+  name: string;
+  version: string | null;
+  /**  The provider page the user can fetch the mod from. */
+  source: SourceRef_Serialize | null;
+  /**  The name of the file the author installed, to pick the right one on the mod's page. */
+  archive: string | null;
 };
 
 /**  What to export. */
@@ -3645,18 +4555,18 @@ export type PackOptions = PackOptions_Serialize | PackOptions_Deserialize;
 
 /**  What to export. */
 export type PackOptions_Deserialize = {
-	info: PackInfo_Deserialize,
-	/**  The profiles, by id, in the order to export them. */
-	profiles: string[],
-	archives: PackArchives,
+  info: PackInfo_Deserialize;
+  /**  The profiles, by id, in the order to export them. */
+  profiles: string[];
+  archives: PackArchives;
 };
 
 /**  What to export. */
 export type PackOptions_Serialize = {
-	info: PackInfo_Serialize,
-	/**  The profiles, by id, in the order to export them. */
-	profiles: string[],
-	archives: PackArchives,
+  info: PackInfo_Serialize;
+  /**  The profiles, by id, in the order to export them. */
+  profiles: string[];
+  archives: PackArchives;
 };
 
 /**  What an import would do, before it does anything. */
@@ -3664,41 +4574,41 @@ export type PackPreview = PackPreview_Serialize | PackPreview_Deserialize;
 
 /**  What an import would do, before it does anything. */
 export type PackPreview_Deserialize = {
-	info: PackInfo_Deserialize,
-	profiles: string[],
-	/**  Mods in all profiles of the pack, each counted once. */
-	total: number,
-	/**  Of them, the ones already in the library. */
-	have: number,
-	/**  The ones whose archive is inside the pack. */
-	bundled: number,
-	missing: PackMissing_Deserialize[],
-	/**  Profiles that an earlier version of this pack made, and what changes in them. */
-	updates: PackUpdate[],
+  info: PackInfo_Deserialize;
+  profiles: string[];
+  /**  Mods in all profiles of the pack, each counted once. */
+  total: number;
+  /**  Of them, the ones already in the library. */
+  have: number;
+  /**  The ones whose archive is inside the pack. */
+  bundled: number;
+  missing: PackMissing_Deserialize[];
+  /**  Profiles that an earlier version of this pack made, and what changes in them. */
+  updates: PackUpdate[];
 };
 
 /**  What an import would do, before it does anything. */
 export type PackPreview_Serialize = {
-	info: PackInfo_Serialize,
-	profiles: string[],
-	/**  Mods in all profiles of the pack, each counted once. */
-	total: number,
-	/**  Of them, the ones already in the library. */
-	have: number,
-	/**  The ones whose archive is inside the pack. */
-	bundled: number,
-	missing: PackMissing_Serialize[],
-	/**  Profiles that an earlier version of this pack made, and what changes in them. */
-	updates: PackUpdate[],
+  info: PackInfo_Serialize;
+  profiles: string[];
+  /**  Mods in all profiles of the pack, each counted once. */
+  total: number;
+  /**  Of them, the ones already in the library. */
+  have: number;
+  /**  The ones whose archive is inside the pack. */
+  bundled: number;
+  missing: PackMissing_Serialize[];
+  /**  Profiles that an earlier version of this pack made, and what changes in them. */
+  updates: PackUpdate[];
 };
 
 /**  How an import changes a profile made from an earlier version of the same pack. */
 export type PackUpdate = {
-	profile: string,
-	from: string,
-	added: string[],
-	removed: string[],
-	updated: string[],
+  profile: string;
+  from: string;
+  added: string[];
+  removed: string[];
+  updated: string[];
 };
 
 /**  When a step runs: before the game starts, or after it has exited. */
@@ -3706,84 +4616,91 @@ export type Phase = "before_start" | "after_end";
 
 /**  A newer portable version. */
 export type PortableUpdate = {
-	/**  The version the manifest names. */
-	version: string,
-	/**  The release notes of the version, when the manifest has them. */
-	notes: string,
+  /**  The version the manifest names. */
+  version: string;
+  /**  The release notes of the version, when the manifest has them. */
+  notes: string;
 };
 
 /**  The steps of a portable update, in order. */
-export type PortableUpdateStep = PortableUpdateStep_Serialize | PortableUpdateStep_Deserialize;
+export type PortableUpdateStep =
+  PortableUpdateStep_Serialize | PortableUpdateStep_Deserialize;
 
 /**  The steps of a portable update, in order. */
-export type PortableUpdateStep_Deserialize = 
-/**  The archive is downloading. `percent` is unknown when the server sends no length. */
-{ step: "downloading"; 
-/**  The share of the archive received, from 0 to 100. */
-percent?: number | null } | 
-/**  The archive is verified and its files are being swapped. */
-{ step: "installing" };
+export type PortableUpdateStep_Deserialize =
+  /**  The archive is downloading. `percent` is unknown when the server sends no length. */
+  | {
+      step: "downloading";
+      /**  The share of the archive received, from 0 to 100. */
+      percent?: number | null;
+    }
+  /**  The archive is verified and its files are being swapped. */
+  | { step: "installing" };
 
 /**  The steps of a portable update, in order. */
-export type PortableUpdateStep_Serialize = 
-/**  The archive is downloading. `percent` is unknown when the server sends no length. */
-{ step: "downloading"; 
-/**  The share of the archive received, from 0 to 100. */
-percent: number | null } | 
-/**  The archive is verified and its files are being swapped. */
-{ step: "installing" };
+export type PortableUpdateStep_Serialize =
+  /**  The archive is downloading. `percent` is unknown when the server sends no length. */
+  | {
+      step: "downloading";
+      /**  The share of the archive received, from 0 to 100. */
+      percent: number | null;
+    }
+  /**  The archive is verified and its files are being swapped. */
+  | { step: "installing" };
 
 /**  One line of the setup checklist. */
-export type PreflightCheck = PreflightCheck_Serialize | PreflightCheck_Deserialize;
+export type PreflightCheck =
+  PreflightCheck_Serialize | PreflightCheck_Deserialize;
 
 /**  One line of the setup checklist. */
 export type PreflightCheck_Deserialize = {
-	/**
-	 *  A stable id the interface uses to pick an action: `game_folder`, `settings_folder`, `mods_folder`, `loader`,
-	 *  `problems`, `overlay`, `space`, `running`.
-	 */
-	id: string,
-	state: CheckState,
-	message: Message,
-	/**  The file the game or its loader needs, when the check names one. The window can open its page with this path. */
-	requirement_path?: string | null,
-	/**  The name the definition gives that file, for the action label. */
-	requirement_name?: string | null,
+  /**
+   *  A stable id the interface uses to pick an action: `game_folder`, `settings_folder`, `mods_folder`, `loader`,
+   *  `problems`, `overlay`, `space`, `running`.
+   */
+  id: string;
+  state: CheckState;
+  message: Message;
+  /**  The file the game or its loader needs, when the check names one. The window can open its page with this path. */
+  requirement_path?: string | null;
+  /**  The name the definition gives that file, for the action label. */
+  requirement_name?: string | null;
 };
 
 /**  One line of the setup checklist. */
 export type PreflightCheck_Serialize = {
-	/**
-	 *  A stable id the interface uses to pick an action: `game_folder`, `settings_folder`, `mods_folder`, `loader`,
-	 *  `problems`, `overlay`, `space`, `running`.
-	 */
-	id: string,
-	state: CheckState,
-	message: Message,
-	/**  The file the game or its loader needs, when the check names one. The window can open its page with this path. */
-	requirement_path: string | null,
-	/**  The name the definition gives that file, for the action label. */
-	requirement_name: string | null,
+  /**
+   *  A stable id the interface uses to pick an action: `game_folder`, `settings_folder`, `mods_folder`, `loader`,
+   *  `problems`, `overlay`, `space`, `running`.
+   */
+  id: string;
+  state: CheckState;
+  message: Message;
+  /**  The file the game or its loader needs, when the check names one. The window can open its page with this path. */
+  requirement_path: string | null;
+  /**  The name the definition gives that file, for the action label. */
+  requirement_name: string | null;
 };
 
 /**
  *  The setup checklist of one game. `problems` and `warnings` are the full lists the mod list already shows, so the
  *  dialog can name every item and not only the first one.
  */
-export type PreflightReport = PreflightReport_Serialize | PreflightReport_Deserialize;
+export type PreflightReport =
+  PreflightReport_Serialize | PreflightReport_Deserialize;
 
 /**
  *  The setup checklist of one game. `problems` and `warnings` are the full lists the mod list already shows, so the
  *  dialog can name every item and not only the first one.
  */
 export type PreflightReport_Deserialize = {
-	ready: boolean,
-	mods_root: string,
-	free_space_kb: number,
-	total_space_kb: number,
-	checks: PreflightCheck_Deserialize[],
-	problems: Message[],
-	warnings: Message[],
+  ready: boolean;
+  mods_root: string;
+  free_space_kb: number;
+  total_space_kb: number;
+  checks: PreflightCheck_Deserialize[];
+  problems: Message[];
+  warnings: Message[];
 };
 
 /**
@@ -3791,81 +4708,82 @@ export type PreflightReport_Deserialize = {
  *  dialog can name every item and not only the first one.
  */
 export type PreflightReport_Serialize = {
-	ready: boolean,
-	mods_root: string,
-	free_space_kb: number,
-	total_space_kb: number,
-	checks: PreflightCheck_Serialize[],
-	problems: Message[],
-	warnings: Message[],
+  ready: boolean;
+  mods_root: string;
+  free_space_kb: number;
+  total_space_kb: number;
+  checks: PreflightCheck_Serialize[];
+  problems: Message[];
+  warnings: Message[];
 };
 
 /**  One placed file. */
 export type PreviewFile = {
-	from: string,
-	to: string,
+  from: string;
+  to: string;
 };
 
 /**  One mod the archive would become. */
 export type PreviewMod = {
-	/**  The folder in the archive the files belong to, or the archive name for the files that belong to it as a whole. */
-	name: string,
-	/**  The slot folder, empty for files that keep a game path. */
-	slot: string,
-	files: number,
-	/**  A few placed files, from the archive path to the path under the deployment root. */
-	examples: PreviewFile[],
+  /**  The folder in the archive the files belong to, or the archive name for the files that belong to it as a whole. */
+  name: string;
+  /**  The slot folder, empty for files that keep a game path. */
+  slot: string;
+  files: number;
+  /**  A few placed files, from the archive path to the path under the deployment root. */
+  examples: PreviewFile[];
 };
 
 /**  The comparison of two profiles: the rows that differ, and how many mods are the same in both. */
-export type ProfileCompare = ProfileCompare_Serialize | ProfileCompare_Deserialize;
+export type ProfileCompare =
+  ProfileCompare_Serialize | ProfileCompare_Deserialize;
 
 /**  The comparison of two profiles: the rows that differ, and how many mods are the same in both. */
 export type ProfileCompare_Deserialize = {
-	first_name: string,
-	second_name: string,
-	rows: CompareRow_Deserialize[],
-	same: number,
+  first_name: string;
+  second_name: string;
+  rows: CompareRow_Deserialize[];
+  same: number;
 };
 
 /**  The comparison of two profiles: the rows that differ, and how many mods are the same in both. */
 export type ProfileCompare_Serialize = {
-	first_name: string,
-	second_name: string,
-	rows: CompareRow_Serialize[],
-	same: number,
+  first_name: string;
+  second_name: string;
+  rows: CompareRow_Serialize[];
+  same: number;
 };
 
 /**  A game profile in the list view. The mod list in `Status` covers only the active profile. */
 export type ProfileView = {
-	id: string,
-	name: string,
-	mod_count: number,
-	enabled_count: number,
-	active: boolean,
-	/**  This profile has a prepared deployment. Overlay profiles may keep their layers side by side. */
-	deployed: boolean,
-	/**  The profile has its own user-data folders (saves, settings). Deleting it removes them too. */
-	has_user_data: boolean,
-	/**  The collections installed into this profile, for the badge and the collection panel. */
-	collections: CollectionBadge[],
+  id: string;
+  name: string;
+  mod_count: number;
+  enabled_count: number;
+  active: boolean;
+  /**  This profile has a prepared deployment. Overlay profiles may keep their layers side by side. */
+  deployed: boolean;
+  /**  The profile has its own user-data folders (saves, settings). Deleting it removes them too. */
+  has_user_data: boolean;
+  /**  The collections installed into this profile, for the badge and the collection panel. */
+  collections: CollectionBadge[];
 };
 
 /**  A Proton build on this computer: the name Steam shows for it, and the folder that holds the `proton` file. */
 export type ProtonBuild = {
-	/**
-	 *  The `display_name` of the tool's `compatibilitytool.vdf` when it has one, else the folder's name, for example
-	 *  `Proton 9.0` or `GE-Proton9-20`.
-	 */
-	name: string,
-	/**  The folder with the `proton` file. The game settings store this folder when the user picks the build. */
-	folder: string,
+  /**
+   *  The `display_name` of the tool's `compatibilitytool.vdf` when it has one, else the folder's name, for example
+   *  `Proton 9.0` or `GE-Proton9-20`.
+   */
+  name: string;
+  /**  The folder with the `proton` file. The game settings store this folder when the user picks the build. */
+  folder: string;
 };
 
 /**  The DLC notes one provider lists for a mod. */
 export type ProviderDlcs = {
-	provider: string,
-	dlcs: string[][],
+  provider: string;
+  dlcs: string[][];
 };
 
 /**  The id of a mod platform, for example `nexus` or `modio`. The list is open: a provider chooses its own id. */
@@ -3878,28 +4796,34 @@ export type Recovery = Recovery_Serialize | Recovery_Deserialize;
  *  What the user can do about an error. The frontend turns an action into a button next to the message, so a failure is
  *  never only text.
  */
-export type RecoveryAction = "set_game_folder" | "set_settings_folder" | "set_mods_folder" | "save_provider_key" | "close_game" | "open_log";
+export type RecoveryAction =
+  | "set_game_folder"
+  | "set_settings_folder"
+  | "set_mods_folder"
+  | "save_provider_key"
+  | "close_game"
+  | "open_log";
 
 /**  A concrete recovery step: the action and, when it needs one, the object it applies to (a provider id, a game id). */
 export type Recovery_Deserialize = {
-	action: RecoveryAction,
-	target?: string | null,
+  action: RecoveryAction;
+  target?: string | null;
 };
 
 /**  A concrete recovery step: the action and, when it needs one, the object it applies to (a provider id, a game id). */
 export type Recovery_Serialize = {
-	action: RecoveryAction,
-	target?: string,
+  action: RecoveryAction;
+  target?: string;
 };
 
 /**  The lists of other mods a mod relates to. */
-export type RelationKind = 
-/**  Mods it needs to work. */
-"requires" | 
-/**  Mods it does not work with. */
-"incompatible" | 
-/**  Mods it stands above in the list, so its copy of a shared file wins. */
-"overrides";
+export type RelationKind =
+  /**  Mods it needs to work. */
+  | "requires"
+  /**  Mods it does not work with. */
+  | "incompatible"
+  /**  Mods it stands above in the list, so its copy of a shared file wins. */
+  | "overrides";
 
 /**
  *  The relations of a mod to other mods (family ids), and to mods on external providers that may not be in the
@@ -3912,14 +4836,14 @@ export type Relations = Relations_Serialize | Relations_Deserialize;
  *  library.
  */
 export type Relations_Deserialize = {
-	/**  Mods it needs to work. */
-	requires: string[],
-	/**  Mods on external providers it needs to work, which may not be in the library. */
-	requirements?: SourceRequirement_Deserialize[],
-	/**  Mods it does not work with. */
-	incompatible: string[],
-	/**  Mods it overrides: it stands above them in the list, so its copy of a shared file wins. */
-	overrides: string[],
+  /**  Mods it needs to work. */
+  requires: string[];
+  /**  Mods on external providers it needs to work, which may not be in the library. */
+  requirements?: SourceRequirement_Deserialize[];
+  /**  Mods it does not work with. */
+  incompatible: string[];
+  /**  Mods it overrides: it stands above them in the list, so its copy of a shared file wins. */
+  overrides: string[];
 };
 
 /**
@@ -3927,164 +4851,168 @@ export type Relations_Deserialize = {
  *  library.
  */
 export type Relations_Serialize = {
-	/**  Mods it needs to work. */
-	requires: string[],
-	/**  Mods on external providers it needs to work, which may not be in the library. */
-	requirements: SourceRequirement_Serialize[],
-	/**  Mods it does not work with. */
-	incompatible: string[],
-	/**  Mods it overrides: it stands above them in the list, so its copy of a shared file wins. */
-	overrides: string[],
+  /**  Mods it needs to work. */
+  requires: string[];
+  /**  Mods on external providers it needs to work, which may not be in the library. */
+  requirements: SourceRequirement_Serialize[];
+  /**  Mods it does not work with. */
+  incompatible: string[];
+  /**  Mods it overrides: it stands above them in the list, so its copy of a shared file wins. */
+  overrides: string[];
 };
 
 /**  What the plan will do with one requirement. */
-export type RequirementAction = 
-/**  The profile already has it on. */
-"already_on" | 
-/**  It is in the library but off in the profile. */
-"enable" | 
-/**  It is not in the library and its provider can install it. */
-"download" | 
-/**  Nothing can install it automatically; `message` says why. */
-"blocked";
+export type RequirementAction =
+  /**  The profile already has it on. */
+  | "already_on"
+  /**  It is in the library but off in the profile. */
+  | "enable"
+  /**  It is not in the library and its provider can install it. */
+  | "download"
+  /**  Nothing can install it automatically; `message` says why. */
+  | "blocked";
 
 /**  What installing a requirement plan did, with the fresh status and any steps that failed. */
-export type RequirementInstallView = RequirementInstallView_Serialize | RequirementInstallView_Deserialize;
+export type RequirementInstallView =
+  RequirementInstallView_Serialize | RequirementInstallView_Deserialize;
 
 /**  What installing a requirement plan did, with the fresh status and any steps that failed. */
 export type RequirementInstallView_Deserialize = {
-	status: Status_Deserialize,
-	/**  Requirement steps that were enabled or installed. */
-	installed: number,
-	/**
-	 *  Steps the plan could not install, with the reason (a missing key, no direct download, a local mod the library
-	 *  does not have).
-	 */
-	blocked: Message[],
-	/**  Downloads that failed while the rest of the plan still ran. */
-	failed: Message[],
+  status: Status_Deserialize;
+  /**  Requirement steps that were enabled or installed. */
+  installed: number;
+  /**
+   *  Steps the plan could not install, with the reason (a missing key, no direct download, a local mod the library
+   *  does not have).
+   */
+  blocked: Message[];
+  /**  Downloads that failed while the rest of the plan still ran. */
+  failed: Message[];
 };
 
 /**  What installing a requirement plan did, with the fresh status and any steps that failed. */
 export type RequirementInstallView_Serialize = {
-	status: Status_Serialize,
-	/**  Requirement steps that were enabled or installed. */
-	installed: number,
-	/**
-	 *  Steps the plan could not install, with the reason (a missing key, no direct download, a local mod the library
-	 *  does not have).
-	 */
-	blocked: Message[],
-	/**  Downloads that failed while the rest of the plan still ran. */
-	failed: Message[],
+  status: Status_Serialize;
+  /**  Requirement steps that were enabled or installed. */
+  installed: number;
+  /**
+   *  Steps the plan could not install, with the reason (a missing key, no direct download, a local mod the library
+   *  does not have).
+   */
+  blocked: Message[];
+  /**  Downloads that failed while the rest of the plan still ran. */
+  failed: Message[];
 };
 
 /**  What the plan will do to meet a mod's requirements, with the steps and the counts for each action. */
-export type RequirementPlan = RequirementPlan_Serialize | RequirementPlan_Deserialize;
+export type RequirementPlan =
+  RequirementPlan_Serialize | RequirementPlan_Deserialize;
 
 /**  What the plan will do to meet a mod's requirements, with the steps and the counts for each action. */
 export type RequirementPlan_Deserialize = {
-	/**  The family the plan starts from. */
-	root: string,
-	steps: RequirementStep_Deserialize[],
-	/**  Requirement chains that loop back on themselves. They are shown, not followed. */
-	cycles: Message[],
-	enable: number,
-	download: number,
-	blocked: number,
+  /**  The family the plan starts from. */
+  root: string;
+  steps: RequirementStep_Deserialize[];
+  /**  Requirement chains that loop back on themselves. They are shown, not followed. */
+  cycles: Message[];
+  enable: number;
+  download: number;
+  blocked: number;
 };
 
 /**  What the plan will do to meet a mod's requirements, with the steps and the counts for each action. */
 export type RequirementPlan_Serialize = {
-	/**  The family the plan starts from. */
-	root: string,
-	steps: RequirementStep_Serialize[],
-	/**  Requirement chains that loop back on themselves. They are shown, not followed. */
-	cycles: Message[],
-	enable: number,
-	download: number,
-	blocked: number,
+  /**  The family the plan starts from. */
+  root: string;
+  steps: RequirementStep_Serialize[];
+  /**  Requirement chains that loop back on themselves. They are shown, not followed. */
+  cycles: Message[];
+  enable: number;
+  download: number;
+  blocked: number;
 };
 
 /**  Where a requirement stands in the profile: the mod is not in the library, it is in the library but off, or on. */
 export type RequirementState = "enabled" | "disabled" | "missing";
 
 /**  One requirement in the closure, with how deep it sits and what the plan will do with it. */
-export type RequirementStep = RequirementStep_Serialize | RequirementStep_Deserialize;
+export type RequirementStep =
+  RequirementStep_Serialize | RequirementStep_Deserialize;
 
 /**  One requirement in the closure, with how deep it sits and what the plan will do with it. */
 export type RequirementStep_Deserialize = {
-	/**  Stable within one plan, for the list key. */
-	id: string,
-	/**  The library family when the requirement is installed. */
-	family?: string | null,
-	/**  The provider mod when the requirement names one. */
-	source?: SourceRef_Deserialize | null,
-	name: string,
-	/**  How many levels below the starting mod this requirement sits. */
-	depth: number,
-	/**  Set when this step is one of several alternatives; one of them is enough. */
-	group?: string | null,
-	action: RequirementAction,
-	message?: Message | null,
+  /**  Stable within one plan, for the list key. */
+  id: string;
+  /**  The library family when the requirement is installed. */
+  family?: string | null;
+  /**  The provider mod when the requirement names one. */
+  source?: SourceRef_Deserialize | null;
+  name: string;
+  /**  How many levels below the starting mod this requirement sits. */
+  depth: number;
+  /**  Set when this step is one of several alternatives; one of them is enough. */
+  group?: string | null;
+  action: RequirementAction;
+  message?: Message | null;
 };
 
 /**  One requirement in the closure, with how deep it sits and what the plan will do with it. */
 export type RequirementStep_Serialize = {
-	/**  Stable within one plan, for the list key. */
-	id: string,
-	/**  The library family when the requirement is installed. */
-	family: string | null,
-	/**  The provider mod when the requirement names one. */
-	source: SourceRef_Serialize | null,
-	name: string,
-	/**  How many levels below the starting mod this requirement sits. */
-	depth: number,
-	/**  Set when this step is one of several alternatives; one of them is enough. */
-	group: string | null,
-	action: RequirementAction,
-	message: Message | null,
+  /**  Stable within one plan, for the list key. */
+  id: string;
+  /**  The library family when the requirement is installed. */
+  family: string | null;
+  /**  The provider mod when the requirement names one. */
+  source: SourceRef_Serialize | null;
+  name: string;
+  /**  How many levels below the starting mod this requirement sits. */
+  depth: number;
+  /**  Set when this step is one of several alternatives; one of them is enough. */
+  group: string | null;
+  action: RequirementAction;
+  message: Message | null;
 };
 
 /**  What a restore did, including the fresh backup it left so the restore can be undone. */
-export type RestoreOutcome = RestoreOutcome_Serialize | RestoreOutcome_Deserialize;
+export type RestoreOutcome =
+  RestoreOutcome_Serialize | RestoreOutcome_Deserialize;
 
 /**  What a restore did, including the fresh backup it left so the restore can be undone. */
 export type RestoreOutcome_Deserialize = {
-	/**  The fresh backup taken before the restore, so it can be undone. `None` when the profile did not exist. */
-	backup?: SnapshotView | null,
-	files: number,
-	/**  The profile the data was restored into, which may be a recreated one. */
-	profile: string,
-	/**  The restore recreated a profile that no longer existed. */
-	profile_created: boolean,
+  /**  The fresh backup taken before the restore, so it can be undone. `None` when the profile did not exist. */
+  backup?: SnapshotView | null;
+  files: number;
+  /**  The profile the data was restored into, which may be a recreated one. */
+  profile: string;
+  /**  The restore recreated a profile that no longer existed. */
+  profile_created: boolean;
 };
 
 /**  What a restore did, including the fresh backup it left so the restore can be undone. */
 export type RestoreOutcome_Serialize = {
-	/**  The fresh backup taken before the restore, so it can be undone. `None` when the profile did not exist. */
-	backup: SnapshotView | null,
-	files: number,
-	/**  The profile the data was restored into, which may be a recreated one. */
-	profile: string,
-	/**  The restore recreated a profile that no longer existed. */
-	profile_created: boolean,
+  /**  The fresh backup taken before the restore, so it can be undone. `None` when the profile did not exist. */
+  backup: SnapshotView | null;
+  files: number;
+  /**  The profile the data was restored into, which may be a recreated one. */
+  profile: string;
+  /**  The restore recreated a profile that no longer existed. */
+  profile_created: boolean;
 };
 
 /**  What a restore would change in the profile and whether the disk has room for it. */
 export type RestorePreview = {
-	added: number,
-	replaced: number,
-	removed: number,
-	/**  The bytes a restore writes. A file that is already the same is not counted. */
-	bytes: number,
-	free_kb: number,
-	enough_space: boolean,
-	running: boolean,
-	/**  The number of mods in the snapshot's list. */
-	mods: number,
-	/**  The profile does not exist any more and the restore will recreate it. */
-	recreates_profile: boolean,
+  added: number;
+  replaced: number;
+  removed: number;
+  /**  The bytes a restore writes. A file that is already the same is not counted. */
+  bytes: number;
+  free_kb: number;
+  enough_space: boolean;
+  running: boolean;
+  /**  The number of mods in the snapshot's list. */
+  mods: number;
+  /**  The profile does not exist any more and the restore will recreate it. */
+  recreates_profile: boolean;
 };
 
 /**
@@ -4098,9 +5026,9 @@ export type Row = Row_Serialize | Row_Deserialize;
  *  the priority. A row with `separator` is a separator with that name, and its `folder` is the separator's id.
  */
 export type Row_Deserialize = {
-	folder: string,
-	enabled: boolean,
-	separator?: string | null,
+  folder: string;
+  enabled: boolean;
+  separator?: string | null;
 };
 
 /**
@@ -4108,9 +5036,9 @@ export type Row_Deserialize = {
  *  the priority. A row with `separator` is a separator with that name, and its `folder` is the separator's id.
  */
 export type Row_Serialize = {
-	folder: string,
-	enabled: boolean,
-	separator: string | null,
+  folder: string;
+  enabled: boolean;
+  separator: string | null;
 };
 
 /**  One launch: when it started, the steps of both phases in the order they ran, and how the game ended. */
@@ -4118,124 +5046,124 @@ export type RunReport = RunReport_Serialize | RunReport_Deserialize;
 
 /**  One launch: when it started, the steps of both phases in the order they ran, and how the game ended. */
 export type RunReport_Deserialize = {
-	started_at: number,
-	finished_at?: number | null,
-	game_started: boolean,
-	game_exit_code?: number | null,
-	/**  The user pressed Stop. A stopped game often has a nonzero exit code and must not be offered as a crash. */
-	stopped_by_user?: boolean,
-	/**
-	 *  Wall time from the start request to the resumption of the game, including PE parsing, stage 0, static imports
-	 *  and injection. Old reports do not have it.
-	 */
-	launch_ms?: number | null,
-	/**
-	 *  The launcher's own steps. Windows fills them from `overlay-launch`; Linux has no hook installer, so it is
-	 *  `None`. Old reports do not have it.
-	 */
-	launch_steps?: LaunchSteps | null,
-	steps: StepReport_Deserialize[],
-	/**
-	 *  The end of the game's standard output and error. The file holds it, so it is filled when the report is read,
-	 *  not stored with it.
-	 */
-	output?: string[],
-	/**
-	 *  The game logs named by the definition that exist for this installation, newest file of each source first.
-	 *  Like `output`, this is filled when the report is read, so the console follows a running game.
-	 */
-	game_logs?: GameLog_Deserialize[],
-	/**
-	 *  Every `.log` file the mod layer and the overwrite layer hold, newest first. A mod adds its log without a
-	 *  definition change; the game's own log paths stay in `game_logs`.
-	 */
-	mod_logs?: GameLog_Deserialize[],
-	/**  The end of Gobbo's own log. Filled when the report is read; it is not stored with the report. */
-	app_log?: string[],
-	/**
-	 *  What changed in the game folder while an overlay session ran. The game folder should not change then, so these
-	 *  are writes that got past the layers. Only the first changes are kept, and `game_changes_total` counts them all.
-	 */
-	game_changes?: GameChange[],
-	game_changes_total?: number,
-	/**
-	 *  The newest decisions of the overlay hook in this launch, oldest first. Like `output`, the file on disk holds the
-	 *  ring and this list is filled when the report is read, so the console follows a running game.
-	 */
-	decisions?: OverlayDecision[],
-	/**  How many decisions the hook recorded in this launch, including the ones the ring no longer holds. */
-	decisions_total?: number,
-	/**  The crash dump of this launch, when the hook wrote one. */
-	crash_dump?: string | null,
-	/**
-	 *  The DLLs an overlay launch found in the mod layer and the static imports it will point there. Filled when the
-	 *  launch starts; a launch without the overlay leaves it unset.
-	 */
-	dlls?: DllReport | null,
+  started_at: number;
+  finished_at?: number | null;
+  game_started: boolean;
+  game_exit_code?: number | null;
+  /**  The user pressed Stop. A stopped game often has a nonzero exit code and must not be offered as a crash. */
+  stopped_by_user?: boolean;
+  /**
+   *  Wall time from the start request to the resumption of the game, including PE parsing, stage 0, static imports
+   *  and injection. Old reports do not have it.
+   */
+  launch_ms?: number | null;
+  /**
+   *  The launcher's own steps. Windows fills them from `overlay-launch`; Linux has no hook installer, so it is
+   *  `None`. Old reports do not have it.
+   */
+  launch_steps?: LaunchSteps | null;
+  steps: StepReport_Deserialize[];
+  /**
+   *  The end of the game's standard output and error. The file holds it, so it is filled when the report is read,
+   *  not stored with it.
+   */
+  output?: string[];
+  /**
+   *  The game logs named by the definition that exist for this installation, newest file of each source first.
+   *  Like `output`, this is filled when the report is read, so the console follows a running game.
+   */
+  game_logs?: GameLog_Deserialize[];
+  /**
+   *  Every `.log` file the mod layer and the overwrite layer hold, newest first. A mod adds its log without a
+   *  definition change; the game's own log paths stay in `game_logs`.
+   */
+  mod_logs?: GameLog_Deserialize[];
+  /**  The end of Gobbo's own log. Filled when the report is read; it is not stored with the report. */
+  app_log?: string[];
+  /**
+   *  What changed in the game folder while an overlay session ran. The game folder should not change then, so these
+   *  are writes that got past the layers. Only the first changes are kept, and `game_changes_total` counts them all.
+   */
+  game_changes?: GameChange[];
+  game_changes_total?: number;
+  /**
+   *  The newest decisions of the overlay hook in this launch, oldest first. Like `output`, the file on disk holds the
+   *  ring and this list is filled when the report is read, so the console follows a running game.
+   */
+  decisions?: OverlayDecision[];
+  /**  How many decisions the hook recorded in this launch, including the ones the ring no longer holds. */
+  decisions_total?: number;
+  /**  The crash dump of this launch, when the hook wrote one. */
+  crash_dump?: string | null;
+  /**
+   *  The DLLs an overlay launch found in the mod layer and the static imports it will point there. Filled when the
+   *  launch starts; a launch without the overlay leaves it unset.
+   */
+  dlls?: DllReport | null;
 };
 
 /**  One launch: when it started, the steps of both phases in the order they ran, and how the game ended. */
 export type RunReport_Serialize = {
-	started_at: number,
-	finished_at: number | null,
-	game_started: boolean,
-	game_exit_code: number | null,
-	/**  The user pressed Stop. A stopped game often has a nonzero exit code and must not be offered as a crash. */
-	stopped_by_user: boolean,
-	/**
-	 *  Wall time from the start request to the resumption of the game, including PE parsing, stage 0, static imports
-	 *  and injection. Old reports do not have it.
-	 */
-	launch_ms: number | null,
-	/**
-	 *  The launcher's own steps. Windows fills them from `overlay-launch`; Linux has no hook installer, so it is
-	 *  `None`. Old reports do not have it.
-	 */
-	launch_steps: LaunchSteps | null,
-	steps: StepReport_Serialize[],
-	/**
-	 *  The end of the game's standard output and error. The file holds it, so it is filled when the report is read,
-	 *  not stored with it.
-	 */
-	output: string[],
-	/**
-	 *  The game logs named by the definition that exist for this installation, newest file of each source first.
-	 *  Like `output`, this is filled when the report is read, so the console follows a running game.
-	 */
-	game_logs: GameLog_Serialize[],
-	/**
-	 *  Every `.log` file the mod layer and the overwrite layer hold, newest first. A mod adds its log without a
-	 *  definition change; the game's own log paths stay in `game_logs`.
-	 */
-	mod_logs: GameLog_Serialize[],
-	/**  The end of Gobbo's own log. Filled when the report is read; it is not stored with the report. */
-	app_log: string[],
-	/**
-	 *  What changed in the game folder while an overlay session ran. The game folder should not change then, so these
-	 *  are writes that got past the layers. Only the first changes are kept, and `game_changes_total` counts them all.
-	 */
-	game_changes: GameChange[],
-	game_changes_total: number,
-	/**
-	 *  The newest decisions of the overlay hook in this launch, oldest first. Like `output`, the file on disk holds the
-	 *  ring and this list is filled when the report is read, so the console follows a running game.
-	 */
-	decisions: OverlayDecision[],
-	/**  How many decisions the hook recorded in this launch, including the ones the ring no longer holds. */
-	decisions_total: number,
-	/**  The crash dump of this launch, when the hook wrote one. */
-	crash_dump: string | null,
-	/**
-	 *  The DLLs an overlay launch found in the mod layer and the static imports it will point there. Filled when the
-	 *  launch starts; a launch without the overlay leaves it unset.
-	 */
-	dlls: DllReport | null,
+  started_at: number;
+  finished_at: number | null;
+  game_started: boolean;
+  game_exit_code: number | null;
+  /**  The user pressed Stop. A stopped game often has a nonzero exit code and must not be offered as a crash. */
+  stopped_by_user: boolean;
+  /**
+   *  Wall time from the start request to the resumption of the game, including PE parsing, stage 0, static imports
+   *  and injection. Old reports do not have it.
+   */
+  launch_ms: number | null;
+  /**
+   *  The launcher's own steps. Windows fills them from `overlay-launch`; Linux has no hook installer, so it is
+   *  `None`. Old reports do not have it.
+   */
+  launch_steps: LaunchSteps | null;
+  steps: StepReport_Serialize[];
+  /**
+   *  The end of the game's standard output and error. The file holds it, so it is filled when the report is read,
+   *  not stored with it.
+   */
+  output: string[];
+  /**
+   *  The game logs named by the definition that exist for this installation, newest file of each source first.
+   *  Like `output`, this is filled when the report is read, so the console follows a running game.
+   */
+  game_logs: GameLog_Serialize[];
+  /**
+   *  Every `.log` file the mod layer and the overwrite layer hold, newest first. A mod adds its log without a
+   *  definition change; the game's own log paths stay in `game_logs`.
+   */
+  mod_logs: GameLog_Serialize[];
+  /**  The end of Gobbo's own log. Filled when the report is read; it is not stored with the report. */
+  app_log: string[];
+  /**
+   *  What changed in the game folder while an overlay session ran. The game folder should not change then, so these
+   *  are writes that got past the layers. Only the first changes are kept, and `game_changes_total` counts them all.
+   */
+  game_changes: GameChange[];
+  game_changes_total: number;
+  /**
+   *  The newest decisions of the overlay hook in this launch, oldest first. Like `output`, the file on disk holds the
+   *  ring and this list is filled when the report is read, so the console follows a running game.
+   */
+  decisions: OverlayDecision[];
+  /**  How many decisions the hook recorded in this launch, including the ones the ring no longer holds. */
+  decisions_total: number;
+  /**  The crash dump of this launch, when the hook wrote one. */
+  crash_dump: string | null;
+  /**
+   *  The DLLs an overlay launch found in the mod layer and the static imports it will point there. Filled when the
+   *  launch starts; a launch without the overlay leaves it unset.
+   */
+  dlls: DllReport | null;
 };
 
 /**  A definition that was written. The window uses the name for its notice and the id to add the game. */
 export type SavedDefinition = {
-	id: string,
-	name: string,
+  id: string;
+  name: string;
 };
 
 /**
@@ -4251,9 +5179,9 @@ export type Separator = Separator_Serialize | Separator_Deserialize;
  *  place when mods are added at the end or removed elsewhere.
  */
 export type Separator_Deserialize = {
-	id: string,
-	name: string,
-	before?: string | null,
+  id: string;
+  name: string;
+  before?: string | null;
 };
 
 /**
@@ -4262,9 +5190,9 @@ export type Separator_Deserialize = {
  *  place when mods are added at the end or removed elsewhere.
  */
 export type Separator_Serialize = {
-	id: string,
-	name: string,
-	before: string | null,
+  id: string;
+  name: string;
+  before: string | null;
 };
 
 /**  Settings entered in the app. Saved in `config.json` in the game's data folder. */
@@ -4272,157 +5200,157 @@ export type Settings = Settings_Serialize | Settings_Deserialize;
 
 /**  Settings entered in the app. Saved in `config.json` in the game's data folder. */
 export type Settings_Deserialize = {
-	/**  The game folder, for example `.../The Witcher 3`. */
-	game_root: string,
-	/**  The folder with `mods.settings`. Empty when the game does not use it. */
-	settings_dir: string,
-	/**
-	 *  The folder that holds the game's mods when it is not the game folder, for example
-	 *  `%APPDATA%/MyGame`. Empty means "use the definition or the game folder".
-	 */
-	mods_root?: string,
-	/**  The folder with the `proton` file that starts the game. Empty when Gobbo picks Proton itself. */
-	proton_dir?: string,
-	/**  Environment variables for the launched game, one per line: `NAME=value`. */
-	launch_env?: string,
-	/**  Parameters added after the game file, separated by spaces. */
-	launch_args?: string,
-	/**  The Proton options switched on, by id (`wined3d`, `proton_log`, ...). See `domain::proton_options`. Linux only. */
-	proton_options?: string[],
-	/**  Frame rate cap for Proton games, written for DXVK and vkd3d-proton. `None` means unlimited. Linux only. */
-	proton_fps_limit?: number | null,
-	/**
-	 *  Files and folders that belong to one profile: saves, configuration, `mods.settings` and similar.
-	 *  Absolute paths. The settings file is added automatically.
-	 */
-	profile_data?: string[],
+  /**  The game folder, for example `.../The Witcher 3`. */
+  game_root: string;
+  /**  The folder with `mods.settings`. Empty when the game does not use it. */
+  settings_dir: string;
+  /**
+   *  The folder that holds the game's mods when it is not the game folder, for example
+   *  `%APPDATA%/MyGame`. Empty means "use the definition or the game folder".
+   */
+  mods_root?: string;
+  /**  The folder with the `proton` file that starts the game. Empty when Gobbo picks Proton itself. */
+  proton_dir?: string;
+  /**  Environment variables for the launched game, one per line: `NAME=value`. */
+  launch_env?: string;
+  /**  Parameters added after the game file, separated by spaces. */
+  launch_args?: string;
+  /**  The Proton options switched on, by id (`wined3d`, `proton_log`, ...). See `domain::proton_options`. Linux only. */
+  proton_options?: string[];
+  /**  Frame rate cap for Proton games, written for DXVK and vkd3d-proton. `None` means unlimited. Linux only. */
+  proton_fps_limit?: number | null;
+  /**
+   *  Files and folders that belong to one profile: saves, configuration, `mods.settings` and similar.
+   *  Absolute paths. The settings file is added automatically.
+   */
+  profile_data?: string[];
 };
 
 /**  Settings entered in the app. Saved in `config.json` in the game's data folder. */
 export type Settings_Serialize = {
-	/**  The game folder, for example `.../The Witcher 3`. */
-	game_root: string,
-	/**  The folder with `mods.settings`. Empty when the game does not use it. */
-	settings_dir: string,
-	/**
-	 *  The folder that holds the game's mods when it is not the game folder, for example
-	 *  `%APPDATA%/MyGame`. Empty means "use the definition or the game folder".
-	 */
-	mods_root: string,
-	/**  The folder with the `proton` file that starts the game. Empty when Gobbo picks Proton itself. */
-	proton_dir: string,
-	/**  Environment variables for the launched game, one per line: `NAME=value`. */
-	launch_env: string,
-	/**  Parameters added after the game file, separated by spaces. */
-	launch_args: string,
-	/**  The Proton options switched on, by id (`wined3d`, `proton_log`, ...). See `domain::proton_options`. Linux only. */
-	proton_options: string[],
-	/**  Frame rate cap for Proton games, written for DXVK and vkd3d-proton. `None` means unlimited. Linux only. */
-	proton_fps_limit: number | null,
-	/**
-	 *  Files and folders that belong to one profile: saves, configuration, `mods.settings` and similar.
-	 *  Absolute paths. The settings file is added automatically.
-	 */
-	profile_data: string[],
+  /**  The game folder, for example `.../The Witcher 3`. */
+  game_root: string;
+  /**  The folder with `mods.settings`. Empty when the game does not use it. */
+  settings_dir: string;
+  /**
+   *  The folder that holds the game's mods when it is not the game folder, for example
+   *  `%APPDATA%/MyGame`. Empty means "use the definition or the game folder".
+   */
+  mods_root: string;
+  /**  The folder with the `proton` file that starts the game. Empty when Gobbo picks Proton itself. */
+  proton_dir: string;
+  /**  Environment variables for the launched game, one per line: `NAME=value`. */
+  launch_env: string;
+  /**  Parameters added after the game file, separated by spaces. */
+  launch_args: string;
+  /**  The Proton options switched on, by id (`wined3d`, `proton_log`, ...). See `domain::proton_options`. Linux only. */
+  proton_options: string[];
+  /**  Frame rate cap for Proton games, written for DXVK and vkd3d-proton. `None` means unlimited. Linux only. */
+  proton_fps_limit: number | null;
+  /**
+   *  Files and folders that belong to one profile: saves, configuration, `mods.settings` and similar.
+   *  Absolute paths. The settings file is added automatically.
+   */
+  profile_data: string[];
 };
 
 /**  The folder that keeps a game from being ready. */
 export type SetupStep = "game" | "settings" | "mods";
 
 /**  Why an archive entry was not unpacked into the library. */
-export type SkipReason = 
-/**  No rule of the game definition took it. */
-"no_rule" | 
-/**  Documentation, source or an optional variant folder. */
-"noise" | 
-/**  The FOMOD definition or its metadata. */
-"metadata" | 
-/**  An entry the FOMOD choices did not select. */
-"not_selected";
+export type SkipReason =
+  /**  No rule of the game definition took it. */
+  | "no_rule"
+  /**  Documentation, source or an optional variant folder. */
+  | "noise"
+  /**  The FOMOD definition or its metadata. */
+  | "metadata"
+  /**  An entry the FOMOD choices did not select. */
+  | "not_selected";
 
 /**  One archive entry that was not unpacked. */
 export type SkippedFile = {
-	/**  The entry name in the archive, with `/` as the separator. */
-	path: string,
-	reason: SkipReason,
+  /**  The entry name in the archive, with `/` as the separator. */
+  path: string;
+  reason: SkipReason;
 };
 
 /**  Why a snapshot was taken. Only the automatic kinds are pruned by retention; a manual one is kept. */
-export type SnapshotKind = 
-/**  Started by the user from the game menu. */
-"manual" | 
-/**  Taken before the profile that owns the data changes. */
-"before_switch" | 
-/**  Taken before a profile and its state folder are removed. */
-"before_delete" | 
-/**  Taken before another profile's data replaces this profile's data. */
-"before_copy" | 
-/**  Taken by a restore, so the restore itself can be undone. */
-"before_restore";
+export type SnapshotKind =
+  /**  Started by the user from the game menu. */
+  | "manual"
+  /**  Taken before the profile that owns the data changes. */
+  | "before_switch"
+  /**  Taken before a profile and its state folder are removed. */
+  | "before_delete"
+  /**  Taken before another profile's data replaces this profile's data. */
+  | "before_copy"
+  /**  Taken by a restore, so the restore itself can be undone. */
+  | "before_restore";
 
 /**  One set of files in a snapshot, with how many files and bytes it holds. */
 export type SnapshotSetView = {
-	id: string,
-	kind: Kind,
-	files: number,
-	bytes: number,
+  id: string;
+  kind: Kind;
+  files: number;
+  bytes: number;
 };
 
 /**  One saved snapshot as the window lists it: when it was taken and what it holds. */
 export type SnapshotView = {
-	id: string,
-	profile: string,
-	profile_name: string,
-	kind: SnapshotKind,
-	created_at: number,
-	/**  The number of mods in the saved profile list. */
-	mods: number,
-	files: number,
-	bytes: number,
-	overwrite_files: number,
-	overwrite_bytes: number,
-	sets: SnapshotSetView[],
+  id: string;
+  profile: string;
+  profile_name: string;
+  kind: SnapshotKind;
+  created_at: number;
+  /**  The number of mods in the saved profile list. */
+  mods: number;
+  files: number;
+  bytes: number;
+  overwrite_files: number;
+  overwrite_bytes: number;
+  sets: SnapshotSetView[];
 };
 
 export type SortMove = {
-	id: string,
-	name: string,
-	/**  One-based place in the current list. */
-	from: number,
-	/**  One-based place after sorting. */
-	to: number,
+  id: string;
+  name: string;
+  /**  One-based place in the current list. */
+  from: number;
+  /**  One-based place after sorting. */
+  to: number;
 };
 
 export type SortPreview = {
-	total: number,
-	/**  The mods whose place changes. Empty when the list already keeps every rule. */
-	moves: SortMove[],
+  total: number;
+  /**  The mods whose place changes. Empty when the list already keeps every rule. */
+  moves: SortMove[];
 };
 
 /**  The account behind a key, as the provider describes it. */
 export type SourceAccount = {
-	name: string,
-	premium: boolean,
-	/**  Whether this account can fetch a provider file without a browser step. */
-	direct_download: boolean,
+  name: string;
+  premium: boolean;
+  /**  Whether this account can fetch a provider file without a browser step. */
+  direct_download: boolean;
 };
 
 /**  Whether the system starts Gobbo for one of a provider's download-link schemes. */
 export type SourceLinkStatus = {
-	/**  The provider whose link scheme this is, by id. */
-	provider: string,
-	/**  The scheme without `://`, for example `nxm`. */
-	scheme: string,
-	/**  Whether this copy of Gobbo is the handler the system starts for the scheme. */
-	registered: boolean,
+  /**  The provider whose link scheme this is, by id. */
+  provider: string;
+  /**  The scheme without `://`, for example `nxm`. */
+  scheme: string;
+  /**  Whether this copy of Gobbo is the handler the system starts for the scheme. */
+  registered: boolean;
 };
 
 /**  What a check of the download links found, and which providers Gobbo registered again. */
 export type SourceLinksReport = {
-	/**  The handler the system has for each scheme the settings take. */
-	statuses: SourceLinkStatus[],
-	/**  The providers whose links Gobbo registered again during this check, by id. */
-	repaired: string[],
+  /**  The handler the system has for each scheme the settings take. */
+  statuses: SourceLinkStatus[];
+  /**  The providers whose links Gobbo registered again during this check, by id. */
+  repaired: string[];
 };
 
 /**  Data from a mod's page on a provider, mapped to the fields the interface and the update check share. */
@@ -4430,48 +5358,48 @@ export type SourceMeta = SourceMeta_Serialize | SourceMeta_Deserialize;
 
 /**  Data from a mod's page on a provider, mapped to the fields the interface and the update check share. */
 export type SourceMeta_Deserialize = {
-	name?: string | null,
-	author?: string | null,
-	uploader?: string | null,
-	category?: string | null,
-	summary?: string | null,
-	description?: string | null,
-	picture_url?: string | null,
-	/**  The copy of the picture in the game's `images/` folder, a file name. */
-	picture?: string | null,
-	version?: string | null,
-	stats?: SourceStats_Deserialize,
-	adult?: boolean,
-	checked_at?: number | null,
-	updated_at?: number | null,
-	created_at?: number | null,
-	status?: string | null,
-	tags?: string[],
-	/**  Provider-specific fields that the shared model does not name. Values stay strings so they can cross IPC. */
-	extra?: { [key in string]: string },
+  name?: string | null;
+  author?: string | null;
+  uploader?: string | null;
+  category?: string | null;
+  summary?: string | null;
+  description?: string | null;
+  picture_url?: string | null;
+  /**  The copy of the picture in the game's `images/` folder, a file name. */
+  picture?: string | null;
+  version?: string | null;
+  stats?: SourceStats_Deserialize;
+  adult?: boolean;
+  checked_at?: number | null;
+  updated_at?: number | null;
+  created_at?: number | null;
+  status?: string | null;
+  tags?: string[];
+  /**  Provider-specific fields that the shared model does not name. Values stay strings so they can cross IPC. */
+  extra?: { [key in string]: string };
 };
 
 /**  Data from a mod's page on a provider, mapped to the fields the interface and the update check share. */
 export type SourceMeta_Serialize = {
-	name: string | null,
-	author: string | null,
-	uploader: string | null,
-	category: string | null,
-	summary: string | null,
-	description: string | null,
-	picture_url: string | null,
-	/**  The copy of the picture in the game's `images/` folder, a file name. */
-	picture: string | null,
-	version: string | null,
-	stats: SourceStats_Serialize,
-	adult: boolean,
-	checked_at: number | null,
-	updated_at: number | null,
-	created_at: number | null,
-	status: string | null,
-	tags: string[],
-	/**  Provider-specific fields that the shared model does not name. Values stay strings so they can cross IPC. */
-	extra: { [key in string]: string },
+  name: string | null;
+  author: string | null;
+  uploader: string | null;
+  category: string | null;
+  summary: string | null;
+  description: string | null;
+  picture_url: string | null;
+  /**  The copy of the picture in the game's `images/` folder, a file name. */
+  picture: string | null;
+  version: string | null;
+  stats: SourceStats_Serialize;
+  adult: boolean;
+  checked_at: number | null;
+  updated_at: number | null;
+  created_at: number | null;
+  status: string | null;
+  tags: string[];
+  /**  Provider-specific fields that the shared model does not name. Values stay strings so they can cross IPC. */
+  extra: { [key in string]: string };
 };
 
 /**  The page data a list row needs: who made the mod and which picture and category it shows. */
@@ -4479,32 +5407,32 @@ export type SourcePreview = SourcePreview_Serialize | SourcePreview_Deserialize;
 
 /**  The page data a list row needs: who made the mod and which picture and category it shows. */
 export type SourcePreview_Deserialize = {
-	provider: string,
-	mod_id: string,
-	name?: string | null,
-	author?: string | null,
-	uploader?: string | null,
-	category?: string | null,
-	picture?: string | null,
-	picture_url?: string | null,
-	adult: boolean,
-	/**  When the page was last checked. The version cell shows it on hover. */
-	checked_at?: number | null,
+  provider: string;
+  mod_id: string;
+  name?: string | null;
+  author?: string | null;
+  uploader?: string | null;
+  category?: string | null;
+  picture?: string | null;
+  picture_url?: string | null;
+  adult: boolean;
+  /**  When the page was last checked. The version cell shows it on hover. */
+  checked_at?: number | null;
 };
 
 /**  The page data a list row needs: who made the mod and which picture and category it shows. */
 export type SourcePreview_Serialize = {
-	provider: string,
-	mod_id: string,
-	name: string | null,
-	author: string | null,
-	uploader: string | null,
-	category: string | null,
-	picture: string | null,
-	picture_url: string | null,
-	adult: boolean,
-	/**  When the page was last checked. The version cell shows it on hover. */
-	checked_at: number | null,
+  provider: string;
+  mod_id: string;
+  name: string | null;
+  author: string | null;
+  uploader: string | null;
+  category: string | null;
+  picture: string | null;
+  picture_url: string | null;
+  adult: boolean;
+  /**  When the page was last checked. The version cell shows it on hover. */
+  checked_at: number | null;
 };
 
 /**
@@ -4512,28 +5440,28 @@ export type SourcePreview_Serialize = {
  *  schemes of its download links (empty when it has none).
  */
 export type SourceProviderInfo = {
-	id: string,
-	name: string,
-	needs_key: boolean,
-	has_key_page: boolean,
-	/**
-	 *  The provider can download its files without a browser step. A saved account may still need a paid tier, which
-	 *  [`SourceAccount::direct_download`] reports for the account itself.
-	 */
-	direct_download: boolean,
-	/**
-	 *  Whether the saved account (or the provider, when it needs no key) downloads directly right now. This is the one
-	 *  answer every update and download button reads.
-	 */
-	download_route: DownloadRoute,
-	/**  The provider can install collections. */
-	collections: boolean,
-	schemes: string[],
+  id: string;
+  name: string;
+  needs_key: boolean;
+  has_key_page: boolean;
+  /**
+   *  The provider can download its files without a browser step. A saved account may still need a paid tier, which
+   *  [`SourceAccount::direct_download`] reports for the account itself.
+   */
+  direct_download: boolean;
+  /**
+   *  Whether the saved account (or the provider, when it needs no key) downloads directly right now. This is the one
+   *  answer every update and download button reads.
+   */
+  download_route: DownloadRoute;
+  /**  The provider can install collections. */
+  collections: boolean;
+  schemes: string[];
 };
 
 /**
  *  A mod on a provider, the exact file when one is known, and the stable part it belongs to.
- * 
+ *
  *  `file_id` names one version; `part_id` names the provider's update chain, for example a Nexus `mod_file_id`.
  *  A part is the installable unit: its versions replace each other, while two parts of the same page stay separate.
  */
@@ -4541,102 +5469,104 @@ export type SourceRef = SourceRef_Serialize | SourceRef_Deserialize;
 
 /**
  *  A mod on a provider, the exact file when one is known, and the stable part it belongs to.
- * 
+ *
  *  `file_id` names one version; `part_id` names the provider's update chain, for example a Nexus `mod_file_id`.
  *  A part is the installable unit: its versions replace each other, while two parts of the same page stay separate.
  */
 export type SourceRef_Deserialize = {
-	/**  The service that owns the ids. */
-	provider: ProviderId,
-	/**  The mod id in the provider's namespace. Text because providers use numbers, slugs or base62. */
-	mod_id: string,
-	/**  The file id in the provider's namespace, when the reference names a file. */
-	file_id?: string | null,
-	/**  The stable part of the page, when the provider has more than one installable file group. */
-	part_id?: string | null,
-	/**  The part's display name, when the provider named it. */
-	part_name?: string | null,
-	/**  The provider's category for the part, for example `main` or `optional`. */
-	part_category?: string | null,
+  /**  The service that owns the ids. */
+  provider: ProviderId;
+  /**  The mod id in the provider's namespace. Text because providers use numbers, slugs or base62. */
+  mod_id: string;
+  /**  The file id in the provider's namespace, when the reference names a file. */
+  file_id?: string | null;
+  /**  The stable part of the page, when the provider has more than one installable file group. */
+  part_id?: string | null;
+  /**  The part's display name, when the provider named it. */
+  part_name?: string | null;
+  /**  The provider's category for the part, for example `main` or `optional`. */
+  part_category?: string | null;
 };
 
 /**
  *  A mod on a provider, the exact file when one is known, and the stable part it belongs to.
- * 
+ *
  *  `file_id` names one version; `part_id` names the provider's update chain, for example a Nexus `mod_file_id`.
  *  A part is the installable unit: its versions replace each other, while two parts of the same page stay separate.
  */
 export type SourceRef_Serialize = {
-	/**  The service that owns the ids. */
-	provider: ProviderId,
-	/**  The mod id in the provider's namespace. Text because providers use numbers, slugs or base62. */
-	mod_id: string,
-	/**  The file id in the provider's namespace, when the reference names a file. */
-	file_id?: string,
-	/**  The stable part of the page, when the provider has more than one installable file group. */
-	part_id?: string,
-	/**  The part's display name, when the provider named it. */
-	part_name?: string,
-	/**  The provider's category for the part, for example `main` or `optional`. */
-	part_category?: string,
+  /**  The service that owns the ids. */
+  provider: ProviderId;
+  /**  The mod id in the provider's namespace. Text because providers use numbers, slugs or base62. */
+  mod_id: string;
+  /**  The file id in the provider's namespace, when the reference names a file. */
+  file_id?: string;
+  /**  The stable part of the page, when the provider has more than one installable file group. */
+  part_id?: string;
+  /**  The part's display name, when the provider named it. */
+  part_name?: string;
+  /**  The provider's category for the part, for example `main` or `optional`. */
+  part_category?: string;
 };
 
 /**  A mod on another provider that this mod needs. A missing one is a warning, not a block. */
-export type SourceRequirement = SourceRequirement_Serialize | SourceRequirement_Deserialize;
+export type SourceRequirement =
+  SourceRequirement_Serialize | SourceRequirement_Deserialize;
 
 /**  One requirement of a mod, on any provider, with its state in the profile. */
-export type SourceRequirementView = SourceRequirementView_Serialize | SourceRequirementView_Deserialize;
+export type SourceRequirementView =
+  SourceRequirementView_Serialize | SourceRequirementView_Deserialize;
 
 /**  One requirement of a mod, on any provider, with its state in the profile. */
 export type SourceRequirementView_Deserialize = {
-	source: SourceRef_Deserialize,
-	name: string,
-	page_url?: string | null,
-	state: RequirementState,
-	/**  The provider can fetch this requirement without leaving Gobbo, so the row can offer **Get**. */
-	direct_download: boolean,
-	from_source: boolean,
-	group?: number | null,
-	ignored: boolean,
+  source: SourceRef_Deserialize;
+  name: string;
+  page_url?: string | null;
+  state: RequirementState;
+  /**  The provider can fetch this requirement without leaving Gobbo, so the row can offer **Get**. */
+  direct_download: boolean;
+  from_source: boolean;
+  group?: number | null;
+  ignored: boolean;
 };
 
 /**  One requirement of a mod, on any provider, with its state in the profile. */
 export type SourceRequirementView_Serialize = {
-	source: SourceRef_Serialize,
-	name: string,
-	page_url: string | null,
-	state: RequirementState,
-	/**  The provider can fetch this requirement without leaving Gobbo, so the row can offer **Get**. */
-	direct_download: boolean,
-	from_source: boolean,
-	group: number | null,
-	ignored: boolean,
+  source: SourceRef_Serialize;
+  name: string;
+  page_url: string | null;
+  state: RequirementState;
+  /**  The provider can fetch this requirement without leaving Gobbo, so the row can offer **Get**. */
+  direct_download: boolean;
+  from_source: boolean;
+  group: number | null;
+  ignored: boolean;
 };
 
 /**  A mod on another provider that this mod needs. A missing one is a warning, not a block. */
 export type SourceRequirement_Deserialize = {
-	source: SourceRef_Deserialize,
-	/**  The mod's name, as the user typed it or as the provider lists it. */
-	name: string,
-	/**  The provider lists this requirement for the mod's newest file, so the user cannot remove it. */
-	from_source?: boolean,
-	/**  Requirements that share a group are alternatives: one of them is enough. */
-	group?: number | null,
-	/**  The user chose to ignore this requirement. */
-	ignored?: boolean,
+  source: SourceRef_Deserialize;
+  /**  The mod's name, as the user typed it or as the provider lists it. */
+  name: string;
+  /**  The provider lists this requirement for the mod's newest file, so the user cannot remove it. */
+  from_source?: boolean;
+  /**  Requirements that share a group are alternatives: one of them is enough. */
+  group?: number | null;
+  /**  The user chose to ignore this requirement. */
+  ignored?: boolean;
 };
 
 /**  A mod on another provider that this mod needs. A missing one is a warning, not a block. */
 export type SourceRequirement_Serialize = {
-	source: SourceRef_Serialize,
-	/**  The mod's name, as the user typed it or as the provider lists it. */
-	name: string,
-	/**  The provider lists this requirement for the mod's newest file, so the user cannot remove it. */
-	from_source: boolean,
-	/**  Requirements that share a group are alternatives: one of them is enough. */
-	group?: number,
-	/**  The user chose to ignore this requirement. */
-	ignored: boolean,
+  source: SourceRef_Serialize;
+  /**  The mod's name, as the user typed it or as the provider lists it. */
+  name: string;
+  /**  The provider lists this requirement for the mod's newest file, so the user cannot remove it. */
+  from_source: boolean;
+  /**  Requirements that share a group are alternatives: one of them is enough. */
+  group?: number;
+  /**  The user chose to ignore this requirement. */
+  ignored: boolean;
 };
 
 /**  The common counters a provider exposes for a page. A field the provider does not have stays `None`. */
@@ -4644,18 +5574,18 @@ export type SourceStats = SourceStats_Serialize | SourceStats_Deserialize;
 
 /**  The common counters a provider exposes for a page. A field the provider does not have stays `None`. */
 export type SourceStats_Deserialize = {
-	downloads?: number | null,
-	unique_downloads?: number | null,
-	endorsements?: number | null,
-	subscribers?: number | null,
+  downloads?: number | null;
+  unique_downloads?: number | null;
+  endorsements?: number | null;
+  subscribers?: number | null;
 };
 
 /**  The common counters a provider exposes for a page. A field the provider does not have stays `None`. */
 export type SourceStats_Serialize = {
-	downloads: number | null,
-	unique_downloads: number | null,
-	endorsements: number | null,
-	subscribers: number | null,
+  downloads: number | null;
+  unique_downloads: number | null;
+  endorsements: number | null;
+  subscribers: number | null;
 };
 
 /**
@@ -4669,25 +5599,25 @@ export type SourceSummary = SourceSummary_Serialize | SourceSummary_Deserialize;
  *  the full text stays in the details view.
  */
 export type SourceSummary_Deserialize = {
-	provider: string,
-	mod_id: string,
-	name?: string | null,
-	author?: string | null,
-	uploader?: string | null,
-	category?: string | null,
-	summary?: string | null,
-	description?: string | null,
-	picture?: string | null,
-	picture_url?: string | null,
-	downloads?: number | null,
-	unique_downloads?: number | null,
-	endorsements?: number | null,
-	adult: boolean,
-	checked_at?: number | null,
-	updated_at?: number | null,
-	created_at?: number | null,
-	status?: string | null,
-	tags: string[],
+  provider: string;
+  mod_id: string;
+  name?: string | null;
+  author?: string | null;
+  uploader?: string | null;
+  category?: string | null;
+  summary?: string | null;
+  description?: string | null;
+  picture?: string | null;
+  picture_url?: string | null;
+  downloads?: number | null;
+  unique_downloads?: number | null;
+  endorsements?: number | null;
+  adult: boolean;
+  checked_at?: number | null;
+  updated_at?: number | null;
+  created_at?: number | null;
+  status?: string | null;
+  tags: string[];
 };
 
 /**
@@ -4695,42 +5625,43 @@ export type SourceSummary_Deserialize = {
  *  the full text stays in the details view.
  */
 export type SourceSummary_Serialize = {
-	provider: string,
-	mod_id: string,
-	name: string | null,
-	author: string | null,
-	uploader: string | null,
-	category: string | null,
-	summary: string | null,
-	description: string | null,
-	picture: string | null,
-	picture_url: string | null,
-	downloads: number | null,
-	unique_downloads: number | null,
-	endorsements: number | null,
-	adult: boolean,
-	checked_at: number | null,
-	updated_at: number | null,
-	created_at: number | null,
-	status: string | null,
-	tags: string[],
+  provider: string;
+  mod_id: string;
+  name: string | null;
+  author: string | null;
+  uploader: string | null;
+  category: string | null;
+  summary: string | null;
+  description: string | null;
+  picture: string | null;
+  picture_url: string | null;
+  downloads: number | null;
+  unique_downloads: number | null;
+  endorsements: number | null;
+  adult: boolean;
+  checked_at: number | null;
+  updated_at: number | null;
+  created_at: number | null;
+  status: string | null;
+  tags: string[];
 };
 
 /**  When a provider's requirements were last read. */
-export type SourceSyncView = SourceSyncView_Serialize | SourceSyncView_Deserialize;
+export type SourceSyncView =
+  SourceSyncView_Serialize | SourceSyncView_Deserialize;
 
 /**  When a provider's requirements were last read. */
 export type SourceSyncView_Deserialize = {
-	provider: string,
-	checked_at: number,
-	older_version?: string | null,
+  provider: string;
+  checked_at: number;
+  older_version?: string | null;
 };
 
 /**  When a provider's requirements were last read. */
 export type SourceSyncView_Serialize = {
-	provider: string,
-	checked_at: number,
-	older_version: string | null,
+  provider: string;
+  checked_at: number;
+  older_version: string | null;
 };
 
 /**  The game's status: everything the window reads to draw the list, the header and the next action. */
@@ -4738,198 +5669,199 @@ export type Status = Status_Serialize | Status_Deserialize;
 
 /**  The game's status: everything the window reads to draw the list, the header and the next action. */
 export type Status_Deserialize = {
-	game_name: string,
-	/**  A short description of the game under its name, for example `Steam 292030`. */
-	game_subtitle: string,
-	/**  The one derived state of the game. Every screen reads this instead of deriving the state from booleans. */
-	stage: GameStage_Deserialize,
-	/**  The one thing to do next, derived from `stage`. */
-	next_action: NextAction,
-	/**  The reason an apply cannot run yet, when there is one. The window only translates it. */
-	blocker?: BlockerKey | null,
-	settings: Settings_Deserialize,
-	game_ready: boolean,
-	settings_ready: boolean,
-	/**  Whether the game reads mods from outside its folder and the user can point to that folder. */
-	needs_mods_root: boolean,
-	/**  Whether the configured mods root exists. An automatically resolved root may be missing and will be created on deploy. */
-	mods_ready: boolean,
-	/**  The effective folder that holds the mods: the user's override or the resolved definition path. */
-	mods_root: string,
-	/**  The game reads `mods.settings`, so Gobbo needs its folder. */
-	needs_settings_dir: boolean,
-	deployed: boolean,
-	/**  Mods whose place differs from the last deployed list (added, removed, or moved). Zero when they match. */
-	draft_changes: number,
-	/**  Unix time in seconds of the last deployment, while something is deployed. */
-	deployed_at?: number | null,
-	/**  Entries of the last deployed list, in order. Discarding draft changes restores this list. */
-	deployed_list: DeployedRow[],
-	/**  The game's profiles. All of them, including inactive ones. */
-	profiles: ProfileView[],
-	/**  The mods of the active profile, in priority order. */
-	mods: ModView_Deserialize[],
-	/**
-	 *  One revision per mod, in the same order. It covers every serialized row field; a window that sends them back
-	 *  receives only the rows that changed.
-	 */
-	revisions: string[],
-	/**
-	 *  The reply number. It grows with each status built, so the window can ignore an answer that is older than the list
-	 *  it already shows.
-	 */
-	build: number,
-	/**  Whether `mods` holds only the rows that changed since the revisions the window sent. */
-	patch: boolean,
-	/**  Ids that left the list since the revisions the window sent. */
-	removed: string[],
-	/**  The full order, when it differs from the order the window sent. */
-	order?: string[] | null,
-	/**  The separators of the active profile's list. Each one sits above the mod it names, or at the end. */
-	separators: Separator_Deserialize[],
-	/**  The groups of the active profile's list. */
-	groups: ModGroup_Deserialize[],
-	/**  Whether a change to the active list can be undone or redone. */
-	history: HistoryState,
-	/**  The search for the mod that breaks the game, while one runs on the active profile. */
-	bisect?: BisectView_Deserialize | null,
-	/**  The game or its tools wrote files into the overlay of the active profile, kept out of the game folder. */
-	has_overwrite: boolean,
-	/**  Number of conflicting file paths among enabled mods. The paths themselves are in `mod_details`. */
-	conflict_count: number,
-	problems: Message[],
-	/**
-	 *  Mods of the profile that do not fit together: a required mod missing or off, or two enabled conflicting mods.
-	 *  They are shown, but do not block deployment.
-	 */
-	warnings: Message[],
-	library_dir: string,
-	/**  The folder with the copies of `.zip` archives that the mods were unpacked from. */
-	archives_dir: string,
-	/**  The state folder of the active profile, once it exists: its deployment journal, overlay layer and overwrite folder. */
-	profile_dir?: string | null,
-	/**  Where the game and its tools write files that no mod owns, inside the active profile's state folder. */
-	overwrite_dir: string,
-	/**  Per-profile data paths declared by the game definition, resolved for this installation. */
-	game_profile_data: string[],
-	/**  The game's user-data sets and the active profile's choices. */
-	user_data: UserDataView[],
-	/**  The command for Steam launch options that starts the game through Gobbo (Linux only). */
-	launch_hint: string,
-	/**  Launch files from the game definition. The "Run" buttons come from here. */
-	executables: ExecutableView[],
-	/**  Tools from the game definition, with the folder of their program when it is in the game folder. */
-	tools: ToolView_Deserialize[],
+  game_name: string;
+  /**  A short description of the game under its name, for example `Steam 292030`. */
+  game_subtitle: string;
+  /**  The one derived state of the game. Every screen reads this instead of deriving the state from booleans. */
+  stage: GameStage_Deserialize;
+  /**  The one thing to do next, derived from `stage`. */
+  next_action: NextAction;
+  /**  The reason an apply cannot run yet, when there is one. The window only translates it. */
+  blocker?: BlockerKey | null;
+  settings: Settings_Deserialize;
+  game_ready: boolean;
+  settings_ready: boolean;
+  /**  Whether the game reads mods from outside its folder and the user can point to that folder. */
+  needs_mods_root: boolean;
+  /**  Whether the configured mods root exists. An automatically resolved root may be missing and will be created on deploy. */
+  mods_ready: boolean;
+  /**  The effective folder that holds the mods: the user's override or the resolved definition path. */
+  mods_root: string;
+  /**  The game reads `mods.settings`, so Gobbo needs its folder. */
+  needs_settings_dir: boolean;
+  deployed: boolean;
+  /**  Mods whose place differs from the last deployed list (added, removed, or moved). Zero when they match. */
+  draft_changes: number;
+  /**  Unix time in seconds of the last deployment, while something is deployed. */
+  deployed_at?: number | null;
+  /**  Entries of the last deployed list, in order. Discarding draft changes restores this list. */
+  deployed_list: DeployedRow[];
+  /**  The game's profiles. All of them, including inactive ones. */
+  profiles: ProfileView[];
+  /**  The mods of the active profile, in priority order. */
+  mods: ModView_Deserialize[];
+  /**
+   *  One revision per mod, in the same order. It covers every serialized row field; a window that sends them back
+   *  receives only the rows that changed.
+   */
+  revisions: string[];
+  /**
+   *  The reply number. It grows with each status built, so the window can ignore an answer that is older than the list
+   *  it already shows.
+   */
+  build: number;
+  /**  Whether `mods` holds only the rows that changed since the revisions the window sent. */
+  patch: boolean;
+  /**  Ids that left the list since the revisions the window sent. */
+  removed: string[];
+  /**  The full order, when it differs from the order the window sent. */
+  order?: string[] | null;
+  /**  The separators of the active profile's list. Each one sits above the mod it names, or at the end. */
+  separators: Separator_Deserialize[];
+  /**  The groups of the active profile's list. */
+  groups: ModGroup_Deserialize[];
+  /**  Whether a change to the active list can be undone or redone. */
+  history: HistoryState;
+  /**  The search for the mod that breaks the game, while one runs on the active profile. */
+  bisect?: BisectView_Deserialize | null;
+  /**  The game or its tools wrote files into the overlay of the active profile, kept out of the game folder. */
+  has_overwrite: boolean;
+  /**  Number of conflicting file paths among enabled mods. The paths themselves are in `mod_details`. */
+  conflict_count: number;
+  problems: Message[];
+  /**
+   *  Mods of the profile that do not fit together: a required mod missing or off, or two enabled conflicting mods.
+   *  They are shown, but do not block deployment.
+   */
+  warnings: Message[];
+  library_dir: string;
+  /**  The folder with the copies of `.zip` archives that the mods were unpacked from. */
+  archives_dir: string;
+  /**  The state folder of the active profile, once it exists: its deployment journal, overlay layer and overwrite folder. */
+  profile_dir?: string | null;
+  /**  Where the game and its tools write files that no mod owns, inside the active profile's state folder. */
+  overwrite_dir: string;
+  /**  Per-profile data paths declared by the game definition, resolved for this installation. */
+  game_profile_data: string[];
+  /**  The game's user-data sets and the active profile's choices. */
+  user_data: UserDataView[];
+  /**  The command for Steam launch options that starts the game through Gobbo (Linux only). */
+  launch_hint: string;
+  /**  Launch files from the game definition. The "Run" buttons come from here. */
+  executables: ExecutableView[];
+  /**  Tools from the game definition, with the folder of their program when it is in the game folder. */
+  tools: ToolView_Deserialize[];
 };
 
 /**  The game's status: everything the window reads to draw the list, the header and the next action. */
 export type Status_Serialize = {
-	game_name: string,
-	/**  A short description of the game under its name, for example `Steam 292030`. */
-	game_subtitle: string,
-	/**  The one derived state of the game. Every screen reads this instead of deriving the state from booleans. */
-	stage: GameStage_Serialize,
-	/**  The one thing to do next, derived from `stage`. */
-	next_action: NextAction,
-	/**  The reason an apply cannot run yet, when there is one. The window only translates it. */
-	blocker: BlockerKey | null,
-	settings: Settings_Serialize,
-	game_ready: boolean,
-	settings_ready: boolean,
-	/**  Whether the game reads mods from outside its folder and the user can point to that folder. */
-	needs_mods_root: boolean,
-	/**  Whether the configured mods root exists. An automatically resolved root may be missing and will be created on deploy. */
-	mods_ready: boolean,
-	/**  The effective folder that holds the mods: the user's override or the resolved definition path. */
-	mods_root: string,
-	/**  The game reads `mods.settings`, so Gobbo needs its folder. */
-	needs_settings_dir: boolean,
-	deployed: boolean,
-	/**  Mods whose place differs from the last deployed list (added, removed, or moved). Zero when they match. */
-	draft_changes: number,
-	/**  Unix time in seconds of the last deployment, while something is deployed. */
-	deployed_at: number | null,
-	/**  Entries of the last deployed list, in order. Discarding draft changes restores this list. */
-	deployed_list: DeployedRow[],
-	/**  The game's profiles. All of them, including inactive ones. */
-	profiles: ProfileView[],
-	/**  The mods of the active profile, in priority order. */
-	mods: ModView_Serialize[],
-	/**
-	 *  One revision per mod, in the same order. It covers every serialized row field; a window that sends them back
-	 *  receives only the rows that changed.
-	 */
-	revisions: string[],
-	/**
-	 *  The reply number. It grows with each status built, so the window can ignore an answer that is older than the list
-	 *  it already shows.
-	 */
-	build: number,
-	/**  Whether `mods` holds only the rows that changed since the revisions the window sent. */
-	patch: boolean,
-	/**  Ids that left the list since the revisions the window sent. */
-	removed: string[],
-	/**  The full order, when it differs from the order the window sent. */
-	order: string[] | null,
-	/**  The separators of the active profile's list. Each one sits above the mod it names, or at the end. */
-	separators: Separator_Serialize[],
-	/**  The groups of the active profile's list. */
-	groups: ModGroup_Serialize[],
-	/**  Whether a change to the active list can be undone or redone. */
-	history: HistoryState,
-	/**  The search for the mod that breaks the game, while one runs on the active profile. */
-	bisect: BisectView_Serialize | null,
-	/**  The game or its tools wrote files into the overlay of the active profile, kept out of the game folder. */
-	has_overwrite: boolean,
-	/**  Number of conflicting file paths among enabled mods. The paths themselves are in `mod_details`. */
-	conflict_count: number,
-	problems: Message[],
-	/**
-	 *  Mods of the profile that do not fit together: a required mod missing or off, or two enabled conflicting mods.
-	 *  They are shown, but do not block deployment.
-	 */
-	warnings: Message[],
-	library_dir: string,
-	/**  The folder with the copies of `.zip` archives that the mods were unpacked from. */
-	archives_dir: string,
-	/**  The state folder of the active profile, once it exists: its deployment journal, overlay layer and overwrite folder. */
-	profile_dir: string | null,
-	/**  Where the game and its tools write files that no mod owns, inside the active profile's state folder. */
-	overwrite_dir: string,
-	/**  Per-profile data paths declared by the game definition, resolved for this installation. */
-	game_profile_data: string[],
-	/**  The game's user-data sets and the active profile's choices. */
-	user_data: UserDataView[],
-	/**  The command for Steam launch options that starts the game through Gobbo (Linux only). */
-	launch_hint: string,
-	/**  Launch files from the game definition. The "Run" buttons come from here. */
-	executables: ExecutableView[],
-	/**  Tools from the game definition, with the folder of their program when it is in the game folder. */
-	tools: ToolView_Serialize[],
+  game_name: string;
+  /**  A short description of the game under its name, for example `Steam 292030`. */
+  game_subtitle: string;
+  /**  The one derived state of the game. Every screen reads this instead of deriving the state from booleans. */
+  stage: GameStage_Serialize;
+  /**  The one thing to do next, derived from `stage`. */
+  next_action: NextAction;
+  /**  The reason an apply cannot run yet, when there is one. The window only translates it. */
+  blocker: BlockerKey | null;
+  settings: Settings_Serialize;
+  game_ready: boolean;
+  settings_ready: boolean;
+  /**  Whether the game reads mods from outside its folder and the user can point to that folder. */
+  needs_mods_root: boolean;
+  /**  Whether the configured mods root exists. An automatically resolved root may be missing and will be created on deploy. */
+  mods_ready: boolean;
+  /**  The effective folder that holds the mods: the user's override or the resolved definition path. */
+  mods_root: string;
+  /**  The game reads `mods.settings`, so Gobbo needs its folder. */
+  needs_settings_dir: boolean;
+  deployed: boolean;
+  /**  Mods whose place differs from the last deployed list (added, removed, or moved). Zero when they match. */
+  draft_changes: number;
+  /**  Unix time in seconds of the last deployment, while something is deployed. */
+  deployed_at: number | null;
+  /**  Entries of the last deployed list, in order. Discarding draft changes restores this list. */
+  deployed_list: DeployedRow[];
+  /**  The game's profiles. All of them, including inactive ones. */
+  profiles: ProfileView[];
+  /**  The mods of the active profile, in priority order. */
+  mods: ModView_Serialize[];
+  /**
+   *  One revision per mod, in the same order. It covers every serialized row field; a window that sends them back
+   *  receives only the rows that changed.
+   */
+  revisions: string[];
+  /**
+   *  The reply number. It grows with each status built, so the window can ignore an answer that is older than the list
+   *  it already shows.
+   */
+  build: number;
+  /**  Whether `mods` holds only the rows that changed since the revisions the window sent. */
+  patch: boolean;
+  /**  Ids that left the list since the revisions the window sent. */
+  removed: string[];
+  /**  The full order, when it differs from the order the window sent. */
+  order: string[] | null;
+  /**  The separators of the active profile's list. Each one sits above the mod it names, or at the end. */
+  separators: Separator_Serialize[];
+  /**  The groups of the active profile's list. */
+  groups: ModGroup_Serialize[];
+  /**  Whether a change to the active list can be undone or redone. */
+  history: HistoryState;
+  /**  The search for the mod that breaks the game, while one runs on the active profile. */
+  bisect: BisectView_Serialize | null;
+  /**  The game or its tools wrote files into the overlay of the active profile, kept out of the game folder. */
+  has_overwrite: boolean;
+  /**  Number of conflicting file paths among enabled mods. The paths themselves are in `mod_details`. */
+  conflict_count: number;
+  problems: Message[];
+  /**
+   *  Mods of the profile that do not fit together: a required mod missing or off, or two enabled conflicting mods.
+   *  They are shown, but do not block deployment.
+   */
+  warnings: Message[];
+  library_dir: string;
+  /**  The folder with the copies of `.zip` archives that the mods were unpacked from. */
+  archives_dir: string;
+  /**  The state folder of the active profile, once it exists: its deployment journal, overlay layer and overwrite folder. */
+  profile_dir: string | null;
+  /**  Where the game and its tools write files that no mod owns, inside the active profile's state folder. */
+  overwrite_dir: string;
+  /**  Per-profile data paths declared by the game definition, resolved for this installation. */
+  game_profile_data: string[];
+  /**  The game's user-data sets and the active profile's choices. */
+  user_data: UserDataView[];
+  /**  The command for Steam launch options that starts the game through Gobbo (Linux only). */
+  launch_hint: string;
+  /**  Launch files from the game definition. The "Run" buttons come from here. */
+  executables: ExecutableView[];
+  /**  Tools from the game definition, with the folder of their program when it is in the game folder. */
+  tools: ToolView_Serialize[];
 };
 
 /**  The Steam manifest that describes a game folder, when the folder is in a Steam library. */
-export type SteamSuggestion = SteamSuggestion_Serialize | SteamSuggestion_Deserialize;
+export type SteamSuggestion =
+  SteamSuggestion_Serialize | SteamSuggestion_Deserialize;
 
 /**  The Steam manifest that describes a game folder, when the folder is in a Steam library. */
 export type SteamSuggestion_Deserialize = {
-	app_id: number,
-	name?: string | null,
-	install_dir?: string | null,
+  app_id: number;
+  name?: string | null;
+  install_dir?: string | null;
 };
 
 /**  The Steam manifest that describes a game folder, when the folder is in a Steam library. */
 export type SteamSuggestion_Serialize = {
-	app_id: number,
-	name: string | null,
-	install_dir: string | null,
+  app_id: number;
+  name: string | null;
+  install_dir: string | null;
 };
 
 /**  The steps the game defines, and the ids this mod asks for in each phase. */
 export type StepChoices = {
-	defined: GameStepView[],
-	before_start: string[],
-	after_end: string[],
+  defined: GameStepView[];
+  before_start: string[];
+  after_end: string[];
 };
 
 /**
@@ -4943,15 +5875,15 @@ export type StepReport = StepReport_Serialize | StepReport_Deserialize;
  *  of a failure), and `params` gives its values.
  */
 export type StepReport_Deserialize = {
-	id: string,
-	phase: Phase,
-	status: StepStatus,
-	code: string,
-	params: { [key in string]: string },
-	outputs: OutputInfo[],
-	log_tail: string[],
-	started_at: number,
-	finished_at?: number | null,
+  id: string;
+  phase: Phase;
+  status: StepStatus;
+  code: string;
+  params: { [key in string]: string };
+  outputs: OutputInfo[];
+  log_tail: string[];
+  started_at: number;
+  finished_at?: number | null;
 };
 
 /**
@@ -4959,44 +5891,44 @@ export type StepReport_Deserialize = {
  *  of a failure), and `params` gives its values.
  */
 export type StepReport_Serialize = {
-	id: string,
-	phase: Phase,
-	status: StepStatus,
-	code: string,
-	params: { [key in string]: string },
-	outputs: OutputInfo[],
-	log_tail: string[],
-	started_at: number,
-	finished_at: number | null,
+  id: string;
+  phase: Phase;
+  status: StepStatus;
+  code: string;
+  params: { [key in string]: string };
+  outputs: OutputInfo[];
+  log_tail: string[];
+  started_at: number;
+  finished_at: number | null;
 };
 
 export type StepStatus = "running" | "done" | "skipped" | "failed";
 
 /**  The data folder, its mode, and the file that records the choice. */
 export type StorageInfo = {
-	/**  The mode the running copy uses. */
-	mode: StorageMode,
-	/**  The data folder as the interface shows it. */
-	root: string,
-	/**  Empty for a custom folder, and before a choice was written. */
-	decision_file: string,
+  /**  The mode the running copy uses. */
+  mode: StorageMode;
+  /**  The data folder as the interface shows it. */
+  root: string;
+  /**  Empty for a custom folder, and before a choice was written. */
+  decision_file: string;
 };
 
 /**  Where the running app keeps its data. */
-export type StorageMode = 
-/**  Next to the program, in `<program folder>/data`. */
-"portable" | 
-/**  In the system's app data folder. */
-"global" | 
-/**  A folder named by `GOBBO_DATA_DIR`, for tests and advanced use. */
-"custom";
+export type StorageMode =
+  /**  Next to the program, in `<program folder>/data`. */
+  | "portable"
+  /**  In the system's app data folder. */
+  | "global"
+  /**  A folder named by `GOBBO_DATA_DIR`, for tests and advanced use. */
+  | "custom";
 
 /**  The store ids that point at a game folder. A definition opts into one with the matching detect field. */
 export type StoreIds = {
-	gog: string[],
-	epic: string[],
-	heroic: string[],
-	lutris: string[],
+  gog: string[];
+  epic: string[];
+  heroic: string[];
+  lutris: string[];
 };
 
 /**
@@ -5004,80 +5936,179 @@ export type StoreIds = {
  *  that decide which rows describe the same operation. The window groups a backend lifecycle row with the matching
  *  local row by this value instead of splitting the id.
  */
-export type TaskDedupe = 
-/**  A deployment of a game's active profile. */
-({ Apply: {
-	/**  The game the deployment belongs to. */
-	game: string,
-} }) & { Collection?: never; Import?: never; Pack?: never; PackLink?: never; Requirement?: never; Tool?: never; Update?: never; UpdateAll?: never } | 
-/**  A loose archive import, keyed by game and archive path. */
-({ Import: {
-	/**  The game the archive is imported into. */
-	game: string,
-	/**  The archive that is being imported. */
-	path: string,
-} }) & { Apply?: never; Collection?: never; Pack?: never; PackLink?: never; Requirement?: never; Tool?: never; Update?: never; UpdateAll?: never } | 
-/**  The update of one mod. The mod is not part of the group: one game has one update row at a time. */
-({ Update: {
-	/**  The game the mod belongs to. */
-	game: string,
-} }) & { Apply?: never; Collection?: never; Import?: never; Pack?: never; PackLink?: never; Requirement?: never; Tool?: never; UpdateAll?: never } | 
-/**  The bulk update of one game. */
-({ UpdateAll: {
-	/**  The game being updated. */
-	game: string,
-} }) & { Apply?: never; Collection?: never; Import?: never; Pack?: never; PackLink?: never; Requirement?: never; Tool?: never; Update?: never } | 
-/**  A requirement install, single or from a plan. One game has one requirement row at a time. */
-({ Requirement: {
-	/**  The game the requirement is installed for. */
-	game: string,
-} }) & { Apply?: never; Collection?: never; Import?: never; Pack?: never; PackLink?: never; Tool?: never; Update?: never; UpdateAll?: never } | 
-/**  An automatic collection install, keyed by its game, profile and collection. */
-({ Collection: {
-	/**  The game the collection is installed into. */
-	game: string,
-	/**  The profile the collection belongs to. */
-	profile: string,
-	/**  The collection being installed. */
-	collection: string,
-} }) & { Apply?: never; Import?: never; Pack?: never; PackLink?: never; Requirement?: never; Tool?: never; Update?: never; UpdateAll?: never } | 
-/**  A pack import or a pack mod download. Both share one group, so the richer local row replaces the backend one. */
-({ Pack: {
-	/**  The game the pack is imported into. */
-	game: string,
-	/**  The pack file that is being used. */
-	path: string,
-} }) & { Apply?: never; Collection?: never; Import?: never; PackLink?: never; Requirement?: never; Tool?: never; Update?: never; UpdateAll?: never } | 
-/**  A pack link download, keyed by game and link. */
-({ PackLink: {
-	/**  The game the pack is downloaded for. */
-	game: string,
-	/**  The link that is being downloaded. */
-	link: string,
-} }) & { Apply?: never; Collection?: never; Import?: never; Pack?: never; Requirement?: never; Tool?: never; Update?: never; UpdateAll?: never } | 
-/**  A tool run or a tool's prerequisite install, keyed by game and tool. */
-({ Tool: {
-	/**  The game the tool belongs to. */
-	game: string,
-	/**  The tool's id in the game definition. */
-	tool: string,
-} }) & { Apply?: never; Collection?: never; Import?: never; Pack?: never; PackLink?: never; Requirement?: never; Update?: never; UpdateAll?: never } | 
-/**  Work without a typed identity yet, such as a row restored from a journal written before this field existed. */
-"Other";
+export type TaskDedupe =
+  /**  A deployment of a game's active profile. */
+  | ({
+      Apply: {
+        /**  The game the deployment belongs to. */
+        game: string;
+      };
+    } & {
+      Collection?: never;
+      Import?: never;
+      Pack?: never;
+      PackLink?: never;
+      Requirement?: never;
+      Tool?: never;
+      Update?: never;
+      UpdateAll?: never;
+    })
+  /**  A loose archive import, keyed by game and archive path. */
+  | ({
+      Import: {
+        /**  The game the archive is imported into. */
+        game: string;
+        /**  The archive that is being imported. */
+        path: string;
+      };
+    } & {
+      Apply?: never;
+      Collection?: never;
+      Pack?: never;
+      PackLink?: never;
+      Requirement?: never;
+      Tool?: never;
+      Update?: never;
+      UpdateAll?: never;
+    })
+  /**  The update of one mod. The mod is not part of the group: one game has one update row at a time. */
+  | ({
+      Update: {
+        /**  The game the mod belongs to. */
+        game: string;
+      };
+    } & {
+      Apply?: never;
+      Collection?: never;
+      Import?: never;
+      Pack?: never;
+      PackLink?: never;
+      Requirement?: never;
+      Tool?: never;
+      UpdateAll?: never;
+    })
+  /**  The bulk update of one game. */
+  | ({
+      UpdateAll: {
+        /**  The game being updated. */
+        game: string;
+      };
+    } & {
+      Apply?: never;
+      Collection?: never;
+      Import?: never;
+      Pack?: never;
+      PackLink?: never;
+      Requirement?: never;
+      Tool?: never;
+      Update?: never;
+    })
+  /**  A requirement install, single or from a plan. One game has one requirement row at a time. */
+  | ({
+      Requirement: {
+        /**  The game the requirement is installed for. */
+        game: string;
+      };
+    } & {
+      Apply?: never;
+      Collection?: never;
+      Import?: never;
+      Pack?: never;
+      PackLink?: never;
+      Tool?: never;
+      Update?: never;
+      UpdateAll?: never;
+    })
+  /**  An automatic collection install, keyed by its game, profile and collection. */
+  | ({
+      Collection: {
+        /**  The game the collection is installed into. */
+        game: string;
+        /**  The profile the collection belongs to. */
+        profile: string;
+        /**  The collection being installed. */
+        collection: string;
+      };
+    } & {
+      Apply?: never;
+      Import?: never;
+      Pack?: never;
+      PackLink?: never;
+      Requirement?: never;
+      Tool?: never;
+      Update?: never;
+      UpdateAll?: never;
+    })
+  /**  A pack import or a pack mod download. Both share one group, so the richer local row replaces the backend one. */
+  | ({
+      Pack: {
+        /**  The game the pack is imported into. */
+        game: string;
+        /**  The pack file that is being used. */
+        path: string;
+      };
+    } & {
+      Apply?: never;
+      Collection?: never;
+      Import?: never;
+      PackLink?: never;
+      Requirement?: never;
+      Tool?: never;
+      Update?: never;
+      UpdateAll?: never;
+    })
+  /**  A pack link download, keyed by game and link. */
+  | ({
+      PackLink: {
+        /**  The game the pack is downloaded for. */
+        game: string;
+        /**  The link that is being downloaded. */
+        link: string;
+      };
+    } & {
+      Apply?: never;
+      Collection?: never;
+      Import?: never;
+      Pack?: never;
+      Requirement?: never;
+      Tool?: never;
+      Update?: never;
+      UpdateAll?: never;
+    })
+  /**  A tool run or a tool's prerequisite install, keyed by game and tool. */
+  | ({
+      Tool: {
+        /**  The game the tool belongs to. */
+        game: string;
+        /**  The tool's id in the game definition. */
+        tool: string;
+      };
+    } & {
+      Apply?: never;
+      Collection?: never;
+      Import?: never;
+      Pack?: never;
+      PackLink?: never;
+      Requirement?: never;
+      Update?: never;
+      UpdateAll?: never;
+    })
+  /**  Work without a typed identity yet, such as a row restored from a journal written before this field existed. */
+  | "Other";
 
 /**  The part of an [`AppError`] a task record keeps: enough to translate the reason, also after a restart. */
 export type TaskError = TaskError_Serialize | TaskError_Deserialize;
 
 /**  The part of an [`AppError`] a task record keeps: enough to translate the reason, also after a restart. */
 export type TaskError_Deserialize = {
-	code: string,
-	params?: { [key in string]: string },
+  code: string;
+  params?: { [key in string]: string };
 };
 
 /**  The part of an [`AppError`] a task record keeps: enough to translate the reason, also after a restart. */
 export type TaskError_Serialize = {
-	code: string,
-	params: { [key in string]: string },
+  code: string;
+  params: { [key in string]: string };
 };
 
 /**
@@ -5093,23 +6124,23 @@ export type TaskView = TaskView_Serialize | TaskView_Deserialize;
  *  window can group this row with the local row of the same work without parsing `id`.
  */
 export type TaskView_Deserialize = {
-	/**  The key that names the operation and is passed back to `cancel_task`. */
-	id: string,
-	/**  The game the task works on, when it is bound to one. */
-	game?: string | null,
-	/**  A stable code such as `import` or `apply`. */
-	kind: string,
-	/**  One of `running`, `done`, `cancelled` or `failed`. */
-	state: string,
-	/**  The last percent the work reported, or `null` while it has not sent any. */
-	percent?: number | null,
-	/**
-	 *  The typed identity of the operation. Additive: a journal written before this field existed still loads and
-	 *  gets [`TaskDedupe::Other`], so this is not an on-disk format migration.
-	 */
-	dedupe?: TaskDedupe,
-	/**  Why a failed task failed, as the error code and values the window translates. Additive like `dedupe`. */
-	error?: TaskError_Deserialize | null,
+  /**  The key that names the operation and is passed back to `cancel_task`. */
+  id: string;
+  /**  The game the task works on, when it is bound to one. */
+  game?: string | null;
+  /**  A stable code such as `import` or `apply`. */
+  kind: string;
+  /**  One of `running`, `done`, `cancelled` or `failed`. */
+  state: string;
+  /**  The last percent the work reported, or `null` while it has not sent any. */
+  percent?: number | null;
+  /**
+   *  The typed identity of the operation. Additive: a journal written before this field existed still loads and
+   *  gets [`TaskDedupe::Other`], so this is not an on-disk format migration.
+   */
+  dedupe?: TaskDedupe;
+  /**  Why a failed task failed, as the error code and values the window translates. Additive like `dedupe`. */
+  error?: TaskError_Deserialize | null;
 };
 
 /**
@@ -5118,23 +6149,23 @@ export type TaskView_Deserialize = {
  *  window can group this row with the local row of the same work without parsing `id`.
  */
 export type TaskView_Serialize = {
-	/**  The key that names the operation and is passed back to `cancel_task`. */
-	id: string,
-	/**  The game the task works on, when it is bound to one. */
-	game: string | null,
-	/**  A stable code such as `import` or `apply`. */
-	kind: string,
-	/**  One of `running`, `done`, `cancelled` or `failed`. */
-	state: string,
-	/**  The last percent the work reported, or `null` while it has not sent any. */
-	percent: number | null,
-	/**
-	 *  The typed identity of the operation. Additive: a journal written before this field existed still loads and
-	 *  gets [`TaskDedupe::Other`], so this is not an on-disk format migration.
-	 */
-	dedupe?: TaskDedupe,
-	/**  Why a failed task failed, as the error code and values the window translates. Additive like `dedupe`. */
-	error?: TaskError_Serialize,
+  /**  The key that names the operation and is passed back to `cancel_task`. */
+  id: string;
+  /**  The game the task works on, when it is bound to one. */
+  game: string | null;
+  /**  A stable code such as `import` or `apply`. */
+  kind: string;
+  /**  One of `running`, `done`, `cancelled` or `failed`. */
+  state: string;
+  /**  The last percent the work reported, or `null` while it has not sent any. */
+  percent: number | null;
+  /**
+   *  The typed identity of the operation. Additive: a journal written before this field existed still loads and
+   *  gets [`TaskDedupe::Other`], so this is not an on-disk format migration.
+   */
+  dedupe?: TaskDedupe;
+  /**  Why a failed task failed, as the error code and values the window translates. Additive like `dedupe`. */
+  error?: TaskError_Serialize;
 };
 
 /**  A tool of the game in the view. `folder` is `None` when its program is not in the game folder. */
@@ -5142,28 +6173,28 @@ export type ToolView = ToolView_Serialize | ToolView_Deserialize;
 
 /**  A tool of the game in the view. `folder` is `None` when its program is not in the game folder. */
 export type ToolView_Deserialize = {
-	id: string,
-	name: string,
-	/**  What the tool makes, for example `generated-mod`. */
-	output: string,
-	folder?: string | null,
-	/**  The provider mod the tool comes from, when the definition names one. */
-	source?: SourceRef_Deserialize | null,
-	/**  The prerequisites that are not in the Proton prefix yet, by name. */
-	missing: string[],
+  id: string;
+  name: string;
+  /**  What the tool makes, for example `generated-mod`. */
+  output: string;
+  folder?: string | null;
+  /**  The provider mod the tool comes from, when the definition names one. */
+  source?: SourceRef_Deserialize | null;
+  /**  The prerequisites that are not in the Proton prefix yet, by name. */
+  missing: string[];
 };
 
 /**  A tool of the game in the view. `folder` is `None` when its program is not in the game folder. */
 export type ToolView_Serialize = {
-	id: string,
-	name: string,
-	/**  What the tool makes, for example `generated-mod`. */
-	output: string,
-	folder: string | null,
-	/**  The provider mod the tool comes from, when the definition names one. */
-	source: SourceRef_Serialize | null,
-	/**  The prerequisites that are not in the Proton prefix yet, by name. */
-	missing: string[],
+  id: string;
+  name: string;
+  /**  What the tool makes, for example `generated-mod`. */
+  output: string;
+  folder: string | null;
+  /**  The provider mod the tool comes from, when the definition names one. */
+  source: SourceRef_Serialize | null;
+  /**  The prerequisites that are not in the Proton prefix yet, by name. */
+  missing: string[];
 };
 
 /**
@@ -5171,59 +6202,60 @@ export type ToolView_Serialize = {
  *  `NextAction`, task kinds and task states.
  */
 export type TrayLabels = {
-	name: string,
-	open: string,
-	settings: string,
-	quit: string,
-	undo: string,
-	stop: string,
-	profiles: string,
-	games: string,
-	working: string,
-	open_working: string,
-	no_game: string,
-	no_tasks: string,
-	/**  `{count}` changes waiting. */
-	changes: string,
-	/**  `{count}` tasks need attention. */
-	attention: string,
-	applied: string,
-	game_running: string,
-	/**  `{percent}` percent of a task. */
-	percent: string,
-	/**  `{game}` and `{profile}` in the tooltip. */
-	tooltip: string,
-	next: { [key in string]: string },
-	busy: { [key in string]: string },
-	kinds: { [key in string]: string },
-	states: { [key in string]: string },
-	quit_title: string,
-	quit_game: string,
-	quit_tasks: string,
-	quit_stop: string,
-	quit_cancel: string,
-	quit_leave: string,
-	notice_title: string,
-	/**  `{kind}` and `{game}` for a task that needs the user. */
-	notice_waiting: string,
-	notice_failed: string,
+  name: string;
+  open: string;
+  settings: string;
+  quit: string;
+  undo: string;
+  stop: string;
+  profiles: string;
+  games: string;
+  working: string;
+  open_working: string;
+  no_game: string;
+  no_tasks: string;
+  /**  `{count}` changes waiting. */
+  changes: string;
+  /**  `{count}` tasks need attention. */
+  attention: string;
+  applied: string;
+  game_running: string;
+  /**  `{percent}` percent of a task. */
+  percent: string;
+  /**  `{game}` and `{profile}` in the tooltip. */
+  tooltip: string;
+  next: { [key in string]: string };
+  busy: { [key in string]: string };
+  kinds: { [key in string]: string };
+  states: { [key in string]: string };
+  quit_title: string;
+  quit_game: string;
+  quit_tasks: string;
+  quit_stop: string;
+  quit_cancel: string;
+  quit_leave: string;
+  notice_title: string;
+  /**  `{kind}` and `{game}` for a task that needs the user. */
+  notice_waiting: string;
+  notice_failed: string;
 };
 
 /**  One step of a bulk update: the mod, its place in the run, and the overall percentage. */
 export type UpdateAllProgress = {
-	name: string,
-	/**  The index of the mod, from 0. */
-	done: number,
-	total: number,
-	stage: UpdateAllStage,
-	percent: number,
+  name: string;
+  /**  The index of the mod, from 0. */
+  done: number;
+  total: number;
+  stage: UpdateAllStage;
+  percent: number;
 };
 
 /**
  *  The phase of an "update all" run. `Switching` is a mod whose newest version is installed already and only needs to
  *  be selected in the profile.
  */
-export type UpdateAllStage = "downloading" | "importing" | "selecting" | "switching";
+export type UpdateAllStage =
+  "downloading" | "importing" | "selecting" | "switching";
 
 /**
  *  What a bulk update did: the fresh status, how many mods it changed, the failures it kept going through, and the
@@ -5236,12 +6268,12 @@ export type UpdateAllView = UpdateAllView_Serialize | UpdateAllView_Deserialize;
  *  previous version of every changed mod, so the window can offer one undo.
  */
 export type UpdateAllView_Deserialize = {
-	status: Status_Deserialize,
-	updated: number,
-	failed: Message[],
-	changes: UpdateChange[],
-	/**  Whether the user stopped the run before every target was done. */
-	cancelled: boolean,
+  status: Status_Deserialize;
+  updated: number;
+  failed: Message[];
+  changes: UpdateChange[];
+  /**  Whether the user stopped the run before every target was done. */
+  cancelled: boolean;
 };
 
 /**
@@ -5249,34 +6281,34 @@ export type UpdateAllView_Deserialize = {
  *  previous version of every changed mod, so the window can offer one undo.
  */
 export type UpdateAllView_Serialize = {
-	status: Status_Serialize,
-	updated: number,
-	failed: Message[],
-	changes: UpdateChange[],
-	/**  Whether the user stopped the run before every target was done. */
-	cancelled: boolean,
+  status: Status_Serialize;
+  updated: number;
+  failed: Message[];
+  changes: UpdateChange[];
+  /**  Whether the user stopped the run before every target was done. */
+  cancelled: boolean;
 };
 
 /**  One mod a bulk update selected a new version for, with the folder it selected before. */
 export type UpdateChange = {
-	id: string,
-	name: string,
-	previous: string,
+  id: string;
+  name: string;
+  previous: string;
 };
 
 /**  The update path of this copy, as the window needs it. */
-export type UpdateChannel = 
-/**  Installed with the installer: the updater plugin runs the installer. */
-"installed" | 
-/**  The portable archive: Gobbo replaces its program files itself. */
-"portable" | 
-/**  A portable copy on a system with no portable archive: nothing can update it. */
-"unsupported";
+export type UpdateChannel =
+  /**  Installed with the installer: the updater plugin runs the installer. */
+  | "installed"
+  /**  The portable archive: Gobbo replaces its program files itself. */
+  | "portable"
+  /**  A portable copy on a system with no portable archive: nothing can update it. */
+  | "unsupported";
 
 /**  One progress step of an in-app update, sent to the window. */
 export type UpdateProgress = {
-	stage: UpdateStage,
-	percent: number,
+  stage: UpdateStage;
+  percent: number;
 };
 
 /**
@@ -5290,37 +6322,37 @@ export type UpdateReport = UpdateReport_Serialize | UpdateReport_Deserialize;
  *  the result of the last saved check too, so the list shows it after a restart or a game switch.
  */
 export type UpdateReport_Deserialize = {
-	/**  Id of the mod family. */
-	id: string,
-	/**  The provider that was checked. */
-	provider: string,
-	/**  The mod id on the provider. */
-	mod_id: string,
-	/**  The version the profile selects now. */
-	current?: string | null,
-	/**  The newest version the provider listed at the check. */
-	latest?: string | null,
-	/**
-	 *  The provider's id of the newest file, when the check read a file chain. It names the exact file a manual update
-	 *  has to download, also when the page has several parts.
-	 */
-	latest_file_id?: string | null,
-	/**  How `latest` compares with `current`, or that the user ignored it. */
-	state: UpdateState,
-	/**  The latest version is already installed in the library, just not selected in this profile. */
-	latest_installed: boolean,
-	/**
-	 *  The library folder of that installed latest version, when `latest_installed` is true. "Use installed version"
-	 *  selects this folder.
-	 */
-	installed_folder?: string | null,
-	/**
-	 *  Whether the newest version is an update the user can take (see `UpdateState::is_update`). The window reads this
-	 *  instead of the state.
-	 */
-	has_update: boolean,
-	/**  Why the check failed. Only a check that ran in this session has one; a saved result never does. */
-	error?: AppError_Deserialize | null,
+  /**  Id of the mod family. */
+  id: string;
+  /**  The provider that was checked. */
+  provider: string;
+  /**  The mod id on the provider. */
+  mod_id: string;
+  /**  The version the profile selects now. */
+  current?: string | null;
+  /**  The newest version the provider listed at the check. */
+  latest?: string | null;
+  /**
+   *  The provider's id of the newest file, when the check read a file chain. It names the exact file a manual update
+   *  has to download, also when the page has several parts.
+   */
+  latest_file_id?: string | null;
+  /**  How `latest` compares with `current`, or that the user ignored it. */
+  state: UpdateState;
+  /**  The latest version is already installed in the library, just not selected in this profile. */
+  latest_installed: boolean;
+  /**
+   *  The library folder of that installed latest version, when `latest_installed` is true. "Use installed version"
+   *  selects this folder.
+   */
+  installed_folder?: string | null;
+  /**
+   *  Whether the newest version is an update the user can take (see `UpdateState::is_update`). The window reads this
+   *  instead of the state.
+   */
+  has_update: boolean;
+  /**  Why the check failed. Only a check that ran in this session has one; a saved result never does. */
+  error?: AppError_Deserialize | null;
 };
 
 /**
@@ -5328,74 +6360,74 @@ export type UpdateReport_Deserialize = {
  *  the result of the last saved check too, so the list shows it after a restart or a game switch.
  */
 export type UpdateReport_Serialize = {
-	/**  Id of the mod family. */
-	id: string,
-	/**  The provider that was checked. */
-	provider: string,
-	/**  The mod id on the provider. */
-	mod_id: string,
-	/**  The version the profile selects now. */
-	current: string | null,
-	/**  The newest version the provider listed at the check. */
-	latest: string | null,
-	/**
-	 *  The provider's id of the newest file, when the check read a file chain. It names the exact file a manual update
-	 *  has to download, also when the page has several parts.
-	 */
-	latest_file_id: string | null,
-	/**  How `latest` compares with `current`, or that the user ignored it. */
-	state: UpdateState,
-	/**  The latest version is already installed in the library, just not selected in this profile. */
-	latest_installed: boolean,
-	/**
-	 *  The library folder of that installed latest version, when `latest_installed` is true. "Use installed version"
-	 *  selects this folder.
-	 */
-	installed_folder: string | null,
-	/**
-	 *  Whether the newest version is an update the user can take (see `UpdateState::is_update`). The window reads this
-	 *  instead of the state.
-	 */
-	has_update: boolean,
-	/**  Why the check failed. Only a check that ran in this session has one; a saved result never does. */
-	error: AppError_Serialize | null,
+  /**  Id of the mod family. */
+  id: string;
+  /**  The provider that was checked. */
+  provider: string;
+  /**  The mod id on the provider. */
+  mod_id: string;
+  /**  The version the profile selects now. */
+  current: string | null;
+  /**  The newest version the provider listed at the check. */
+  latest: string | null;
+  /**
+   *  The provider's id of the newest file, when the check read a file chain. It names the exact file a manual update
+   *  has to download, also when the page has several parts.
+   */
+  latest_file_id: string | null;
+  /**  How `latest` compares with `current`, or that the user ignored it. */
+  state: UpdateState;
+  /**  The latest version is already installed in the library, just not selected in this profile. */
+  latest_installed: boolean;
+  /**
+   *  The library folder of that installed latest version, when `latest_installed` is true. "Use installed version"
+   *  selects this folder.
+   */
+  installed_folder: string | null;
+  /**
+   *  Whether the newest version is an update the user can take (see `UpdateState::is_update`). The window reads this
+   *  instead of the state.
+   */
+  has_update: boolean;
+  /**  Why the check failed. Only a check that ran in this session has one; a saved result never does. */
+  error: AppError_Serialize | null;
 };
 
 /**  The phase of an in-app update. */
 export type UpdateStage = "downloading" | "importing" | "selecting";
 
 /**  How the newest version a provider lists compares with the version a profile selects. */
-export type UpdateState = 
-/**  The check brought no version, or it failed. */
-"unknown" | 
-/**  The selected version is the newest one. */
-"current" | 
-/**  The provider's file chain or the version comparison says the newest version is newer. */
-"newer" | 
-/**
- *  The provider lists a different version, but the version strings cannot say which one is newer. The user
- *  decides whether it is an update, a variant or a beta.
- */
-"different" | 
-/**  The user ignored this exact version. It stays hidden until the provider lists another one. */
-"ignored";
+export type UpdateState =
+  /**  The check brought no version, or it failed. */
+  | "unknown"
+  /**  The selected version is the newest one. */
+  | "current"
+  /**  The provider's file chain or the version comparison says the newest version is newer. */
+  | "newer"
+  /**
+   *  The provider lists a different version, but the version strings cannot say which one is newer. The user
+   *  decides whether it is an update, a variant or a beta.
+   */
+  | "different"
+  /**  The user ignored this exact version. It stays hidden until the provider lists another one. */
+  | "ignored";
 
 /**  One user-data set of the game for the active profile. The frontend translates `kind` with one universal label. */
 export type UserDataView = {
-	id: string,
-	kind: Kind,
-	/**  The folder the game sees, resolved for this installation. */
-	path: string,
-	/**  The effective mode: `redirect` when the overlay serves it, `copy` otherwise. */
-	mode: Mode,
-	isolated: boolean,
-	inherit: boolean,
-	/**  The profile's writable layer or copy store; "Open folder" opens this. */
-	upper: string,
-	/**  The profile's upper layer exists, so "Open folder" can reach it. */
-	upper_exists: boolean,
-	/**  The folder or its parent exists, so the path can be used. */
-	available: boolean,
+  id: string;
+  kind: Kind;
+  /**  The folder the game sees, resolved for this installation. */
+  path: string;
+  /**  The effective mode: `redirect` when the overlay serves it, `copy` otherwise. */
+  mode: Mode;
+  isolated: boolean;
+  inherit: boolean;
+  /**  The profile's writable layer or copy store; "Open folder" opens this. */
+  upper: string;
+  /**  The profile's upper layer exists, so "Open folder" can reach it. */
+  upper_exists: boolean;
+  /**  The folder or its parent exists, so the path can be used. */
+  available: boolean;
 };
 
 /**
@@ -5409,14 +6441,14 @@ export type Verified = Verified_Serialize | Verified_Deserialize;
  *  interface then calls it unverified instead of guessing.
  */
 export type Verified_Deserialize = {
-	/**  The day of the test, `YYYY-MM-DD`. */
-	date: string,
-	/**  The systems it was tested on, for example `windows` and `linux`. */
-	os?: string[],
-	/**  The game build the test used. */
-	game_version?: string | null,
-	/**  The loader build the test used. */
-	loader_version?: string | null,
+  /**  The day of the test, `YYYY-MM-DD`. */
+  date: string;
+  /**  The systems it was tested on, for example `windows` and `linux`. */
+  os?: string[];
+  /**  The game build the test used. */
+  game_version?: string | null;
+  /**  The loader build the test used. */
+  loader_version?: string | null;
 };
 
 /**
@@ -5424,14 +6456,14 @@ export type Verified_Deserialize = {
  *  interface then calls it unverified instead of guessing.
  */
 export type Verified_Serialize = {
-	/**  The day of the test, `YYYY-MM-DD`. */
-	date: string,
-	/**  The systems it was tested on, for example `windows` and `linux`. */
-	os: string[],
-	/**  The game build the test used. */
-	game_version: string | null,
-	/**  The loader build the test used. */
-	loader_version: string | null,
+  /**  The day of the test, `YYYY-MM-DD`. */
+  date: string;
+  /**  The systems it was tested on, for example `windows` and `linux`. */
+  os: string[];
+  /**  The game build the test used. */
+  game_version: string | null;
+  /**  The loader build the test used. */
+  loader_version: string | null;
 };
 
 /**  One installed version of a mod, for the version picker. */
@@ -5439,48 +6471,53 @@ export type VersionView = VersionView_Serialize | VersionView_Deserialize;
 
 /**  One installed version of a mod, for the version picker. */
 export type VersionView_Deserialize = {
-	folder: string,
-	name: string,
-	version?: string | null,
-	files: number,
-	size_kb: number,
-	archive?: string | null,
-	archive_file?: string | null,
-	installed_at: number,
-	/**  Number of profiles that select this version. */
-	used_by: number,
+  folder: string;
+  name: string;
+  version?: string | null;
+  files: number;
+  size_kb: number;
+  archive?: string | null;
+  archive_file?: string | null;
+  installed_at: number;
+  /**  Number of profiles that select this version. */
+  used_by: number;
 };
 
 /**  One installed version of a mod, for the version picker. */
 export type VersionView_Serialize = {
-	folder: string,
-	name: string,
-	version: string | null,
-	files: number,
-	size_kb: number,
-	archive: string | null,
-	archive_file: string | null,
-	installed_at: number,
-	/**  Number of profiles that select this version. */
-	used_by: number,
+  folder: string;
+  name: string;
+  version: string | null;
+  files: number;
+  size_kb: number;
+  archive: string | null;
+  archive_file: string | null;
+  installed_at: number;
+  /**  Number of profiles that select this version. */
+  used_by: number;
 };
 
 /**  A preview of the archive before import: a plain zip, or a FOMOD installer with steps for the wizard. */
 export type ZipInspect = ZipInspect_Serialize | ZipInspect_Deserialize;
 
 /**  A preview of the archive before import: a plain zip, or a FOMOD installer with steps for the wizard. */
-export type ZipInspect_Deserialize = { kind: "plain" } | { kind: "fomod"; module_name: string; steps: FomodStepView_Deserialize[] };
+export type ZipInspect_Deserialize =
+  | { kind: "plain" }
+  | { kind: "fomod"; module_name: string; steps: FomodStepView_Deserialize[] };
 
 /**  A preview of the archive before import: a plain zip, or a FOMOD installer with steps for the wizard. */
-export type ZipInspect_Serialize = { kind: "plain" } | { kind: "fomod"; module_name: string; steps: FomodStepView_Serialize[] };
+export type ZipInspect_Serialize =
+  | { kind: "plain" }
+  | { kind: "fomod"; module_name: string; steps: FomodStepView_Serialize[] };
 
 /* Tauri Specta runtime */
-async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {
-    try {
-        return { status: "ok", data: await result };
-    } catch (e) {
-        if (e instanceof Error) throw e;
-        return { status: "error", error: e as any };
-    }
+async function typedError<T, E>(
+  result: Promise<T>,
+): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {
+  try {
+    return { status: "ok", data: await result };
+  } catch (e) {
+    if (e instanceof Error) throw e;
+    return { status: "error", error: e as any };
+  }
 }
-

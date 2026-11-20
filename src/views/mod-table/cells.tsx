@@ -127,7 +127,13 @@ export function VersionCell({
 	return (
 		<div
 			className="grid min-w-0 gap-0.5 text-xs"
-			title={checkedAt === undefined ? undefined : t("mods.sources.checkedOn", { date: formatDate(checkedAt, i18n.language) })}
+			title={
+				checkedAt === undefined
+					? undefined
+					: t("mods.sources.checkedOn", {
+							date: formatDate(checkedAt, i18n.language),
+						})
+			}
 		>
 			{picker}
 			{line}

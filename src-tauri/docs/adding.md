@@ -43,7 +43,6 @@ A feature is a vertical module: its commands, use case and engine live in one fo
 7. Run the gates, regenerate `src/bindings.ts` when a command or IPC type changed, and update `AGENTS.md` plus
    `CHANGELOG.md` when the structure or the user-visible behavior changed.
 
-
 ### API design
 
 - For new public APIs, prefer a newtype or an enum to a `bool` or an `Option` parameter (Rust API Guidelines C-NEWTYPE

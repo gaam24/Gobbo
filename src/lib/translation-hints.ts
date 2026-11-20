@@ -129,7 +129,12 @@ export function suggestTranslationPairs(mods: ModView[], existingGroups: ModGrou
 			if (reference === 0) continue;
 			const raw = LANGUAGE_WEIGHT + NAME_WEIGHT * reference + pageScore(base, translation);
 			const confidence = Math.round(Math.min(1, Math.max(0, raw)) * 100) / 100;
-			hints.push({ baseId: base.id, translationId: translation.id, language, confidence });
+			hints.push({
+				baseId: base.id,
+				translationId: translation.id,
+				language,
+				confidence,
+			});
 		}
 	}
 

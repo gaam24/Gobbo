@@ -100,5 +100,14 @@ export function useNotices() {
 		[notifyError],
 	);
 
-	return { notices, dismissNotice, notify, notifyDurable, notifyError, markRead, clearNotices, attempt };
+	return {
+		notices,
+		dismissNotice,
+		notify,
+		notifyDurable,
+		notifyError,
+		markRead,
+		clearNotices,
+		attempt,
+	};
 }

@@ -129,7 +129,11 @@ function collectUnplaced(
 	const files = view.skipped_files.filter((file) => file.reason === "no_rule");
 
 	if (!folder || files.length === 0) return;
-	into.push({ folder, name: view.mods.find((mod) => mod.folder === folder)?.name ?? fallbackName, files });
+	into.push({
+		folder,
+		name: view.mods.find((mod) => mod.folder === folder)?.name ?? fallbackName,
+		files,
+	});
 }
 
 /// Runs `task` on every item, with at most `workers` running at once. A worker takes the next item when its task ends.
@@ -161,7 +165,10 @@ export function useImport({
 	const fomodWizard = (selectedGame ? wizards[selectedGame] : undefined) ?? null;
 	/// An import that added a version of a mod which already had a selected one. Switching is the user's choice, so it
 	/// waits in a banner. The game is kept with the list, so switching games hides it without losing the other game's.
-	const [pending, setPending] = useState<{ game: string; mods: ImportedModView[] } | null>(null);
+	const [pending, setPending] = useState<{
+		game: string;
+		mods: ImportedModView[];
+	} | null>(null);
 	const pendingVersions = pending?.game === selectedGame ? pending.mods : [];
 	const fomodResolvers = useRef(new Map<string, (choices: FomodChoice[] | null) => void>());
 	/// One import queue per game: the wizard can show one archive at a time per game, and a second import of the same
@@ -182,7 +189,13 @@ export function useImport({
 				fomodResolvers.current.set(gameId, resolve);
 				setWizards((prev) => ({
 					...prev,
-					[gameId]: { game: gameId, path, moduleName: inspect.module_name, steps: inspect.steps, fileName: file },
+					[gameId]: {
+						game: gameId,
+						path,
+						moduleName: inspect.module_name,
+						steps: inspect.steps,
+						fileName: file,
+					},
 				}));
 			}),
 		[],
@@ -206,7 +219,10 @@ export function useImport({
 			notify(
 				t("import.skippedFiles", { count, archives: items.length }),
 				first && gameId === selectedGame
-					? { label: t("import.showSkipped"), onClick: () => onArchiveReport(gameId, first.folder, first.name) }
+					? {
+							label: t("import.showSkipped"),
+							onClick: () => onArchiveReport(gameId, first.folder, first.name),
+						}
 					: undefined,
 			);
 		},
@@ -252,7 +268,11 @@ export function useImport({
 				return;
 			}
 
-			const skippedFiles: Array<{ folder: string; name: string; files: SkippedFile[] }> = [];
+			const skippedFiles: Array<{
+				folder: string;
+				name: string;
+				files: SkippedFile[];
+			}> = [];
 			collectUnplaced(event.view, event.name, skippedFiles);
 			announceSkipped(skippedFiles, event.game);
 			settleImport(event.game, event.status, event.view.folders, event.view.mods, true);
@@ -273,9 +293,17 @@ export function useImport({
 			const imported: string[] = [];
 			const added: ImportedModView[] = [];
 			const failed: string[] = [];
-			const failedImports: Array<{ path: string; name: string; message: string }> = [];
+			const failedImports: Array<{
+				path: string;
+				name: string;
+				message: string;
+			}> = [];
 			const skippedByUser: string[] = [];
-			const skippedFiles: Array<{ folder: string; name: string; files: SkippedFile[] }> = [];
+			const skippedFiles: Array<{
+				folder: string;
+				name: string;
+				files: SkippedFile[];
+			}> = [];
 			// Each archive is previewed first: an FOMOD installer opens the wizard, a plain one is imported whole. The
 			// previews run one at a time, since the wizard shows one archive at a time. The wizard key of each FOMOD
 			// archive is remembered so its saved answers can be dropped when this import ends.
@@ -435,12 +463,26 @@ export function useImport({
 
 	/// Takes one imported version out of the banner, after the user chose it or kept the selected one.
 	const dismissPendingVersion = useCallback((folder: string) => {
-		setPending((current) => (current ? { ...current, mods: current.mods.filter((item) => item.folder !== folder) } : null));
+		setPending((current) =>
+			current
+				? {
+						...current,
+						mods: current.mods.filter((item) => item.folder !== folder),
+					}
+				: null,
+		);
 	}, []);
 
 	/// Drops the banner entries of one mod family after an update step selected the imported version itself.
 	const dismissPendingFamily = useCallback((family: string) => {
-		setPending((current) => (current ? { ...current, mods: current.mods.filter((item) => item.family !== family) } : null));
+		setPending((current) =>
+			current
+				? {
+						...current,
+						mods: current.mods.filter((item) => item.family !== family),
+					}
+				: null,
+		);
 	}, []);
 
 	/// Remembers the answers before resolving the import, so a wizard shown again for the same archive starts from them.

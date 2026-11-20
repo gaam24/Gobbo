@@ -19,7 +19,10 @@ function game(id: string, name: string): GameView {
 }
 
 function scan(id: string, root: string | null): GameScan {
-	return { id, found: root === null ? null : { game_root: root, library: "/library/steam", store: "steam" } };
+	return {
+		id,
+		found: root === null ? null : { game_root: root, library: "/library/steam", store: "steam" },
+	};
 }
 
 const managed: ManagedGame[] = [{ id: "added", game_root: "/games/added", ready: true }];
@@ -27,7 +30,12 @@ const managed: ManagedGame[] = [{ id: "added", game_root: "/games/added", ready:
 test("an added game wins over a scan result and keeps its folder", () => {
 	const added = game("added", "Added");
 	const entries = buildGameEntries([added], managed, [scan("added", "/elsewhere")]);
-	expect(entries[0]).toEqual({ game: added, status: "added", root: "/games/added", ready: true });
+	expect(entries[0]).toEqual({
+		game: added,
+		status: "added",
+		root: "/games/added",
+		ready: true,
+	});
 });
 
 test("a game without an answer yet is searching, then found or missing", () => {

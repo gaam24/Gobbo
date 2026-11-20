@@ -27,7 +27,10 @@ export async function waitForPlaceholder(text: string, timeout = 30_000): Promis
 					),
 				text,
 			),
-		{ timeout, timeoutMsg: `the field with placeholder ${JSON.stringify(text)} did not appear` },
+		{
+			timeout,
+			timeoutMsg: `the field with placeholder ${JSON.stringify(text)} did not appear`,
+		},
 	);
 }
 
@@ -50,7 +53,10 @@ export async function waitForSelector(selector: string, timeout = 30_000): Promi
 export async function waitForHeading(text: string, timeout = 30_000): Promise<void> {
 	await browser.waitUntil(
 		async () => browser.execute((wanted: string) => document.querySelector("h1")?.textContent?.trim() === wanted, text),
-		{ timeout, timeoutMsg: `the page heading ${JSON.stringify(text)} did not appear` },
+		{
+			timeout,
+			timeoutMsg: `the page heading ${JSON.stringify(text)} did not appear`,
+		},
 	);
 }
 
@@ -90,7 +96,10 @@ export async function clickByLabel(label: string, scope?: string): Promise<void>
 				label,
 				scope ?? null,
 			),
-		{ timeout: 30_000, timeoutMsg: `the control labelled ${JSON.stringify(label)} did not appear` },
+		{
+			timeout: 30_000,
+			timeoutMsg: `the control labelled ${JSON.stringify(label)} did not appear`,
+		},
 	);
 	await browser.execute(
 		(wanted: string, selector: string | null) => {
@@ -145,7 +154,10 @@ export async function clickByLabelPrefix(prefix: string, scope?: string): Promis
 				prefix,
 				scope ?? null,
 			),
-		{ timeout: 30_000, timeoutMsg: `the control labelled ${JSON.stringify(prefix)} did not appear` },
+		{
+			timeout: 30_000,
+			timeoutMsg: `the control labelled ${JSON.stringify(prefix)} did not appear`,
+		},
 	);
 	await browser.execute(
 		(wanted: string, selector: string | null) => {
@@ -179,7 +191,10 @@ export async function clickByText(
 				selector,
 				scope ?? null,
 			),
-		{ timeout: 30_000, timeoutMsg: `the control with text ${JSON.stringify(text)} did not appear` },
+		{
+			timeout: 30_000,
+			timeoutMsg: `the control with text ${JSON.stringify(text)} did not appear`,
+		},
 	);
 	await browser.execute(
 		(wanted: string, css: string, scopeSelector: string | null) => {
@@ -436,7 +451,13 @@ export async function chooseSelect(triggerSelector: string, optionText: string):
 
 		if (!element) return false;
 		element.focus();
-		element.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }));
+		element.dispatchEvent(
+			new KeyboardEvent("keydown", {
+				key: "ArrowDown",
+				bubbles: true,
+				cancelable: true,
+			}),
+		);
 		return true;
 	}, triggerSelector);
 
@@ -451,8 +472,20 @@ export async function chooseSelect(triggerSelector: string, optionText: string):
 
 		if (!option) return false;
 		option.focus();
-		option.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }));
-		option.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+		option.dispatchEvent(
+			new KeyboardEvent("keydown", {
+				key: "ArrowDown",
+				bubbles: true,
+				cancelable: true,
+			}),
+		);
+		option.dispatchEvent(
+			new KeyboardEvent("keydown", {
+				key: "Enter",
+				bubbles: true,
+				cancelable: true,
+			}),
+		);
 		return true;
 	}, optionText);
 
@@ -488,7 +521,10 @@ export async function waitForMod(name: string, timeout = 30_000): Promise<void> 
 				(wanted: string) => [...document.querySelectorAll("[data-mod]")].some((element) => element.textContent?.includes(wanted)),
 				name,
 			),
-		{ timeout, timeoutMsg: `the mod ${JSON.stringify(name)} did not appear in the list` },
+		{
+			timeout,
+			timeoutMsg: `the mod ${JSON.stringify(name)} did not appear in the list`,
+		},
 	);
 }
 
@@ -502,7 +538,14 @@ export async function clickMod(name: string, modifiers: { control?: boolean; shi
 			if (!element) throw new Error(`the mod ${wanted} was not found`);
 
 			if (ctrl || shift) {
-				element.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, ctrlKey: ctrl, shiftKey: shift }));
+				element.dispatchEvent(
+					new MouseEvent("click", {
+						bubbles: true,
+						cancelable: true,
+						ctrlKey: ctrl,
+						shiftKey: shift,
+					}),
+				);
 			} else {
 				element.click();
 			}
@@ -579,7 +622,13 @@ export async function activateMenuItem(text: string): Promise<void> {
 
 		if (!item) return false;
 		item.focus();
-		item.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+		item.dispatchEvent(
+			new KeyboardEvent("keydown", {
+				key: "Enter",
+				bubbles: true,
+				cancelable: true,
+			}),
+		);
 		return true;
 	}, text);
 
@@ -619,6 +668,9 @@ export async function waitForGame(name: string, timeout = 30_000): Promise<void>
 				(wanted: string) => [...document.querySelectorAll("[aria-label]")].some((element) => element.getAttribute("aria-label") === wanted),
 				name,
 			),
-		{ timeout, timeoutMsg: `the game ${JSON.stringify(name)} did not appear in the rail` },
+		{
+			timeout,
+			timeoutMsg: `the game ${JSON.stringify(name)} did not appear in the rail`,
+		},
 	);
 }

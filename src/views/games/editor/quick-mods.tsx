@@ -23,7 +23,9 @@ export function QuickMods({ draft, onChange, inspection, presets, layout, onLayo
 		<QuickSection number={2} title={t("editor.quick.modsTitle")} hint={t("editor.quick.modsHint")}>
 			{brokenPresets.length > 0 && (
 				<p className="text-destructive text-sm">
-					{t("editor.quick.presetProblems", { presets: brokenPresets.map((preset) => preset.id).join(", ") })}
+					{t("editor.quick.presetProblems", {
+						presets: brokenPresets.map((preset) => preset.id).join(", "),
+					})}
 				</p>
 			)}
 			<div className="grid gap-2 sm:grid-cols-3">
@@ -81,7 +83,9 @@ export function QuickMods({ draft, onChange, inspection, presets, layout, onLayo
 								</SelectTrigger>
 								<SelectContent>
 									<SelectItem value="default">
-										{t("editor.quick.variantDefault", { variant: selectedPreset.default_variant ?? "—" })}
+										{t("editor.quick.variantDefault", {
+											variant: selectedPreset.default_variant ?? "—",
+										})}
 									</SelectItem>
 									{selectedPreset.variants.map((variant) => (
 										<SelectItem key={variant.name} value={variant.name}>
@@ -100,10 +104,16 @@ export function QuickMods({ draft, onChange, inspection, presets, layout, onLayo
 									{t("editor.quick.loaderDetected")}
 								</p>
 							)}
-							<p className="text-muted-foreground">{t("editor.quick.loaderPlaces", { places: selectedPreset.places.join(", ") || "—" })}</p>
+							<p className="text-muted-foreground">
+								{t("editor.quick.loaderPlaces", {
+									places: selectedPreset.places.join(", ") || "—",
+								})}
+							</p>
 							{selectedPreset.requires.length > 0 && (
 								<p className="text-muted-foreground font-mono text-xs">
-									{t("editor.quick.loaderRequires", { files: selectedPreset.requires.join(", ") })}
+									{t("editor.quick.loaderRequires", {
+										files: selectedPreset.requires.join(", "),
+									})}
 								</p>
 							)}
 						</div>
@@ -128,7 +138,10 @@ export function QuickMods({ draft, onChange, inspection, presets, layout, onLayo
 							spellCheck={false}
 							onChange={(event) => {
 								const slots = [...(draft.deploy.slots ?? [])];
-								slots[0] = { ...(slots[0] ?? { dir: "" }), dir: event.currentTarget.value };
+								slots[0] = {
+									...(slots[0] ?? { dir: "" }),
+									dir: event.currentTarget.value,
+								};
 								onChange({ ...draft, deploy: { ...draft.deploy, slots } });
 							}}
 						/>
@@ -140,7 +153,10 @@ export function QuickMods({ draft, onChange, inspection, presets, layout, onLayo
 							placeholder="mod"
 							onChange={(event) => {
 								const slots = [...(draft.deploy.slots ?? [])];
-								slots[0] = { ...(slots[0] ?? { dir: "" }), prefix: event.currentTarget.value };
+								slots[0] = {
+									...(slots[0] ?? { dir: "" }),
+									prefix: event.currentTarget.value,
+								};
 								onChange({ ...draft, deploy: { ...draft.deploy, slots } });
 							}}
 						/>
@@ -152,7 +168,10 @@ export function QuickMods({ draft, onChange, inspection, presets, layout, onLayo
 							placeholder="content"
 							onChange={(event) => {
 								const slots = [...(draft.deploy.slots ?? [])];
-								slots[0] = { ...(slots[0] ?? { dir: "" }), marker: event.currentTarget.value };
+								slots[0] = {
+									...(slots[0] ?? { dir: "" }),
+									marker: event.currentTarget.value,
+								};
 								onChange({ ...draft, deploy: { ...draft.deploy, slots } });
 							}}
 						/>
@@ -186,8 +205,14 @@ export function QuickMods({ draft, onChange, inspection, presets, layout, onLayo
 									spellCheck={false}
 									onChange={(event) => {
 										const mirrors = [...(draft.deploy.mirror ?? [])];
-										mirrors[index] = { ...mirrors[index], dir: event.currentTarget.value };
-										onChange({ ...draft, deploy: { ...draft.deploy, mirror: mirrors } });
+										mirrors[index] = {
+											...mirrors[index],
+											dir: event.currentTarget.value,
+										};
+										onChange({
+											...draft,
+											deploy: { ...draft.deploy, mirror: mirrors },
+										});
 									}}
 								/>
 							</EditorField>
@@ -198,7 +223,10 @@ export function QuickMods({ draft, onChange, inspection, presets, layout, onLayo
 								onClick={() =>
 									onChange({
 										...draft,
-										deploy: { ...draft.deploy, mirror: (draft.deploy.mirror ?? []).filter((_, at) => at !== index) },
+										deploy: {
+											...draft.deploy,
+											mirror: (draft.deploy.mirror ?? []).filter((_, at) => at !== index),
+										},
 									})
 								}
 							>
@@ -211,7 +239,15 @@ export function QuickMods({ draft, onChange, inspection, presets, layout, onLayo
 						variant="outline"
 						size="sm"
 						className="w-fit"
-						onClick={() => onChange({ ...draft, deploy: { ...draft.deploy, mirror: [...(draft.deploy.mirror ?? []), { dir: "" }] } })}
+						onClick={() =>
+							onChange({
+								...draft,
+								deploy: {
+									...draft.deploy,
+									mirror: [...(draft.deploy.mirror ?? []), { dir: "" }],
+								},
+							})
+						}
 					>
 						<Search /> {t("editor.quick.addMirror")}
 					</Button>

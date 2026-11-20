@@ -10,7 +10,12 @@ import { activateMenuItem, clickMenuTrigger, waitForMod } from "../support/ui";
 
 async function importError(game: string, archive: string): Promise<{ code: string }> {
 	try {
-		await invokeWithChannel("import_zip", { game, path: archive, choices: null, source: null });
+		await invokeWithChannel("import_zip", {
+			game,
+			path: archive,
+			choices: null,
+			source: null,
+		});
 		throw new Error("the import was expected to fail");
 	} catch (error) {
 		if (error instanceof CommandFailure) return error;
@@ -114,7 +119,10 @@ describe("import", () => {
 		const name = `E2E Import Source ${id}`;
 		const { fixture } = await seedGame({ id, name });
 		const archive = modZip("import-source.zip", "Sourced");
-		await importMods(id, [archive], { provider: "thunderstore", mod_id: "Owner-Sourced" });
+		await importMods(id, [archive], {
+			provider: "thunderstore",
+			mod_id: "Owner-Sourced",
+		});
 		const status = await statusOf(id);
 		const mod = status.mods.find((item) => item.folder.includes("import-source"));
 		assert.ok(mod, "the sourced mod is missing");
@@ -142,7 +150,11 @@ describe("import", () => {
 		assert.equal(versions.length, 2);
 		const newer = versions.find((version) => version.version === "2.0");
 		assert.ok(newer, `the 2.0 version is missing: ${JSON.stringify(versions)}`);
-		await invoke("set_mod_version", { game: id, id: mod.id, folder: newer.folder });
+		await invoke("set_mod_version", {
+			game: id,
+			id: mod.id,
+			folder: newer.folder,
+		});
 		const switched = await statusOf(id);
 		const selected = switched.mods.find((item) => item.id === mod.id);
 		assert.equal(selected?.info.version, "2.0");

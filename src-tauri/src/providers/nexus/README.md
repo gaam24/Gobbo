@@ -4,12 +4,12 @@ The player-facing guide is [Nexus Mods and Thunderstore](../../../../docs/user/p
 
 The module talks to three Nexus APIs, and only where each one is needed:
 
-| API | Used for |
-|---|---|
-| v3 (`https://api.nexusmods.com/v3`) | mod pages, file versions, file lists, signed download links, file dependencies |
-| v2 (`https://api.nexusmods.com/v2`) | the signed archive link of a collection revision |
+| API                                                 | Used for                                                                                                                       |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| v3 (`https://api.nexusmods.com/v3`)                 | mod pages, file versions, file lists, signed download links, file dependencies                                                 |
+| v2 (`https://api.nexusmods.com/v2`)                 | the signed archive link of a collection revision                                                                               |
 | GraphQL v2 (`https://api.nexusmods.com/v2/graphql`) | a mod's summary, its creation/update dates, the requirements it lists for itself, and collection revisions; batched by aliases |
-| v1 (`https://api.nexusmods.com/v1`) | `GET /users/validate.json` only; v3 has no user endpoint |
+| v1 (`https://api.nexusmods.com/v1`)                 | `GET /users/validate.json` only; v3 has no user endpoint                                                                       |
 
 The v3 endpoints are marked **Experimental** by Nexus. Wire types are therefore tolerant: missing optional fields
 deserialize to `None`, and a batch that fails leaves the previously saved values in place.
@@ -18,13 +18,13 @@ deserialize to `None`, and a batch that fails leaves the previously saved values
 
 Nexus uses several ids that look alike. Mixing them is the easiest way to get a 404.
 
-| Name | Example | Used by |
-|---|---|---|
-| game-scoped mod id | `107` | `nxm://.../mods/107/...`, `/games/{domain}/mods/{id}` |
-| global mod uid | `14315125997675` | `ModPage.uid`, `/mods/{id}/files` |
-| game-scoped file version id | `168615` | `nxm://.../files/168615`, `/games/{domain}/mod-file-versions/{id}`, `download-link` |
-| global file version id | `14315126166183` | `/mod-file-versions/{id}`, `/mod-file-versions/{id}/dependencies` |
-| global mod file id | a string | `/mod-files/{id}/versions` |
+| Name                        | Example          | Used by                                                                             |
+| --------------------------- | ---------------- | ----------------------------------------------------------------------------------- |
+| game-scoped mod id          | `107`            | `nxm://.../mods/107/...`, `/games/{domain}/mods/{id}`                               |
+| global mod uid              | `14315125997675` | `ModPage.uid`, `/mods/{id}/files`                                                   |
+| game-scoped file version id | `168615`         | `nxm://.../files/168615`, `/games/{domain}/mod-file-versions/{id}`, `download-link` |
+| global file version id      | `14315126166183` | `/mod-file-versions/{id}`, `/mod-file-versions/{id}/dependencies`                   |
+| global mod file id          | a string         | `/mod-files/{id}/versions`                                                          |
 
 ## Download flow
 

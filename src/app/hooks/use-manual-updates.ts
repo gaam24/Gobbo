@@ -249,7 +249,10 @@ export function useManualUpdates({
 				percent: 0,
 				state: "waiting",
 				cancel: { label: t("tasks.stop"), run: () => stopRef.current() },
-				open: { label: t("tasks.openWindow"), run: () => openFromTask(game, targets) },
+				open: {
+					label: t("tasks.openWindow"),
+					run: () => openFromTask(game, targets),
+				},
 				source: "local",
 			});
 		},
@@ -259,7 +262,12 @@ export function useManualUpdates({
 	/// The window listens for page requests from the backend and opens the matching target through the captured action.
 	/// A browser preview has no events; the backend still owns whatever run the real window started.
 	useTauriListener(async (scope) => {
-		const off = await scope.listen<{ game: string; id: string; name: string; provider: string }>(PAGE_EVENT, (event) => {
+		const off = await scope.listen<{
+			game: string;
+			id: string;
+			name: string;
+			provider: string;
+		}>(PAGE_EVENT, (event) => {
 			const actions = actionsRef.current;
 
 			if (!actions || event.payload.game !== gameRef.current) return;

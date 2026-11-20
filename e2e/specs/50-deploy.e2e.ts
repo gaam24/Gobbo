@@ -56,7 +56,9 @@ describe("deploy", () => {
 		assert.ok(mod);
 		const gameFile = slotPath(game.fixture.root, mod.folder, "content/x.ws");
 		expectNoFile(gameFile);
-		const preview = await invoke<DeployPreview>("preview_deployment", { game: game.id });
+		const preview = await invoke<DeployPreview>("preview_deployment", {
+			game: game.id,
+		});
 		assert.ok(preview.files >= 1, "the preview has no files");
 		await apply(game.id);
 		await waitForStage(game.id, "applied");
@@ -95,7 +97,11 @@ describe("deploy", () => {
 		await waitForStage(game.id, "applied");
 		// The mount lives in the app's namespace, so `stat` from this process cannot see it. The game started through
 		// Gobbo can: its script copies the mod file it finds in the merged game folder.
-		const started = await invoke<boolean>("launch_game", { game: game.id, executable: null, applyDraft: false });
+		const started = await invoke<boolean>("launch_game", {
+			game: game.id,
+			executable: null,
+			applyDraft: false,
+		});
 		assert.equal(started, true, "the overlay launch did not report a game with mods");
 		const seen = path.join(game.fixture.out, "mod.ws");
 		await browser.waitUntil(() => exists(seen), {
@@ -115,13 +121,19 @@ describe("deploy", () => {
 		const id = uniqueId("deploy-conflict");
 		const name = `E2E Conflict ${id}`;
 		const { fixture } = await seedGame({ id, name });
-		const first = modZip(`conflict-${id}-one.zip`, "One", { "content/shared.ws": "one" });
-		const second = modZip(`conflict-${id}-two.zip`, "Two", { "content/shared.ws": "two" });
+		const first = modZip(`conflict-${id}-one.zip`, "One", {
+			"content/shared.ws": "one",
+		});
+		const second = modZip(`conflict-${id}-two.zip`, "Two", {
+			"content/shared.ws": "two",
+		});
 		await importMods(id, [first, second]);
 		await enableMods(id);
 		const before = await statusOf(id);
 		assert.equal(before.conflict_count, 1);
-		const explorer = await invoke<ConflictExplorer>("conflict_explorer", { game: id });
+		const explorer = await invoke<ConflictExplorer>("conflict_explorer", {
+			game: id,
+		});
 		assert.equal(explorer.total, 1);
 		const entry = explorer.entries[0];
 		assert.ok(entry);
@@ -133,7 +145,11 @@ describe("deploy", () => {
 		assert.ok(["one", "two"].includes(deployed), `unexpected deployed content ${deployed}`);
 		const other = entry.losers[0];
 		assert.ok(other, "the conflict has no loser");
-		await invoke("set_file_winner", { game: id, path: entry.path, family: other });
+		await invoke("set_file_winner", {
+			game: id,
+			path: entry.path,
+			family: other,
+		});
 		await apply(id);
 		const loser = before.mods.find((mod) => mod.id === other);
 		assert.ok(loser, "the conflict loser is not in the status");
@@ -151,7 +167,11 @@ describe("deploy", () => {
 		const status = await waitForStatus(game.id, (current) => current.mods.length === 1);
 		const mod = status.mods[0];
 		assert.ok(mod);
-		await invoke("set_mod_priority", { game: game.id, id: mod.id, priority: 5 });
+		await invoke("set_mod_priority", {
+			game: game.id,
+			id: mod.id,
+			priority: 5,
+		});
 		await apply(game.id);
 		const settings = path.join(game.fixture.root, "settings/mods.settings");
 		expectText(settings, `[mod${mod.folder}]`);
@@ -171,7 +191,9 @@ describe("deploy", () => {
 		assert.ok(mod);
 		const userFile = slotPath(fixture.root, mod.folder, "content/x.ws");
 		writeFile(userFile, "user file");
-		const preview = await invoke<DeployPreview>("preview_deployment", { game: id });
+		const preview = await invoke<DeployPreview>("preview_deployment", {
+			game: id,
+		});
 		assert.equal(preview.problems.length, 0, "the overlay must not block on a game file");
 		await invokeWithChannel("apply", { game: id });
 		const staged = layerPath(id, await activeProfile(id), path.join("Mods", `mod${mod.folder}`, "content/x.ws"));

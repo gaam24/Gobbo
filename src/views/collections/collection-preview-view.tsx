@@ -137,7 +137,10 @@ export function CollectionPreviewView({ preview, onClose }: { preview: Collectio
 						actions={
 							<>
 								<span className="text-muted-foreground mr-1 font-mono text-xs tabular-nums">
-									{t("collection.selected", { count: selected.size, total: plan.items.length })}
+									{t("collection.selected", {
+										count: selected.size,
+										total: plan.items.length,
+									})}
 								</span>
 								<Button size="xs" variant="ghost" onClick={() => setSelected(new Set(plan.items.map((item) => item.key)))}>
 									{t("collection.selectAll")}
@@ -238,7 +241,10 @@ export function CollectionPreviewView({ preview, onClose }: { preview: Collectio
 			<DialogFooter className="items-center">
 				<span className="text-muted-foreground mr-auto font-mono text-xs tabular-nums">
 					{download > 0
-						? t("collection.footer.download", { count: selected.size, size: formatSize(download, i18n.language) })
+						? t("collection.footer.download", {
+								count: selected.size,
+								size: formatSize(download, i18n.language),
+							})
 						: t("collection.footer.selected", { count: selected.size })}
 				</span>
 				{installed && (

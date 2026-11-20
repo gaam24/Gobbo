@@ -128,7 +128,14 @@ const groupRows: ListItem[] = [
 	{ kind: "mod", id: alpha.id, mod: alpha },
 	{ kind: "mod", id: beta.id, mod: beta },
 ];
-const bundle: ModGroup[] = [{ id: "g1", name: "Quality tweaks", members: ["alpha", "beta"], kind: "bundle" }];
+const bundle: ModGroup[] = [
+	{
+		id: "g1",
+		name: "Quality tweaks",
+		members: ["alpha", "beta"],
+		kind: "bundle",
+	},
+];
 
 test("a user group gets one full-width header with its name and mod count", () => {
 	const html = renderToString(<ModTable {...tableProps({ rows: groupRows, groups: bundle })} />);
@@ -142,14 +149,30 @@ test("a user group gets one full-width header with its name and mod count", () =
 });
 
 test("a folded user group keeps its header and hides both parts", () => {
-	const html = renderToString(<ModTable {...tableProps({ rows: groupRows, groups: bundle, foldedPages: new Set([groupRowId("g1")]) })} />);
+	const html = renderToString(
+		<ModTable
+			{...tableProps({
+				rows: groupRows,
+				groups: bundle,
+				foldedPages: new Set([groupRowId("g1")]),
+			})}
+		/>,
+	);
 	expect(html).toContain("Quality tweaks");
 	expect(html).not.toContain('data-mod="alpha"');
 	expect(html).not.toContain('data-mod="beta"');
 });
 
 test("a translation group shows its language in the header", () => {
-	const groups: ModGroup[] = [{ id: "g2", name: "German pack", members: ["alpha", "beta"], kind: "translation", language: "German" }];
+	const groups: ModGroup[] = [
+		{
+			id: "g2",
+			name: "German pack",
+			members: ["alpha", "beta"],
+			kind: "translation",
+			language: "German",
+		},
+	];
 	const html = renderToString(<ModTable {...tableProps({ rows: groupRows, groups })} />);
 	expect(html).toContain("German pack");
 	expect(html).toContain("German");

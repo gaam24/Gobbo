@@ -46,7 +46,15 @@ describe("command contracts", () => {
 			assert.equal(error.code, "io.failed", `${command} answered ${error.code}`);
 		}
 
-		assert.equal((await invokeError("export_definition", { game: "e2e-missing", path: "/tmp/never.zip" })).code, "games.unknown");
+		assert.equal(
+			(
+				await invokeError("export_definition", {
+					game: "e2e-missing",
+					path: "/tmp/never.zip",
+				})
+			).code,
+			"games.unknown",
+		);
 		assert.deepEqual(await invoke("snapshots", { game: "e2e-missing" }), []);
 
 		try {
@@ -62,19 +70,80 @@ describe("command contracts", () => {
 		const game = await directGame({ id, name: `E2E Contract ${id}` });
 		const active = game.status.profiles.find((profile) => profile.active);
 		assert.ok(active);
-		assert.equal((await invokeError("rename_profile", { game: id, id: "p99", name: "Nope" })).code, "profiles.not_found");
+		assert.equal(
+			(
+				await invokeError("rename_profile", {
+					game: id,
+					id: "p99",
+					name: "Nope",
+				})
+			).code,
+			"profiles.not_found",
+		);
 		assert.equal((await invokeError("switch_profile", { game: id, id: "p99" })).code, "profiles.not_found");
 		assert.equal((await invokeError("delete_profile", { game: id, id: active.id })).code, "profiles.last_profile");
 		assert.equal(
-			(await invokeError("create_profile", { game: id, name: "x".repeat(200), copyFrom: null, copyData: false })).code,
+			(
+				await invokeError("create_profile", {
+					game: id,
+					name: "x".repeat(200),
+					copyFrom: null,
+					copyData: false,
+				})
+			).code,
 			"profiles.name_too_long",
 		);
-		assert.equal((await invokeError("set_mod_tags", { game: id, id: "local:nope", tags: [] })).code, "library.mod_missing");
-		assert.equal((await invokeError("set_mod_priority", { game: id, id: "local:nope", priority: 1 })).code, "profile.priority_unsupported");
-		assert.equal((await invokeError("set_mod_priority", { game: id, id: "local:nope", priority: null })).code, "library.mod_missing");
+		assert.equal(
+			(
+				await invokeError("set_mod_tags", {
+					game: id,
+					id: "local:nope",
+					tags: [],
+				})
+			).code,
+			"library.mod_missing",
+		);
+		assert.equal(
+			(
+				await invokeError("set_mod_priority", {
+					game: id,
+					id: "local:nope",
+					priority: 1,
+				})
+			).code,
+			"profile.priority_unsupported",
+		);
+		assert.equal(
+			(
+				await invokeError("set_mod_priority", {
+					game: id,
+					id: "local:nope",
+					priority: null,
+				})
+			).code,
+			"library.mod_missing",
+		);
 		assert.equal((await invokeError("delete_mod", { game: id, id: "local:nope" })).code, "library.mod_missing");
-		assert.equal((await invokeError("set_mod_version", { game: id, id: "local:nope", folder: "nope" })).code, "library.version_unknown");
-		assert.equal((await invokeError("delete_mod_version", { game: id, folder: "nope", replacement: null })).code, "library.mod_missing");
+		assert.equal(
+			(
+				await invokeError("set_mod_version", {
+					game: id,
+					id: "local:nope",
+					folder: "nope",
+				})
+			).code,
+			"library.version_unknown",
+		);
+		assert.equal(
+			(
+				await invokeError("delete_mod_version", {
+					game: id,
+					folder: "nope",
+					replacement: null,
+				})
+			).code,
+			"library.mod_missing",
+		);
 
 		try {
 			await invokeWithChannel("undo", { game: id });
@@ -90,7 +159,11 @@ describe("command contracts", () => {
 	});
 	it("sends the recovery action with a missing game or settings folder", async () => {
 		const id = uniqueId("contract-folders");
-		const game = await directGame({ id, name: `E2E Folders ${id}`, loadOrder: true });
+		const game = await directGame({
+			id,
+			name: `E2E Folders ${id}`,
+			loadOrder: true,
+		});
 		await invoke("save_settings", {
 			game: id,
 			settings: { ...game.status.settings, game_root: "", settings_dir: "" },
@@ -132,15 +205,37 @@ describe("command contracts", () => {
 		const active = game.status.profiles.find((profile) => profile.active);
 		assert.ok(active);
 		assert.equal(
-			(await invokeError("set_profile_user_data", { game: id, profile: active.id, set: "nope", isolated: true })).code,
+			(
+				await invokeError("set_profile_user_data", {
+					game: id,
+					profile: active.id,
+					set: "nope",
+					isolated: true,
+				})
+			).code,
 			"user_data.unknown_set",
 		);
 		assert.equal((await invokeError("run_tool", { game: id, tool: "nope" })).code, "tools.unknown");
-		assert.equal((await invokeError("install_tool_prerequisites", { game: id, tool: "nope" })).code, "tools.unknown");
-		const outside = await invokeError("open_path", { game: id, path: "/etc", reveal: false });
+		assert.equal(
+			(
+				await invokeError("install_tool_prerequisites", {
+					game: id,
+					tool: "nope",
+				})
+			).code,
+			"tools.unknown",
+		);
+		const outside = await invokeError("open_path", {
+			game: id,
+			path: "/etc",
+			reveal: false,
+		});
 		assert.equal(outside.code, "io.path_not_allowed");
 		// An empty profile now creates an empty snapshot instead of failing with snapshot.nothing.
-		const snapshot = await invoke<SnapshotView>("create_snapshot", { game: id, profile: active.id });
+		const snapshot = await invoke<SnapshotView>("create_snapshot", {
+			game: id,
+			profile: active.id,
+		});
 		assert.equal(snapshot.profile, active.id);
 		assert.equal(snapshot.mods, 0);
 		assert.equal(snapshot.files, 0);

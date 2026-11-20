@@ -124,7 +124,9 @@ export function ModMenuContent({
 	onRemoveFromLibrary,
 	onDeleteVersion,
 	deferClose,
-}: Omit<ModMenuProps, "children"> & { deferClose: (action: () => void) => void }) {
+}: Omit<ModMenuProps, "children"> & {
+	deferClose: (action: () => void) => void;
+}) {
 	const { t } = useTranslation();
 	const source = mod.source;
 	/// The lookup reads the newest status, so the group is resolved when the menu opens, not from the row's last render.

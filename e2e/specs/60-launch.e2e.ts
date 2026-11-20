@@ -29,7 +29,11 @@ const OVERLAY_UNAVAILABLE = new Set(["deploy.overlay_unavailable", "deploy.overl
 /// that as a documented error, so those runs check the launch itself and leave the layer assertions to a capable host.
 async function launchWithDraft(game: string): Promise<boolean | null> {
 	try {
-		return await invoke<boolean>("launch_game", { game, executable: null, applyDraft: true });
+		return await invoke<boolean>("launch_game", {
+			game,
+			executable: null,
+			applyDraft: true,
+		});
 	} catch (error) {
 		if (error instanceof CommandFailure && OVERLAY_UNAVAILABLE.has(error.code)) return null;
 		throw error;
@@ -57,7 +61,11 @@ describe("launch and console", () => {
 		const name = `E2E Launch ${id}`;
 		const { fixture } = await seedGame({ id, name });
 		await importMods(id, [modZip(`launch-bare-${id}.zip`, "Bare")]);
-		await invoke<boolean>("launch_game", { game: id, executable: null, applyDraft: false });
+		await invoke<boolean>("launch_game", {
+			game: id,
+			executable: null,
+			applyDraft: false,
+		});
 		const report = await waitForExit(id);
 		assert.equal(report.game_exit_code, 0);
 		assert.equal(report.stopped_by_user, false);
@@ -104,7 +112,11 @@ describe("launch and console", () => {
 			launch_args: "-one -two",
 			launch_env: `GOBBO_E2E_OUT=${fixture.out}\nE2E_EXTRA=hello`,
 		});
-		await invoke<boolean>("launch_game", { game: id, executable: null, applyDraft: false });
+		await invoke<boolean>("launch_game", {
+			game: id,
+			executable: null,
+			applyDraft: false,
+		});
 		await waitForExit(id);
 		assert.deepEqual(readText(path.join(fixture.out, "args.txt")).trim().split("\n"), ["-one", "-two"]);
 		assert.ok(readText(path.join(fixture.out, "env.txt")).includes("E2E_EXTRA=hello"));
@@ -115,7 +127,11 @@ describe("launch and console", () => {
 	it("stops a sleeping game and blocks an apply while it runs", async () => {
 		const id = uniqueId("launch-stop");
 		const name = `E2E Launch Stop ${id}`;
-		const { fixture } = await seedGame({ id, name, executable: "sleep-binary" });
+		const { fixture } = await seedGame({
+			id,
+			name,
+			executable: "sleep-binary",
+		});
 		await importMods(id, [modZip(`launch-stop-${id}.zip`, "Stop")]);
 		await enableMods(id);
 		const started = await launchWithDraft(id);
@@ -153,7 +169,11 @@ describe("launch and console", () => {
 		const id = uniqueId("launch-crash");
 		const name = `E2E Launch Crash ${id}`;
 		const { fixture } = await seedGame({ id, name, executable: "crash" });
-		await invoke<boolean>("launch_game", { game: id, executable: null, applyDraft: false });
+		await invoke<boolean>("launch_game", {
+			game: id,
+			executable: null,
+			applyDraft: false,
+		});
 		const report = await waitForExit(id);
 		assert.equal(report.game_exit_code, 3);
 		await reloadWindow();
@@ -168,7 +188,11 @@ describe("launch and console", () => {
 		const id = uniqueId("launch-console");
 		const name = `E2E Launch Console ${id}`;
 		const { fixture } = await seedGame({ id, name });
-		await invoke<boolean>("launch_game", { game: id, executable: null, applyDraft: false });
+		await invoke<boolean>("launch_game", {
+			game: id,
+			executable: null,
+			applyDraft: false,
+		});
 		await waitForExit(id);
 		await reloadWindow();
 		await clickByText("Console", "button");

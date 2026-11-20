@@ -49,7 +49,10 @@ export function ColumnHandle({
 				// The edge belongs to the resize, so the header under it does not start a drag.
 				event.stopPropagation();
 				event.currentTarget.setPointerCapture(event.pointerId);
-				drag.current = { x: event.clientX, width: cellWidth(event.currentTarget) };
+				drag.current = {
+					x: event.clientX,
+					width: cellWidth(event.currentTarget),
+				};
 			}}
 			onPointerMove={(event) => {
 				const start = drag.current;

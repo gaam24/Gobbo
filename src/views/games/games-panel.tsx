@@ -72,7 +72,10 @@ export function GamesPanel({
 	const { t, i18n } = useTranslation();
 	const { openDialog } = useUiActions();
 	const [query, setQuery] = useState("");
-	const [confirmRemove, setConfirmRemove] = useState<{ id: string; name: string } | null>(null);
+	const [confirmRemove, setConfirmRemove] = useState<{
+		id: string;
+		name: string;
+	} | null>(null);
 	const [locating, setLocating] = useState<{ id: string; name: string } | null>(null);
 
 	// Opening the page reads the definitions again, so a file the user just added works without a restart.
@@ -216,7 +219,10 @@ export function GamesPanel({
 
 				{visible.length !== entries.length && (
 					<footer className="text-muted-foreground border-t px-6 py-2 text-xs">
-						{t("games.showing", { shown: visible.length, total: entries.length })}
+						{t("games.showing", {
+							shown: visible.length,
+							total: entries.length,
+						})}
 					</footer>
 				)}
 			</PageFrame>

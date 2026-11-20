@@ -90,7 +90,10 @@ export function ModGrid({
 	const focused = selection[selection.length - 1] ?? null;
 	const grid = useRef<HTMLOListElement>(null);
 	const [width, setWidth] = useState(0);
-	const [measured, setMeasured] = useState<{ width: number; height: number } | null>(null);
+	const [measured, setMeasured] = useState<{
+		width: number;
+		height: number;
+	} | null>(null);
 
 	useLayoutEffect(() => {
 		const element = grid.current;
@@ -198,7 +201,13 @@ export function ModGrid({
 								// A page row keeps its details on `page`; wrap them in the same `Group` a user row already is.
 								const header: Group =
 									unit.kind === "page"
-										? { source: "page", id: unit.id, name: unit.page.name, parts: unit.page.mods, page: unit.page }
+										? {
+												source: "page",
+												id: unit.id,
+												name: unit.page.name,
+												parts: unit.page.mods,
+												page: unit.page,
+											}
 										: unit.group;
 								const storedId = unit.kind === "group" ? (unit.group.group?.id ?? unit.id) : null;
 								return [
@@ -207,7 +216,12 @@ export function ModGrid({
 										group={header}
 										folded={foldedPages.has(unit.id)}
 										filtering={filtering}
-										positionStyle={{ position: "absolute", top, left: PADDING_X, right: PADDING_X }}
+										positionStyle={{
+											position: "absolute",
+											top,
+											left: PADDING_X,
+											right: PADDING_X,
+										}}
 										onToggle={(enabled) => void onSetEnabled(unit.id, enabled)}
 										onFold={() => onTogglePage(unit.id)}
 										onOpenSource={onOpenSource}
@@ -237,7 +251,12 @@ export function ModGrid({
 										collapsed={collapsed.has(unit.id)}
 										fresh={freshSeparator === unit.id}
 										className="col-span-full px-3"
-										positionStyle={{ position: "absolute", top, left: PADDING_X, right: PADDING_X }}
+										positionStyle={{
+											position: "absolute",
+											top,
+											left: PADDING_X,
+											right: PADDING_X,
+										}}
 										onRenameSeparator={onRenameSeparator}
 										onRenameDone={onRenameDone}
 										onRemoveSeparator={onRemoveSeparator}

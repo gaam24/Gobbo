@@ -76,7 +76,9 @@ export function UpdateLine({
 				<Button
 					variant="link"
 					title={t("mods.version.useInstalled", { version: update.latest })}
-					aria-label={t("mods.version.useInstalled", { version: update.latest })}
+					aria-label={t("mods.version.useInstalled", {
+						version: update.latest,
+					})}
 					className="text-muted-foreground h-auto justify-start gap-1.5 p-0 text-sm font-medium"
 					onClick={onUse}
 				>

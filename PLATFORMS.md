@@ -10,34 +10,34 @@ Every platform difference has one owner: process and path handling in `src-tauri
 
 Here's what each platform supports today.
 
-| Area | Windows | Linux |
-| --- | --- | --- |
-| Deploy | Overlay only: hook DLL, x64 and x86 | Overlay only: overlayfs in a user namespace |
-| User data: isolated redirects | Yes, through the hook | Copy fallback, no redirect |
-| User data: shared | Yes | Yes |
-| Launch: native executable | Yes | Yes |
-| Launch: Proton | No | Yes |
-| Tools: Proton prerequisites | No | Yes |
-| Process list and stop | Toolhelp/Windows APIs | `/proc` and the overlay session |
-| Deep links (`nxm://`, future schemes) | Yes, registered by the app | Yes, registered by the app |
-| OS keyring | Yes | Yes, the desktop keyring must be running |
-| System tray | Icon, menu and left-click window | Icon and menu; click events aren't delivered, so use the menu |
-| First-start storage dialog | `rfd` | GTK on the main thread |
-| Mod picture cache | Yes | Yes |
-| Overlay probe | x64 built in, x86 helper | Not applicable: no hook DLL |
-| Minidumper | x64 in process, x86 helper | Not applicable |
+| Area                                  | Windows                             | Linux                                                         |
+| ------------------------------------- | ----------------------------------- | ------------------------------------------------------------- |
+| Deploy                                | Overlay only: hook DLL, x64 and x86 | Overlay only: overlayfs in a user namespace                   |
+| User data: isolated redirects         | Yes, through the hook               | Copy fallback, no redirect                                    |
+| User data: shared                     | Yes                                 | Yes                                                           |
+| Launch: native executable             | Yes                                 | Yes                                                           |
+| Launch: Proton                        | No                                  | Yes                                                           |
+| Tools: Proton prerequisites           | No                                  | Yes                                                           |
+| Process list and stop                 | Toolhelp/Windows APIs               | `/proc` and the overlay session                               |
+| Deep links (`nxm://`, future schemes) | Yes, registered by the app          | Yes, registered by the app                                    |
+| OS keyring                            | Yes                                 | Yes, the desktop keyring must be running                      |
+| System tray                           | Icon, menu and left-click window    | Icon and menu; click events aren't delivered, so use the menu |
+| First-start storage dialog            | `rfd`                               | GTK on the main thread                                        |
+| Mod picture cache                     | Yes                                 | Yes                                                           |
+| Overlay probe                         | x64 built in, x86 helper            | Not applicable: no hook DLL                                   |
+| Minidumper                            | x64 in process, x86 helper          | Not applicable                                                |
 
 ## Architecture
 
 The pieces that actually differ between systems:
 
-| Piece | Windows | Linux |
-| --- | --- | --- |
-| Hook | `gobbo_overlay_hook.dll`, `gobbo_overlay_hook32.dll` | None; the crate is empty |
-| Launcher | `gobbo_overlay_inject.exe`, `gobbo_overlay_inject32.exe` | overlayfs command |
-| Static imports | Rewritten in the suspended process | Every file is in the overlay |
-| 32-bit game | hook32 + inject32, required | Not applicable |
-| ARM64 | Experimental, must compile | Not applicable |
+| Piece          | Windows                                                  | Linux                        |
+| -------------- | -------------------------------------------------------- | ---------------------------- |
+| Hook           | `gobbo_overlay_hook.dll`, `gobbo_overlay_hook32.dll`     | None; the crate is empty     |
+| Launcher       | `gobbo_overlay_inject.exe`, `gobbo_overlay_inject32.exe` | overlayfs command            |
+| Static imports | Rewritten in the suspended process                       | Every file is in the overlay |
+| 32-bit game    | hook32 + inject32, required                              | Not applicable               |
+| ARM64          | Experimental, must compile                               | Not applicable               |
 
 The game folder is never written by a hooked call. If the hook can't prove a path is safe, it fails closed. Never copy a mod DLL into the game folder as a fallback.
 

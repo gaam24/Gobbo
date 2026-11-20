@@ -28,7 +28,12 @@ test("unwrap returns data and turns a backend error into a CommandError", async 
 	expect(await unwrap(Promise.resolve({ status: "ok", data: 42 }))).toBe(42);
 
 	try {
-		await unwrap(Promise.resolve({ status: "error", error: appError("state.busy", "retryable") }));
+		await unwrap(
+			Promise.resolve({
+				status: "error",
+				error: appError("state.busy", "retryable"),
+			}),
+		);
 		throw new Error("the error was not thrown");
 	} catch (error) {
 		expect(error).toBeInstanceOf(CommandError);

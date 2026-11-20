@@ -20,7 +20,12 @@ function download(overrides: Partial<Download>): Download {
 }
 
 test("the rail adds up the running downloads and counts the ones that wait", () => {
-	expect(downloadSummary([])).toEqual({ running: 0, percent: null, waiting: 0, failed: 0 });
+	expect(downloadSummary([])).toEqual({
+		running: 0,
+		percent: null,
+		waiting: 0,
+		failed: 0,
+	});
 	expect(
 		downloadSummary([
 			download({ id: 1, received_kb: 50, total_kb: 100 }),

@@ -16,7 +16,12 @@ export function applySuggestions(draft: GameDraft, inspection: FolderInspection_
 		const executable = inspection.executables[0];
 		next = {
 			...next,
-			executables: [{ name: executable.name.replace(EXE_SUFFIX, ""), path: executable.path }],
+			executables: [
+				{
+					name: executable.name.replace(EXE_SUFFIX, ""),
+					path: executable.path,
+				},
+			],
 		};
 	}
 

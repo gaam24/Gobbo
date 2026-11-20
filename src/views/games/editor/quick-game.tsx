@@ -68,7 +68,11 @@ export function QuickGame({
 							</Badge>
 						)}
 						{inspection.executables.length > 0 && (
-							<Badge variant="outline">{t("editor.quick.programs", { count: inspection.executables.length })}</Badge>
+							<Badge variant="outline">
+								{t("editor.quick.programs", {
+									count: inspection.executables.length,
+								})}
+							</Badge>
 						)}
 					</p>
 					{inspection.loaders.length > 0 && (

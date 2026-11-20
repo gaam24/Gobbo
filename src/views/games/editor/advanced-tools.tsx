@@ -32,7 +32,19 @@ export function AdvancedTools({ draft, onChange }: { draft: GameDraft; onChange:
 				title={t("editor.tools.tools")}
 				hint={t("editor.tools.toolsHint")}
 				addLabel={t("editor.tools.addTool")}
-				onAdd={() => setTools([...tools, { id: "", name: "", output: "generated-mod", detect: [], source: undefined, prerequisites: [] }])}
+				onAdd={() =>
+					setTools([
+						...tools,
+						{
+							id: "",
+							name: "",
+							output: "generated-mod",
+							detect: [],
+							source: undefined,
+							prerequisites: [],
+						},
+					])
+				}
 			>
 				{tools.map((tool, index) => (
 					<RepeatRow
@@ -97,7 +109,14 @@ export function AdvancedTools({ draft, onChange }: { draft: GameDraft; onChange:
 									onClick={() =>
 										setPrerequisites(index, [
 											...(tool.prerequisites ?? []),
-											{ name: "", url: "", sha512: "", args: [], check: "", check_starts_with: "" },
+											{
+												name: "",
+												url: "",
+												sha512: "",
+												args: [],
+												check: "",
+												check_starts_with: "",
+											},
 										])
 									}
 								/>
@@ -196,7 +215,11 @@ export function AdvancedTools({ draft, onChange }: { draft: GameDraft; onChange:
 							<EditorField id={`editor-step-phase-${index}`} label={t("editor.tools.phase")}>
 								<Select
 									value={step.phase}
-									onValueChange={(phase) => setStep(index, { phase: phase === "after_end" ? "after_end" : "before_start" })}
+									onValueChange={(phase) =>
+										setStep(index, {
+											phase: phase === "after_end" ? "after_end" : "before_start",
+										})
+									}
 								>
 									<SelectTrigger id={`editor-step-phase-${index}`} className="w-full">
 										<SelectValue />

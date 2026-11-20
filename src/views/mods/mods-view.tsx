@@ -104,7 +104,12 @@ export function ModsView({ gameId, status }: ModsViewProps) {
 	/// the profile list again.
 	const profileId = status.profiles.find((profile) => profile.active)?.id ?? "none";
 
-	const { hidden, setHidden } = useHiddenMods({ gameId, profileId, mods, profiles: status.profiles });
+	const { hidden, setHidden } = useHiddenMods({
+		gameId,
+		profileId,
+		mods,
+		profiles: status.profiles,
+	});
 	const { filter, setFilter, query, setQuery, tagFilter, setTagFilter, filtering, allTags, visible, counts, clearFilters } = useModFilter({
 		mods,
 		updates,
@@ -126,9 +131,19 @@ export function ModsView({ gameId, status }: ModsViewProps) {
 
 	/// One stable object for every memoized row and card. The refs carry the newest status and action wrappers, so a
 	/// status answer never changes a row's props; the group is resolved when a menu actually opens.
-	const latestMenu = useRef({ groups: status.groups, selection, openDialog, gameActions });
+	const latestMenu = useRef({
+		groups: status.groups,
+		selection,
+		openDialog,
+		gameActions,
+	});
 	useEffect(() => {
-		latestMenu.current = { groups: status.groups, selection, openDialog, gameActions };
+		latestMenu.current = {
+			groups: status.groups,
+			selection,
+			openDialog,
+			gameActions,
+		};
 	}, [status.groups, selection, openDialog, gameActions]);
 	const groupMenu = useMemo<GroupMenuActions>(
 		() => ({

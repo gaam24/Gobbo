@@ -39,7 +39,11 @@ function demoModZip(archive: string, folder: string, name: string, version: stri
 describe("README screenshots", () => {
 	it("captures the mod list, the apply preview and the conflict explorer", async () => {
 		mkdirSync(OUT, { recursive: true });
-		const fixture = prepareGame({ id: GAME_ID, name: GAME_NAME, verified: true });
+		const fixture = prepareGame({
+			id: GAME_ID,
+			name: GAME_NAME,
+			verified: true,
+		});
 		copyFileSync(path.join(root, "games/the-witcher-3-wild-hunt/icon.webp"), path.join(definitionsDir, GAME_ID, "icon.webp"));
 		await invoke("add_game", { game: GAME_ID, gameRoot: fixture.root });
 		await saveSettings(GAME_ID, {
@@ -80,7 +84,11 @@ describe("README screenshots", () => {
 		const active = before.profiles.find((profile) => profile.active) ?? before.profiles[0];
 
 		if (active && active.name !== "Main") {
-			await invoke("rename_profile", { game: GAME_ID, id: active.id, name: "Main" });
+			await invoke("rename_profile", {
+				game: GAME_ID,
+				id: active.id,
+				name: "Main",
+			});
 		}
 
 		await createProfile(GAME_ID, "Testing", null);

@@ -42,11 +42,39 @@ const label = (key: TaskGroupLabelKey): string => key;
 
 function grouped(): Task[] {
 	return [
-		{ id: "b", kind: "import", title: "Beta", state: "running", game: "game-b", gameName: "Game B" },
-		{ id: "a", kind: "import", title: "Alpha", state: "failed", game: "game-a", gameName: "Game A" },
-		{ id: "c", kind: "import", title: "Alpha", state: "running", game: "game-a", gameName: "Game A" },
+		{
+			id: "b",
+			kind: "import",
+			title: "Beta",
+			state: "running",
+			game: "game-b",
+			gameName: "Game B",
+		},
+		{
+			id: "a",
+			kind: "import",
+			title: "Alpha",
+			state: "failed",
+			game: "game-a",
+			gameName: "Game A",
+		},
+		{
+			id: "c",
+			kind: "import",
+			title: "Alpha",
+			state: "running",
+			game: "game-a",
+			gameName: "Game A",
+		},
 		{ id: "d", kind: "import", title: "Zeta", state: "waiting", game: null },
-		{ id: "e", kind: "import", title: "Gamma", state: "failed", game: "game-a", gameName: "Game A" },
+		{
+			id: "e",
+			kind: "import",
+			title: "Gamma",
+			state: "failed",
+			game: "game-a",
+			gameName: "Game A",
+		},
 		{ id: "f", kind: "import", title: "Delta", state: "running", game: null },
 	];
 }
@@ -76,7 +104,11 @@ test("equal titles fall back to the id so two rows never swap", () => {
 test("an empty list has no groups and a game without a catalogue entry keeps its id", () => {
 	expect(groupedTasks([])).toEqual([]);
 	const groups = groupedTasks([{ ...task("a", "running"), game: "game-missing" }]);
-	expect(groups[0]).toMatchObject({ game: "game-missing", gameName: undefined, count: 1 });
+	expect(groups[0]).toMatchObject({
+		game: "game-missing",
+		gameName: undefined,
+		count: 1,
+	});
 });
 
 test("the counts stay in step with the groups", () => {

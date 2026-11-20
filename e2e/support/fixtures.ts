@@ -288,7 +288,14 @@ export function prepareGame(options: GameOptions): GameFixture {
 	const definitionPath = path.join(definitionsDir, options.id, "game.toml");
 	writeFile(definitionPath, definition);
 	const root = writeGameRoot(options, options.root);
-	return { id: options.id, name: options.name, root, out: path.join(outDir, options.id), definitionPath, definition };
+	return {
+		id: options.id,
+		name: options.name,
+		root,
+		out: path.join(outDir, options.id),
+		definitionPath,
+		definition,
+	};
 }
 
 export function modZip(name: string, folder: string, files?: Record<string, string>): string {
@@ -323,7 +330,10 @@ export function invalidZip(name: string): string {
 
 export function traversalZip(name: string): string {
 	const file = path.join(fixturesDir, name);
-	writeZip(file, { "../escaped.txt": "escape", "Mods/Escape/content/x.ws": "x" });
+	writeZip(file, {
+		"../escaped.txt": "escape",
+		"Mods/Escape/content/x.ws": "x",
+	});
 	return file;
 }
 

@@ -8,8 +8,14 @@ test("a repeated answer keeps the state object, so a poll that finds nothing new
 
 test("a changed value or another key replaces the state", () => {
 	const first = answerState(null, "game", true);
-	expect(answerState(first, "game", false)).toEqual({ key: "game", value: false });
-	expect(answerState(first, "other", true)).toEqual({ key: "other", value: true });
+	expect(answerState(first, "game", false)).toEqual({
+		key: "game",
+		value: false,
+	});
+	expect(answerState(first, "other", true)).toEqual({
+		key: "other",
+		value: true,
+	});
 });
 
 test("an object answer is a new state each time, because it is a new object", () => {

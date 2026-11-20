@@ -100,7 +100,10 @@ goblin = "0.9"
 proptest = "1"
 # The writer is only a test and benchmark fixture. The release build reads 7z archives; it never writes one, so the
 # encoder (`compress`, and the lzma encoder behind it) stays out of the shipped binary.
-sevenz-rust2 = { version = "0.24", default-features = false, features = ["compress", "util"] }
+sevenz-rust2 = { version = "0.24", default-features = false, features = [
+  "compress",
+  "util",
+] }
 
 [[bench]]
 name = "backend"
@@ -129,14 +132,14 @@ gobbo-overlay-decisions.workspace = true
 # purpose: it is only used by predefined Copy/Cut/Paste menu items, which the tray does not have, and it needs an extra
 # system library on Linux.
 tauri = { version = "2", default-features = false, features = [
-    "common-controls-v6",
-    "compression",
-    "dbus",
-    "image-ico",
-    "image-png",
-    "tray-icon",
-    "wry",
-    "x11",
+  "common-controls-v6",
+  "compression",
+  "dbus",
+  "image-ico",
+  "image-png",
+  "tray-icon",
+  "wry",
+  "x11",
 ] }
 tauri-plugin-opener = "2"
 tauri-plugin-notification = "2"
@@ -152,15 +155,15 @@ specta-typescript = "=0.0.13"
 # Every decompression method the format offers is supported: a mod packed outside Nexus may use any of them. Zopfli is
 # only an optional deflate encoder for writing, so the reader keeps the smaller flate2 backend instead.
 zip = { version = "9", default-features = false, features = [
-    "aes-crypto",
-    "bzip2",
-    "deflate64",
-    "deflate-flate2-zlib-rs",
-    "lzma",
-    "ppmd",
-    "time",
-    "xz",
-    "zstd",
+  "aes-crypto",
+  "bzip2",
+  "deflate64",
+  "deflate-flate2-zlib-rs",
+  "lzma",
+  "ppmd",
+  "time",
+  "xz",
+  "zstd",
 ] }
 sha2 = "0.11"
 crc32fast = "1"
@@ -169,14 +172,20 @@ md-5 = "0.11"
 faster-hex = { version = "1", default-features = false, features = ["std"] }
 memchr = "2"
 rustc-hash.workspace = true
-time = { version = "0.3", default-features = false, features = ["std", "parsing", "formatting"] }
+time = { version = "0.3", default-features = false, features = [
+  "std",
+  "parsing",
+  "formatting",
+] }
 # Parsing `nxm://` links: the OS may percent-encode the key and the expiry, and a URL parser gets the
 # scheme, host and query decoding right where a hand-written split does not.
 url = "2"
 roxmltree = "0.21"
 same-file = "1"
 tempfile = "3"
-sevenz-rust2 = { version = "0.24", default-features = false, features = ["util"] }
+sevenz-rust2 = { version = "0.24", default-features = false, features = [
+  "util",
+] }
 unrar = "0.5"
 keyring = "4"
 thiserror = "2"
@@ -188,11 +197,17 @@ tauri-plugin-process = "2"
 # Windows and macOS. On Linux the question uses the `gtk` crate directly, because `rfd`'s GTK backend initializes GTK on
 # a background thread, which breaks Tauri's event loop; `rfd`'s `gtk3` feature stays enabled for `tauri-plugin-dialog`'s
 # own dialogs. `sys-locale` (MIT/Apache-2.0) is a small, maintained crate for the language of that one question.
-rfd = { version = "0.17", default-features = false, features = ["common-controls-v6", "gtk3"] }
+rfd = { version = "0.17", default-features = false, features = [
+  "common-controls-v6",
+  "gtk3",
+] }
 sys-locale = "0.3"
 # The free space on the drive that holds a game or its mods, for the preflight check. The same crate already drives the
 # Windows process list; `disk` is the one feature the preflight adds.
-sysinfo = { version = "0.39.6", default-features = false, features = ["disk", "system"] }
+sysinfo = { version = "0.39.6", default-features = false, features = [
+  "disk",
+  "system",
+] }
 mimalloc = { version = "0.1", optional = true }
 # The MCP bridge for the coding assistant: a debug-only dev aid behind the `mcp-bridge` feature (MIT).
 tauri-plugin-mcp-bridge = { version = "0.13", optional = true }
@@ -205,7 +220,10 @@ tauri-plugin-wdio-webdriver = { version = "=1.5.1", optional = true }
 gtk = "0.18"
 # Native TLS on Windows is SChannel, which the system already has; Linux keeps rustls. Both are HTTP/1 clients for the
 # provider APIs; `infra/http.rs` names the provider each build enables, because ureq defaults to rustls in both cases.
-ureq = { version = "3", default-features = false, features = ["rustls", "gzip"] }
+ureq = { version = "3", default-features = false, features = [
+  "rustls",
+  "gzip",
+] }
 
 # Sending SIGKILL to a game's process tree. Already in the lock through the archive reader; only the signal calls are used.
 [target.'cfg(unix)'.dependencies]
@@ -269,7 +287,10 @@ gobbo-overlay-dump.workspace = true
 gobbo-overlay-launch.workspace = true
 # SChannel through the Windows certificate store, instead of a bundled rustls/ring/webpki stack. `infra/http.rs` selects
 # this provider; ureq would otherwise assume rustls, which this feature set does not build.
-ureq = { version = "3", default-features = false, features = ["native-tls", "gzip"] }
+ureq = { version = "3", default-features = false, features = [
+  "native-tls",
+  "gzip",
+] }
 # Windows 11 Efficiency mode (EcoQoS): a safe wrapper for SetProcessInformation, so the app keeps
 # `#![forbid(unsafe_code)]`. It uses the `windows`/`windows-result` versions already in the tree.
 win32-ecoqos = { version = "0.6", default-features = false }

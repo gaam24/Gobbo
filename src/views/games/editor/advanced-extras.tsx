@@ -15,7 +15,10 @@ export function AdvancedExtras({ draft, onChange }: { draft: GameDraft; onChange
 	const setProvider = (index: number, id: string, key: string) => {
 		const next: Record<string, { key?: string }> = {};
 		providers.forEach(([name, entry], at) => {
-			next[at === index ? id : name] = { ...entry, key: at === index ? key : entry.key };
+			next[at === index ? id : name] = {
+				...entry,
+				key: at === index ? key : entry.key,
+			};
 		});
 		setProviders(next);
 	};
@@ -37,7 +40,10 @@ export function AdvancedExtras({ draft, onChange }: { draft: GameDraft; onChange
 
 	const order = draft.load_order;
 	const setOrder = (patch: Partial<LoadOrderDraft>) =>
-		onChange({ ...draft, load_order: { format: "mods_settings", file: "", ...order, ...patch } });
+		onChange({
+			...draft,
+			load_order: { format: "mods_settings", file: "", ...order, ...patch },
+		});
 
 	const logs = draft.logs ?? [];
 	const setLogs = (next: LogSourceDraft[]) => onChange({ ...draft, logs: next });
@@ -200,7 +206,18 @@ export function AdvancedExtras({ draft, onChange }: { draft: GameDraft; onChange
 					title={t("editor.extras.logs")}
 					hint={t("editor.extras.logsHint")}
 					addLabel={t("editor.extras.addLog")}
-					onAdd={() => setLogs([...logs, { kind: "game", path: "", pattern: "*.log", limit: 4, recursive: true }])}
+					onAdd={() =>
+						setLogs([
+							...logs,
+							{
+								kind: "game",
+								path: "",
+								pattern: "*.log",
+								limit: 4,
+								recursive: true,
+							},
+						])
+					}
 				>
 					{logs.map((log, index) => (
 						<RepeatRow

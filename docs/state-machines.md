@@ -51,12 +51,12 @@ command palette and the inspector read its `primary`, `menu`, `canApply`, `canPl
 
 Runtime overlay:
 
-| Runtime           | What the user sees | Primary action |
-| ----------------- | ------------------ | -------------- |
-| `gameRunning`     | `Game running`     | `Stop`         |
+| Runtime           | What the user sees | Primary action                      |
+| ----------------- | ------------------ | ----------------------------------- |
+| `gameRunning`     | `Game running`     | `Stop`                              |
 | `busy: applying`  | `Applying…`        | `Apply` disabled, Undo/Discard stay |
-| `busy: launching` | `Launching…`       | `Play` disabled, Undo/Discard stay |
-| `busy: stopping`  | `Stopping…`        | `Stop` disabled, Undo/Discard stay |
+| `busy: launching` | `Launching…`       | `Play` disabled, Undo/Discard stay  |
+| `busy: stopping`  | `Stopping…`        | `Stop` disabled, Undo/Discard stay  |
 
 Only the action whose own work is running is disabled; a busy game still has a legible primary and keeps the other
 actions and the Working-panel controls.
@@ -143,12 +143,12 @@ stateDiagram-v2
     Finished --> [*]
 ```
 
-| State | Source of truth | What the window does |
-|---|---|---|
-| preview | `CollectionPreview` from the provider revision and plan | shows statuses, optional selection, profile and mode |
-| session | `CollectionSessionView` with `statuses`, `counts` and `next` | install view / panel; never derives a member state |
-| working | the task registry row plus `CollectionProgress` over a channel, or `CollectionItemAction` for one guided member | repeats the automatic round or asks for the next guided file; reads the round from **Working** after a close or switch |
-| finished | `finish_collection` returns the settled session | **Apply now** hands off to the normal deploy |
+| State    | Source of truth                                                                                                 | What the window does                                                                                                   |
+| -------- | --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| preview  | `CollectionPreview` from the provider revision and plan                                                         | shows statuses, optional selection, profile and mode                                                                   |
+| session  | `CollectionSessionView` with `statuses`, `counts` and `next`                                                    | install view / panel; never derives a member state                                                                     |
+| working  | the task registry row plus `CollectionProgress` over a channel, or `CollectionItemAction` for one guided member | repeats the automatic round or asks for the next guided file; reads the round from **Working** after a close or switch |
+| finished | `finish_collection` returns the settled session                                                                 | **Apply now** hands off to the normal deploy                                                                           |
 
 A FOMOD with no stored choices answers `needs_choice`, and the window shows the shared wizard. A free account's file
 page answers `waiting`; the owned download is imported by the window and never auto-installed by the queue. A member

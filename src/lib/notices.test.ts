@@ -13,11 +13,22 @@ import {
 } from "@/lib/notices";
 
 function notice(overrides: Partial<Notice>): Notice {
-	return { id: "1", kind: "info", text: "Saved.", at: 0, read: false, ...overrides };
+	return {
+		id: "1",
+		kind: "info",
+		text: "Saved.",
+		at: 0,
+		read: false,
+		...overrides,
+	};
 }
 
 test("a new notice is unread, and its detail is kept only when it adds to the text", () => {
-	expect(newNotice("info", "Saved.")).toMatchObject({ kind: "info", text: "Saved.", read: false });
+	expect(newNotice("info", "Saved.")).toMatchObject({
+		kind: "info",
+		text: "Saved.",
+		read: false,
+	});
 	expect(newNotice("error", "Failed.", "install.unknown_layout")).toMatchObject({ detail: "install.unknown_layout" });
 	expect(newNotice("error", "Failed.", "Failed.")).not.toHaveProperty("detail");
 });
@@ -75,11 +86,20 @@ test("notices made in one start never share an id", () => {
 
 test("consecutive identical results fold into one toast run, and a different result starts a new one", () => {
 	const first = continueToastRun(null, "success|Saved.");
-	expect(first).toEqual({ run: { signature: "success|Saved.", count: 1 }, repeated: false });
+	expect(first).toEqual({
+		run: { signature: "success|Saved.", count: 1 },
+		repeated: false,
+	});
 	const second = continueToastRun(first.run, "success|Saved.");
-	expect(second).toEqual({ run: { signature: "success|Saved.", count: 2 }, repeated: true });
+	expect(second).toEqual({
+		run: { signature: "success|Saved.", count: 2 },
+		repeated: true,
+	});
 	const third = continueToastRun(second.run, "info|Downloading.");
-	expect(third).toEqual({ run: { signature: "info|Downloading.", count: 1 }, repeated: false });
+	expect(third).toEqual({
+		run: { signature: "info|Downloading.", count: 1 },
+		repeated: false,
+	});
 });
 
 test("a durable notice keeps its action, and a stored action keeps its label when the callback is dropped", () => {

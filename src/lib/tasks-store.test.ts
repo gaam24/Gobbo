@@ -14,7 +14,15 @@ import {
 } from "@/lib/tasks-store";
 
 function local(id: string, overrides: Partial<RegisteredTask> = {}): RegisteredTask {
-	return { id, game: null, kind: "import", title: id, state: "running", source: "local", ...overrides };
+	return {
+		id,
+		game: null,
+		kind: "import",
+		title: id,
+		state: "running",
+		source: "local",
+		...overrides,
+	};
 }
 
 beforeEach(() => {
@@ -133,9 +141,19 @@ test("a snapshot row normalizes a null percent into an absent one", () => {
 test("a restored failure carries the retry and open actions of its kind", () => {
 	const retry = { label: "Retry", run: () => undefined };
 	const open = { label: "Open", run: () => undefined };
-	const payload = { id: "apply:game-b", game: "game-b", kind: "apply", state: "failed" };
+	const payload = {
+		id: "apply:game-b",
+		game: "game-b",
+		kind: "apply",
+		state: "failed",
+	};
 
-	expect(backendTaskFromPayload(payload, "Apply failed", { retry: () => retry, open: () => open })).toMatchObject({
+	expect(
+		backendTaskFromPayload(payload, "Apply failed", {
+			retry: () => retry,
+			open: () => open,
+		}),
+	).toMatchObject({
 		state: "failed",
 		retry,
 		open,

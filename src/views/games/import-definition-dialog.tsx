@@ -140,7 +140,11 @@ export function DefinitionImportDialog({
 					{replace && (
 						<Alert variant="destructive">
 							<AlertTitle>{t("editor.import.overwritesTitle")}</AlertTitle>
-							<AlertDescription>{t("editor.import.overwrites", { items: preview.overwrites.join(", ") })}</AlertDescription>
+							<AlertDescription>
+								{t("editor.import.overwrites", {
+									items: preview.overwrites.join(", "),
+								})}
+							</AlertDescription>
 						</Alert>
 					)}
 

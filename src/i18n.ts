@@ -132,7 +132,10 @@ function currentLanguage(): Locale {
 
 /// The translation hook. `t` translates a key; `i18n.language` is the current locale, for formatting dates and numbers.
 /// A component that reads it re-renders when the language changes.
-export function useTranslation(): { t: typeof translateKey; i18n: { language: Locale } } {
+export function useTranslation(): {
+	t: typeof translateKey;
+	i18n: { language: Locale };
+} {
 	const current = useSyncExternalStore(subscribe, currentLanguage, currentLanguage);
 	// React Compiler memoizes `t("key")` by the identity of `t`. A stable `t` would keep the strings of the previous
 	// language after a switch, so the hook returns a function bound to the current locale.

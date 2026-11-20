@@ -37,7 +37,10 @@ export function ManualUpdateDialog({
 	return (
 		<ModalDialog title={t("updates.manual.title")} description={t("updates.manual.hint")} width="sm" onClose={onClose}>
 			<p className="text-muted-foreground text-sm">
-				{t("updates.manual.step", { done: Math.min(index + 1, targets.length), total: targets.length })}
+				{t("updates.manual.step", {
+					done: Math.min(index + 1, targets.length),
+					total: targets.length,
+				})}
 			</p>
 			<BoxList ordered scroll>
 				{targets.map((target, at) => {

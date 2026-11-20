@@ -164,7 +164,10 @@ export function unregisterBackendActions(code: string): void {
 export function backendActionsOf(kind: string): BackendTaskActions {
 	const generic = backendActions.get("*");
 	const own = backendActions.get(kind);
-	return { retry: own?.retry ?? generic?.retry, open: own?.open ?? generic?.open };
+	return {
+		retry: own?.retry ?? generic?.retry,
+		open: own?.open ?? generic?.open,
+	};
 }
 
 type Translate = ReturnType<typeof useTranslation>["t"];
@@ -211,7 +214,13 @@ export function backendTaskDetail(dedupe: TaskDedupe | undefined): string | unde
 
 /// The translated reason of a failed backend row.
 export function backendTaskError(error: TaskError | null | undefined): string | undefined {
-	return error ? errorText({ code: error.code, params: error.params ?? {}, kind: "user_action" }) : undefined;
+	return error
+		? errorText({
+				code: error.code,
+				params: error.params ?? {},
+				kind: "user_action",
+			})
+		: undefined;
 }
 
 function backendState(state: string): RegisteredTaskState {
@@ -289,7 +298,10 @@ export function useBackendTasks(): void {
 			const task = backendTaskFromPayload(payload, backendTaskTitle(payload.kind, payload.state, t), backendActionsOf(payload.kind));
 
 			if (task.state === "running") {
-				task.cancel = { label: t("common.cancel"), run: () => void commands.cancelTask(payload.id) };
+				task.cancel = {
+					label: t("common.cancel"),
+					run: () => void commands.cancelTask(payload.id),
+				};
 			}
 
 			// A failure stays in the backend journal until the user has read it; dismissing forgets it there too.
@@ -312,7 +324,9 @@ export function useBackendTasks(): void {
 			}),
 			scope.listen<BackendTaskPayload>("task-cancelled", (event) => removeTask(event.payload.id)),
 			scope.listen<BackendTaskPayload>("task-progress", (event) => {
-				updateTask(event.payload.id, { percent: event.payload.percent ?? undefined });
+				updateTask(event.payload.id, {
+					percent: event.payload.percent ?? undefined,
+				});
 			}),
 		]);
 		scope.add(...unlisten);

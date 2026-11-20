@@ -29,14 +29,26 @@ import {
 } from "@/lib/mods";
 import { sourceLists } from "@/sources/requirements";
 
-const labels = { enabled: "enabled", disabled: "disabled", requires: "Requires", or: "or" };
+const labels = {
+	enabled: "enabled",
+	disabled: "disabled",
+	requires: "Requires",
+	or: "or",
+};
 const sourceName = (provider: string) => (provider === "nexus" ? "Nexus" : provider);
 
 const mods: ListedMod[] = [
 	{
 		priority: 1,
 		enabled: true,
-		sources: [{ provider: "nexus", mod_id: "4311", page_url: "https://www.nexusmods.com/examplegame/mods/4311", file_id: null }],
+		sources: [
+			{
+				provider: "nexus",
+				mod_id: "4311",
+				page_url: "https://www.nexusmods.com/examplegame/mods/4311",
+				file_id: null,
+			},
+		],
 		info: { name: "Cool Mod", version: "1.2", author: null, description: null },
 		instructions: "",
 		requires_names: [],
@@ -46,7 +58,12 @@ const mods: ListedMod[] = [
 		priority: 2,
 		enabled: false,
 		sources: [],
-		info: { name: "Plain_Mod [v2]", version: null, author: null, description: null },
+		info: {
+			name: "Plain_Mod [v2]",
+			version: null,
+			author: null,
+			description: null,
+		},
 		instructions: "",
 		requires_names: [],
 		requirement_groups: [],
@@ -74,10 +91,20 @@ const part = (id: string, partId: string, name: string): Mod =>
 	});
 
 /// A plain mod for the user-group tests, with a stable id and a readable folder and name.
-const member = (id: string): Mod => listed({ id, folder: id, info: { name: id, version: null, author: null, description: null } });
+const member = (id: string): Mod =>
+	listed({
+		id,
+		folder: id,
+		info: { name: id, version: null, author: null, description: null },
+	});
 
 /// A stored user group with generic ids and the bundle kind.
-const userGroup = (id: string, members: string[]): ModGroup => ({ id, name: `Group ${id}`, members, kind: "bundle" });
+const userGroup = (id: string, members: string[]): ModGroup => ({
+	id,
+	name: `Group ${id}`,
+	members,
+	kind: "bundle",
+});
 
 test("adjacent parts of one page become one page header with the parts under it", () => {
 	const items = listItems(
@@ -90,7 +117,11 @@ test("adjacent parts of one page become one page header with the parts under it"
 	);
 	const table = tableItems(items);
 	expect(table.map((row) => row.kind)).toEqual(["page", "mod", "mod", "mod"]);
-	expect(table[0]).toMatchObject({ kind: "page", id: pageRowId("nexus:225"), page: { name: "AudioXL", author: "DigitalVixen" } });
+	expect(table[0]).toMatchObject({
+		kind: "page",
+		id: pageRowId("nexus:225"),
+		page: { name: "AudioXL", author: "DigitalVixen" },
+	});
 
 	if (table[0]?.kind === "page") expect(table[0].page.mods.map((mod) => mod.info.name)).toEqual(["Base", "Addon"]);
 	expect(foldedPageParts([part("a", "100", "Base"), part("b", "200", "Addon")], new Set([pageRowId("nexus:225")]))).toEqual(
@@ -110,19 +141,31 @@ test("the grid keeps a page's cards under one header, and folding hides only the
 	);
 	const grid = gridItems(tableItems(items), 2);
 	expect(grid.map((unit) => unit.kind)).toEqual(["page", "cards", "cards"]);
-	expect(grid[1]).toMatchObject({ kind: "cards", mods: [{ id: "nexus:225" }, { id: "nexus:225#200" }] });
-	expect(grid[2]).toMatchObject({ kind: "cards", mods: [{ id: "local:other" }] });
+	expect(grid[1]).toMatchObject({
+		kind: "cards",
+		mods: [{ id: "nexus:225" }, { id: "nexus:225#200" }],
+	});
+	expect(grid[2]).toMatchObject({
+		kind: "cards",
+		mods: [{ id: "local:other" }],
+	});
 
 	const folded = gridItems(tableItems(items, new Set([pageRowId("nexus:225")])), 2);
 	expect(folded.map((unit) => unit.kind)).toEqual(["page", "cards"]);
-	expect(folded[1]).toMatchObject({ kind: "cards", mods: [{ id: "local:other" }] });
+	expect(folded[1]).toMatchObject({
+		kind: "cards",
+		mods: [{ id: "local:other" }],
+	});
 });
 
 test("a page with one visible part is a plain card in the grid", () => {
 	const items = listItems([part("nexus:225", "100", "Base"), listed({ id: "local:other", folder: "Other", page_id: null })], []);
 	const grid = gridItems(tableItems(items), 2);
 	expect(grid.map((unit) => unit.kind)).toEqual(["cards"]);
-	expect(grid[0]).toMatchObject({ kind: "cards", mods: [{ id: "nexus:225" }, { id: "local:other" }] });
+	expect(grid[0]).toMatchObject({
+		kind: "cards",
+		mods: [{ id: "nexus:225" }, { id: "local:other" }],
+	});
 });
 
 test("the grid packs a long page into rows and keeps its cards after the header", () => {
@@ -149,12 +192,19 @@ test("two user groups each get one header with their parts under it", () => {
 	const shown = [member("mod-a"), member("mod-b"), member("mod-c"), member("mod-d"), member("solo")];
 	const table = tableItems(listItems(shown, []), new Set(), groups);
 	expect(table.map((row) => row.kind)).toEqual(["group", "mod", "mod", "group", "mod", "mod", "mod"]);
-	expect(table[0]).toMatchObject({ kind: "group", id: groupRowId("g1"), group: { name: "Group g1" } });
+	expect(table[0]).toMatchObject({
+		kind: "group",
+		id: groupRowId("g1"),
+		group: { name: "Group g1" },
+	});
 
 	if (table[0]?.kind === "group") expect(table[0].group.parts.map((p) => p.id)).toEqual(["mod-a", "mod-b"]);
 	const grid = gridItems(table, 2);
 	expect(grid.map((unit) => unit.kind)).toEqual(["group", "cards", "group", "cards", "cards"]);
-	expect(grid[1]).toMatchObject({ kind: "cards", mods: [{ id: "mod-a" }, { id: "mod-b" }] });
+	expect(grid[1]).toMatchObject({
+		kind: "cards",
+		mods: [{ id: "mod-a" }, { id: "mod-b" }],
+	});
 });
 
 test("a user group wins over a page header over the same rows", () => {
@@ -176,7 +226,10 @@ test("folding a user group hides its parts but keeps the header", () => {
 
 test("a user group header resolves to every member family for a header toggle", () => {
 	const groups = [userGroup("g1", ["mod-a", "mod-b"])];
-	const shown = ["mod-a", "mod-b", "solo"].map((id) => ({ ...member(id), enabled: false }));
+	const shown = ["mod-a", "mod-b", "solo"].map((id) => ({
+		...member(id),
+		enabled: false,
+	}));
 	const items = listItems(shown, []);
 	expect(groupMemberIds(items, groupRowId("g1"), groups)).toEqual(["mod-a", "mod-b"]);
 });
@@ -207,8 +260,20 @@ test("instructions sit under their mod in every format", () => {
 		{
 			priority: 1,
 			enabled: true,
-			sources: [{ provider: "nexus", mod_id: "4311", page_url: "https://www.nexusmods.com/examplegame/mods/4311", file_id: null }],
-			info: { name: "Cool Mod", version: "1.2", author: null, description: null },
+			sources: [
+				{
+					provider: "nexus",
+					mod_id: "4311",
+					page_url: "https://www.nexusmods.com/examplegame/mods/4311",
+					file_id: null,
+				},
+			],
+			info: {
+				name: "Cool Mod",
+				version: "1.2",
+				author: null,
+				description: null,
+			},
 			instructions: "Copy into Mods.\nPick the 4K option.",
 			requires_names: [],
 			requirement_groups: [],
@@ -254,7 +319,12 @@ test("what a mod needs is one line under it, with the Nexus alternatives joined 
 			priority: 1,
 			enabled: true,
 			sources: [],
-			info: { name: "Cool Mod", version: null, author: null, description: null },
+			info: {
+				name: "Cool Mod",
+				version: null,
+				author: null,
+				description: null,
+			},
 			instructions: "",
 			requires_names: ["Base"],
 			requirement_groups: [["Mod 1", "Mod 2"], ["Mod 3"]],
@@ -273,7 +343,12 @@ test("a source without a saved page URL gets no link, because no URL is built fr
 			priority: 1,
 			enabled: false,
 			sources: [{ provider: "nexus", mod_id: "4311", page_url: null, file_id: null }],
-			info: { name: "Plain_Mod [v2]", version: null, author: null, description: null },
+			info: {
+				name: "Plain_Mod [v2]",
+				version: null,
+				author: null,
+				description: null,
+			},
 			instructions: "",
 			requires_names: [],
 			requirement_groups: [],
@@ -338,7 +413,11 @@ const update: UpdateReport = {
 
 test("a mod counts as updatable when the backend says it has an update", () => {
 	expect(hasUpdate({ "local:cool-mod": update }, "local:cool-mod")).toBe(true);
-	const different = { ...update, state: "different" as const, has_update: true };
+	const different = {
+		...update,
+		state: "different" as const,
+		has_update: true,
+	};
 	expect(hasUpdate({ "local:cool-mod": different }, "local:cool-mod")).toBe(true);
 	const ignored = { ...update, state: "ignored" as const, has_update: false };
 	expect(hasUpdate({ "local:cool-mod": ignored }, "local:cool-mod")).toBe(false);
@@ -435,7 +514,12 @@ test("a patch keeps unchanged rows, replaces changed ones and follows the sent o
 	const b = listed({ id: "b", folder: "fb" });
 	const before = status({ mods: [a, b], revisions: ["1", "2"], build: 1 });
 	const changed = { ...b, enabled: false };
-	const patch = status({ mods: [changed], revisions: ["3"], build: 2, patch: true });
+	const patch = status({
+		mods: [changed],
+		revisions: ["3"],
+		build: 2,
+		patch: true,
+	});
 	const merged = applyStatus(before, patch);
 	expect(merged.mods[0]).toBe(a);
 	expect(merged.mods[1]).toEqual(changed);
@@ -445,19 +529,37 @@ test("a patch keeps unchanged rows, replaces changed ones and follows the sent o
 	expect(knownRows(merged)).toEqual({ ids: ["a", "b"], revisions: ["1", "3"] });
 
 	const c = listed({ id: "c", folder: "fc" });
-	const reordered = status({ mods: [c], revisions: ["4"], build: 3, patch: true, order: ["c", "a", "b"] });
+	const reordered = status({
+		mods: [c],
+		revisions: ["4"],
+		build: 3,
+		patch: true,
+		order: ["c", "a", "b"],
+	});
 	const withNew = applyStatus(merged, reordered);
 	expect(withNew.mods.map((mod) => mod.id)).toEqual(["c", "a", "b"]);
 	expect(withNew.revisions).toEqual(["4", "1", "3"]);
 
-	const removed = status({ mods: [], revisions: [], build: 4, patch: true, removed: ["a"], order: ["b"] });
+	const removed = status({
+		mods: [],
+		revisions: [],
+		build: 4,
+		patch: true,
+		removed: ["a"],
+		order: ["b"],
+	});
 	expect(applyStatus(withNew, removed).mods.map((mod) => mod.id)).toEqual(["b"]);
 });
 
 /// Three mods A, B, C in list order; only A is enabled.
 function list(): Mod[] {
 	return ["A", "B", "C"].map((name, index) =>
-		listed({ id: name, folder: `f${name}`, enabled: index === 0, info: { name, version: null, author: null, description: null } }),
+		listed({
+			id: name,
+			folder: `f${name}`,
+			enabled: index === 0,
+			info: { name, version: null, author: null, description: null },
+		}),
 	);
 }
 
@@ -517,8 +619,18 @@ test("the update state is the saved check of each mod, and a failure of this ses
 	const error = { code: "nexus.down", params: {}, kind: "retryable" as const };
 	expect(updatesOf([checked, unchecked], {})).toEqual({ [checked.id]: update });
 	// A failed check shows over the saved result, and a mod with no saved check shows its failure alone.
-	const failure = { ...update, id: unchecked.id, latest: null, state: "unknown" as const, has_update: false, error };
-	const failed = updatesOf([checked, unchecked], { [checked.id]: { ...update, error }, [unchecked.id]: failure });
+	const failure = {
+		...update,
+		id: unchecked.id,
+		latest: null,
+		state: "unknown" as const,
+		has_update: false,
+		error,
+	};
+	const failed = updatesOf([checked, unchecked], {
+		[checked.id]: { ...update, error },
+		[unchecked.id]: failure,
+	});
 	expect(failed[checked.id]?.error?.code).toBe("nexus.down");
 	expect(failed[unchecked.id]).toEqual(failure);
 });
@@ -555,7 +667,11 @@ function profileWith(families: string[], active: boolean): ProfileView {
 test("a disabled mod is hidden when the user hid it or another profile's collection uses it alone", () => {
 	const off = listed({ id: "local:off", enabled: false });
 	const on = listed({ id: "local:on", enabled: true });
-	const shared = listed({ id: "local:shared", enabled: false, collections: ["Pack"] });
+	const shared = listed({
+		id: "local:shared",
+		enabled: false,
+		collections: ["Pack"],
+	});
 	const other = [profileWith(["local:off", "local:on", "local:shared"], false)];
 	// An enabled mod is never hidden, even when the user hid it or another collection claims it.
 	expect(hiddenModIds([on], other, new Map([[on.id, true]]))).toEqual(new Set());
