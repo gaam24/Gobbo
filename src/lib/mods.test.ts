@@ -362,6 +362,14 @@ test("matches filters by state, text and tag", () => {
 	expect(matches(mod, "all", "", "audio", {})).toBe(false);
 });
 
+test("a search ignores letter case and Polish accents", () => {
+	const mod = listed({ folder: "Źródło Światła" });
+	expect(matches(mod, "all", "zrodlo", null, {})).toBe(true);
+	expect(matches(mod, "all", "ŚWIATŁA", null, {})).toBe(true);
+	expect(matches(mod, "all", "swiatla", null, {})).toBe(true);
+	expect(matches(mod, "all", "ciemnosc", null, {})).toBe(false);
+});
+
 test("a disabled mod wins and loses nothing", () => {
 	expect(activeConflicts(listed({ enabled: true, wins: 3, loses: 2 }))).toEqual({ wins: 3, loses: 2 });
 	expect(activeConflicts(listed({ enabled: false, wins: 3, loses: 2 }))).toEqual({ wins: 0, loses: 0 });

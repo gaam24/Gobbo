@@ -12,6 +12,7 @@ import type {
 	UpdateReport,
 } from "@/bindings";
 import { assertNever } from "@/lib/assert";
+import { foldText } from "@/lib/fold-text";
 
 export type Mod = Status["mods"][number];
 
@@ -584,7 +585,22 @@ export function tagsOf(mods: readonly Mod[], locale: string): string[] {
 
 /// A mod matches when it passes the filter, the search text, and the tag filter.
 export function matches(mod: Mod, filter: Filter, query: string, tagFilter: string | null, updates: Record<string, UpdateReport>): boolean {
-	return matchesNeedle(mod, filter, query.trim().toLowerCase(), tagFilter, updates);
+	return matchesNeedle(mod, filter, foldText(query.trim()), tagFilter, updates);
+}
+
+/// The folded text a mod is found by, built once per mod object: a status answer replaces the objects that changed, so
+/// typing does not fold 2 000 names again on every keystroke.
+const SEARCH_TEXT = new WeakMap<Mod, string>();
+
+function searchTextOf(mod: Mod): string {
+	let text = SEARCH_TEXT.get(mod);
+
+	if (text === undefined) {
+		text = foldText(`${mod.info.name} ${mod.folder} ${mod.page_name ?? ""} ${mod.source?.name ?? ""}`);
+		SEARCH_TEXT.set(mod, text);
+	}
+
+	return text;
 }
 
 /// Whether a mod belongs to a state filter. The filter chips count with the same rule the list filters with.
@@ -608,7 +624,7 @@ export function passesFilter(mod: Mod, filter: Filter, updates: Record<string, U
 	}
 }
 
-/// `matches` with the search text already trimmed and lowercased, so a list of thousands does not build the same
+/// `matches` with the search text already trimmed and folded with `foldText`, so a list of thousands does not build the same
 /// needle for every mod.
 export function matchesNeedle(
 	mod: Mod,
@@ -618,8 +634,7 @@ export function matchesNeedle(
 	updates: Record<string, UpdateReport>,
 ): boolean {
 	const byState = passesFilter(mod, filter, updates);
-	const byText =
-		needle === "" || `${mod.info.name} ${mod.folder} ${mod.page_name ?? ""} ${mod.source?.name ?? ""}`.toLowerCase().includes(needle);
+	const byText = needle === "" || searchTextOf(mod).includes(needle);
 	const byTag = tagFilter === null || mod.tags.includes(tagFilter);
 	return byState && byText && byTag;
 }

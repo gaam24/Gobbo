@@ -9,6 +9,7 @@ import type {
 } from "@/bindings";
 import type { StatusTone } from "@/components/app/status-badge";
 import type { TranslationKey } from "@/i18n";
+import { foldText } from "@/lib/fold-text";
 
 /// The key the IPC and the profile badge use for one collection.
 export function collectionKey(origin: Pick<CollectionOrigin_Serialize, "provider" | "game_key" | "slug">): string {
@@ -166,10 +167,10 @@ export function filterCounts(
 
 /// Whether a member matches the search text: its name, author or version.
 export function matchesSearch(item: CollectionItem_Serialize, query: string): boolean {
-	const text = query.trim().toLowerCase();
+	const text = foldText(query.trim());
 
 	if (!text) return true;
-	return [item.name, item.author ?? "", item.version ?? ""].some((value) => value.toLowerCase().includes(text));
+	return [item.name, item.author ?? "", item.version ?? ""].some((value) => foldText(value).includes(text));
 }
 
 /// The download size in KB of the selected members that still need a download.

@@ -1,6 +1,7 @@
 import { useDeferredValue, useMemo, useState } from "react";
 import type { Status, UpdateReport } from "@/bindings";
 import { useTranslation } from "@/i18n";
+import { foldText } from "@/lib/fold-text";
 import { type Filter, matchesNeedle, passesFilter, tagsOf } from "@/lib/mods";
 
 /// The search, the status filter and the tag filter of the mod list, with the counts the filter buttons show. The hidden
@@ -27,7 +28,7 @@ export function useModFilter({
 	/// The field shows every keystroke at once; the list catches up in a lower-priority render, so typing stays smooth
 	/// even when the filter has to walk 2 000 mods.
 	const deferredQuery = useDeferredValue(query);
-	const needle = deferredQuery.trim().toLowerCase();
+	const needle = foldText(deferredQuery.trim());
 	const visible = useMemo(
 		() => mods.filter((mod) => hidden.has(mod.id) === (filter === "hidden") && matchesNeedle(mod, filter, needle, tagFilter, updates)),
 		[mods, filter, needle, tagFilter, updates, hidden],

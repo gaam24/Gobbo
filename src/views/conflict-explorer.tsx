@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useTranslation } from "@/i18n";
+import { foldText } from "@/lib/fold-text";
 import { unwrap } from "@/lib/ipc";
 import { formatSize } from "@/lib/mods";
 import { useLoad } from "@/lib/use-load";
@@ -39,7 +40,7 @@ export function ConflictExplorerDialog({ gameId, onClose }: { gameId: string; on
 
 	const names = new Map((status?.mods ?? []).map((mod) => [mod.id, mod.info.name || mod.folder]));
 	const nameOf = (id: string) => names.get(id) ?? id;
-	const needle = deferred.trim().toLowerCase();
+	const needle = foldText(deferred.trim());
 	const filtered = (explorer?.entries ?? []).filter((entry) => {
 		const copyMatch = copies === "all" || (copies === "two" ? entry.copies === 2 : entry.copies > 2);
 
@@ -47,9 +48,9 @@ export function ConflictExplorerDialog({ gameId, onClose }: { gameId: string; on
 
 		if (needle === "") return true;
 		return (
-			entry.path.toLowerCase().includes(needle) ||
-			nameOf(entry.winner).toLowerCase().includes(needle) ||
-			entry.losers.some((loser) => nameOf(loser).toLowerCase().includes(needle))
+			foldText(entry.path).includes(needle) ||
+			foldText(nameOf(entry.winner)).includes(needle) ||
+			entry.losers.some((loser) => foldText(nameOf(loser)).includes(needle))
 		);
 	});
 

@@ -1,4 +1,5 @@
 import type { GameScan, GameView, ManagedGame } from "@/bindings";
+import { foldText } from "@/lib/fold-text";
 
 /// Where a supported game stands. `searching` lasts only while the libraries are being scanned; a failed scan leaves
 /// the games `unsearched` instead of pretending the search is still running.
@@ -37,12 +38,13 @@ export function buildGameEntries(games: GameView[], managed: ManagedGame[], scan
 	});
 }
 
-/// The entries that pass the status filter and the search text. The text matches the name and the id, in lower case.
+/// The entries that pass the status filter and the search text. The text matches the name and the id, folded with
+/// `foldText`.
 export function filterGameEntries(entries: GameEntry[], filter: GameFilter, query: string): GameEntry[] {
-	const needle = query.trim().toLowerCase();
+	const needle = foldText(query.trim());
 	return entries.filter(
 		(entry) =>
 			(filter === "all" || entry.status === filter) &&
-			(needle === "" || entry.game.name.toLowerCase().includes(needle) || entry.game.id.includes(needle)),
+			(needle === "" || foldText(entry.game.name).includes(needle) || entry.game.id.includes(needle)),
 	);
 }
