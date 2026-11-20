@@ -39,8 +39,10 @@ static DUMPER: OnceLock<Option<minidumper::Client>> = OnceLock::new();
 /// The crash handler that asks the minidumper for a dump. It must stay alive for the process, or it detaches.
 static DUMP_HANDLER: OnceLock<crash_handler::CrashHandler> = OnceLock::new();
 
-/// Whether the out-of-process filter is armed after the program had time to install its own handlers.
-static DUMPER_READY: AtomicBool = AtomicBool::new(false);
+/// Whether the out-of-process dump path is established: the client connected and its handler attached. Set at install
+/// by the successful attach, not by the filter's re-arm thread, so a crash inside the first 250 ms still takes only the
+/// out-of-process path.
+static DUMPER_ATTACHED: AtomicBool = AtomicBool::new(false);
 
 /// Set once a dump was requested, so a filter and an abort handler do not ask for two.
 static DUMP_REQUESTED: AtomicBool = AtomicBool::new(false);
@@ -220,10 +222,6 @@ fn spawn_rearm() {
             for delay in REARM_DELAYS {
                 thread::sleep(delay);
                 arm_filter();
-
-                if DUMPER.get().is_some_and(Option::is_some) {
-                    DUMPER_READY.store(true, Ordering::Release);
-                }
             }
 
             loop {
@@ -268,6 +266,7 @@ fn install_dumper() {
         Ok(handler) => {
             if DUMP_HANDLER.set(handler).is_ok() {
                 arm_filter();
+                DUMPER_ATTACHED.store(true, Ordering::Release);
                 crate::trace::log("minidumper: connected, the out-of-process dump is armed");
             }
         }
@@ -294,9 +293,9 @@ fn arm_filter() {
     }
 }
 
-/// Whether the out-of-process filter is armed.
+/// Whether the out-of-process dump path is armed, so the in-process fallback must stay quiet.
 fn dumper_armed() -> bool {
-    DUMPER_READY.load(Ordering::Acquire)
+    DUMPER_ATTACHED.load(Ordering::Acquire)
 }
 
 /// The last-chance filter: Windows calls it when no handler took the exception. It sends the context to Gobbo and lets
@@ -333,9 +332,10 @@ unsafe extern "system" fn on_unhandled(pointers: *const EXCEPTION_POINTERS) -> i
     EXCEPTION_CONTINUE_SEARCH
 }
 
-/// Whether the out-of-process minidumper of this process is connected. The session report names it.
+/// Whether the out-of-process minidumper of this process is connected. The session report names it. The client alone is
+/// not enough: a failed handler attach leaves the in-process path in charge, so that must report disconnected.
 pub(super) fn dumper_connected() -> bool {
-    DUMPER.get().is_some_and(Option::is_some)
+    DUMPER_ATTACHED.load(Ordering::Acquire)
 }
 
 /// Sends one crash context to Gobbo. Only the first request is sent; a failure lets a later path try again.

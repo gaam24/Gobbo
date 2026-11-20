@@ -8,7 +8,7 @@ use windows_sys::Win32::Foundation::STATUS_UNSUCCESSFUL;
 use super::names::{call_redirected, redirect_nt, refuse_device_write};
 use super::trace_nt;
 use crate::guard::Guard;
-use crate::trace::trace_status_named;
+use crate::trace::trace_status;
 use crate::types::ObjectAttributes;
 use crate::win32::PreserveLastError;
 
@@ -78,6 +78,6 @@ unsafe fn query(
     let status =
         unsafe { call_redirected(attributes, redirected, |attributes| call(attributes, info)) };
     let _last_error = PreserveLastError::capture();
-    trace_status_named(operation, status);
+    trace_status(operation, status);
     status
 }

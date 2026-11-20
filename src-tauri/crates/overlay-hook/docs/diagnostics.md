@@ -53,6 +53,16 @@ The ring is a file, not a memory map. An mmap would make a reader and a writer s
 gain: the ring is off in the benchmark and the writer only appends when a mutation or a new listing happens. Revisit this
 only if a ring benchmark shows the seek/write dominating a hot path; this paragraph is the deviation record.
 
+Two diagnostics locks are deliberate deviations from section 9's rule that a process-wide mutex must not be held across a
+filesystem call. Both paths are off unless a switch names them, both are crash-adjacent dev-only code, and both serialize
+two writers of the same file - the rationale behind the per-target copy-up exception. These paragraphs are their
+deviation records; do not restructure either lock without moving its record first.
+
+- The decision ring (`RING` in `diag/ring.rs`) is held across `Ring::record`, which writes the record and the index
+  file. The path text is built before the lock is taken, so no formatting runs under it.
+- The trace file (`TRACE_FILE` in `diag/writer.rs`) is held across `metadata`, `rename`, `open` and `write_all` during a
+  rotation, so a batch cannot interleave with the rename of the file it is writing.
+
 The crash path is special:
 
 - unhandled exceptions only by default; the text report covers a panic and the opt-in first-chance path

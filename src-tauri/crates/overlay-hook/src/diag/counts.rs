@@ -41,8 +41,7 @@ pub(crate) fn count(operation: &str, detail: impl FnOnce() -> String) {
     let key = format!("{operation} {}", detail());
     let report = {
         let mut counts = COUNTS.lock().unwrap_or_else(PoisonError::into_inner);
-        *counts.by_key.entry(key).or_insert(0) += 1;
-        counts.total += 1;
+        increment(&mut counts, key);
 
         if !counts.total.is_multiple_of(REPORT_EVERY) {
             return;
@@ -58,6 +57,13 @@ pub(crate) fn count(operation: &str, detail: impl FnOnce() -> String) {
     }
 }
 
+/// Counts one event, saturating instead of overflowing after a lifetime of calls.
+fn increment(counts: &mut Counts, key: String) {
+    let entry = counts.by_key.entry(key).or_insert(0);
+    *entry = entry.saturating_add(1);
+    counts.total = counts.total.saturating_add(1);
+}
+
 /// The most frequent keys, and whether one of them looks like a loop.
 fn report(counts: &Counts) -> String {
     let mut ranked: Vec<(&String, &u64)> = counts.by_key.iter().collect();
@@ -65,7 +71,7 @@ fn report(counts: &Counts) -> String {
     let mut out = format!("total events: {}\n", counts.total);
 
     if let Some((_, top)) = ranked.first()
-        && **top * 4 > counts.total
+        && (**top).saturating_mul(4) > counts.total
     {
         out.push_str("one event is more than a quarter of all events: a loop is likely\n");
     }
@@ -110,5 +116,26 @@ mod tests {
 
         counts.total = 20;
         assert!(!report(&counts).contains("loop"));
+    }
+
+    #[test]
+    fn counting_saturates_at_the_limit_instead_of_overflowing() {
+        let mut counts = Counts::default();
+        counts.by_key.insert("a".into(), u64::MAX);
+        counts.total = u64::MAX;
+
+        increment(&mut counts, "a".into());
+
+        assert_eq!(counts.by_key["a"], u64::MAX);
+        assert_eq!(counts.total, u64::MAX);
+    }
+
+    #[test]
+    fn a_report_with_a_huge_top_count_does_not_overflow_the_loop_check() {
+        let mut counts = Counts::default();
+        counts.by_key.insert("a".into(), u64::MAX / 2);
+        counts.total = u64::MAX;
+
+        assert!(report(&counts).starts_with(&format!("total events: {}\n", u64::MAX)));
     }
 }

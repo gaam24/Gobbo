@@ -58,6 +58,8 @@ pub(super) fn dropped_lines() -> u64 {
 /// `TRACE_LIMIT`, it is moved to its old name, which replaces the one before it, and a new file is started. The caller
 /// holds the hook's guard, so opening the file is not hooked.
 fn write_kept_open(path: &Path, text: &str) -> std::io::Result<()> {
+    // The rotation holds this dev-only lock across metadata/rename/open/write so a batch cannot interleave with the
+    // rename of the file it writes. Documented deviation; see docs/diagnostics.md.
     let mut file = TRACE_FILE.lock().unwrap_or_else(PoisonError::into_inner);
     let full = file
         .as_ref()

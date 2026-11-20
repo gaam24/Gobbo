@@ -49,8 +49,9 @@ pub(crate) fn remember_hook(path: PathBuf) {
     let _ = HOOK_PATHS.set(HookPaths { native, wow64 });
 }
 
-/// `name` next to `dll`, or one folder above it. The second case is the cargo test layout, where the hook is loaded
-/// from `target/debug/deps` but the 32-bit DLL is staged in `target/debug`.
+/// `name` next to `dll`. In a debug build it may also be one folder above: the cargo test layout loads the hook from
+/// `target/debug/deps` while staging the 32-bit DLL in `target/debug`. A release build keeps only the sibling lookup,
+/// because production stages both DLLs in one folder; a test layout has no branch there.
 fn sibling_or_parent(dll: &std::path::Path, name: &str) -> PathBuf {
     let sibling = dll.with_file_name(name);
 
@@ -58,11 +59,14 @@ fn sibling_or_parent(dll: &std::path::Path, name: &str) -> PathBuf {
         return sibling;
     }
 
-    if let Some(folder) = dll.parent().and_then(std::path::Path::parent) {
-        let above = folder.join(name);
+    #[cfg(debug_assertions)]
+    {
+        if let Some(folder) = dll.parent().and_then(std::path::Path::parent) {
+            let above = folder.join(name);
 
-        if above.is_file() {
-            return above;
+            if above.is_file() {
+                return above;
+            }
         }
     }
 
@@ -83,6 +87,13 @@ struct ProcessInformation {
 fn internal_present() -> bool {
     !crate::diag::settings().disabled(crate::detours::PROCESS_INTERNAL)
         && INTERNAL_HOOK.load(Ordering::Acquire)
+}
+
+/// Which `CreateProcess` entry point received the call. The internal detour is the injector and always injects here; a
+/// documented fallback injects only when the internal detour is absent, so a new caller cannot decide this on its own.
+enum CallSite {
+    Internal,
+    Fallback,
 }
 
 /// `CreateProcessInternalW`: the child starts suspended, the hook is loaded into it, and then it runs, unless the caller
@@ -109,22 +120,29 @@ pub(crate) unsafe extern "system" fn create_process(
     });
 
     unsafe {
-        start_child_or_call(false, application, command, flags, information, |flags| {
-            original.call(
-                token,
-                application,
-                command,
-                attributes,
-                thread_attributes,
-                inherit,
-                flags,
-                environment,
-                directory,
-                startup,
-                information,
-                new_token,
-            )
-        })
+        start_child_or_call(
+            CallSite::Internal,
+            application,
+            command,
+            flags,
+            information,
+            |flags| {
+                original.call(
+                    token,
+                    application,
+                    command,
+                    attributes,
+                    thread_attributes,
+                    inherit,
+                    flags,
+                    environment,
+                    directory,
+                    startup,
+                    information,
+                    new_token,
+                )
+            },
+        )
     }
 }
 
@@ -151,7 +169,7 @@ pub(crate) unsafe extern "system" fn create_process_w(
 
     unsafe {
         start_child_or_call(
-            internal_present(),
+            CallSite::Fallback,
             application,
             command,
             flags,
@@ -197,7 +215,7 @@ pub(crate) unsafe extern "system" fn create_process_as_user(
 
     unsafe {
         start_child_or_call(
-            internal_present(),
+            CallSite::Fallback,
             application,
             command,
             flags,
@@ -299,18 +317,24 @@ unsafe fn start_child(
     started
 }
 
-/// Starts the child through the hook, or passes the call to the original when the internal hook is present.
+/// Starts the child through the hook, or passes the call to the original when the internal detour will inject it.
 ///
 /// # Safety
 /// The arguments must be the ones of the `CreateProcess` call, and `call` the original function with the flags.
 unsafe fn start_child_or_call(
-    internal_present: bool,
+    site: CallSite,
     application: *const u16,
     command: *const u16,
     flags: u32,
     information: *mut c_void,
     call: impl FnOnce(u32) -> i32,
 ) -> i32 {
+    // The internal detour is this call path, so it injects here. A fallback defers to it when it is active; otherwise
+    // the inner hook would never see this start and the fallback must inject.
+    let internal_present = match site {
+        CallSite::Internal => false,
+        CallSite::Fallback => internal_present(),
+    };
     if internal_present {
         return call(flags);
     }
@@ -490,9 +514,16 @@ fn child_imports(program: &std::path::Path) -> Vec<(String, PathBuf)> {
 /// Stops a child that could not receive the hook, and closes the handles the caller no longer receives. The call fails
 /// with `ERROR_DLL_INIT_FAILED`, so a game cannot silently run an unhooked helper against the real folder.
 fn stop_unhooked(child: &ProcessInformation) -> i32 {
-    // SAFETY: the process and thread handles are the ones `CreateProcess` returned, and each is closed once.
+    // SAFETY: the process and thread handles are the ones `CreateProcess` returned, and each is closed once. A child
+    // that survives termination is never resumed; only the report of the failure changes.
     unsafe {
-        TerminateProcess(child.process, ERROR_DLL_INIT_FAILED);
+        if TerminateProcess(child.process, ERROR_DLL_INIT_FAILED) == FALSE {
+            log(&format!(
+                "could not terminate unhooked child process {}: {}",
+                child.process_id,
+                std::io::Error::last_os_error()
+            ));
+        }
         CloseHandle(child.thread);
         CloseHandle(child.process);
     }

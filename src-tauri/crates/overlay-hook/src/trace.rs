@@ -53,16 +53,6 @@ pub(crate) fn trace_status(operation: &str, status: i32) {
     trace(|| format!("status {operation} 0x{:08x}", status as u32));
 }
 
-/// The same as `trace_status`, for a call site that has no prebuilt operation name. The line is built only when per-call
-/// tracing is on, so a loader that asks for attributes does not allocate for a message nobody reads.
-pub(crate) fn trace_status_named(operation: &str, status: i32) {
-    if !diag::settings().calls {
-        return;
-    }
-
-    trace(|| format!("status {operation} 0x{:08x}", status as u32));
-}
-
 /// Logs whether a Win32 call succeeded and the error it left, when `GOBBO_OVERLAY_LOG` is set. The error is read by the
 /// caller before this call, because the log's own file write may change it.
 pub(crate) fn trace_result(operation: &str, succeeded: bool, error: u32) {

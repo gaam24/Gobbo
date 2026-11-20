@@ -47,6 +47,8 @@ pub(crate) fn record(kind: Kind, layer: Layer, error: u32, path: impl FnOnce() -
     // Build the path before taking the ring lock: the decision path may call `to_string_lossy` or `format!`, and the
     // writer must not hold a process-wide lock during that work.
     let path = path();
+    // This diagnostics-only lock covers two file writes and serializes the writers of one ring file. It is a documented
+    // deviation from the no-mutex-across-I/O rule; see the deviation records in docs/diagnostics.md.
     let mut ring = lock.lock().unwrap_or_else(PoisonError::into_inner);
     let _ = ring.record(kind, layer, error, &path, crate::win32::thread_id());
 }
