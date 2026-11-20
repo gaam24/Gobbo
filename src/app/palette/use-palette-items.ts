@@ -37,7 +37,7 @@ import { useWorkspace } from "@/app/contexts/workspace-context";
 import { gamePresentation } from "@/app/selectors/game-presentation";
 import type { Status } from "@/bindings";
 import { useTranslation } from "@/i18n";
-import { authorOf, formatModList } from "@/lib/mods";
+import { authorOf, formatModList, hasUpdate } from "@/lib/mods";
 import type { PaletteItem } from "@/lib/palette";
 import { shortcutHint } from "@/lib/shortcuts";
 import { useSourceName } from "@/sources/source-name";
@@ -81,7 +81,7 @@ export function usePaletteItems(): () => PaletteItem[] {
 			requires: t("mods.col.requires"),
 			or: t("mods.relations.requirementsOr"),
 		};
-		const updateCount = gameStatus.mods.reduce((count, mod) => count + (mod.update?.has_update ? 1 : 0), 0);
+		const updateCount = gameStatus.mods.filter((mod) => hasUpdate(modUpdates.updates, mod.id)).length;
 		let launchReason: string | undefined;
 
 		if (gameRunning) launchReason = t("palette.reason.running");
