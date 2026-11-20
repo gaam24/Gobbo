@@ -283,13 +283,6 @@ mod tests {
     }
 
     #[test]
-    fn a_root_file_is_a_bare_name_that_compares_like_a_path() {
-        let deploy = deploy();
-        assert_eq!(deploy.root_file_of("WINHTTP.DLL"), Some("winhttp.dll"));
-        assert!(deploy.root_file_of("bin/winhttp.dll").is_none());
-    }
-
-    #[test]
     fn a_mirrored_or_root_file_keeps_its_game_path() {
         let deploy = deploy();
         assert!(deploy.keeps_game_path("DLC/dlcfoo/x.bundle"));

@@ -135,13 +135,24 @@ mod tests {
             },
         ];
         let mut seen = Vec::new();
+        let mut prepared = Vec::new();
+        let mut written = Vec::new();
         write_jobs(
             &jobs,
             &mut |progress| seen.push(progress.percent),
-            |_| Ok(()),
-            |_| Ok::<_, DeployError>(()),
+            |job| {
+                prepared.push(job.src.clone());
+                Ok(())
+            },
+            |job| {
+                written.push(job.src.clone());
+                Ok::<_, DeployError>(())
+            },
         )
         .unwrap();
         assert_eq!(seen, [50, 100]);
+        let names = [PathBuf::from("a"), PathBuf::from("b")];
+        assert_eq!(prepared, names);
+        assert_eq!(written, names);
     }
 }
