@@ -81,9 +81,8 @@ These rules apply to every change, whichever game or platform started it.
 `bun run lint` is the merge gate: Biome, oxlint, the TypeScript checks and the architecture guard (layers, data
 boundary, production `unwrap`/`expect`/`panic`/`todo`/`dbg`, overlay invariants, generated bindings and permissions).
 The full E2E suite runs nightly and on demand, not as a release gate; the `Security` workflow runs `cargo deny` and
-`bun audit` weekly and on pull requests that change dependencies. A pull request runs the fast checks, the web gate and
-one Linux clippy gate; the full Rust suite and the Windows gate run on main and nightly (and on a PR that changes
-Windows-only code).
+`bun audit` weekly and on pull requests that change dependencies. Every push and pull request runs four parallel CI jobs: the web gate, Linux clippy and tests, Windows clippy and Windows
+tests (`.github/workflows/ci.yml`).
 Coverage, mutation, bundle-size and docs-link reports are local tools, not merge gates. Details:
 [docs/agent/quality.md](docs/agent/quality.md).
 
@@ -98,7 +97,8 @@ bun run check:rust
 ```
 
 `bun run check:rust` runs `cargo fmt --all --check`, `cargo clippy --workspace --all-targets --locked -- -D warnings`,
-`cargo test --workspace --locked` and the overlay allocation budget test in `src-tauri`. Area-specific commands are in
+and `cargo test --workspace --features bench --locked` (which includes the overlay allocation budget test) in
+`src-tauri`; on Windows run `bun run build:overlay-hook` first. Area-specific commands are in
 [src-tauri/AGENTS.md](src-tauri/AGENTS.md) and in the hook's `ARCHITECTURE.md`. A change in `platform/`, in `deploy/` or
 behind `#[cfg]` is checked on Linux and on Windows; name any gate that cannot run on this machine instead of skipping it
 quietly.

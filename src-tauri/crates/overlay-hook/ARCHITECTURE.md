@@ -263,6 +263,10 @@ A change to this crate needs the tests that match its risk:
   mod DLL is built with `lib.exe` and tested x64 and x86 (`tests/dlls.rs`); the same test covers a mod DLL overriding a
   game DLL and checks that the game's file did not change. The hook's own import table is checked against the common
   proxy DLL names (`tests/imports.rs`).
+- Known gap: a game folder spelled with 8.3 names (`C:\Users\RUNNER~1\...`). The loader reports module paths in the
+  spelling the process used, while handle APIs report the long form, and the session stores one form. The CI runner's
+  default `TEMP` is such a path, so the Windows job points `TEMP` at a long path; a real fix needs both spellings in
+  every comparison and a test that starts a game from an 8.3 path.
 - Property tests for path normalization; fuzz tests for NT structure parsers are a known gap (no harness yet).
 - Benchmark before/after for hot-path changes, with allocation counts.
 - `overlay-bench` is the source of the numbers: `cargo build -p gobbo-overlay-hook --features "bench-alloc bench-stats"`,
@@ -283,15 +287,11 @@ cargo test --workspace
 cargo test -p gobbo-overlay-hook
 ```
 
-On Windows, also build both hooks, the 32-bit injector and run the overlay tests:
+On Windows, build both hooks, the 32-bit injector, the probes and the dumper (staged in `target/debug`, where the tests
+look for them), then run the overlay tests. CI runs exactly this:
 
 ```bash
-cargo build -p gobbo-overlay-hook
-cargo build -p gobbo-overlay-hook --target i686-pc-windows-msvc
-cargo build -p gobbo-overlay-launch --bin gobbo_overlay_inject32 --target i686-pc-windows-msvc
-# The test binaries find these helpers in `target/debug` (Cargo nests them deeper):
-Copy-Item target/i686-pc-windows-msvc/debug/gobbo_overlay_hook.dll target/debug/gobbo_overlay_hook32.dll
-Copy-Item target/i686-pc-windows-msvc/debug/gobbo_overlay_inject32.exe target/debug/gobbo_overlay_inject32.exe
+bun run build:overlay-hook
 cargo test -p gobbo --lib deploy::overlay::windows
 # Compile check for the experimental ARM64 target:
 cargo check -p gobbo-overlay-hook -p gobbo-overlay-launch --target aarch64-pc-windows-msvc --all-targets

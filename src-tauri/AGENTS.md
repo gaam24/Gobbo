@@ -222,9 +222,11 @@ Run these from `src-tauri`. They are the same gates as `bun run check:rust` and 
 ```bash
 cargo fmt --all --check
 cargo clippy --workspace --all-targets --locked -- -D warnings
-cargo test --workspace --locked
-cargo test --features bench --test alloc_budget --locked
+cargo test --workspace --features bench --locked
 ```
+
+`--features bench` adds the benchmark fixtures and the overlay allocation budget test. On Windows, run
+`bun run build:overlay-hook` once first: the overlay tests load the hook binaries it stages in `target/debug`.
 
 A focused data-format change can be checked first with `cargo test --lib migrations` in `src-tauri`; the full workspace
 run above covers it before you finish.
