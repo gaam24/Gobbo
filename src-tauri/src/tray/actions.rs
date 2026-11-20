@@ -129,10 +129,18 @@ fn quit(app: &AppHandle, snapshot: &Snapshot, labels: &TrayLabels) {
             match stop_game {
                 Some(game) => {
                     // Stop before exiting: leaving a game process behind would also leave the overlay mounted.
+                    // When the stop fails, Gobbo stays open and says why, so the user can stop the game another way.
                     drop(tauri::async_runtime::spawn_blocking(move || {
                         let data = handle.state::<Data>();
-                        let _ = crate::launch::start::stop_game(&data, &game);
-                        handle.exit(0);
+                        match crate::launch::start::stop_game(&data, &game) {
+                            Ok(_) => handle.exit(0),
+                            Err(error) => {
+                                crate::infra::log::warn(format!(
+                                    "quit: the game was not stopped: {error}"
+                                ));
+                                handle.dialog().message(error.to_string()).show(|_| {});
+                            }
+                        }
                     }));
                 }
                 None => handle.exit(0),
