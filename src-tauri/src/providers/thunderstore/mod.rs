@@ -16,7 +16,7 @@ use crate::domain::source::{
 use crate::domain::version::update_state;
 use crate::error::AppError;
 use crate::providers::link::is_slug;
-use crate::providers::picture::{read_picture, save_picture, stem};
+use crate::providers::picture::{save_picture, stem};
 use crate::providers::workers::{WORKER_PANIC, per_request};
 use crate::providers::{
     SourceDownloadRequest, SourceDownloaded, SourceProvider, SourceUpdate, SourceUpdateRequest,
@@ -138,10 +138,6 @@ impl SourceProvider for ThunderstoreProvider {
         per_request(requests, check_one, |request| {
             SourceUpdate::error(request, AppError::unexpected(WORKER_PANIC))
         })
-    }
-
-    fn picture(&self, images: &std::path::Path, file: &str) -> Result<Option<String>, AppError> {
-        read_picture(images, file)
     }
 
     fn fetch_meta(

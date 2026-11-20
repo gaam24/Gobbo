@@ -252,9 +252,9 @@ pub trait SourceProvider: Send + Sync {
         None
     }
 
-    /// Reads a saved page picture as a data URL. The provider decides which file names are its own.
-    fn picture(&self, _images: &Path, _file: &str) -> Result<Option<String>, AppError> {
-        Err(unsupported())
+    /// Reads a saved page picture as a data URL. The shared reader accepts only plain picture names in `images`.
+    fn picture(&self, images: &Path, file: &str) -> Result<Option<String>, AppError> {
+        picture::read_picture(images, file)
     }
 
     /// Reads a mod page by its provider id.

@@ -249,10 +249,6 @@ impl SourceProvider for NexusProvider {
         update::check_updates(key, requests)
     }
 
-    fn picture(&self, images: &std::path::Path, file: &str) -> Result<Option<String>, AppError> {
-        crate::providers::picture::read_picture(images, file)
-    }
-
     fn fetch_meta(&self, key: &str, game_key: &str, mod_id: &str) -> Result<SourceMeta, AppError> {
         let domain = plain_domain(game_key)
             .ok_or_else(|| AppError::new("nexus.no_domain").with("domain", game_key))?;
