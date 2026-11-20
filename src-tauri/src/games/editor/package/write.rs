@@ -4,7 +4,7 @@ use std::fs;
 use std::path::Path;
 
 use crate::error::{AppError, io_at};
-use crate::games::{forget_definition, is_valid_id};
+use crate::games::{forget_all_definitions, forget_definition, is_valid_id};
 use crate::infra::store;
 
 use super::read::read_package;
@@ -67,7 +67,12 @@ pub(super) fn import_with(
         }
     }
 
-    forget_definition(&game_path);
+    if data.loaders.is_empty() {
+        forget_definition(&game_path);
+    } else {
+        forget_all_definitions();
+    }
+
     Ok(ImportedDefinitionPackage {
         id: data.preview.id,
         name: data.preview.name,

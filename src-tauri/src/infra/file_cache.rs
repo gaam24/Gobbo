@@ -81,6 +81,14 @@ impl<T> FileCache<T> {
         entries.retain(|(cached, _)| cached.path != path);
     }
 
+    /// Drops every entry, for a change that the file keys cannot see.
+    pub fn clear(&self) {
+        self.entries
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clear();
+    }
+
     fn hit(&self, key: &Key) -> Option<Arc<T>> {
         let mut entries = self.entries.lock().unwrap_or_else(PoisonError::into_inner);
         let at = entries.iter().position(|(cached, _)| cached == key)?;
@@ -146,6 +154,19 @@ mod tests {
             .unwrap();
         assert!(!Arc::ptr_eq(&first, &third));
         assert_eq!(parses, 2);
+    }
+
+    #[test]
+    fn a_cleared_cache_parses_an_unchanged_file_again() {
+        let dir = scratch!("file-cache-clear");
+        let path = dir.join("game.toml");
+        fs::write(&path, "one").unwrap();
+        let cache = FileCache::<u32>::default();
+        cache.load(&path, || Ok(1)).unwrap();
+
+        cache.clear();
+
+        assert_eq!(*cache.load(&path, || Ok(2)).unwrap(), 2);
     }
 
     #[test]

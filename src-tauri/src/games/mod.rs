@@ -186,6 +186,14 @@ pub fn forget_definition(path: &Path) {
     }
 }
 
+/// Drops every parsed definition. A user loader preset is merged into each game that names it, and the cache is keyed
+/// by `game.toml` only, so a written preset must reach every game that uses it.
+pub fn forget_all_definitions() {
+    if let Some(cache) = DEFINITIONS.get() {
+        cache.clear();
+    }
+}
+
 /// The `game.toml` of one game by id. An id that cannot name a game folder gives an empty path.
 pub fn definition_path(id: &str) -> PathBuf {
     if !is_valid_id(id) {
