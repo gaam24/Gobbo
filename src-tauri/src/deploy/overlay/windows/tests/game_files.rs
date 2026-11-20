@@ -314,7 +314,7 @@ fn a_rebuilt_layer_starts_without_the_whiteouts_of_the_old_one() {
     undo(&target.journal_roots()).unwrap();
 
     // Other mods build the layer again, so the old whiteouts go.
-    let other = overlay_plan(&library);
+    let other = overlay_plan(&library, &[]);
     apply(&other, &library, &target).unwrap();
     assert!(!layers.whiteouts_file().exists());
     assert!(!layers.whiteouts_journal_file().exists());
