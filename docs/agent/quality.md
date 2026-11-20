@@ -8,17 +8,21 @@ dependency policy or the workflow itself. `cargo deny` fails on every advisory t
 `src-tauri/deny.toml`; each ignore carries a reason and a recheck date, so a moderate advisory with no safe upgrade is
 visible without blocking a merge on noise. `cargo machete` and `bun run docs:check` stay report-only.
 
-`ci.yml` first classifies the changed paths: formatting, biome, oxlint, types and the architecture guards run on every
-change. A pull request runs the web gate and a single Linux `clippy --all-targets` gate – which type-checks the tests
-without running them – so it pays for one Rust compile. The full Rust suite and the Windows gate (whose build script
-needs the staged hook binaries) run on main, nightly and reusable calls; a pull request that touches Windows-only code
-also runs the Windows gate. Nightly and manual runs run every gate. The release calls the same workflow with
-`e2e: false`, so the long E2E suite never holds a release.
+## CI
 
-`sccache` is deliberately not used: it cannot cache `cargo check` or `cargo clippy`, and `rust-cache` already restores
-all dependencies. Cargo deliberately drops workspace artifacts from its cache, so adding more jobs would recompile the
-workspace more often. One test that cannot find its helper process on a hosted runner is quarantined with `#[ignore]`;
-it runs in a non-blocking step on main and nightly.
+`ci.yml` runs four independent jobs in parallel on every push and pull request, so the wall time is the slowest job
+(Windows tests), not the sum:
+
+- **Web** — `cargo fmt --check`, `bun run lint`, `bun test`, `bun run build:web`.
+- **Rust** — Linux clippy and `cargo test --workspace --features bench` (no debug info, for faster links).
+- **Windows clippy** — clippy for the Windows-only code. The bundle resources are empty placeholder files: clippy links
+  nothing, and tauri-build only checks that they exist.
+- **Windows tests** — `bun scripts/build-overlay-hook.ts`, then `cargo test --workspace`. The static CRT is set for every
+  Windows crate in `src-tauri/.cargo/config.toml`, so the test build reuses the hook binaries instead of rebuilding them.
+  `TEMP` points at a long path, because the runner's default is an 8.3 path (see the hook's `ARCHITECTURE.md`).
+
+Each job has its own `rust-cache` key, written only from `main`. E2E runs nightly and on demand. The release workflow
+calls `ci.yml` as its gate, in parallel with the platform builds; tests marked `#[ignore]` do not run in CI.
 
 ## Optional local reports
 
