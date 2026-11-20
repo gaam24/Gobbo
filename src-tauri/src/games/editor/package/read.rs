@@ -9,7 +9,7 @@ use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use crate::error::{AppError, io_at};
 use crate::games::definition::GameDef;
 use crate::games::editor::DefinitionProblemView;
-use crate::games::editor::check::check_with;
+use crate::games::editor::check::{check_with, problem};
 use crate::games::loaders::LoaderDef;
 use crate::games::view::GameLoaderView;
 use crate::infra::archive::Archive;
@@ -336,11 +336,4 @@ fn data_url(bytes: &[u8]) -> String {
         "image/webp"
     };
     format!("data:{mime};base64,{}", BASE64_STANDARD.encode(bytes))
-}
-
-fn problem(section: &str, message: impl Into<String>) -> DefinitionProblemView {
-    DefinitionProblemView {
-        section: section.to_string(),
-        message: message.into(),
-    }
 }

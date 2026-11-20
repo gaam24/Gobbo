@@ -111,7 +111,10 @@ fn section_of(message: &str) -> &'static str {
     }
 }
 
-fn problem(section: &str, message: impl Into<String>) -> DefinitionProblemView {
+pub(in crate::games::editor) fn problem(
+    section: &str,
+    message: impl Into<String>,
+) -> DefinitionProblemView {
     DefinitionProblemView {
         section: section.to_string(),
         message: message.into(),

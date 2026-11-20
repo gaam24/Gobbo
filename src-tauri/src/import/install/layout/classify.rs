@@ -8,7 +8,8 @@ pub(super) fn mirror_path(rule: &MirrorRule<'_>, parts: &[&str]) -> String {
 
     match &parts[rule.dir.len()..] {
         [folder, inner @ ..] if !inner.is_empty() => {
-            let prefixed = starts_with_ignore_case(folder, &rule.mirror.prefix);
+            let prefixed =
+                crate::domain::pathkey::starts_with_ignore_ascii_case(folder, &rule.mirror.prefix);
             rel.push(if prefixed {
                 (*folder).to_string()
             } else {
@@ -41,16 +42,6 @@ pub(super) fn extension_allowed(parts: &[&str], extensions: &[String]) -> bool {
                 .get(1..)
                 .is_some_and(|suffix| suffix.eq_ignore_ascii_case(extension))
     })
-}
-
-/// Whether `text` starts with `prefix`, ignoring ASCII case. Game definitions use ASCII prefixes; a non-ASCII prefix
-/// falls back to the full Unicode lowercasing.
-fn starts_with_ignore_case(text: &str, prefix: &str) -> bool {
-    if prefix.is_ascii() {
-        crate::domain::pathkey::starts_with_ignore_ascii_case(text, prefix)
-    } else {
-        text.to_lowercase().starts_with(&prefix.to_lowercase())
-    }
 }
 
 /// Whether the path starts with these parts (regardless of letter case). An equal path counts too.
