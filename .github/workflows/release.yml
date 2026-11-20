@@ -1,8 +1,8 @@
 name: Release
 
 # Push a tag `v<version>` on main (the version in release.json) to publish a release. A manual run builds and attests
-# the same files but never publishes. The CI gate and the two platform builds run in parallel, and the
-# publish job waits for all of them, so a broken commit never gets a release.
+# the same files but never publishes. The CI check and the two platform builds run in parallel, and the publish job
+# waits for all of them, so a broken commit never gets a release.
 #
 # Secrets: TAURI_SIGNING_PRIVATE_KEY and TAURI_SIGNING_PRIVATE_KEY_PASSWORD (the updater signing key).
 #
@@ -26,9 +26,33 @@ env:
   CARGO_INCREMENTAL: "0"
 
 jobs:
+  # The tag's commit is on main, where CI already ran; the release waits for that run instead of repeating it, which
+  # saves a full Windows test run. A manual build has no gate: it never publishes.
   checks:
-    name: Checks
-    uses: ./.github/workflows/ci.yml
+    name: CI passed
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      actions: read
+    steps:
+      - name: Wait for the CI run of this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for _ in $(seq 1 80); do
+            run="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$GITHUB_SHA&event=push" \
+              --jq '.workflow_runs[0] | "\(.status) \(.conclusion)"' || true)"
+            echo "CI: ${run:-not started}"
+            case "$run" in
+              "completed success") exit 0 ;;
+              completed*) echo "::error::CI failed for $GITHUB_SHA"; exit 1 ;;
+            esac
+            sleep 30
+          done
+          echo "::error::no finished CI run for $GITHUB_SHA"
+          exit 1
 
   build:
     name: Build ${{ matrix.platform }}
