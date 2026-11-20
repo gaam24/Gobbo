@@ -4,7 +4,6 @@ import type {
 	CollectionItemStatus,
 	CollectionOrigin_Serialize,
 	CollectionPlan_Serialize,
-	CollectionSessionView_Serialize,
 	CollectionSource_Serialize,
 	SourceProviderInfo,
 } from "@/bindings";
@@ -40,25 +39,6 @@ export function isDone(status: CollectionItemStatus | undefined): boolean {
 /// Whether the member still needs a download, an import or the user.
 export function needsWork(status: CollectionItemStatus | undefined): boolean {
 	return !isDone(status) && status?.kind !== "unsupported";
-}
-
-/// The next member the guided flow should ask for. `deferred` holds temporary skips; when every remaining member is
-/// deferred, the set is cleared by the caller and the loop starts again.
-export function nextPending(
-	session: CollectionSessionView_Serialize,
-	deferred: ReadonlySet<string>,
-): { item: CollectionItem_Serialize; last: boolean } | null {
-	const excluded = new Set(session.origin.excluded ?? []);
-	const pending = session.plan.items.filter((item) => {
-		const status = session.statuses[item.key];
-		return !(excluded.has(item.key) || deferred.has(item.key)) && status !== undefined && needsWork(status);
-	});
-	const ordered = session.plan.order
-		.map((key) => pending.find((item) => item.key === key))
-		.filter((item): item is CollectionItem_Serialize => item !== undefined);
-	const item = ordered[0];
-	if (!item) return null;
-	return { item, last: ordered.length === 1 };
 }
 
 /// The members in the order they enter the list. Keys the order does not name come last, so a damaged plan still lists

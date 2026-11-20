@@ -81,28 +81,12 @@ export function pageRowId(pageId: string): string {
 	return `${PAGE_ROW_PREFIX}${pageId}`;
 }
 
-/// The page id of a page group's row id, or `null` for any other row.
-export function pageIdOfRow(rowId: string): string | null {
-	return rowId.startsWith(PAGE_ROW_PREFIX) ? rowId.slice(PAGE_ROW_PREFIX.length) : null;
-}
-
 /// The prefix of a user-group header's row id. It keeps the id apart from a page row id and a mod family id.
 const GROUP_ROW_PREFIX = "group:";
 
 /// The row id of a user group header.
 export function groupRowId(groupId: string): string {
 	return `${GROUP_ROW_PREFIX}${groupId}`;
-}
-
-/// The stored group id of a user-group header row, or `null` for any other row.
-export function groupIdOfRow(rowId: string): string | null {
-	return rowId.startsWith(GROUP_ROW_PREFIX) ? rowId.slice(GROUP_ROW_PREFIX.length) : null;
-}
-
-/// Whether a row id names a page or user group header. The backend resolves the group drag rules; the views only need
-/// to know that such a row is not a plain mod.
-export function isGroupHeader(rowId: string): boolean {
-	return pageIdOfRow(rowId) !== null || groupIdOfRow(rowId) !== null;
 }
 
 /// The installed parts of one source page, in list order. A page-wide command names the page by its first part, because
