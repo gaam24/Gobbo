@@ -36,8 +36,14 @@ pub fn replace_program_files(program_dir: &Path, staged: &Path) -> Result<usize,
             for path in &written {
                 let _ = fs::remove_file(path);
             }
+            // A file that cannot be moved back stays as `<name>.gobbo-old`; the next start puts it back.
             for path in &moved {
-                let _ = fs::rename(aside(path), path);
+                if let Err(rollback) = fs::rename(aside(path), path) {
+                    crate::infra::log::warn(format!(
+                        "could not restore {} after a failed update: {rollback}",
+                        path.display()
+                    ));
+                }
             }
             Err(error)
         }
@@ -104,7 +110,7 @@ pub fn cleanup_leftovers(program_dir: &Path) {
         if path.is_dir() {
             cleanup_under(&path);
         } else if is_leftover(&path) {
-            let _ = fs::remove_file(&path);
+            settle_leftover(&path);
         }
     }
 }
@@ -118,8 +124,24 @@ fn cleanup_under(dir: &Path) {
         if path.is_dir() {
             cleanup_under(&path);
         } else if is_leftover(&path) {
-            let _ = fs::remove_file(&path);
+            settle_leftover(&path);
         }
+    }
+}
+
+/// A moved-aside file is removed once its new copy is in place. When the original is missing, a rollback failed and this
+/// is the only copy left, so it is put back instead.
+fn settle_leftover(path: &Path) {
+    let original = path.with_file_name(
+        path.file_name()
+            .and_then(|name| name.to_str())
+            .and_then(|name| name.strip_suffix(OLD_SUFFIX))
+            .unwrap_or_default(),
+    );
+    if original.exists() {
+        let _ = fs::remove_file(path);
+    } else {
+        let _ = fs::rename(path, &original);
     }
 }
 
@@ -203,6 +225,7 @@ mod tests {
         let dir = tempfile::tempdir().expect("tempdir");
         let program = dir.path();
         write(&program.join("gobbo.exe.gobbo-old"), "old");
+        write(&program.join("gobbo.exe"), "new");
         write(&program.join("games/a/game.toml.gobbo-old"), "old");
         write(&program.join("games/a/game.toml"), "current");
         write(&program.join(STAGING_DIR).join("gobbo"), "unpacked");
@@ -218,5 +241,20 @@ mod tests {
             "current"
         );
         assert!(program.join("data/keep.gobbo-old").exists());
+    }
+
+    #[test]
+    fn cleanup_puts_back_a_file_whose_rollback_failed() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let program = dir.path();
+        write(&program.join("gobbo.exe.gobbo-old"), "old");
+
+        cleanup_leftovers(program);
+
+        assert_eq!(
+            fs::read_to_string(program.join("gobbo.exe")).expect("restored"),
+            "old"
+        );
+        assert!(!program.join("gobbo.exe.gobbo-old").exists());
     }
 }
