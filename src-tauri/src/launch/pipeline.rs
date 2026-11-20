@@ -3,7 +3,8 @@
 //! options and in the `Launch` they hand in.
 
 use std::path::{Path, PathBuf};
-use std::sync::atomic::Ordering;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
 
 use super::changes::{record_game_changes, watch_game_folder};
@@ -11,6 +12,7 @@ use super::output;
 use super::report;
 use super::start::Launch;
 use super::steps::run_steps;
+use super::watch::Snapshot;
 use crate::context::{Data, Settings, load_settings};
 use crate::deploy::overlay;
 use crate::error::AppError;
@@ -123,47 +125,26 @@ pub(super) fn run(
     } else {
         None
     };
-    let session_root = PathBuf::from(settings.game_root.trim());
+    let after = AfterExit {
+        data: data.clone(),
+        game: game.clone(),
+        home: home.to_path_buf(),
+        state_root,
+        session_root: PathBuf::from(settings.game_root.trim()),
+        live_flag,
+        record,
+        notify: on_exit.take(),
+        watched,
+        steps: steps && with_mods,
+        finish,
+    };
 
     if background {
-        let data = data.clone();
-        let game = game.clone();
-        let home = home.to_path_buf();
-        let notify = on_exit.take();
         std::thread::spawn(move || {
             let code = running.wait();
-            crate::infra::log::info(format!("launch: game={} exited with {code:?}", game.id));
 
-            if record {
-                report::update(&data, |report| report.game_exit_code = code);
-            }
-            // The launcher can exit while the game's own processes still run in the overlay, such as Wine's services.
-            // The game counts as running until the last of them has ended.
-            overlay::wait_released(&session_root);
-
-            if let Some(flag) = live_flag {
-                flag.store(false, Ordering::Release);
-            }
-
-            if let Some(notify) = notify {
-                notify(code);
-            }
-
-            if let Some((root, before)) = watched {
-                record_game_changes(&data, &root, &before);
-            }
-            // The settings are read again after the game exits: its steps may have changed its profile data.
-            if steps && with_mods {
-                let after = load_settings(&data);
-
-                if let Err(error) = run_steps(&data, &game, Phase::AfterEnd, &home, &after) {
-                    crate::infra::log::error(error);
-                }
-            }
-
-            if finish {
-                let settings = load_settings(&data);
-                super::finish_launch(&data, &game, &settings, &state_root);
+            if let Err(error) = after.run(code) {
+                crate::infra::log::error(error);
             }
         });
         return Ok(Outcome {
@@ -173,38 +154,72 @@ pub(super) fn run(
     }
 
     let code = running.wait();
-    crate::infra::log::info(format!("launch: game={} exited with {code:?}", game.id));
-
-    if let Some(flag) = live_flag {
-        flag.store(false, Ordering::Release);
-    }
-
-    if record {
-        report::update(data, |report| report.game_exit_code = code);
-    }
-
-    if let Some(notify) = on_exit {
-        notify(code);
-    }
-
-    if let Some((root, before)) = watched {
-        record_game_changes(data, &root, &before);
-    }
-
-    if steps && with_mods {
-        let after = load_settings(data);
-        run_steps(data, game, Phase::AfterEnd, home, &after)?;
-    }
-
-    if finish {
-        let settings = load_settings(data);
-        super::finish_launch(data, game, &settings, &state_root);
-    }
-
+    after.run(code)?;
     Ok(Outcome {
         with_mods,
         exit_code: code,
     })
+}
+
+/// What follows the exit of a launched program, the same for a background and a foreground run.
+struct AfterExit {
+    data: Data,
+    game: GameDef,
+    home: PathBuf,
+    state_root: PathBuf,
+    session_root: PathBuf,
+    live_flag: Option<Arc<AtomicBool>>,
+    record: bool,
+    notify: Option<ExitNotice>,
+    watched: Option<(PathBuf, Snapshot)>,
+    steps: bool,
+    finish: bool,
+}
+
+impl AfterExit {
+    /// Records the exit, waits for the overlay to be released, runs the after-end steps and saves the profile data. A
+    /// failed step is returned only after the profile data is saved, so it never loses what the game wrote.
+    fn run(self, code: Option<i32>) -> Result<(), AppError> {
+        let Self { data, game, .. } = &self;
+        crate::infra::log::info(format!("launch: game={} exited with {code:?}", game.id));
+
+        if self.record {
+            report::update(data, |report| report.game_exit_code = code);
+        }
+        // The launcher can exit while the game's own processes still run in the overlay, such as Wine's services.
+        // The game counts as running until the last of them has ended.
+        overlay::wait_released(&self.session_root);
+
+        if let Some(flag) = &self.live_flag {
+            flag.store(false, Ordering::Release);
+        }
+
+        if let Some((root, before)) = &self.watched {
+            record_game_changes(data, root, before);
+        }
+        // The settings are read again after the game exits: its steps may have changed its profile data.
+        let steps = if self.steps {
+            run_steps(
+                data,
+                game,
+                Phase::AfterEnd,
+                &self.home,
+                &load_settings(data),
+            )
+        } else {
+            Ok(())
+        };
+
+        if self.finish {
+            super::finish_launch(data, game, &load_settings(data), &self.state_root);
+        }
+
+        if let Some(notify) = self.notify {
+            notify(code);
+        }
+
+        steps
+    }
 }
 
 /// The DLLs an overlay launch found in the mod layer and the static imports it will patch. A plain launch has none.
