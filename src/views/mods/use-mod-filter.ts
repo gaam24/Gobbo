@@ -1,7 +1,7 @@
 import { useDeferredValue, useMemo, useState } from "react";
 import type { Status, UpdateReport } from "@/bindings";
 import { useTranslation } from "@/i18n";
-import { type Filter, hasUpdate, matchesNeedle, tagsOf } from "@/lib/mods";
+import { type Filter, matchesNeedle, passesFilter, tagsOf } from "@/lib/mods";
 
 /// The search, the status filter and the tag filter of the mod list, with the counts the filter buttons show. The hidden
 /// mods leave the list and its counts; the Hidden filter shows them alone.
@@ -44,15 +44,14 @@ export function useModFilter({
 			hidden: hidden.size,
 		};
 
+		const counted = ["enabled", "disabled", "missing", "conflict", "updates"] as const;
+
 		for (const mod of mods) {
 			if (hidden.has(mod.id)) continue;
-			all[mod.enabled ? "enabled" : "disabled"] += 1;
 
-			if (mod.unmet_requirements > 0) all.missing += 1;
-
-			if (mod.enabled && (mod.wins > 0 || mod.loses > 0)) all.conflict += 1;
-
-			if (hasUpdate(updates, mod.id)) all.updates += 1;
+			for (const filter of counted) {
+				if (passesFilter(mod, filter, updates)) all[filter] += 1;
+			}
 		}
 
 		return all;

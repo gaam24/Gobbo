@@ -11,6 +11,7 @@ import type {
 	Status,
 	UpdateReport,
 } from "@/bindings";
+import { assertNever } from "@/lib/assert";
 
 export type Mod = Status["mods"][number];
 
@@ -586,6 +587,27 @@ export function matches(mod: Mod, filter: Filter, query: string, tagFilter: stri
 	return matchesNeedle(mod, filter, query.trim().toLowerCase(), tagFilter, updates);
 }
 
+/// Whether a mod belongs to a state filter. The filter chips count with the same rule the list filters with.
+export function passesFilter(mod: Mod, filter: Filter, updates: Record<string, UpdateReport>): boolean {
+	switch (filter) {
+		case "all":
+		case "hidden":
+			return true;
+		case "enabled":
+			return mod.enabled;
+		case "disabled":
+			return !mod.enabled;
+		case "missing":
+			return mod.unmet_requirements > 0;
+		case "conflict":
+			return mod.enabled && (mod.wins > 0 || mod.loses > 0);
+		case "updates":
+			return hasUpdate(updates, mod.id);
+		default:
+			return assertNever(filter);
+	}
+}
+
 /// `matches` with the search text already trimmed and lowercased, so a list of thousands does not build the same
 /// needle for every mod.
 export function matchesNeedle(
@@ -595,14 +617,7 @@ export function matchesNeedle(
 	tagFilter: string | null,
 	updates: Record<string, UpdateReport>,
 ): boolean {
-	const byState =
-		filter === "all" ||
-		filter === "hidden" ||
-		(filter === "enabled" && mod.enabled) ||
-		(filter === "disabled" && !mod.enabled) ||
-		(filter === "missing" && mod.unmet_requirements > 0) ||
-		(filter === "conflict" && mod.enabled && (mod.wins > 0 || mod.loses > 0)) ||
-		(filter === "updates" && hasUpdate(updates, mod.id));
+	const byState = passesFilter(mod, filter, updates);
 	const byText =
 		needle === "" || `${mod.info.name} ${mod.folder} ${mod.page_name ?? ""} ${mod.source?.name ?? ""}`.toLowerCase().includes(needle);
 	const byTag = tagFilter === null || mod.tags.includes(tagFilter);
