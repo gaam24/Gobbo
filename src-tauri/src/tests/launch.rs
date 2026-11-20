@@ -535,7 +535,7 @@ fn a_cancelled_tool_exit_keeps_a_null_code_in_its_payload() {
 #[test]
 #[cfg(target_os = "linux")]
 // On a hosted runner the helper process is not visible to `Process::by_program` even though the overlay starts and the
-// other launch tests pass. It runs in full on this machine; CI runs it in the quarantined, non-blocking step.
+// other launch tests pass. Run it locally with `cargo test -- --ignored`; CI does not run ignored tests.
 #[ignore = "the helper process is not discovered on GitHub-hosted runners"]
 fn cancelling_a_running_tool_stops_its_process_and_reports_a_null_code() {
     use crate::infra::tasks::state;
