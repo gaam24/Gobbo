@@ -5,7 +5,9 @@ use std::ffi::OsString;
 use std::path::PathBuf;
 use std::sync::OnceLock;
 
-use gobbo_overlay_decisions::ENV_RING;
+use gobbo_overlay_decisions::{
+    BASE_STEM, CRASH_DUMP_FILE, ENV_DUMPER, ENV_DUMPER32, ENV_IN_PROCESS_DUMP, ENV_RING,
+};
 
 /// The switches, read once.
 pub(crate) struct Settings {
@@ -87,9 +89,9 @@ fn flag(name: &str) -> bool {
 /// The minidump file: `1` or `on` selects the developer file, another non-empty value is a path, and unset/`off` means
 /// no dump. Unlike the trace, a dump is never on by default: it is large and a first-chance exception may be harmless.
 fn dump_switch() -> Option<PathBuf> {
-    match std::env::var_os("GOBBO_OVERLAY_DUMP") {
+    match std::env::var_os(ENV_IN_PROCESS_DUMP) {
         Some(value) if value.is_empty() || value == "off" => None,
-        Some(value) if value == "1" || value == "on" => developer_file("crash.dmp"),
+        Some(value) if value == "1" || value == "on" => developer_file(CRASH_DUMP_FILE),
         Some(value) => Some(PathBuf::from(value)),
         None => None,
     }
@@ -98,7 +100,7 @@ fn dump_switch() -> Option<PathBuf> {
 /// The base of the decision ring: a path, or `1`/`on` for the developer base. Unset, a dev build keeps a ring next to
 /// the other developer files; a release build writes none until the app names a base.
 fn ring_switch() -> Option<PathBuf> {
-    let developer = || developer_dir().map(|dir| dir.join("overlay-decisions"));
+    let developer = || developer_dir().map(|dir| dir.join(BASE_STEM));
 
     match std::env::var_os(ENV_RING) {
         Some(value) if value.is_empty() || value == "off" => None,
@@ -118,9 +120,9 @@ fn ring_switch() -> Option<PathBuf> {
 /// its separate variable, because the minidumper protocol carries pointer-sized fields.
 fn dumper_switch() -> Option<PathBuf> {
     let name = if cfg!(target_pointer_width = "64") {
-        "GOBBO_OVERLAY_DUMPER"
+        ENV_DUMPER
     } else {
-        "GOBBO_OVERLAY_DUMPER32"
+        ENV_DUMPER32
     };
     choose(std::env::var_os(name), || None)
 }

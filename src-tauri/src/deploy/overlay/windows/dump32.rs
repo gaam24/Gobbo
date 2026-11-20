@@ -8,13 +8,10 @@ use std::process::{Child, Command};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use gobbo_overlay_dump::{ENV_DUMPER32, socket_path};
+use gobbo_overlay_dump::{ENV_DUMPER32, READY_FILE, socket_path};
 
 /// How long the helper may take to bind its socket.
 const READY_TIMEOUT: Duration = Duration::from_secs(3);
-
-/// The ready file of one launch.
-const READY_FILE: &str = "dump32.ready";
 
 /// A running 32-bit minidumper.
 pub(super) struct Monitor {

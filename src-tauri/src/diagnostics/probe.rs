@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use gobbo_overlay_probe::{REPORT_FLAG, Report};
 use serde::{Deserialize, Serialize};
 
 use crate::context::{Data, load_game};
@@ -35,15 +36,22 @@ pub struct OverlayProbeCheck {
     pub detail: String,
 }
 
-/// The JSON the probe writes. `arch` and the physical game folder check are added here.
-#[derive(Debug, Deserialize)]
-struct ProbeFile {
-    #[serde(default)]
-    probe: String,
-    #[serde(default)]
-    layers: BTreeMap<String, String>,
-    #[serde(default)]
+impl From<gobbo_overlay_probe::Check> for OverlayProbeCheck {
+    fn from(check: gobbo_overlay_probe::Check) -> Self {
+        Self {
+            name: check.name,
+            ok: check.ok,
+            detail: check.detail,
+        }
+    }
+}
+
+/// What one probe run contributed: the probe's own answer plus the parts the app's view needs.
+struct ProbeResult {
+    ok: bool,
     checks: Vec<OverlayProbeCheck>,
+    probe: Option<String>,
+    layers: BTreeMap<String, String>,
 }
 
 /// The state folder of the active overlay session, for the diagnostics panel. `None` when nothing is deployed.
@@ -80,22 +88,22 @@ pub fn run_probe(root: &Data, game_id: &str) -> Result<Vec<OverlayProbeReport>, 
     for (arch, probe) in probes {
         let report_path = state.join(format!("overlay-probe-{arch}.json"));
         let _ = fs::remove_file(&report_path);
-        let args = vec!["--report".to_string(), report_path.display().to_string()];
+        let args = vec![REPORT_FLAG.to_string(), report_path.display().to_string()];
         let started = overlay::run_with_output(&session, &probe.display().to_string(), &args, None);
-        // The report is read once. Three helpers used to parse the same JSON for its checks, probe folder and
-        // layers.
-        let (mut checks, probe_folder, layers) = match started {
+        let mut result = match started {
             Ok(_code) => read_report(&report_path),
-            Err(error) => (
-                vec![failed("start", error.to_string())],
-                None,
-                BTreeMap::new(),
-            ),
+            Err(error) => ProbeResult {
+                ok: false,
+                checks: vec![failed("start", error.to_string())],
+                probe: None,
+                layers: BTreeMap::new(),
+            },
         };
-        let clean = probe_folder
+        let clean = result
+            .probe
             .as_deref()
             .is_none_or(|folder| !game_root.join(folder).exists());
-        checks.push(OverlayProbeCheck {
+        result.checks.push(OverlayProbeCheck {
             name: "game folder clean".to_string(),
             ok: clean,
             detail: if clean {
@@ -104,14 +112,14 @@ pub fn run_probe(root: &Data, game_id: &str) -> Result<Vec<OverlayProbeReport>, 
                 "the game folder has the probe folder".to_string()
             },
         });
-        let ok = checks.iter().all(|check| check.ok);
-        let probe_folder = probe_folder.unwrap_or_default();
+        // The probe's own answer is authoritative; only the app's physical-folder check can add a failure.
+        let ok = result.ok && clean;
         reports.push(OverlayProbeReport {
             arch: arch.to_string(),
             ok,
-            probe: probe_folder,
-            layers,
-            checks,
+            probe: result.probe.unwrap_or_default(),
+            layers: result.layers,
+            checks: result.checks,
         });
     }
 
@@ -138,23 +146,27 @@ fn probe_programs() -> Vec<(&'static str, PathBuf)> {
     found
 }
 
-/// The checks, the unique probe folder and the layers of one report. A missing or broken report gives one failed
-/// check instead.
-fn read_report(
-    path: &Path,
-) -> (
-    Vec<OverlayProbeCheck>,
-    Option<String>,
-    BTreeMap<String, String>,
-) {
+/// The probe's answer, checks, probe folder and layers of one report. A missing or broken report gives one failed check
+/// instead, so the window still sees why the doctor could not answer.
+fn read_report(path: &Path) -> ProbeResult {
     match read_file(path) {
-        Ok(file) => (file.checks, Some(file.probe), file.layers),
-        Err(error) => (vec![failed("report", error)], None, BTreeMap::new()),
+        Ok(report) => ProbeResult {
+            ok: report.ok,
+            checks: report.checks.into_iter().map(Into::into).collect(),
+            probe: report.probe,
+            layers: report.layers.unwrap_or_default(),
+        },
+        Err(error) => ProbeResult {
+            ok: false,
+            checks: vec![failed("report", error)],
+            probe: None,
+            layers: BTreeMap::new(),
+        },
     }
 }
 
 /// Reads and parses one probe report.
-fn read_file(path: &Path) -> Result<ProbeFile, String> {
+fn read_file(path: &Path) -> Result<Report, String> {
     let text = fs::read_to_string(path).map_err(|error| error.to_string())?;
     serde_json::from_str(&text).map_err(|error| error.to_string())
 }
@@ -177,17 +189,33 @@ mod tests {
         let path =
             std::env::temp_dir().join(format!("gobbo-probe-report-{}.json", std::process::id()));
         fs::write(&path, "not json").unwrap();
-        let (checks, probe, layers) = read_report(&path);
-        assert_eq!(checks.len(), 1);
-        assert!(!checks[0].ok);
-        assert_eq!(checks[0].name, "report");
-        assert_eq!(probe, None);
-        assert!(layers.is_empty());
+        let result = read_report(&path);
+        assert!(!result.ok);
+        assert_eq!(result.checks.len(), 1);
+        assert!(!result.checks[0].ok);
+        assert_eq!(result.checks[0].name, "report");
+        assert_eq!(result.probe, None);
+        assert!(result.layers.is_empty());
         let _ = fs::remove_file(path);
     }
 
     #[test]
     fn a_probe_folder_is_read_from_the_report() {
-        assert_eq!(read_report(Path::new("missing-file")).1, None);
+        assert_eq!(read_report(Path::new("missing-file")).probe, None);
+    }
+
+    #[test]
+    fn the_probes_answer_is_used_even_when_its_checks_are_empty() {
+        let path =
+            std::env::temp_dir().join(format!("gobbo-probe-answer-{}.json", std::process::id()));
+        fs::write(
+            &path,
+            r#"{"ok":false,"probe":null,"layers":null,"checks":[]}"#,
+        )
+        .unwrap();
+        let result = read_report(&path);
+        assert!(!result.ok);
+        assert!(result.checks.is_empty());
+        let _ = fs::remove_file(path);
     }
 }

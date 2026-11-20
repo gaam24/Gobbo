@@ -16,17 +16,21 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use minidumper::{LoopAction, MinidumpBinary, Server, ServerHandler, SocketName};
 
-/// The socket the x64 hook connects to.
-pub const ENV_DUMPER: &str = "GOBBO_OVERLAY_DUMPER";
+// One owner for the session and environment names: the plain-std crate the app and the hook already share.
+pub use gobbo_overlay_decisions::{CRASH_DUMP_FILE, ENV_DUMPER, ENV_DUMPER32, LAST_DUMP_FILE};
 
-/// The socket the 32-bit hook connects to.
-pub const ENV_DUMPER32: &str = "GOBBO_OVERLAY_DUMPER32";
+/// The file the 32-bit helper writes once its socket is bound. The app's spawner and the helper use this name instead
+/// of each spelling it.
+pub const READY_FILE: &str = "dump32.ready";
 
-/// The marker with the newest out-of-process dump.
-pub const LAST_DUMP_FILE: &str = "last_dump";
+/// The bytes the 32-bit helper writes to [`READY_FILE`] when its socket is listening.
+pub const READY_CONTENT: &str = "ready";
 
-/// The in-process `DbgHelp` dump, used when no out-of-process monitor is available.
-pub const CRASH_DUMP_FILE: &str = "crash.dmp";
+/// The protocol's fixed buffer for an `AF_UNIX` socket path. A path must be shorter so the terminator fits.
+pub const SOCKET_PATH_MAX: usize = 108;
+
+/// The bound `socket_path` uses, below [`SOCKET_PATH_MAX`] so a generated path never reaches the terminator byte.
+const SOCKET_PATH_LIMIT: usize = SOCKET_PATH_MAX - 8;
 
 /// The folder of the session dumps.
 const DUMPS: &str = "dumps";
@@ -107,12 +111,15 @@ pub fn start(state: &Path) -> Option<Monitor> {
     }
 }
 
-/// Runs a server in the current process until the process is killed. The helper writes `ready` once the socket is
-/// bound, so the app can pass the socket to the hook without a race.
+/// Runs a server in the current process until it is killed, then writes [`READY_CONTENT`] to `ready`.
+///
+/// The helper is called as `<state> <socket> <ready>`: the state folder owns the dumps, the socket carries the
+/// pointer-sized protocol, and the ready file exists only after the socket is bound, so the spawner can pass the socket
+/// to the hook without a race.
 pub fn serve(state: &Path, socket: &Path, ready: &Path) -> Result<(), String> {
     fs::create_dir_all(dumps_dir(state)).map_err(|error| error.to_string())?;
     let server = Server::with_name(SocketName::Path(socket)).map_err(|error| error.to_string())?;
-    fs::write(ready, b"ready").map_err(|error| error.to_string())?;
+    fs::write(ready, READY_CONTENT.as_bytes()).map_err(|error| error.to_string())?;
     let shutdown = AtomicBool::new(false);
     let mut server = server;
     server
@@ -120,7 +127,8 @@ pub fn serve(state: &Path, socket: &Path, ready: &Path) -> Result<(), String> {
         .map_err(|error| error.to_string())
 }
 
-/// A short path for the `AF_UNIX` socket. The protocol stores the path in 108 bytes.
+/// A short path for the `AF_UNIX` socket. [`SOCKET_PATH_LIMIT`] keeps it inside the protocol's [`SOCKET_PATH_MAX`]
+/// buffer, leaving the last byte for the terminator.
 pub fn socket_path(prefix: &str) -> Option<PathBuf> {
     static SOCKETS: AtomicU64 = AtomicU64::new(0);
     let name = format!(
@@ -129,11 +137,11 @@ pub fn socket_path(prefix: &str) -> Option<PathBuf> {
         SOCKETS.fetch_add(1, Ordering::Relaxed)
     );
     let path = std::env::temp_dir().join(name);
-    (path.to_str()?.len() < 100).then_some(path)
+    (path.to_str()?.len() < SOCKET_PATH_LIMIT).then_some(path)
 }
 
 /// The folder of the session dumps.
-pub fn dumps_dir(state: &Path) -> PathBuf {
+fn dumps_dir(state: &Path) -> PathBuf {
     state.join(DUMPS)
 }
 
@@ -237,7 +245,13 @@ mod tests {
     #[test]
     fn a_short_socket_path_fits_the_protocol() {
         let path = socket_path("g").expect("the temporary folder gives a short path");
-        assert!(path.to_string_lossy().len() < 100);
+        assert!(path.to_string_lossy().len() < SOCKET_PATH_MAX);
+        const { assert!(SOCKET_PATH_LIMIT < SOCKET_PATH_MAX) };
+    }
+
+    #[test]
+    fn a_socket_path_beyond_the_protocol_is_refused() {
+        assert!(socket_path(&"x".repeat(SOCKET_PATH_MAX)).is_none());
     }
 
     #[test]

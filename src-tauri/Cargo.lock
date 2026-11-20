@@ -2115,6 +2115,7 @@ dependencies = [
  "gobbo-overlay-decisions",
  "gobbo-overlay-dump",
  "gobbo-overlay-launch",
+ "gobbo-overlay-probe",
  "goblin",
  "gtk",
  "iai-callgrind",
@@ -2189,6 +2190,7 @@ version = "0.1.0"
 name = "gobbo-overlay-dump"
 version = "0.1.0"
 dependencies = [
+ "gobbo-overlay-decisions",
  "minidumper",
 ]
 
@@ -2229,6 +2231,7 @@ name = "gobbo-overlay-probe"
 version = "0.1.0"
 dependencies = [
  "gobbo-overlay-core",
+ "serde",
  "serde_json",
 ]
 

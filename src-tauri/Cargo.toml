@@ -17,6 +17,7 @@ gobbo-overlay-decisions = { path = "crates/overlay-decisions" }
 gobbo-overlay-dump = { path = "crates/overlay-dump" }
 gobbo-overlay-launch = { path = "crates/overlay-launch" }
 gobbo-overlay-pe = { path = "crates/overlay-pe" }
+gobbo-overlay-probe = { path = "crates/overlay-probe" }
 rustc-hash = "2"
 windows-sys = "0.61"
 
@@ -127,6 +128,8 @@ required-features = ["bench"]
 [dependencies]
 gobbo-overlay-core.workspace = true
 gobbo-overlay-decisions.workspace = true
+# The probe binary runs on Windows, but its report types and `--report` flag are shared with the cross-platform doctor.
+gobbo-overlay-probe.workspace = true
 # The default feature set plus its platform pieces, without `dynamic-acl`: every capability is static in
 # `capabilities/default.json`, so the runtime ACL editor is dead weight in the binary. `linux-libxdo` is left out on
 # purpose: it is only used by predefined Copy/Cut/Paste menu items, which the tray does not have, and it needs an extra

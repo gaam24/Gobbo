@@ -7,12 +7,9 @@
 //! It is not loaded as a DLL and has no dependency on Gobbo. Run it through `gobbo run` or set the three `GOBBO_OVERLAY_*`
 //! variables yourself.
 
-#[cfg(windows)]
-mod probe;
-
 fn main() {
     #[cfg(windows)]
-    probe::main();
+    gobbo_overlay_probe::probe::main();
     #[cfg(not(windows))]
     {
         eprintln!("overlay-probe needs Windows: the overlay hook is a Windows DLL.");

@@ -167,7 +167,7 @@ pub struct OverlayDecision {
     pub time: u32,
     pub pid: u32,
     pub thread: u32,
-    /// The stable kind name: `write`, `copy_up`, `whiteout`, `missing`, `refuse` or `pass_through`.
+    /// The stable kind name: `write`, `copy_up`, `whiteout`, `missing`, `refuse`, `pass_through` or `list`.
     pub kind: String,
     /// The layer the decision used: `none`, `upper`, `staging` or `root`.
     pub layer: String,

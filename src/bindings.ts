@@ -3474,7 +3474,7 @@ export type OverlayDecision = {
 	time: number,
 	pid: number,
 	thread: number,
-	/**  The stable kind name: `write`, `copy_up`, `whiteout`, `missing`, `refuse` or `pass_through`. */
+	/**  The stable kind name: `write`, `copy_up`, `whiteout`, `missing`, `refuse`, `pass_through` or `list`. */
 	kind: string,
 	/**  The layer the decision used: `none`, `upper`, `staging` or `root`. */
 	layer: string,

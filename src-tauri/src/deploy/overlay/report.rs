@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 
 use super::session::Session;
 use crate::domain::resolver::DeployPlan;
-use gobbo_overlay_decisions::Decision;
+use gobbo_overlay_decisions::{BASE_STEM, Decision};
 
 /// The launcher's steps before the program's first instruction, in microseconds. Linux has no hook installer, so its
 /// `Running::timings` returns `None`; the Windows values come from `overlay-launch`.
@@ -30,13 +30,13 @@ pub struct LaunchTimings {
 
 /// The base name of the decision ring inside a session's state folder. Every process of the game adds its id and
 /// `.ring`; the app reads the files while the game runs.
-pub const DECISIONS_BASE: &str = "overlay-decisions";
+pub const DECISIONS_BASE: &str = BASE_STEM;
 
 /// The file that names the last out-of-process crash dump of a session.
-pub const LAST_DUMP_FILE: &str = "last_dump";
+pub const LAST_DUMP_FILE: &str = gobbo_overlay_decisions::LAST_DUMP_FILE;
 
 /// The in-process dump of a session, used when the out-of-process dumper is not available (notably a 32-bit game).
-pub const CRASH_DUMP_FILE: &str = "crash.dmp";
+pub const CRASH_DUMP_FILE: &str = gobbo_overlay_decisions::CRASH_DUMP_FILE;
 
 /// Where the decision ring of a session lives.
 pub fn decisions_base(state: &Path) -> PathBuf {

@@ -24,6 +24,26 @@ use std::os::windows::fs::FileExt;
 /// The environment variable that names the base path of the ring. The hook appends its process id and `.ring`.
 pub const ENV_RING: &str = "GOBBO_OVERLAY_RING";
 
+/// The stem of the ring base both Gobbo's app and the hook's developer default build. The app joins it to the session
+/// state folder; a dev build of the hook joins it to the developer folder.
+pub const BASE_STEM: &str = "overlay-decisions";
+
+/// The file that names the newest out-of-process minidump of a session. The dumper writes it and the launch report reads
+/// it.
+pub const LAST_DUMP_FILE: &str = "last_dump";
+
+/// The in-process `DbgHelp` dump of a session, used when no out-of-process monitor is available.
+pub const CRASH_DUMP_FILE: &str = "crash.dmp";
+
+/// The environment variable that names the x64 minidumper socket. Gobbo starts the x64 server and exports this name.
+pub const ENV_DUMPER: &str = "GOBBO_OVERLAY_DUMPER";
+
+/// The environment variable that names the 32-bit minidumper socket. Gobbo starts the helper and exports this name.
+pub const ENV_DUMPER32: &str = "GOBBO_OVERLAY_DUMPER32";
+
+/// The environment variable that names the in-process `DbgHelp` dump. Gobbo passes it to the game; the hook reads it.
+pub const ENV_IN_PROCESS_DUMP: &str = "GOBBO_OVERLAY_DUMP";
+
 /// The magic and version at the start of the header. `Ring::open` recreates a file carrying other bytes, so a changed
 /// layout is never read with the old record offsets.
 const MAGIC: &[u8; 8] = b"GBODEC01";

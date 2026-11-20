@@ -5,21 +5,24 @@
 
 #[cfg(windows)]
 fn main() {
+    use gobbo_overlay_dump::{READY_FILE, serve};
+
+    let usage = || eprintln!("usage: gobbo_overlay_dump32 <state> <socket> {READY_FILE}");
     let mut args = std::env::args().skip(1);
     let Some(state) = args.next() else {
-        eprintln!("usage: gobbo_overlay_dump32 <state> <socket> <ready>");
+        usage();
         std::process::exit(2);
     };
     let Some(socket) = args.next() else {
-        eprintln!("usage: gobbo_overlay_dump32 <state> <socket> <ready>");
+        usage();
         std::process::exit(2);
     };
     let Some(ready) = args.next() else {
-        eprintln!("usage: gobbo_overlay_dump32 <state> <socket> <ready>");
+        usage();
         std::process::exit(2);
     };
 
-    if let Err(error) = gobbo_overlay_dump::serve(
+    if let Err(error) = serve(
         std::path::Path::new(&state),
         std::path::Path::new(&socket),
         std::path::Path::new(&ready),
