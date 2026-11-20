@@ -11,7 +11,6 @@
 
 #![forbid(unsafe_code)]
 
-use std::ffi::OsStr;
 use std::fs::{File, OpenOptions};
 use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
@@ -25,17 +24,17 @@ use std::os::windows::fs::FileExt;
 /// The environment variable that names the base path of the ring. The hook appends its process id and `.ring`.
 pub const ENV_RING: &str = "GOBBO_OVERLAY_RING";
 
-/// The file magic and version. A file with another magic is recreated by `Ring::open`.
+/// The magic and version at the start of the header. `Ring::open` recreates a file carrying other bytes, so a changed
+/// layout is never read with the old record offsets.
 const MAGIC: &[u8; 8] = b"GBODEC01";
 const VERSION: u32 = 1;
 const HEADER: usize = 64;
 const RECORD: usize = 256;
-const CAPACITY: u32 = 4096;
+/// The number of fixed-size records in a ring file. The crate owns this number; the hook, the app and benchmarks share it.
+pub const CAPACITY: u32 = 4096;
 const PATH_AT: usize = 32;
 const PATH_MAX: usize = RECORD - PATH_AT;
 const WRITE_AT: usize = 24;
-/// The name used when the base path has no file name.
-const DEFAULT_STEM: &str = "overlay-decisions";
 
 /// Generates the stable lowercase `name` and the `from_u8` decoder of a decision enum.
 macro_rules! enum_code {
@@ -126,8 +125,8 @@ pub struct Ring {
 }
 
 impl Ring {
-    /// Opens `path`, creating or truncating the ring when it is missing or has another format. A new ring has no
-    /// decisions; the app removes old ring files before a launch.
+    /// Opens `path`, creating or truncating the ring when it is missing or has another format or version. A new ring
+    /// has no decisions; the app removes old ring files before a launch.
     pub fn open(path: &Path) -> io::Result<Self> {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
@@ -140,14 +139,15 @@ impl Ring {
             .truncate(false)
             .open(path)?;
         let length = file.metadata()?.len();
-        let mut magic = [0u8; 8];
+        let mut stored = [0u8; HEADER];
 
         if length >= HEADER as u64 {
             file.seek(SeekFrom::Start(0))?;
-            file.read_exact(&mut magic)?;
+            file.read_exact(&mut stored)?;
         }
 
-        if length != ring_length() || &magic != MAGIC {
+        let version = u32::from_le_bytes([stored[8], stored[9], stored[10], stored[11]]);
+        if length != ring_length() || stored[..8] != MAGIC[..] || version != VERSION {
             file.set_len(ring_length())?;
             file.seek(SeekFrom::Start(0))?;
             file.write_all(&header(0))?;
@@ -207,13 +207,16 @@ impl Ring {
 }
 
 /// The file of this process under `base`: `<name>.<pid>.ring`.
-pub fn process_file(base: &Path) -> PathBuf {
-    let name = base.file_name().unwrap_or_else(|| OsStr::new(DEFAULT_STEM));
-    base.with_file_name(format!(
+///
+/// Returns `None` when `base` has no file name, the same rule the readers use, so a ring is never written where
+/// nothing can read it back.
+pub fn process_file(base: &Path) -> Option<PathBuf> {
+    let name = base.file_name()?;
+    Some(base.with_file_name(format!(
         "{}.{}.ring",
         name.to_string_lossy(),
         std::process::id()
-    ))
+    )))
 }
 
 /// Reads the newest `limit` decisions of all processes whose files start with `base`, and the total number recorded.
@@ -362,7 +365,7 @@ pub fn read_last(path: &Path, limit: usize) -> io::Result<(Vec<Decision>, u64)> 
 }
 
 /// The size of a ring file: the header and every record slot.
-pub const fn ring_length() -> u64 {
+const fn ring_length() -> u64 {
     (HEADER + RECORD * CAPACITY as usize) as u64
 }
 
@@ -597,7 +600,43 @@ mod tests {
         assert!(other.exists());
         assert!(not_a_ring.exists());
         let own = dir.join(format!("overlay-decisions.{}.ring", std::process::id()));
-        assert_eq!(process_file(&base), own);
+        assert_eq!(process_file(&base), Some(own));
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn a_stem_less_base_is_refused_by_both_the_write_and_read_paths() {
+        let base = Path::new("");
+        let from_writer = process_file(base);
+        let from_reader = split_base(base);
+
+        assert!(from_writer.is_none());
+        assert!(from_reader.is_none());
+        let (decisions, total) = read_base(base, 10).unwrap();
+        assert!(decisions.is_empty());
+        assert_eq!(total, 0);
+        clear(base).unwrap();
+    }
+
+    #[test]
+    fn a_ring_with_a_different_version_is_recreated_by_open() {
+        let dir = scratch("version");
+        let path = dir.join("ring");
+        let mut ring = Ring::open(&path).unwrap();
+        ring.record(Kind::Write, Layer::Upper, 0, "before", 1)
+            .unwrap();
+        drop(ring);
+
+        // Keep the length and magic intact so only the stored version can force a recreate.
+        let mut file = OpenOptions::new().write(true).open(&path).unwrap();
+        file.seek(SeekFrom::Start(8)).unwrap();
+        file.write_all(&(VERSION + 1).to_le_bytes()).unwrap();
+        drop(file);
+
+        Ring::open(&path).unwrap();
+        let (decisions, total) = read_last(&path, 10).unwrap();
+        assert_eq!(total, 0);
+        assert!(decisions.is_empty());
         let _ = std::fs::remove_dir_all(dir);
     }
 

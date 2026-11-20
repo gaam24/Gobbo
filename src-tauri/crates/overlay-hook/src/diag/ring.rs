@@ -16,7 +16,10 @@ static RING: OnceLock<Option<Mutex<Ring>>> = OnceLock::new();
 /// Opens the ring of this process under `base`: `<base>.<pid>.ring`. The app removes the old files before a launch.
 pub(crate) fn open(base: Option<&Path>) {
     let ring = base.and_then(|base| {
-        let path = gobbo_overlay_decisions::process_file(base);
+        let Some(path) = gobbo_overlay_decisions::process_file(base) else {
+            crate::trace::log("the decision ring base has no file name");
+            return None;
+        };
 
         match Ring::open(&path) {
             Ok(ring) => Some(Mutex::new(ring)),
@@ -57,12 +60,6 @@ pub(crate) fn layer(layer: gobbo_overlay_core::Layer) -> Layer {
     }
 }
 
-/// The path of this process's ring file, for a log line. Kept private: `open` and the app use the shared naming rule.
-#[cfg(test)]
-fn process_ring(base: &Path) -> std::path::PathBuf {
-    gobbo_overlay_decisions::process_file(base)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -72,15 +69,5 @@ mod tests {
         assert_eq!(layer(gobbo_overlay_core::Layer::Upper), Layer::Upper);
         assert_eq!(layer(gobbo_overlay_core::Layer::Staging), Layer::Staging);
         assert_eq!(layer(gobbo_overlay_core::Layer::Root), Layer::Root);
-    }
-
-    #[test]
-    fn the_ring_file_of_a_process_has_the_pid_in_its_name() {
-        let path = process_ring(Path::new(r"C:\state\overlay-decisions"));
-        let name = path.file_name().unwrap().to_string_lossy();
-        assert_eq!(
-            name,
-            format!("overlay-decisions.{}.ring", std::process::id())
-        );
     }
 }

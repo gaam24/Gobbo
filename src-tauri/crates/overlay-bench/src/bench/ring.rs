@@ -4,10 +4,12 @@ use std::error::Error;
 use std::fs;
 use std::time::Instant;
 
-use gobbo_overlay_decisions::{Kind, Layer, Ring};
+use gobbo_overlay_decisions::{CAPACITY, Kind, Layer, Ring};
 use hdrhistogram::Histogram;
 
-const RECORDS: usize = 4096;
+/// Records written past capacity so the benchmark measures the wrap path and can check the newest capacity survive.
+const OVERFLOW: usize = 32;
+const RECORDS: usize = CAPACITY as usize + OVERFLOW;
 const READS: usize = 100;
 
 /// Runs the ring benchmark and prints p50/p95 for `record` and `read_last`.
@@ -40,6 +42,14 @@ pub(super) fn run() -> Result<(), Box<dyn Error>> {
                     .max(1),
             )
             .map_err(|error| error.to_string())?;
+    }
+
+    let (newest, _) = gobbo_overlay_decisions::read_last(&path, usize::MAX)?;
+    if newest.len() != CAPACITY as usize
+        || newest.first().map(|decision| decision.seq) != Some(OVERFLOW as u64)
+        || newest.last().map(|decision| decision.seq) != Some((RECORDS - 1) as u64)
+    {
+        return Err("the ring did not keep the newest capacity records".into());
     }
 
     let mut reads = Histogram::<u64>::new(3).map_err(|error| error.to_string())?;
