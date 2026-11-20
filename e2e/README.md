@@ -74,7 +74,7 @@ its definitions, its roots and its output; it also restores the write bit on fol
 A native dialog cannot be driven by WebDriver, so the `e2e` build reads test-only globals that a production build
 removes (`scripts/check-e2e-hooks.ts` proves the release bundle has none):
 
-- `window.__GOBBO_E2E_DIALOGS__` answers the file, folder and save dialogs (`files`, `folder`, `file`, `saveFile`).
+- `window.__GOBBO_E2E_DIALOGS__` answers the file dialogs (`files`, `file`).
   A spec sets it directly; `setThrow` in `e2e/support/ui.ts` arms the failure seam.
 - `window.__GOBBO_E2E_THROW__` and `sessionStorage["gobbo.e2e.throw"]` force a render failure in one view or in the
   shell, so the error boundaries are checked with a real window. The session copy survives a reload.

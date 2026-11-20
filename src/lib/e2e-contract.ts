@@ -4,9 +4,7 @@
 /// Queued answers for the native file dialogs. An empty `files` array is a cancelled dialog.
 export interface E2eDialogOverrides {
 	files?: string[];
-	folder?: string | null;
 	file?: string | null;
-	saveFile?: string | null;
 }
 
 /// The lifecycle events the workspace emits for backend work, forwarded by the e2e task seam.
