@@ -12,7 +12,6 @@ import {
 	OctagonX,
 	Play,
 	Upload,
-	X,
 } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
@@ -29,15 +28,23 @@ import { groupedTasks, TASK_GROUP_LABEL, type Task, type TaskKind, type TaskStat
 export function ActivityCenter() {
 	const { t } = useTranslation();
 	const tasks = useActivity();
-	const [open, setOpen] = useState(true);
+	const groups = useMemo(() => groupedTasks(tasks), [tasks]);
+	const counts = useMemo(() => taskCounts(tasks), [tasks]);
+	// The card floats over the content, so it opens by itself only for work in progress or work that waits for the user.
+	// Failures alone keep it folded: the header still shows how many need attention, and a click shows them.
+	const active = counts.running + counts.waiting;
+	const [open, setOpen] = useState(active > 0);
+	const previousActive = useRef(active);
+	useEffect(() => {
+		if (active > previousActive.current) setOpen(true);
+		previousActive.current = active;
+	}, [active]);
 	/// A click on Working in the tray opens the card again even if the user had folded it.
 	useEffect(() => {
 		const show = () => setOpen(true);
 		window.addEventListener("gobbo:tray-working", show);
 		return () => window.removeEventListener("gobbo:tray-working", show);
 	}, []);
-	const groups = useMemo(() => groupedTasks(tasks), [tasks]);
-	const counts = useMemo(() => taskCounts(tasks), [tasks]);
 
 	// The live region follows state changes, not progress ticks: a percent update leaves the message untouched and the
 	// failure toast keeps its own announcement, so a screen reader does not hear the same work twice.
@@ -60,7 +67,7 @@ export function ActivityCenter() {
 				<section
 					aria-label={t("tasks.title")}
 					aria-busy={counts.running > 0}
-					className="bg-card text-card-foreground fixed right-4 bottom-4 z-40 w-[min(22rem,calc(100vw-2rem))] rounded-xl border shadow-lg"
+					className="bg-card text-card-foreground fixed right-4 bottom-12 z-40 w-[min(24rem,calc(100vw-2rem))] rounded-xl border shadow-lg"
 				>
 					<header className="flex items-center gap-2 px-3 py-2.5">
 						<span className="text-sm font-medium">{t("tasks.title")}</span>
@@ -103,7 +110,7 @@ export function ActivityCenter() {
 						</Button>
 					</header>
 					{open && (
-						<div className="grid max-h-64 gap-3 overflow-y-auto border-t px-3 py-3">
+						<div className="grid max-h-[min(26rem,45vh)] gap-3 overflow-y-auto overscroll-contain border-t px-3 py-3">
 							{groups.map((group) => (
 								<div key={group.state} data-state={group.state} className="grid gap-1.5">
 									<h3 className="text-muted-foreground flex items-center gap-1.5 text-xs font-medium">
@@ -113,12 +120,12 @@ export function ActivityCenter() {
 									{group.games.map((game) => (
 										<div key={game.game ?? "global"} data-game={game.game ?? undefined} className="grid gap-1.5">
 											{game.gameName && (
-												<p className="text-subtle-foreground truncate pl-1 text-xs">
+												<p className="text-subtle-foreground truncate pl-1 text-xs" title={game.gameName}>
 													{game.gameName}
 													<span className="text-muted-foreground ml-1 font-mono tabular-nums">{game.count}</span>
 												</p>
 											)}
-											<ul className="grid gap-1.5">
+											<ul className="grid gap-2">
 												{game.tasks.map((task) => (
 													<TaskRow key={task.id} task={task} />
 												))}
@@ -157,46 +164,60 @@ function SummaryBadge({
 	);
 }
 
+/// One task: what it is, what it works on and, for a failure, why. Long text is cut to the card's width and shown in
+/// full on hover; the reason of a failure wraps instead, because it is the one line the user needs to read.
 function TaskRow({ task }: { task: Task }) {
 	const { t } = useTranslation();
-	const parts = [task.gameName, task.detail].filter(Boolean);
-	const detail = parts[0] === parts[1] ? parts[0] : parts.join(" · ");
+	// A row of global work has no game group above it, so it names its game itself.
+	const detail = task.detail ?? (task.game ? undefined : task.gameName);
+	const actions = task.onOpen ?? task.onRetry ?? task.onCancel ?? task.onDismiss;
 	return (
-		<li className="grid gap-1.5">
-			<div className="flex items-start gap-2">
-				<TaskIcon kind={task.kind} state={task.state} />
-				<div className="grid min-w-0 flex-1 gap-0.5">
-					<div className="flex min-w-0 items-center gap-1.5">
-						{task.state === "waiting" && <span className="text-draft shrink-0 text-xs font-medium">{t("tasks.waitingForYou")}</span>}
-						<p className={cn("truncate text-sm", task.state === "failed" && "text-destructive")}>{task.title}</p>
+		<li className="flex items-start gap-2 py-0.5">
+			<TaskIcon kind={task.kind} state={task.state} />
+			<div className="grid min-w-0 flex-1 gap-1">
+				<div className="grid min-w-0 gap-0.5">
+					{task.state === "waiting" && <span className="text-draft text-xs font-medium">{t("tasks.waitingForYou")}</span>}
+					<p className="truncate text-sm font-medium" title={task.title}>
+						{task.title}
+					</p>
+					{detail && (
+						<p className="text-muted-foreground truncate font-mono text-xs" title={detail}>
+							{detail}
+						</p>
+					)}
+					{task.error && (
+						<p className="text-destructive line-clamp-3 text-xs text-pretty break-words" title={task.error}>
+							{task.error}
+						</p>
+					)}
+				</div>
+				{task.state === "running" && task.percent !== undefined && (
+					<Progress value={task.percent} aria-label={task.title} aria-valuetext={detail ?? `${task.percent}%`} />
+				)}
+				{actions && (
+					<div className="flex flex-wrap items-center gap-1.5">
+						{task.onOpen && (
+							<Button variant="outline" size="sm" onClick={task.onOpen}>
+								{task.openLabel ?? t("tasks.openWindow")}
+							</Button>
+						)}
+						{task.onRetry && (
+							<Button variant="outline" size="sm" onClick={task.onRetry}>
+								{task.actionLabel ?? t("common.retry")}
+							</Button>
+						)}
+						{task.onCancel && (
+							<Button variant="ghost" size="sm" onClick={task.onCancel}>
+								{task.cancelLabel ?? t("common.cancel")}
+							</Button>
+						)}
+						{task.onDismiss && (
+							<Button variant="ghost" size="sm" onClick={task.onDismiss}>
+								{t("tasks.dismiss")}
+							</Button>
+						)}
 					</div>
-					{detail && <p className="text-muted-foreground truncate text-xs">{detail}</p>}
-					{task.percent !== undefined && (
-						<Progress value={task.percent} aria-label={task.title} aria-valuetext={task.detail ?? `${task.percent}%`} className="mt-1" />
-					)}
-				</div>
-				<div className="flex shrink-0 gap-1">
-					{task.onOpen && (
-						<Button variant="outline" size="sm" onClick={task.onOpen}>
-							{task.openLabel ?? t("tasks.openWindow")}
-						</Button>
-					)}
-					{task.onRetry && (
-						<Button variant="outline" size="sm" onClick={task.onRetry}>
-							{task.actionLabel ?? t("common.retry")}
-						</Button>
-					)}
-					{task.onCancel && (
-						<Button variant="ghost" size="sm" onClick={task.onCancel}>
-							{task.cancelLabel ?? t("common.cancel")}
-						</Button>
-					)}
-					{task.onDismiss && (
-						<Button variant="ghost" size="icon" className="size-7" aria-label={t("tasks.dismiss")} onClick={task.onDismiss}>
-							<X />
-						</Button>
-					)}
-				</div>
+				)}
 			</div>
 		</li>
 	);
