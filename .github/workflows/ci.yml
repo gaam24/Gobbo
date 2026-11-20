@@ -1,21 +1,19 @@
 name: CI
 
-# Four independent jobs run in parallel, so the wall time is the slowest one (Windows tests), not the sum:
-#   web            format, lint, architecture guard, unit tests, web bundle
-#   rust           Linux clippy and the full Rust test suite
-#   windows-clippy clippy for the Windows-only code (placeholder hook resources, nothing is linked)
-#   windows-test   builds the overlay hook binaries once, then runs the Windows test suite
-# The E2E suite is long and environment-dependent: it runs nightly and on demand, never as a gate.
-# Rust caches are written only from main; pull requests restore them.
+# Built to spend as few Actions minutes as possible (Windows minutes cost double):
+#   changes   decides from the diff which jobs a push or pull request needs (a few seconds)
+#   web       format, lint, architecture guard, unit tests, web bundle
+#   rust      Linux clippy and the full Rust suite
+#   windows   clippy, overlay hook build and the Windows suite, in one job; it runs only when the diff touches code that
+#             Windows compiles differently: a Rust file with `cfg(windows)` code or Win32 calls, the overlay crates, Cargo
+#             files or the hook build script. A push to main also runs it for any Rust change, so main always has a Windows result.
+# A run that a newer push replaces is cancelled. There is no nightly run; E2E runs only by hand.
 
 on:
   push:
     branches: [main]
   pull_request:
-  schedule:
-    - cron: "0 3 * * *"
   workflow_dispatch:
-  workflow_call: # the release gate (release.yml)
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -30,8 +28,51 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  changes:
+    name: Changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      web: ${{ steps.diff.outputs.web }}
+      rust: ${{ steps.diff.outputs.rust }}
+      windows: ${{ steps.diff.outputs.windows }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Classify the diff
+        id: diff
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          set -euo pipefail
+          all() { for name in web rust windows; do echo "$name=true" >> "$GITHUB_OUTPUT"; done; exit 0; }
+          # A manual run, a new branch or a force push without a usable base checks everything.
+          if [ "$EVENT" = workflow_dispatch ] || [ -z "$BASE" ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then all; fi
+          files="$(git diff --name-only "$BASE" HEAD)"
+          printf '%s\n' "$files"
+          has() { grep -qE "$1" <<< "$files"; }
+          workflow='^\.github/workflows/ci\.yml$'
+          web=false; rust=false; windows=false
+          # Lint reads the Markdown guides and game tables too, so only images and the license skip the web job.
+          if grep -qvE '\.(png|webp|svg|ico|jpg)$|^LICENSE$' <<< "$files"; then web=true; fi
+          if has "^src-tauri/|^games/|^loaders/|$workflow"; then rust=true; fi
+          if has "^src-tauri/(crates/|\.cargo/|Cargo\.|build\.rs|tauri\.windows)|^scripts/build-overlay-hook\.ts$|$workflow"; then
+            windows=true
+          fi
+          for file in $(grep -E '^src-tauri/.*\.rs$' <<< "$files" || true); do
+            if [ ! -f "$file" ] || grep -qE 'cfg\([^)]*windows|windows_sys|win32' "$file"; then windows=true; fi
+          done
+          if [ "$EVENT" = push ] && [ "$rust" = true ]; then windows=true; fi
+          { echo "web=$web"; echo "rust=$rust"; echo "windows=$windows"; } | tee -a "$GITHUB_OUTPUT"
+
   web:
     name: Web
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -72,8 +113,10 @@ jobs:
 
   rust:
     name: Rust
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 25
     env:
       CARGO_PROFILE_DEV_DEBUG: "0" # no debug info: faster links and a much smaller cache
     steps:
@@ -95,6 +138,7 @@ jobs:
           workspaces: src-tauri
           shared-key: linux
           save-if: ${{ github.ref == 'refs/heads/main' }}
+          cache-on-failure: true
 
       - name: Clippy
         working-directory: src-tauri
@@ -110,41 +154,14 @@ jobs:
         working-directory: src-tauri
         run: cargo test --workspace --features bench --locked
 
-  windows-clippy:
-    name: Windows clippy
+  windows:
+    name: Windows
+    needs: changes
+    if: needs.changes.outputs.windows == 'true'
     runs-on: windows-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          persist-credentials: false
-
-      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
-        with:
-          components: clippy
-
-      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
-        with:
-          workspaces: src-tauri
-          shared-key: windows-clippy
-          save-if: ${{ github.ref == 'refs/heads/main' }}
-
-      # tauri-build only checks that the bundle resources exist; clippy links nothing, so empty files are enough.
-      - name: Placeholder hook resources
-        working-directory: src-tauri
-        shell: bash
-        run: |
-          mkdir -p overlay-hook
-          for file in $(jq -r '.bundle.resources | keys[]' tauri.windows.conf.json); do touch "$file"; done
-
-      - name: Clippy
-        working-directory: src-tauri
-        run: cargo clippy --workspace --all-targets --locked -- -D warnings
-
-  windows-test:
-    name: Windows tests
-    runs-on: windows-latest
-    timeout-minutes: 40
+    timeout-minutes: 35
+    env:
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only # the hook keeps a PDB with names and lines, but links much faster
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -157,12 +174,14 @@ jobs:
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           targets: i686-pc-windows-msvc
+          components: clippy
 
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           workspaces: src-tauri
-          shared-key: windows-test
+          shared-key: windows
           save-if: ${{ github.ref == 'refs/heads/main' }}
+          cache-on-failure: true
 
       # The runner's default TEMP is the 8.3 form `C:\Users\RUNNER~1\...`. The overlay tests build their game folders
       # under TEMP, and a game folder spelled in 8.3 names is a known gap of the hook (see the hook's ARCHITECTURE.md,
@@ -174,9 +193,14 @@ jobs:
           echo "TMP=$RUNNER_TEMP" >> "$GITHUB_ENV"
 
       # The same script developers run: both hooks, the 32-bit injector, the probes and the dumper, staged where the
-      # bundle and the tests look for them. The script needs no node_modules.
+      # bundle and the tests look for them. It needs no node_modules. Clippy needs the staged files too: tauri-build
+      # checks that the bundle resources exist.
       - name: Build the overlay binaries
         run: bun scripts/build-overlay-hook.ts
+
+      - name: Clippy
+        working-directory: src-tauri
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
 
       - name: Tests
         working-directory: src-tauri
@@ -184,7 +208,7 @@ jobs:
 
   e2e:
     name: E2E
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:

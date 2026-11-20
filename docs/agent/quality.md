@@ -10,19 +10,21 @@ visible without blocking a merge on noise. `cargo machete` and `bun run docs:che
 
 ## CI
 
-`ci.yml` runs four independent jobs in parallel on every push and pull request, so the wall time is the slowest job
-(Windows tests), not the sum:
+`ci.yml` is built to spend few Actions minutes (Windows minutes cost double) and to answer quickly:
 
+- **Changes** reads the diff and decides which of the jobs below run. Images and the license alone run nothing.
 - **Web** — `cargo fmt --check`, `bun run lint`, `bun test`, `bun run build:web`.
-- **Rust** — Linux clippy and `cargo test --workspace --features bench` (no debug info, for faster links).
-- **Windows clippy** — clippy for the Windows-only code. The bundle resources are empty placeholder files: clippy links
-  nothing, and tauri-build only checks that they exist.
-- **Windows tests** — `bun scripts/build-overlay-hook.ts`, then `cargo test --workspace`. The static CRT is set for every
-  Windows crate in `src-tauri/.cargo/config.toml`, so the test build reuses the hook binaries instead of rebuilding them.
-  `TEMP` points at a long path, because the runner's default is an 8.3 path (see the hook's `ARCHITECTURE.md`).
+- **Rust** — Linux clippy and `cargo test --workspace --features bench` (no debug info, for faster links); for changes
+  under `src-tauri/`, `games/` or `loaders/`.
+- **Windows** — `bun scripts/build-overlay-hook.ts`, clippy and `cargo test --workspace` in one job. A pull request runs
+  it only when a changed Rust file has `cfg(windows)` code or Win32 calls, or the overlay crates, Cargo files or the hook
+  build script changed; a push to `main` runs it for any Rust change. The static CRT for every Windows crate is set in
+  `src-tauri/.cargo/config.toml`, so the test build reuses the hook binaries. `TEMP` points at a long path, because the
+  runner's default is an 8.3 path (see the hook's `ARCHITECTURE.md`).
 
-Each job has its own `rust-cache` key, written only from `main`. E2E runs nightly and on demand. The release workflow
-calls `ci.yml` as its gate, in parallel with the platform builds; tests marked `#[ignore]` do not run in CI.
+The jobs run in parallel and a newer push cancels an older run. Rust caches are written only from `main`, also after a
+failed run. There is no nightly run: E2E runs only from **Actions → CI → Run workflow**. The release does not run CI
+again; it waits for the CI run of the tagged commit to pass. Tests marked `#[ignore]` do not run in CI.
 
 ## Optional local reports
 
@@ -59,8 +61,8 @@ the web bundle, so run `e2e:build` again after a change under `src/`. The suite 
 Steam/Proton fixtures all point under `target/`, so the suite never opens the user's library. The `e2e` feature,
 `tauri.e2e.conf.json` and the dialog/forced-failure seams are test-only: never enable them in a release build.
 
-`bun run e2e:smoke` runs the seven core specs for a quick local check. CI runs the full suite nightly and on demand, not
-on a pull request and not as a release gate. `E2E_SPECS`, `E2E_SMOKE` and `E2E_BAIL` select a subset, the smoke set and
+`bun run e2e:smoke` runs the seven core specs for a quick local check. CI runs the full suite only on demand, not on a pull
+request and not as a release gate. `E2E_SPECS`, `E2E_SMOKE` and `E2E_BAIL` select a subset, the smoke set and
 fail-fast. The harness, isolation and the list of specs are in [`e2e/README.md`](../../e2e/README.md). Run it for a
 change to the window, the IPC surface, the first-run flow, deployment, launch, profiles, packs, FOMOD or recovery, or
 when you add a user-visible command.

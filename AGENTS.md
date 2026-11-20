@@ -80,9 +80,9 @@ These rules apply to every change, whichever game or platform started it.
 
 `bun run lint` is the merge gate: Biome, oxlint, the TypeScript checks and the architecture guard (layers, data
 boundary, production `unwrap`/`expect`/`panic`/`todo`/`dbg`, overlay invariants, generated bindings and permissions).
-The full E2E suite runs nightly and on demand, not as a release gate; the `Security` workflow runs `cargo deny` and
-`bun audit` weekly and on pull requests that change dependencies. Every push and pull request runs four parallel CI jobs: the web gate, Linux clippy and tests, Windows clippy and Windows
-tests (`.github/workflows/ci.yml`).
+The full E2E suite runs only on demand, not as a release gate; the `Security` workflow runs `cargo deny` and
+`bun audit` weekly and on pull requests that change dependencies. CI (`.github/workflows/ci.yml`) runs the web gate, Linux clippy and tests, and a Windows job (clippy and tests), each only
+when the diff needs it.
 Coverage, mutation, bundle-size and docs-link reports are local tools, not merge gates. Details:
 [docs/agent/quality.md](docs/agent/quality.md).
 

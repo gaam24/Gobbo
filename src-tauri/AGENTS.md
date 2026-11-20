@@ -234,7 +234,7 @@ run above covers it before you finish.
 `bun run lint` from the repository root also runs the architecture guard (`scripts/check-layers.ts`,
 `scripts/check-agent-policy.ts`, `scripts/check-data-boundary.ts`, `scripts/check-overlay-invariants.ts` and
 `scripts/check-generated.ts`). The check reads the production code only; test fixtures may cross layers. The full E2E
-suite runs nightly and on demand, not as a release gate; the `Security` workflow runs `cargo deny` and `bun audit`
+suite runs only on demand, not as a release gate; the `Security` workflow runs `cargo deny` and `bun audit`
 weekly and on pull requests that change dependencies.
 
 Coverage and mutation reports are optional local tools, not CI gates. Run `cargo llvm-cov` or `cargo mutants` when a

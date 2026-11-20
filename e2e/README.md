@@ -31,7 +31,7 @@ E2E_SPECS='./specs/20-import.e2e.ts,./specs/30-mods-list.e2e.ts' E2E_BAIL=0 bun 
 - `E2E_SPECS` runs only the named files, in the order given.
 - `E2E_BAIL=1` stops at the first failure; the default `0` collects every failure.
 - `E2E_SMOKE=1` (or `bun run e2e:smoke`) runs first run, games, command contracts, import, mod list, deploy and launch.
-  Pull requests and pushes run that subset; the nightly schedule and the release call run the full suite.
+  Use it for a quick local check; CI runs the full suite only when started by hand.
 
 The runner deletes `target/e2e-data`, `target/e2e-home` and `target/e2e-artifacts` before the app starts, then writes
 English app settings. A full run is independent of the previous one.
