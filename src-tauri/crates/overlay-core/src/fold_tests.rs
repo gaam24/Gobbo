@@ -2,7 +2,10 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::*;
+    use crate::{
+        Whiteouts, copy_temp_name, fold_char, fold_unit, is_copy_temp_name, relative_to,
+        wildcard_match,
+    };
 
     #[test]
     fn a_letter_outside_ascii_folds_to_its_lower_case_form() {
@@ -36,7 +39,7 @@ mod tests {
         whiteouts.hide(r"Ś\Plik.txt");
         assert!(whiteouts.hides(r"ś\plik.txt"));
         assert!(whiteouts.hides(r"Ś\PLIK.TXT"));
-        assert!(whiteouts.hides_child("Ś", "PLIK.txt"));
+        assert!(whiteouts.hides_child_in_visible_folder("Ś", "PLIK.txt"));
         assert!(!whiteouts.hides(r"ś\inny.txt"));
     }
 
@@ -50,21 +53,15 @@ mod tests {
     }
 
     #[test]
-    fn a_listing_shows_one_entry_for_a_name_spelled_in_two_cases() {
-        let merged = merge_listing(
-            vec![("Ś.txt".to_string(), 1)],
-            Vec::new(),
-            vec![("ś.txt".to_string(), 2)],
-        );
-        assert_eq!(merged.len(), 1);
-        assert_eq!(merged[0].0, "Ś.txt");
-    }
-
-    #[test]
     fn a_copy_temporary_name_has_one_shape_and_no_other_name_does() {
         let name = copy_temp_name(4242, 7);
         assert_eq!(name, ".gobbo-copy-4242-7.tmp");
         assert!(is_copy_temp_name(&name));
+
+        // The writer and the recogniser share one shape: every name written is recognised back, at the smallest and
+        // the largest process and sequence.
+        assert!(is_copy_temp_name(&copy_temp_name(0, 0)));
+        assert!(is_copy_temp_name(&copy_temp_name(u32::MAX, u64::MAX)));
 
         for other in [
             ".gobbo-copy-x-7.tmp",

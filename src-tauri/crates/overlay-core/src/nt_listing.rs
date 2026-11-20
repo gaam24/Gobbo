@@ -119,6 +119,9 @@ struct Layout {
     name: usize,
     /// Where `FileNameLength` is (in bytes).
     name_length: usize,
+    /// Whether the entry carries the metadata fields. The names-only class has none: its `FileNameLength` is the
+    /// last field before the name.
+    metadata: bool,
     ea: Option<usize>,
     short_name: Option<usize>,
     short_name_length: Option<usize>,
@@ -130,6 +133,7 @@ fn layout(class: u32) -> Option<Layout> {
     let common = Layout {
         name: 64,
         name_length: 60,
+        metadata: true,
         ea: None,
         short_name: None,
         short_name_length: None,
@@ -153,6 +157,7 @@ fn layout(class: u32) -> Option<Layout> {
         NAMES => Some(Layout {
             name: 12,
             name_length: 8,
+            metadata: false,
             ea: None,
             short_name: None,
             short_name_length: None,
@@ -181,8 +186,7 @@ fn layout(class: u32) -> Option<Layout> {
 fn write_entry(layout: &Layout, data: &Entry<'_>, out: &mut [u8]) {
     out.fill(0);
     write_u32(out, layout.name_length, (2 * data.name.len()) as u32);
-    // The names-only class has no metadata: its `FileNameLength` is the last field before the name.
-    if layout.name_length > 8 {
+    if layout.metadata {
         write_u64(out, 8, data.created);
         write_u64(out, 16, data.accessed);
         write_u64(out, 24, data.written);
@@ -410,14 +414,20 @@ mod tests {
     #[test]
     fn every_layout_matches_the_windows_structure() {
         let expected = [
-            (DIRECTORY, (64, 60, None, None, None, None)),
-            (FULL_DIRECTORY, (68, 60, Some(64), None, None, None)),
-            (BOTH_DIRECTORY, (94, 60, Some(64), Some(70), Some(68), None)),
-            (NAMES, (12, 8, None, None, None, None)),
-            (ID_FULL_DIRECTORY, (80, 60, Some(64), None, None, Some(72))),
+            (DIRECTORY, (64, 60, true, None, None, None, None)),
+            (FULL_DIRECTORY, (68, 60, true, Some(64), None, None, None)),
+            (
+                BOTH_DIRECTORY,
+                (94, 60, true, Some(64), Some(70), Some(68), None),
+            ),
+            (NAMES, (12, 8, false, None, None, None, None)),
+            (
+                ID_FULL_DIRECTORY,
+                (80, 60, true, Some(64), None, None, Some(72)),
+            ),
             (
                 ID_BOTH_DIRECTORY,
-                (104, 60, Some(64), Some(70), Some(68), Some(96)),
+                (104, 60, true, Some(64), Some(70), Some(68), Some(96)),
             ),
         ];
 
@@ -427,6 +437,7 @@ mod tests {
                 (
                     layout.name,
                     layout.name_length,
+                    layout.metadata,
                     layout.ea,
                     layout.short_name,
                     layout.short_name_length,

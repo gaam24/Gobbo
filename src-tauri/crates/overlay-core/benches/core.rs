@@ -37,7 +37,7 @@ fn paths(c: &mut Criterion) {
     });
     group.bench_function("hides_child/hit", |b| {
         b.iter(|| {
-            black_box(whiteouts.hides_child(
+            black_box(whiteouts.hides_child_in_visible_folder(
                 black_box(r"content\archive500\data"),
                 black_box("file500.bin"),
             ))
@@ -45,7 +45,7 @@ fn paths(c: &mut Criterion) {
     });
     group.bench_function("hides_child/miss", |b| {
         b.iter(|| {
-            black_box(whiteouts.hides_child(
+            black_box(whiteouts.hides_child_in_visible_folder(
                 black_box(r"content\archive500\data"),
                 black_box("missing.bin"),
             ))
@@ -54,7 +54,12 @@ fn paths(c: &mut Criterion) {
     let units: Vec<u16> = "file500.bin".encode_utf16().collect();
     group.bench_function("hides_child_units/hit", |b| {
         b.iter(|| {
-            black_box(whiteouts.hides_child_units(black_box(r"content\archive500\data"), &units))
+            black_box(
+                whiteouts.hides_child_units_in_visible_folder(
+                    black_box(r"content\archive500\data"),
+                    &units,
+                ),
+            )
         });
     });
     group.finish();
@@ -95,23 +100,6 @@ fn paths(c: &mut Criterion) {
             black_box(wildcard_match(
                 black_box("content*0_*"),
                 black_box("content0000_MergedFiles.0"),
-            ))
-        });
-    });
-    group.finish();
-
-    let mut group = c.benchmark_group("merge");
-    let upper = Vec::new();
-    let staging = (0..1_000)
-        .map(|number| (format!("file{number}.pak"), number))
-        .collect::<Vec<_>>();
-    let root = staging.clone();
-    group.bench_function("listing/2x1000", |b| {
-        b.iter(|| {
-            black_box(gobbo_overlay_core::merge_listing(
-                black_box(upper.clone()),
-                black_box(staging.clone()),
-                black_box(root.clone()),
             ))
         });
     });

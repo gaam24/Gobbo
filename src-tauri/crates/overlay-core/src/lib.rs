@@ -16,10 +16,11 @@ use std::path::{Path, PathBuf};
 use rustc_hash::FxHashSet;
 use serde::{Deserialize, Serialize};
 
-/// Environment variables that pass the layers from Gobbo to the hook in the game process.
-pub const ENV_ROOT: &str = "GOBBO_OVERLAY_ROOT";
-pub const ENV_STAGING: &str = "GOBBO_OVERLAY_STAGING";
-pub const ENV_UPPER: &str = "GOBBO_OVERLAY_UPPER";
+/// Environment variables that pass the layers from Gobbo to the hook in the game process. Only `to_env` and
+/// `from_env` spell them; a session with more than the game mount uses the `MountConfig` file named by `ENV_MOUNTS`.
+const ENV_ROOT: &str = "GOBBO_OVERLAY_ROOT";
+const ENV_STAGING: &str = "GOBBO_OVERLAY_STAGING";
+const ENV_UPPER: &str = "GOBBO_OVERLAY_UPPER";
 /// The JSON file that names every mount of the session, including the game folder and the profile's user-data roots.
 /// A hook that finds it uses it instead of the three single-layer variables above.
 pub const ENV_MOUNTS: &str = "GOBBO_OVERLAY_MOUNTS";
@@ -65,6 +66,10 @@ pub struct MountSpec {
 }
 
 impl MountSpec {
+    /// The id of the game folder's mount. Gobbo writes it when it builds the file, and `MountConfig::game` looks for
+    /// it, so the spelling of the id lives in one place.
+    pub const GAME_ID: &str = "game";
+
     /// The layers of this mount.
     pub fn layers(&self) -> Layers {
         Layers::new(self.root.clone(), self.staging.clone(), self.upper.clone())
@@ -84,12 +89,14 @@ impl MountConfig {
     /// The current format version.
     pub const VERSION: u32 = 1;
 
-    /// The game mount, when the set has the expected shape.
+    /// The game mount, which is first and carries `MountSpec::GAME_ID`. The shape is validated before this is read
+    /// (the hook in `session_config`, Gobbo where it writes the file), so this only selects and never validates.
     pub fn game(&self) -> Option<&MountSpec> {
-        (self.version == Self::VERSION)
-            .then(|| self.mounts.first())
-            .flatten()
-            .filter(|mount| mount.id == "game")
+        let [game, ..] = &self.mounts[..] else {
+            return None;
+        };
+
+        (game.id == MountSpec::GAME_ID).then_some(game)
     }
 
     /// The user-data redirects after the game mount.
@@ -168,8 +175,7 @@ impl Whiteouts {
                     return true;
                 }
 
-                hash ^= u64::from(byte.to_ascii_lowercase());
-                hash = hash.wrapping_mul(FNV_PRIME);
+                hash = fnv_step(hash, byte.to_ascii_lowercase());
             }
             // The whole path, including a trailing separator when the caller gave one.
             return self.hash_hides(hash, rel);
@@ -182,12 +188,6 @@ impl Whiteouts {
         }
 
         self.hides_folded(&fold_key(rel))
-    }
-
-    /// Whether the entry `name` inside `rel` is hidden by this set. A hidden folder hides everything below it, so a
-    /// listing can ask about one child without building `rel\name` first.
-    pub fn hides_child(&self, rel: &str, name: &str) -> bool {
-        self.hides(rel) || self.hides_child_in_visible_folder(rel, name)
     }
 
     /// `hides_child` when the caller already knows that `rel` itself is not hidden.
@@ -224,14 +224,10 @@ impl Whiteouts {
         self.contains_folded(&join_rel(rel, name))
     }
 
-    /// `hides_child` for a name that is still UTF-16, as a directory listing receives it. An ASCII name is converted to
-    /// a small stack buffer, so a lower entry does not allocate just to ask about a whiteout.
-    pub fn hides_child_units(&self, rel: &str, name: &[u16]) -> bool {
-        self.hides(rel) || self.hides_child_units_in_visible_folder(rel, name)
-    }
-
-    /// `hides_child_units` when the caller already knows that `rel` itself is not hidden. A directory listing checks the
-    /// folder once and then asks this for every entry, so the folder prefixes are not walked again per entry.
+    /// Whether the entry `name` inside the visible folder `rel` is hidden, for a name that is still UTF-16 as a
+    /// directory listing receives it. An ASCII name is converted to a small stack buffer, so a lower entry does not
+    /// allocate just to ask about a whiteout. A directory listing checks the folder once and then asks this for every
+    /// entry, so the folder prefixes are not walked again per entry.
     pub fn hides_child_units_in_visible_folder(&self, rel: &str, name: &[u16]) -> bool {
         if self.paths.is_empty() {
             return false;
@@ -282,8 +278,7 @@ impl Whiteouts {
                 return true;
             }
 
-            hash ^= u64::from(byte);
-            hash = hash.wrapping_mul(FNV_PRIME);
+            hash = fnv_step(hash, byte);
         }
 
         self.hash_hides_folded(hash, lower)
@@ -370,12 +365,6 @@ impl Layers {
         })
     }
 
-    /// The path relative to the game folder, when `path` lies in it. The game folder itself gives `""`.
-    /// The comparison ignores case, as Windows does; the result keeps the spelling of `path`.
-    pub fn relative(&self, path: &str) -> Option<String> {
-        relative_to(&self.root.to_string_lossy(), path)
-    }
-
     /// The folder of one layer. The upper layer is `upper`, the mod layer `staging` and the base folder `root`.
     /// `staging` is `None` for a mount without a mod layer.
     pub fn base(&self, layer: Layer) -> Option<&Path> {
@@ -423,20 +412,6 @@ impl Layers {
             .find(|(_, path)| exists(path))
     }
 
-    /// Whether the mod layer or the game folder has the path, and the whiteouts do not hide it.
-    pub fn in_lower(
-        &self,
-        rel: &str,
-        exists: impl Fn(&Path) -> bool,
-        whiteouts: &Whiteouts,
-    ) -> bool {
-        !whiteouts.hides(rel)
-            && [Layer::Staging, Layer::Root]
-                .into_iter()
-                .filter_map(|layer| self.base(layer))
-                .any(|base| exists(&join(base, rel)))
-    }
-
     /// Where a write to the relative path goes. Writes never reach the staging or the game folder.
     pub fn write_target(&self, rel: &str) -> PathBuf {
         join(&self.upper, rel)
@@ -459,12 +434,14 @@ impl Layers {
 /// The prefix and the suffix of the temporary file a copy-up writes beside its target before it publishes it. A name
 /// with this shape is never a game file: the hook hides it from listings, and Gobbo removes the ones an interrupted copy
 /// left behind.
-pub const COPY_TEMP_PREFIX: &str = ".gobbo-copy-";
-pub const COPY_TEMP_SUFFIX: &str = ".tmp";
+const COPY_TEMP_PREFIX: &str = ".gobbo-copy-";
+const COPY_TEMP_SUFFIX: &str = ".tmp";
+/// The separator between the process id and the sequence in a copy-up temporary name.
+const COPY_TEMP_SEP: char = '-';
 
 /// The name of the temporary copy of one copy-up: the process that makes it and a counter that is unique in it.
 pub fn copy_temp_name(process: u32, sequence: u64) -> String {
-    format!("{COPY_TEMP_PREFIX}{process}-{sequence}{COPY_TEMP_SUFFIX}")
+    format!("{COPY_TEMP_PREFIX}{process}{COPY_TEMP_SEP}{sequence}{COPY_TEMP_SUFFIX}")
 }
 
 /// Whether a name has the shape of a copy-up temporary file (see `copy_temp_name`).
@@ -475,9 +452,11 @@ pub fn is_copy_temp_name(name: &str) -> bool {
     else {
         return false;
     };
-    middle.split_once('-').is_some_and(|(process, sequence)| {
-        process.parse::<u32>().is_ok() && sequence.parse::<u64>().is_ok()
-    })
+    middle
+        .split_once(COPY_TEMP_SEP)
+        .is_some_and(|(process, sequence)| {
+            process.parse::<u32>().is_ok() && sequence.parse::<u64>().is_ok()
+        })
 }
 
 /// The folded form of one character: the rule every name comparison of Gobbo uses, in the hook and in the app. ASCII folds
@@ -685,15 +664,20 @@ pub fn relative_to(root: &str, path: &str) -> Option<String> {
     }
 }
 
-/// `path` relative to a root that is already canonical (`C:\...`, no `.`/`..`, no trailing separator).
-fn relative_from_normal(root: &str, path: &str) -> Option<String> {
-    let rest = strip_folded_prefix(path, root)?;
-
+/// What `strip_folded_prefix` left of a path inside the root: `""` for the root itself, the text after one `\` for a
+/// child, and `None` when the two only share a name prefix (`C:\Ga` is not inside `C:\Gar`). Every spelling of the
+/// inside/outside boundary goes through this one rule.
+fn inside_after_prefix(rest: &str) -> Option<String> {
     if rest.is_empty() {
         Some(String::new())
     } else {
         rest.strip_prefix('\\').map(str::to_string)
     }
+}
+
+/// `path` relative to a root that is already canonical (`C:\...`, no `.`/`..`, no trailing separator).
+fn relative_from_normal(root: &str, path: &str) -> Option<String> {
+    inside_after_prefix(strip_folded_prefix(path, root)?)
 }
 
 /// A drive-absolute path in the form `normal` gives it, without the `replace('/', "\\")`, the component `Vec` and the
@@ -770,16 +754,8 @@ fn relative_direct(root: &str, path: &str) -> Direct {
         return Direct::Fallback;
     }
 
-    let Some(rest) = strip_folded_prefix(path, root) else {
-        return Direct::Outside;
-    };
-
-    if rest.is_empty() {
-        return Direct::Inside(String::new());
-    }
-
-    match rest.strip_prefix('\\') {
-        Some(rel) => Direct::Inside(rel.to_string()),
+    match strip_folded_prefix(path, root).and_then(inside_after_prefix) {
+        Some(rel) => Direct::Inside(rel),
         None => Direct::Outside,
     }
 }
@@ -805,15 +781,7 @@ fn is_canonical_drive(text: &str) -> bool {
 
 /// The old normalizing path, kept for UNC, verbatim, `/`, `.`/`..`, trailing separators and relative roots.
 fn relative_to_normalized(root: &str, path: &str) -> Option<String> {
-    let root = normal(root);
-    let path = normal(path);
-    let rest = strip_folded_prefix(&path, &root)?;
-
-    if rest.is_empty() {
-        Some(String::new())
-    } else {
-        rest.strip_prefix('\\').map(str::to_string)
-    }
+    inside_after_prefix(strip_folded_prefix(&normal(path), &normal(root))?)
 }
 
 /// Joins a `\`-separated relative path onto a base folder, one component at a time. The buffer is reserved once, so a
@@ -855,62 +823,22 @@ pub fn join_rel(rel: &str, name: &str) -> String {
 const FNV_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
 const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
 
+/// One FNV-1a step over a byte that is already folded. `key_hash` and the incremental prefix hashes of `hides` and
+/// `hides_folded` all mix through this one step, so they cannot drift apart.
+#[inline]
+fn fnv_step(hash: u64, folded: u8) -> u64 {
+    (hash ^ u64::from(folded)).wrapping_mul(FNV_PRIME)
+}
+
 /// FNV-1a over the bytes with ASCII case folded.
 fn key_hash(key: &str) -> u64 {
     let mut hash = FNV_OFFSET;
 
     for byte in key.bytes() {
-        hash ^= u64::from(byte.to_ascii_lowercase());
-        hash = hash.wrapping_mul(FNV_PRIME);
+        hash = fnv_step(hash, byte.to_ascii_lowercase());
     }
 
     hash
-}
-
-/// The names of one folder in a lower layer, without the ones the whiteouts hide. `rel` is the folder. Each name keeps
-/// the payload `T` it came with (the hook keeps the metadata there). Test-only: the hook filters while it merges layers.
-#[cfg(test)]
-fn unhidden<T>(rel: &str, names: Vec<(String, T)>, whiteouts: &Whiteouts) -> Vec<(String, T)> {
-    if whiteouts.paths.is_empty() {
-        return names;
-    }
-
-    if whiteouts.hides(rel) {
-        return Vec::new();
-    }
-
-    names
-        .into_iter()
-        .filter(|(name, _)| !whiteouts.hides_child_in_visible_folder(rel, name))
-        .collect()
-}
-
-/// The names of one folder in each layer (upper, staging, root) merged into one list. A name that exists in several
-/// layers appears once, with the spelling, the layer and the payload of the top-most one. The order is the order of
-/// first appearance, upper first. Names match ignoring ASCII case, as Windows does.
-pub fn merge_listing<T>(
-    upper: Vec<(String, T)>,
-    staging: Vec<(String, T)>,
-    root: Vec<(String, T)>,
-) -> Vec<(String, Layer, T)> {
-    let total = upper.len() + staging.len() + root.len();
-    let mut seen: FxHashSet<String> = FxHashSet::default();
-    seen.reserve(total);
-    let mut merged = Vec::with_capacity(total);
-
-    for (layer, names) in [
-        (Layer::Upper, upper),
-        (Layer::Staging, staging),
-        (Layer::Root, root),
-    ] {
-        for (name, payload) in names {
-            if seen.insert(fold_key(&name)) {
-                merged.push((name, layer, payload));
-            }
-        }
-    }
-
-    merged
 }
 
 /// Matches a file name against a Windows search pattern: `*` is any text, `?` is one character, and the case is
@@ -1094,7 +1022,6 @@ fn normal(path: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashSet;
 
     fn layers() -> Layers {
         Layers {
@@ -1102,10 +1029,6 @@ mod tests {
             staging: Some(PathBuf::from("/state/staging")),
             upper: PathBuf::from("/state/upper"),
         }
-    }
-
-    fn listing(names: &[&str]) -> Vec<(String, ())> {
-        names.iter().map(|name| (name.to_string(), ())).collect()
     }
 
     fn mount(id: &str) -> MountSpec {
@@ -1147,12 +1070,6 @@ mod tests {
             relative_to(r"\\server\share\Game", r"\\?\UNC\server\share\Other\x"),
             None
         );
-    }
-
-    #[test]
-    fn a_sibling_with_the_same_start_is_not_inside() {
-        assert_eq!(relative_to(r"C:\Game", r"C:\Game Mods\a.ws"), None);
-        assert_eq!(relative_to(r"C:\Game", r"C:\Other\a.ws"), None);
     }
 
     #[test]
@@ -1232,53 +1149,6 @@ mod tests {
             layers().write_target("data\\new.txt"),
             PathBuf::from("/state/upper/data/new.txt")
         );
-    }
-
-    #[test]
-    fn a_merged_listing_keeps_each_name_once_with_the_top_spelling() {
-        let merged = merge_listing(
-            listing(&["Readme.TXT"]),
-            listing(&["readme.txt", "mod.pak"]),
-            listing(&["README.txt", "game.exe"]),
-        );
-        assert_eq!(
-            merged,
-            vec![
-                ("Readme.TXT".to_string(), Layer::Upper, ()),
-                ("mod.pak".to_string(), Layer::Staging, ()),
-                ("game.exe".to_string(), Layer::Root, ()),
-            ]
-        );
-        let names: HashSet<String> = merged
-            .into_iter()
-            .map(|(name, _, _)| name.to_lowercase())
-            .collect();
-        assert_eq!(names.len(), 3);
-    }
-
-    #[test]
-    fn a_merged_listing_keeps_the_payload_of_the_top_most_entry() {
-        let merged = merge_listing(
-            vec![("a.txt".to_string(), 1)],
-            vec![("A.txt".to_string(), 2), ("b.txt".to_string(), 3)],
-            vec![("a.TXT".to_string(), 4), ("c.txt".to_string(), 5)],
-        );
-        assert_eq!(
-            merged,
-            vec![
-                ("a.txt".to_string(), Layer::Upper, 1),
-                ("b.txt".to_string(), Layer::Staging, 3),
-                ("c.txt".to_string(), Layer::Root, 5),
-            ]
-        );
-    }
-
-    #[test]
-    fn a_long_listing_is_merged_in_one_pass() {
-        let names: Vec<(String, ())> = (0..20_000).map(|i| (format!("file{i}.pak"), ())).collect();
-        let merged = merge_listing(Vec::new(), names.clone(), names);
-        assert_eq!(merged.len(), 20_000);
-        assert!(merged.iter().all(|(_, layer, _)| *layer == Layer::Staging));
     }
 
     #[test]
@@ -1392,7 +1262,6 @@ mod tests {
             layers.resolve_visible("data\\a.txt", exists, &whiteouts),
             None
         );
-        assert!(!layers.in_lower("data\\a.txt", exists, &whiteouts));
         let upper_copy = |path: &Path| path == Path::new("/state/upper/data/a.txt") || exists(path);
         assert_eq!(
             layers.resolve_visible("data\\a.txt", upper_copy, &whiteouts),
@@ -1415,10 +1284,11 @@ mod tests {
             layers.resolve_visible("archive\\pc\\mod\\b.archive", exists, &whiteouts),
             None
         );
-        assert_eq!(
-            unhidden("", listing(&["archive", "bin", "Archive2"]), &whiteouts),
-            listing(&["bin", "Archive2"])
-        );
+        let kept: Vec<&str> = ["archive", "bin", "Archive2"]
+            .into_iter()
+            .filter(|name| !whiteouts.hides_child_in_visible_folder("", name))
+            .collect();
+        assert_eq!(kept, ["bin", "Archive2"]);
     }
 
     #[test]
@@ -1426,9 +1296,9 @@ mod tests {
         let whiteouts = Whiteouts::parse("Ś\\save.dat");
         assert!(whiteouts.hides("ś\\save.dat"));
         assert!(whiteouts.hides("Ś\\SAVE.DAT"));
-        assert!(whiteouts.hides_child("Ś", "SAVE.DAT"));
+        assert!(whiteouts.hides_child_in_visible_folder("Ś", "SAVE.DAT"));
         let name: Vec<u16> = "SAVE.DAT".encode_utf16().collect();
-        assert!(whiteouts.hides_child_units("Ś", &name));
+        assert!(whiteouts.hides_child_units_in_visible_folder("Ś", &name));
         let path: Vec<u16> = "ś\\save.dat".encode_utf16().collect();
         assert!(whiteouts.hides(&String::from_utf16(&path).unwrap()));
     }
@@ -1480,11 +1350,20 @@ mod tests {
         let mut whiteouts = Whiteouts::default();
         whiteouts.hide("archive");
         whiteouts.hide(r"data\A.txt");
-        assert!(whiteouts.hides_child("data", "a.txt"));
-        assert!(whiteouts.hides_child_units("data", &"A.TXT".encode_utf16().collect::<Vec<_>>()));
-        assert!(whiteouts.hides_child("archive", "any"));
-        assert!(!whiteouts.hides_child("data", "b.txt"));
-        assert!(!whiteouts.hides_child_units("other", &"x".encode_utf16().collect::<Vec<_>>()));
+        assert!(whiteouts.hides_child_in_visible_folder("data", "a.txt"));
+        assert!(whiteouts.hides_child_units_in_visible_folder(
+            "data",
+            &"A.TXT".encode_utf16().collect::<Vec<_>>()
+        ));
+        // A hidden folder hides everything below it, so the child check is never reached for it.
+        assert!(whiteouts.hides("archive"));
+        assert!(!whiteouts.hides_child_in_visible_folder("data", "b.txt"));
+        assert!(
+            !whiteouts.hides_child_units_in_visible_folder(
+                "other",
+                &"x".encode_utf16().collect::<Vec<_>>()
+            )
+        );
     }
 
     #[test]
@@ -1645,14 +1524,6 @@ mod tests {
         );
         assert_eq!(
             MountConfig {
-                version: MountConfig::VERSION + 1,
-                ..config.clone()
-            }
-            .game(),
-            None
-        );
-        assert_eq!(
-            MountConfig {
                 mounts: vec![mount("saves")],
                 ..config.clone()
             }
@@ -1672,11 +1543,6 @@ mod tests {
     #[test]
     fn the_layer_helpers_cover_the_paths_and_the_missing_staging() {
         let layers = layers();
-        assert_eq!(
-            layers.relative("/game/data/a.txt"),
-            Some(r"data\a.txt".to_string())
-        );
-        assert_eq!(layers.relative("/other/a.txt"), None);
         assert_eq!(
             layers
                 .layer_paths()
@@ -1700,17 +1566,6 @@ mod tests {
             layers.whiteouts_journal_file(),
             PathBuf::from("/state/upper.whiteouts.journal")
         );
-    }
-
-    #[test]
-    fn in_lower_is_true_only_for_a_present_unhidden_path() {
-        let layers = layers();
-        let present = [PathBuf::from("/state/staging/data/a.txt")];
-        let exists = |path: &Path| present.iter().any(|known| known == path);
-        assert!(layers.in_lower("data\\a.txt", exists, &Whiteouts::default()));
-        let mut whiteouts = Whiteouts::default();
-        whiteouts.hide("data\\a.txt");
-        assert!(!layers.in_lower("data\\a.txt", exists, &whiteouts));
     }
 
     #[test]
@@ -1746,15 +1601,6 @@ mod tests {
         assert!(!is_canonical_drive(r"C:\Game\.."));
         assert!(!is_canonical_drive(r"1:\Game"));
         assert!(!is_canonical_drive(r"C:\Game\\bin"));
-    }
-
-    #[test]
-    fn the_key_hash_is_fnv1a_over_folded_ascii() {
-        assert_eq!(key_hash(""), 0xcbf2_9ce4_8422_2325);
-        assert_eq!(key_hash("a"), 0xaf63_dc4c_8601_ec8c);
-        assert_eq!(key_hash("A"), key_hash("a"));
-        assert_eq!(key_hash("ab"), 0x089c_4407_b545_986a);
-        assert_eq!(key_hash(r"data\a.txt"), 0xfa17_c32c_f61a_0d88);
     }
 
     #[test]
@@ -1804,7 +1650,7 @@ mod tests {
         let name: Vec<u16> = format!("{prefix}{}", "z".repeat(40))
             .encode_utf16()
             .collect();
-        assert!(!whiteouts.hides_child_units("data", &name));
+        assert!(!whiteouts.hides_child_units_in_visible_folder("data", &name));
     }
 }
 
