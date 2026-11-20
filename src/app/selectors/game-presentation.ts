@@ -88,6 +88,7 @@ export function gamePresentation(status: Status, runtime: GameRuntime = IDLE): G
 			canUndo: false,
 		};
 	}
+
 	const presentation = statusPresentation(status);
 	return runtime.busy === null ? presentation : duringBusy(presentation, runtime.busy);
 }
@@ -285,9 +286,11 @@ function nextStepOf(status: Status, action: GameAction): GameNextStep | undefine
 			return { titleKey: "start.enable.title", bodyKey: "start.enable.hint", action };
 		case "apply": {
 			const stage = status.stage;
+
 			if (stage.kind === "draft") {
 				return { titleKey: "start.changes.title", bodyKey: "start.changes.hint", params: { count: stage.changes }, action };
 			}
+
 			return { titleKey: "start.deploy.title", bodyKey: "start.deploy.hint", action };
 		}
 		case "play":
@@ -302,6 +305,7 @@ function nextStepOf(status: Status, action: GameAction): GameNextStep | undefine
 function blockerOf(status: Status): TranslationKey | undefined {
 	if (!status.blocker) return undefined;
 	const blocker: BlockerKey = status.blocker;
+
 	switch (blocker) {
 		case "game_and_settings":
 			return "deploy.blocker.gameAndSettings";

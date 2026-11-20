@@ -36,6 +36,7 @@ export function DefinitionImportDialog({
 		void (async () => {
 			try {
 				const result = await unwrap(commands.inspectDefinitionPackage(path));
+
 				if (live.current) setPreview(result);
 			} catch (failure) {
 				if (live.current) setError(messageOf(failure));
@@ -60,6 +61,7 @@ export function DefinitionImportDialog({
 		});
 		setImporting(true);
 		setImportError(null);
+
 		try {
 			const result = await unwrap(commands.importDefinitionPackage(path, preview.overwrites.length > 0));
 			await onImported(result.name);

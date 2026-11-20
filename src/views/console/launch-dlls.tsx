@@ -12,6 +12,7 @@ export function LaunchDlls({ dlls }: { dlls: DllReport }) {
 	const { layer, injected } = dlls;
 	const copy = async () => {
 		const lines = [...injected.map((dll) => `injected ${dll.name} ${dll.path} <- ${dll.source}`), ...layer.map((path) => `layer ${path}`)];
+
 		try {
 			await navigator.clipboard.writeText(lines.join("\n"));
 			setCopied(true);

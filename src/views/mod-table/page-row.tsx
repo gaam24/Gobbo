@@ -83,6 +83,7 @@ export function PageRow({
 	}, null);
 	// The same words as a part's version line, so a header and its parts read the same way.
 	let status = t("mods.version.upToDate");
+
 	if (updateCount > 0) status = t("mods.page.updates", { count: updateCount });
 	else if (checkedAt == null) status = t("mods.version.notChecked");
 	const conflicts = mods.reduce(
@@ -199,6 +200,7 @@ export function PageRow({
 			}
 			case "missing": {
 				const missing = mods.reduce((total, mod) => total + mod.unmet_requirements, 0);
+
 				if (missing === 0) return <span />;
 				return <span className="text-destructive text-right font-mono text-xs font-medium tabular-nums">{missing}</span>;
 			}

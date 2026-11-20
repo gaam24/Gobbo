@@ -100,20 +100,25 @@ export function useActivity(): Task[] {
 		// Feature-owned registry rows (collections, packs, waiting dialogs) own their presentation. Backend lifecycle
 		// rows are added only when no local row already describes the same operation: one apply must not appear twice.
 		const byOperation = new Map<string, Task>();
+
 		for (const task of local) byOperation.set(task.dedupeKey ?? task.id, task);
+
 		for (const task of registryTasks(
 			registered.filter((item) => item.source === "local"),
 			games,
 		)) {
 			byOperation.set(task.dedupeKey ?? task.id, task);
 		}
+
 		for (const task of registryTasks(
 			registered.filter((item) => item.source === "backend"),
 			games,
 		)) {
 			const key = task.dedupeKey ?? task.id;
+
 			if (!byOperation.has(key)) byOperation.set(key, task);
 		}
+
 		return [...byOperation.values()];
 	}, [
 		busy,
@@ -201,6 +206,7 @@ function busyTasks(
 					},
 				];
 			}
+
 			return [
 				{
 					id: "update",
@@ -228,6 +234,7 @@ function busyTasks(
 /// phases say what is happening instead of showing a count that does not move.
 function deployDetail(progress: DeployProgress | null, t: Translate): string | undefined {
 	if (!progress) return undefined;
+
 	switch (progress.stage) {
 		case "preparing":
 			return t("tasks.deployPreparing");
@@ -359,6 +366,7 @@ function downloadTasks(
 	t: Translate,
 ): Task[] {
 	const tasks: Task[] = [];
+
 	for (const download of downloads) {
 		if (download.state === "downloading") {
 			tasks.push({
@@ -403,5 +411,6 @@ function downloadTasks(
 			});
 		}
 	}
+
 	return tasks;
 }

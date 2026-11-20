@@ -8,11 +8,14 @@ export async function runBusyAction(
 	clearError?: () => void,
 ): Promise<void> {
 	setBusy(true);
+
 	if (clearError) clearError();
+
 	try {
 		await action();
 	} catch (error) {
 		onError(error);
 	}
+
 	setBusy(false);
 }

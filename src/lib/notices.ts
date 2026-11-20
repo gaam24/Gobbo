@@ -62,8 +62,10 @@ export interface NoticeGroup {
 /// its kind, text and detail match, so a message that comes back later still shows where it belongs in the list.
 export function groupNotices(notices: readonly Notice[]): NoticeGroup[] {
 	const groups: NoticeGroup[] = [];
+
 	for (const notice of notices) {
 		const last = groups.at(-1);
+
 		if (last && last.notice.kind === notice.kind && last.notice.text === notice.text && last.notice.detail === notice.detail) {
 			last.count += 1;
 			last.ids.push(notice.id);
@@ -71,6 +73,7 @@ export function groupNotices(notices: readonly Notice[]): NoticeGroup[] {
 			groups.push({ notice, count: 1, ids: [notice.id] });
 		}
 	}
+
 	return groups;
 }
 
@@ -85,6 +88,7 @@ export function continueToastRun(run: ToastRun | null, signature: string): { run
 	if (run?.signature === signature) {
 		return { run: { signature, count: run.count + 1 }, repeated: true };
 	}
+
 	return { run: { signature, count: 1 }, repeated: false };
 }
 

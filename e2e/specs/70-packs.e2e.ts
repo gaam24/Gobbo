@@ -52,6 +52,7 @@ async function activeProfileId(game: string): Promise<string> {
 /// installation receiving the pack.
 async function removeLibraryMods(game: string): Promise<void> {
 	const status = await statusOf(game);
+
 	for (const mod of status.mods) await invoke("delete_mod", { game, id: mod.id });
 	const empty = await statusOf(game);
 	assert.equal(empty.mods.length, 0, "the library still has mods");
@@ -119,13 +120,16 @@ describe("mod packs", () => {
 		const packProfile = status.profiles.find((entry) => !entry.active);
 		assert.ok(packProfile, "the pack profile is missing");
 		assert.equal(packProfile.enabled_count, 2);
+
 		for (const mod of status.mods) {
 			expectFile(path.join(dataDir, "games", source.id, "library", mod.folder, "content/x.ws"));
 		}
+
 		await cleanup(source);
 	});
 	it("rejects a pack link that is not an https gobbo link", async () => {
 		const game = await sourceGame("pack-link");
+
 		try {
 			await invokeWithChannel("download_pack_link", { game: game.id, link: "http://example.invalid/pack.gobbopack" });
 			throw new Error("the link was expected to be refused");
@@ -133,6 +137,7 @@ describe("mod packs", () => {
 			assert.ok(error instanceof CommandFailure, "the link failed with an unexpected error");
 			assert.equal(error.code, "pack.link_invalid");
 		}
+
 		const pending = await invoke<string | null>("take_pack_link");
 		assert.equal(pending, null);
 		await cleanup(game);

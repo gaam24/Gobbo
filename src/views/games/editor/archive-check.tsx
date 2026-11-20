@@ -22,16 +22,19 @@ export function ArchiveCheck({ text }: { text: string }) {
 
 	const run = async () => {
 		const [picked] = await pickFiles(t("editor.archive.filter"), ARCHIVE_EXTENSIONS, false);
+
 		if (!picked) return;
 		setFile(picked);
 		setBusy(true);
 		setError(null);
+
 		try {
 			setPreview(await unwrap(commands.previewDefinition(text, picked)));
 		} catch (failure) {
 			setPreview(null);
 			setError(messageOf(failure));
 		}
+
 		setBusy(false);
 	};
 

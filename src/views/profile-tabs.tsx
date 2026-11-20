@@ -134,7 +134,9 @@ export function ProfileActions({
 
 	const deleteHint = (profile: ProfileView) => {
 		if (profiles.length <= 1) return t("profiles.delete.hintLast");
+
 		if (profile.deployed) return t("profiles.delete.hintDeployed");
+
 		if (profile.has_user_data) return t("profiles.delete.hintUserData");
 		return t("profiles.delete.hintListOnly");
 	};
@@ -256,6 +258,7 @@ function RenameDialog({
 				className="grid gap-3"
 				onSubmit={(event) => {
 					event.preventDefault();
+
 					if (!(profile && trimmed) || unchanged || clashes) return;
 					void onRename(profile.id, trimmed);
 					onClose();

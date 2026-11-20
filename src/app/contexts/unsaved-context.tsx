@@ -15,9 +15,11 @@ const UnsavedContext = createContext<Unsaved | null>(null);
 
 export function useUnsavedChanges(): Unsaved {
 	const context = useContext(UnsavedContext);
+
 	if (!context) {
 		throw new Error("useUnsavedChanges must be used inside <UnsavedProvider>.");
 	}
+
 	return context;
 }
 

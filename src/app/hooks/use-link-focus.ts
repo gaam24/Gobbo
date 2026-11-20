@@ -24,10 +24,12 @@ export function useLinkFocus(check: () => void, everyMs = CHECK_EVERY_MS) {
 				const stop = await getCurrentWindow().onFocusChanged(({ payload: focused }) => {
 					if (!focused) return;
 					const now = Date.now();
+
 					if (now - last.current < everyMs) return;
 					last.current = now;
 					latest.current();
 				});
+
 				if (state.stopped) stop();
 				else unlisten = stop;
 			} catch {

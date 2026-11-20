@@ -47,6 +47,7 @@ export function useRowActions({
 			const list = latest.current.shown;
 			const at = list.findIndex((mod) => mod.id === modId);
 			const target = list[at + delta];
+
 			if (at < 0 || !target) return;
 			void onMoveMod(modId, target.id, delta < 0 ? "above" : "below");
 		},
@@ -117,11 +118,13 @@ export function useRowActions({
 	const pick = useCallback(
 		(modId: string, event: ReactMouseEvent) => {
 			const current = latest.current;
+
 			if (event.ctrlKey || event.metaKey) {
 				onSelect(current.selection.includes(modId) ? current.selection.filter((item) => item !== modId) : [...current.selection, modId]);
 			} else if (event.shiftKey && current.focused) {
 				const from = current.shown.findIndex((mod) => mod.id === current.focused);
 				const to = current.shown.findIndex((mod) => mod.id === modId);
+
 				if (from >= 0 && to >= 0) {
 					const [lo, hi] = from < to ? [from, to] : [to, from];
 					onSelect(current.shown.slice(lo, hi + 1).map((mod) => mod.id));

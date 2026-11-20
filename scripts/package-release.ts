@@ -14,6 +14,7 @@ const release = path.join(targetDir, "release");
 const distDir = path.join(root, "dist-release");
 
 let osName: string | undefined;
+
 if (process.platform === "win32") {
 	osName = "windows";
 } else if (process.platform === "linux") {
@@ -25,9 +26,11 @@ if (osName === undefined) {
 }
 
 const config: unknown = JSON.parse(readFileSync(path.join(srcTauri, "tauri.conf.json"), "utf8"));
+
 if (typeof config !== "object" || config === null || !("version" in config) || typeof config.version !== "string") {
 	throw new Error("src-tauri/tauri.conf.json has no version.");
 }
+
 const version = config.version;
 const portableFolder = `gobbo-${version}-${osName}-${process.arch}-portable`;
 const exeName = process.platform === "win32" ? "gobbo.exe" : "gobbo";
@@ -37,9 +40,11 @@ function filesUnder(dir: string, prefix: string, entries: Zippable) {
 	for (const entry of readdirSync(dir, { recursive: true })) {
 		const rel = entry.toString();
 		const abs = path.join(dir, rel);
+
 		if (!statSync(abs).isFile()) {
 			continue;
 		}
+
 		entries[`${prefix}/${rel.split(path.sep).join("/")}`] = readFileSync(abs);
 	}
 }
@@ -48,6 +53,7 @@ function required(file: string) {
 	if (!existsSync(file)) {
 		throw new Error(`${file} is missing. Run \`bun run build\` on this OS first.`);
 	}
+
 	return file;
 }
 
@@ -60,6 +66,7 @@ addPortableFile(exeName);
 // The marker tells the app this is the portable archive, so the first-start question recommends Portable. The
 // decision file itself is deliberately not shipped: the user chooses on the first start.
 portableEntries[`${portableFolder}/gobbo.portable`] = new TextEncoder().encode("Gobbo portable\n");
+
 if (process.platform === "win32") {
 	for (const file of [
 		"gobbo_overlay_hook.dll",

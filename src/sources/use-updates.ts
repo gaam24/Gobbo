@@ -31,6 +31,7 @@ export function createCheckRegistry() {
 		},
 		finish(gameId: string) {
 			const index = games.indexOf(gameId);
+
 			if (index !== -1) games.splice(index, 1);
 		},
 		active(): string | null {
@@ -78,10 +79,12 @@ export function useModUpdates({ gameId, status, onStatus, nameOf, notify, notify
 		setFailuresByGame((prev) => {
 			const current = prev[recordGame] ?? NO_FAILURES;
 			let next = current;
+
 			for (const report of reports) {
 				if (report.error) next = { ...next, [report.id]: report };
 				else if (report.id in next) next = withoutKey(next, report.id);
 			}
+
 			if (next === current) return prev;
 			return { ...prev, [recordGame]: next };
 		});
@@ -93,6 +96,7 @@ export function useModUpdates({ gameId, status, onStatus, nameOf, notify, notify
 		const requestedGame = gameId;
 		const startedAt = generation.current;
 		const report = await unwrap(commands.checkModUpdate(requestedGame, modId));
+
 		if (activeGame.current !== requestedGame || generation.current !== startedAt) return report;
 		record(requestedGame, [report]);
 		// A successful check is saved in the library, so the status carries the new result. A failed refresh is a
@@ -104,6 +108,7 @@ export function useModUpdates({ gameId, status, onStatus, nameOf, notify, notify
 				notifyError(messageOf(failure), detailOf(failure));
 			}
 		}
+
 		return report;
 	};
 
@@ -111,6 +116,7 @@ export function useModUpdates({ gameId, status, onStatus, nameOf, notify, notify
 	const checkModFromMenu = async (modId: string) => {
 		try {
 			const report = await checkMod(modId);
+
 			if (report.error) {
 				notifyError(errorText(report.error));
 			} else if (report.state === "ignored" && report.latest) {
@@ -131,6 +137,7 @@ export function useModUpdates({ gameId, status, onStatus, nameOf, notify, notify
 	const checkUpdates = async () => {
 		if (!gameId) return;
 		const requestedGame = gameId;
+
 		if (!checks.current.start(requestedGame)) return;
 		const startedAt = generation.current;
 		setCheckingGames(checks.current.list());
@@ -139,12 +146,15 @@ export function useModUpdates({ gameId, status, onStatus, nameOf, notify, notify
 			checks.current.finish(requestedGame);
 			setCheckingGames(checks.current.list());
 		};
+
 		try {
 			const reports = await unwrap(commands.checkUpdates(requestedGame));
 			finish();
 			const switched = activeGame.current !== requestedGame || generation.current !== startedAt;
+
 			if (!switched) {
 				record(requestedGame, reports);
+
 				if (reports.some((report) => !report.error)) {
 					try {
 						onStatus(requestedGame, await unwrap(commands.getStatus(requestedGame)));
@@ -153,10 +163,12 @@ export function useModUpdates({ gameId, status, onStatus, nameOf, notify, notify
 					}
 				}
 			}
+
 			const available = reports.filter((report) => report.has_update).length;
 			const ignored = reports.filter((report) => report.state === "ignored").length;
 			const broken = reports.filter((report) => report.error).length;
 			let base = t("updates.allCurrent", { count: reports.length });
+
 			if (available > 0) base = t("updates.found", { count: available, total: reports.length });
 			else if (ignored > 0) base = t("updates.noNewVersions", { count: reports.length });
 			const ignoredText = ignored > 0 ? ` ${t("updates.ignored", { count: ignored })}` : "";
@@ -176,6 +188,7 @@ export function useModUpdates({ gameId, status, onStatus, nameOf, notify, notify
 		generation.current += 1;
 		setFailuresByGame((prev) => {
 			const current = prev[forgetGame] ?? NO_FAILURES;
+
 			if (!(modId in current)) return prev;
 			return { ...prev, [forgetGame]: withoutKey(current, modId) };
 		});

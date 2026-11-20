@@ -69,6 +69,7 @@ export function FomodWizard({
 		loadKey,
 		async () => {
 			const defaults = await readFomodState(game, target, null);
+
 			if (!initialChoices || initialChoices.length === 0) return defaults;
 			return fomodFromChoices(game, target, initialChoices);
 		},
@@ -94,8 +95,10 @@ export function FomodWizard({
 			return next;
 		});
 		const at = ++request.current;
+
 		try {
 			const next = await toggleFomodPick(game, target, answer.selection, atStep, atGroup, optionName);
+
 			if (at !== request.current) return;
 			setClicked(next);
 			setFailure(null);
@@ -106,6 +109,7 @@ export function FomodWizard({
 
 	const problemText = (problem: GroupProblem, group: string): string => {
 		if (problem === "pick_one") return t("fomod.error.exactlyOne", { group });
+
 		if (problem === "pick_at_least_one") return t("fomod.error.atLeastOne", { group });
 		return t("fomod.error.atMostOne", { group });
 	};
@@ -115,29 +119,38 @@ export function FomodWizard({
 	const check = (value: FomodState, indices: number[], focusFirst = false): boolean => {
 		const found: Record<string, string> = {};
 		let firstFailing = -1;
+
 		for (const index of indices) {
 			const item = steps[index];
+
 			if (!item) continue;
+
 			for (const [groupIndex, group] of item.groups.entries()) {
 				const problem = value.steps[index]?.groups[groupIndex]?.problem;
+
 				if (problem) {
 					found[groupKey(index, groupIndex)] = problemText(problem, group.name);
+
 					if (firstFailing < 0) firstFailing = value.visible.indexOf(index);
 				}
 			}
 		}
+
 		setErrors(found);
+
 		if (focusFirst && firstFailing >= 0) setCurrent(firstFailing);
 		return Object.keys(found).length === 0;
 	};
 
 	const next = () => {
 		if (stepIndex === undefined || !answer) return;
+
 		if (check(answer, [stepIndex])) setCurrent(position + 1);
 	};
 
 	const install = () => {
 		if (!answer) return;
+
 		if (check(answer, answer.visible, true)) onConfirm(answer.selection);
 	};
 
@@ -174,6 +187,7 @@ export function FomodWizard({
 						<ol className="grid gap-1">
 							{visible.map((index, at) => {
 								const item = steps[index];
+
 								if (!item) return null;
 								const state = stepState(at, position);
 								return (

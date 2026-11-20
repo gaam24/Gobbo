@@ -38,6 +38,7 @@ export function RequirementPlanDialog({ folder, onClose }: { folder: string; onC
 		setFailure(null);
 		const ok = await gameActions.installRequirements(folder);
 		setBusy(false);
+
 		if (ok) onClose();
 		else setFailure(t("requirements.installFailed"));
 	};

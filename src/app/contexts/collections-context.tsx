@@ -75,9 +75,11 @@ const CollectionsContext = createContext<Collections | null>(null);
 
 export function useCollections(): Collections {
 	const context = useContext(CollectionsContext);
+
 	if (!context) {
 		throw new Error("useCollections must be used inside <CollectionsProvider>.");
 	}
+
 	return context;
 }
 
@@ -146,16 +148,20 @@ export function CollectionsProvider({ children }: { children: ReactNode }) {
 	const reopen = useCallback(
 		(key: string) => {
 			const install = installsRef.current.get(key);
+
 			if (!install) return;
 			setFocusedKey(key);
 			setScreen("install");
 			const game = install.identity.gameId;
+
 			if (game !== gameId) {
 				deferOpen(key);
 				selectGame(game);
 				return;
 			}
+
 			clearDeferredOpen();
+
 			if (dialog?.kind !== "collection") openDialog({ kind: "collection" });
 		},
 		[clearDeferredOpen, deferOpen, dialog, gameId, openDialog, selectGame],
@@ -199,6 +205,7 @@ export function CollectionsProvider({ children }: { children: ReactNode }) {
 				fail(t("collection.noGame"));
 				return;
 			}
+
 			await runBusyAction(
 				async () => {
 					const result = await unwrap(commands.inspectCollection(gameId, link.trim(), revision));
@@ -248,6 +255,7 @@ export function CollectionsProvider({ children }: { children: ReactNode }) {
 					const fresh = await unwrap(commands.checkCollectionUpdates(gameId, profile));
 					applyStatus(gameId, fresh);
 					const shown = panelRef.current;
+
 					if (shown?.profile === profile) {
 						setPanelSession(await unwrap(commands.collectionStatus(gameId, profile, collectionKey(shown.origin))));
 					}
@@ -265,8 +273,10 @@ export function CollectionsProvider({ children }: { children: ReactNode }) {
 	const checkedGames = useRef<Set<string>>(new Set());
 	useEffect(() => {
 		if (!(checkCollectionsOnLaunch && gameId && status)) return;
+
 		if (checkedGames.current.has(gameId)) return;
 		const active = status.profiles.find((profile) => profile.active);
+
 		if (!active || active.collections.length === 0) return;
 		checkedGames.current.add(gameId);
 		void checkUpdates(active.id);
@@ -278,6 +288,7 @@ export function CollectionsProvider({ children }: { children: ReactNode }) {
 				fail(t("collection.noGame"));
 				return;
 			}
+
 			await runBusyAction(
 				async () => {
 					const view = await unwrap(commands.startCollection(gameId, request));
@@ -302,6 +313,7 @@ export function CollectionsProvider({ children }: { children: ReactNode }) {
 		async (current: CollectionSessionView_Serialize, chosenMode: CollectionMode) => {
 			const focusedInstall = focusedKey ? installsRef.current.get(focusedKey) : undefined;
 			const game = focusedInstall?.identity.gameId ?? gameId;
+
 			if (!game) return;
 			setDialogFailure(null);
 			const profile = current.profile;
@@ -311,6 +323,7 @@ export function CollectionsProvider({ children }: { children: ReactNode }) {
 			setFocusedKey(key);
 			setScreen("install");
 			const fresh = await fetchSession(key);
+
 			if (fresh) await run(key, chosenMode, fresh);
 		},
 		[create, fetchSession, focusedKey, gameId, run],
@@ -350,7 +363,9 @@ export function CollectionsProvider({ children }: { children: ReactNode }) {
 			await engineFinish(focusedKey);
 			return;
 		}
+
 		const current = panelSession;
+
 		if (!(gameId && current)) return;
 		await runBusyAction(
 			async () => {
@@ -366,6 +381,7 @@ export function CollectionsProvider({ children }: { children: ReactNode }) {
 	const skipItem = useCallback(
 		async (item: string, permanent: boolean) => {
 			const current = panelSession;
+
 			if (!(gameId && current)) return;
 			await runBusyAction(
 				async () => {
@@ -402,6 +418,7 @@ export function CollectionsProvider({ children }: { children: ReactNode }) {
 	const openPage = useCallback(
 		async (profile: string, origin: Pick<CollectionOrigin_Serialize, "provider" | "game_key" | "slug">) => {
 			if (!gameId) return;
+
 			try {
 				await unwrap(commands.openCollectionPage(gameId, profile, collectionKey(origin)));
 			} catch (error) {
@@ -414,6 +431,7 @@ export function CollectionsProvider({ children }: { children: ReactNode }) {
 	// A collection link from the site. The pending command covers the window that starts after the click.
 	useTauriListener(async (scope) => {
 		const pending = await commands.takeCollectionLink();
+
 		if (pending) await openPreview(pending);
 		const unlisten = await scope.listen<string>("collection-link", (event) => {
 			void openPreview(event.payload);

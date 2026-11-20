@@ -42,7 +42,9 @@ export function ConflictExplorerDialog({ gameId, onClose }: { gameId: string; on
 	const needle = deferred.trim().toLowerCase();
 	const filtered = (explorer?.entries ?? []).filter((entry) => {
 		const copyMatch = copies === "all" || (copies === "two" ? entry.copies === 2 : entry.copies > 2);
+
 		if (!copyMatch) return false;
+
 		if (needle === "") return true;
 		return (
 			entry.path.toLowerCase().includes(needle) ||
@@ -68,6 +70,7 @@ export function ConflictExplorerDialog({ gameId, onClose }: { gameId: string; on
 	};
 
 	let body: ReactNode;
+
 	if (preview) {
 		body = <ConflictPreviewPanel gameId={gameId} path={preview.path} families={preview.families} onBack={() => setPreview(null)} />;
 	} else if (!explorer) {
@@ -82,6 +85,7 @@ export function ConflictExplorerDialog({ gameId, onClose }: { gameId: string; on
 				<div className="relative" style={{ height: totalSize }}>
 					{virtualRows.map((item) => {
 						const entry = filtered[item.index];
+
 						if (!entry) return null;
 						return (
 							<div

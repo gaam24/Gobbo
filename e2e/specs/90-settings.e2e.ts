@@ -35,6 +35,7 @@ function appSettings(): Promise<AppSettings> {
 async function waitForAppSetting(check: (settings: AppSettings) => boolean): Promise<AppSettings> {
 	const deadline = Date.now() + 30_000;
 	let current = await appSettings();
+
 	while (!check(current)) {
 		if (Date.now() > deadline) throw new Error(`the app settings did not change: ${JSON.stringify(current)}`);
 		await new Promise<void>((resolve) => {
@@ -42,6 +43,7 @@ async function waitForAppSetting(check: (settings: AppSettings) => boolean): Pro
 		});
 		current = await appSettings();
 	}
+
 	return current;
 }
 
@@ -49,6 +51,7 @@ async function waitForAppSetting(check: (settings: AppSettings) => boolean): Pro
 /// fails halfway.
 async function ensureEnglish(): Promise<void> {
 	const settings = await appSettings();
+
 	if (settings.language === "en") return;
 	await invoke("save_app_settings", { settings: { ...settings, language: "en" } });
 	await reloadWindow();
@@ -81,6 +84,7 @@ describe("settings", () => {
 	it("switches the language at once and keeps it across a reload", async () => {
 		await ensureEnglish();
 		await openAppSettings();
+
 		try {
 			await chooseSelect("#app-language", "Polski");
 			await browser.waitUntil(async () => (await browser.execute(() => document.documentElement.lang)) === "pl", {

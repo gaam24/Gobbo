@@ -106,8 +106,10 @@ export function useAppSettings({
 	const refreshSourceAccount = useCallback(
 		async (provider: string, key: string | null): Promise<SourceAccount | null> => {
 			const generation = nextAccountGeneration(accountGeneration, provider);
+
 			try {
 				const account = await unwrap(commands.validateSourceKey(provider, key));
+
 				if (accountGeneration.current[provider] !== generation) return null;
 				rememberSourceAccount(provider, account);
 				await refreshProviders();
@@ -161,11 +163,13 @@ export function useAppSettings({
 			{ lostMessage, repeat }: { lostMessage: "notice.sourceLinksLost" | "notice.sourceLinksStillLost"; repeat: boolean },
 		) => {
 			setLinkStatus(report.statuses);
+
 			if (report.repaired.length > 0) notify(t("notice.sourceLinksRepaired", { names: namesOf(names, report.repaired) }));
 			const lost = lostLinkProviders(report.statuses);
 			const key = lostKey(report.statuses);
 			const changed = key !== reportedLost.current;
 			reportedLost.current = key;
+
 			if (lost.length > 0 && (repeat || changed)) notifyError(t(lostMessage, { names: namesOf(names, lost) }));
 		},
 		[notify, notifyError, t],
@@ -180,12 +184,14 @@ export function useAppSettings({
 			const [list, report] = await Promise.all([commands.sourceProviders(), unwrap(commands.ensureSourceLinks())]);
 			providersRef.current = list;
 			setProviders(list);
+
 			if (startupLinks.current) {
 				setLinkStatus(report.statuses);
 			} else {
 				startupLinks.current = true;
 				applyLinkReport(report, list, { lostMessage: "notice.sourceLinksLost", repeat: true });
 			}
+
 			const saved = await Promise.all(
 				list
 					.filter((provider) => provider.needs_key)
@@ -299,7 +305,9 @@ export function useAppSettings({
 		void attempt(async () => {
 			await update({ source_links: taken });
 			setSourceLinks(taken);
+
 			if (added.length > 0) notify(t("notice.sourceLinksOn", { names: namesOf(providers, added) }));
+
 			if (removed.length > 0) notify(t("notice.sourceLinksOff", { names: namesOf(providers, removed) }));
 			const status = await unwrap(commands.sourceLinkStatus());
 			setLinkStatus(status);

@@ -49,6 +49,7 @@ test("stored answers are copies on the way in and on the way out", () => {
 	answers.push({ step: 1, group_index: 0, group: "More", option: "Extra" });
 	expect(storedChoices(cache, "game-one", FIRST_WIZARD)).toEqual(choices("First"));
 	const restored = storedChoices(cache, "game-one", FIRST_WIZARD);
+
 	if (restored) restored.push({ step: 2, group_index: 0, group: "Last", option: "Later" });
 	expect(storedChoices(cache, "game-one", FIRST_WIZARD)).toEqual(choices("First"));
 });

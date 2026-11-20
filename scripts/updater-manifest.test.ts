@@ -8,9 +8,11 @@ import { buildManifest, type Fragment, findUpdaterArchive, merge, stage, stageAr
 /// names. `scripts/check-release-meta.ts` asserts the other copies match it.
 function releaseVersion(): string {
 	const meta: unknown = JSON.parse(readFileSync(join(import.meta.dir, "..", "release.json"), "utf8"));
+
 	if (typeof meta === "object" && meta !== null && "version" in meta && typeof meta.version === "string") {
 		return meta.version;
 	}
+
 	throw new Error("release.json has no version");
 }
 
@@ -26,9 +28,11 @@ function bundleWith(root: string, folder: string, name: string, signature: strin
 	const dir = join(root, "bundle", folder);
 	mkdirSync(dir, { recursive: true });
 	writeFileSync(join(dir, name), "archive");
+
 	if (signature !== null) {
 		writeFileSync(join(dir, `${name}.sig`), `${signature}\n`);
 	}
+
 	return join(root, "bundle");
 }
 
@@ -43,6 +47,7 @@ function fragments(): Fragment[] {
 
 test("stage copies the installer under a name without spaces and records its signature", () => {
 	const ws = workspace();
+
 	try {
 		const bundle = bundleWith(ws.root, "nsis", `Gobbo Mods Organizer_${VERSION}_x64-setup.exe`, "SIG-WIN");
 		const out = join(ws.root, "out");
@@ -61,6 +66,7 @@ test("stage copies the installer under a name without spaces and records its sig
 
 test("a missing signature or an ambiguous installer is refused, not guessed", () => {
 	const ws = workspace();
+
 	try {
 		const unsigned = bundleWith(ws.root, "appimage", `Gobbo_${VERSION}_amd64.AppImage`, null);
 		expect(() => findUpdaterArchive(unsigned, "linux-x86_64")).toThrow("was not signed");
@@ -76,6 +82,7 @@ test("a missing signature or an ambiguous installer is refused, not guessed", ()
 
 test("stageArchive records the portable archive that is already a release asset", () => {
 	const ws = workspace();
+
 	try {
 		const archive = join(ws.root, "dist-release", `gobbo-${VERSION}-linux-x64-portable.zip`);
 		mkdirSync(join(ws.root, "dist-release"), { recursive: true });
@@ -97,6 +104,7 @@ test("stageArchive records the portable archive that is already a release asset"
 
 test("a portable archive whose name has a space is refused before it reaches a URL", () => {
 	const ws = workspace();
+
 	try {
 		const archive = join(ws.root, `gobbo ${VERSION} portable.zip`);
 		writeFileSync(archive, "zip");
@@ -133,12 +141,15 @@ test("bad versions and repository names are refused before a URL is written", ()
 
 test("merge reads the staged fragments and writes latest.json", () => {
 	const ws = workspace();
+
 	try {
 		const staged = join(ws.root, "staged");
 		mkdirSync(staged, { recursive: true });
+
 		for (const fragment of fragments()) {
 			writeFileSync(join(staged, `${fragment.platform}.fragment.json`), JSON.stringify(fragment));
 		}
+
 		writeFileSync(join(staged, "notes.txt"), "ignored");
 		const outFile = join(ws.root, "dist", "latest.json");
 		merge(staged, outFile, VERSION, "gaam24/Gobbo", `Gobbo ${VERSION}`);

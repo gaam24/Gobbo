@@ -6,12 +6,14 @@ import { policyProblems } from "./check-agent-policy";
 
 function scan(files: Record<string, string>): string[] {
 	const root = mkdtempSync(join(tmpdir(), "gobbo-policy-"));
+
 	try {
 		for (const [name, text] of Object.entries(files)) {
 			const target = join(root, name);
 			mkdirSync(join(target, ".."), { recursive: true });
 			writeFileSync(target, text);
 		}
+
 		return policyProblems(root);
 	} finally {
 		rmSync(root, { recursive: true, force: true });

@@ -51,6 +51,7 @@ export function VersionSection({
 	const hasUnused = versions.some((version) => version.used_by === 0);
 
 	let body: ReactNode;
+
 	if (mod.version_count <= 1) {
 		body = <span className="font-mono text-sm tabular-nums">{mod.info.version ?? t("common.none")}</span>;
 	} else if (versions.length === 0) {

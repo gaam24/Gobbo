@@ -30,8 +30,11 @@ export const toast = {
 			action,
 			duration: timeout && timeout > 0 ? timeout : Number.POSITIVE_INFINITY,
 		};
+
 		if (type === "success") return sonner.success(title, options);
+
 		if (type === "error") return sonner.error(title, options);
+
 		if (type === "warning") return sonner.warning(title, options);
 		return sonner.info(title, options);
 	},

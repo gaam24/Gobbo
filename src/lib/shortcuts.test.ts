@@ -45,6 +45,7 @@ const EXPECTED: Record<ShortcutId, { keys: string[][]; hint: string }> = {
 
 test("every shortcut keeps its keys and its palette hint", () => {
 	expect(shortcutIds.length).toBe(Object.keys(EXPECTED).length);
+
 	for (const id of shortcutIds) {
 		expect(Object.hasOwn(EXPECTED, id), id).toBe(true);
 		const expected = EXPECTED[id];
@@ -64,8 +65,10 @@ test("named keys keep the casing KeyboardEvent uses", () => {
 
 test("no two shortcuts claim the same key in the same context", () => {
 	const claims = new Map<string, string>();
+
 	for (const id of shortcutIds) {
 		const { context } = shortcut(id);
+
 		for (const combo of shortcut(id).keys) {
 			const signature = `${context}|${[...combo.modifiers].toSorted().join("+")}+${comboEventKey(combo)}`;
 			const owner = claims.get(signature);

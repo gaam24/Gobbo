@@ -24,13 +24,17 @@ export function useGlobalShortcuts({ openPalette }: { openPalette: () => void })
 			const key = event.key.toLowerCase();
 			// A dialog owns the keyboard. The palette does not open above it: the user closes the dialog first.
 			if (latest.current.dialog) return;
+
 			if (ctrl && key === PALETTE_KEY) {
 				event.preventDefault();
 				latest.current.openPalette();
 				return;
 			}
+
 			const typing = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target?.isContentEditable;
+
 			if (typing || target?.closest("[role='dialog'], [role='alertdialog'], [role='menu']")) return;
+
 			if (HELP_KEYS.includes(event.key) || HELP_KEYS.includes(key)) latest.current.openDialog({ kind: "shortcuts" });
 			else if (ctrl && key === DETAILS_KEY) void latest.current.toggleInspector();
 			else if (ctrl && key === CONSOLE_KEY) latest.current.toggleConsole();

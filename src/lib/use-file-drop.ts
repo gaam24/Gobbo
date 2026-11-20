@@ -15,6 +15,7 @@ export function useFileDrop(onDrop: (paths: string[]) => void | Promise<void>): 
 		const { getCurrentWebview } = await loadWebview();
 		const stop = await getCurrentWebview().onDragDropEvent((event) => {
 			const { payload } = event;
+
 			if (payload.type === "drop") {
 				setDragging(false);
 				void handlerRef.current(payload.paths);

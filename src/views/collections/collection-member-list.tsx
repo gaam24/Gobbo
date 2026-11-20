@@ -66,6 +66,7 @@ export function CollectionMemberList({
 		if (item.source.kind === "provider") {
 			return item.source.provider === provider ? null : providerName(providers, item.source.provider);
 		}
+
 		const key = sourceLabelKey(item.source);
 		return key ? t(key) : null;
 	};

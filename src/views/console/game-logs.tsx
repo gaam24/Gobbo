@@ -77,6 +77,7 @@ export function GameLogs({ report }: { report: RunReport }) {
 	};
 
 	const entries: LogEntry[] = [];
+
 	if ((report.app_log ?? []).length > 0) {
 		entries.push({
 			key: "gobbo:gobbo.log",
@@ -86,6 +87,7 @@ export function GameLogs({ report }: { report: RunReport }) {
 			lines: report.app_log ?? [],
 		});
 	}
+
 	for (const log of report.game_logs ?? []) {
 		entries.push({
 			key: `game:${log.path}`,
@@ -96,6 +98,7 @@ export function GameLogs({ report }: { report: RunReport }) {
 			modifiedAt: log.modified_at,
 		});
 	}
+
 	for (const log of report.mod_logs ?? []) {
 		entries.push({
 			key: `mod:${log.path}`,
@@ -114,6 +117,7 @@ export function GameLogs({ report }: { report: RunReport }) {
 	};
 	const copy = async () => {
 		if (!selected) return;
+
 		try {
 			await navigator.clipboard.writeText(selected.lines.join("\n"));
 			setCopied(true);

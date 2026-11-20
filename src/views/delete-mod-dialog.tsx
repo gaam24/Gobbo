@@ -90,6 +90,7 @@ export function DeleteModDialog({
 	let running = usage?.running === true;
 	let ready = usage !== undefined;
 	let blocked = false;
+
 	if (page) {
 		// A page is deleted without its usage; a running game still refuses the command, and the dialog says so.
 		prepared = page.prepared;
@@ -102,6 +103,7 @@ export function DeleteModDialog({
 		ready = target !== undefined;
 		blocked = !onDeleteVersion || onlyVersion || (used && replacement === null);
 	}
+
 	const close = onClose;
 
 	// The confirm button closes the dialog itself, and that close reaches `onClose` through `onOpenChange`.
@@ -118,6 +120,7 @@ export function DeleteModDialog({
 	let title = t("mods.confirmDelete.title", { name });
 	let body = t("mods.confirmDelete.body", { name });
 	let action = t("mods.confirmDelete.action");
+
 	if (page) {
 		title = t("mods.confirmDelete.pageTitle", { name });
 		body = t("mods.confirmDelete.pageBody", { name });

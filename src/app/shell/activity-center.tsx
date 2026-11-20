@@ -46,6 +46,7 @@ export function ActivityCenter() {
 	useEffect(() => {
 		const next = taskAnnouncement(previous.current, counts, (key) => t(key));
 		previous.current = counts;
+
 		if (next) setAnnouncement(next);
 	}, [counts, t]);
 

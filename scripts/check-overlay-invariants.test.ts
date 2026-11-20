@@ -6,6 +6,7 @@ import { overlayProblems } from "./check-overlay-invariants";
 
 function scan(hook: string, app: string): string[] {
 	const root = mkdtempSync(join(tmpdir(), "gobbo-overlay-check-"));
+
 	try {
 		mkdirSync(join(root, "hook"), { recursive: true });
 		mkdirSync(join(root, "app"), { recursive: true });

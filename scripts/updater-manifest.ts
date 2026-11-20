@@ -61,6 +61,7 @@ function isInstallerPlatform(value: Platform): value is InstallerPlatform {
 
 function isFragment(value: unknown): value is Fragment {
 	if (typeof value !== "object" || value === null) return false;
+
 	if (!("platform" in value && "file" in value && "signature" in value)) return false;
 	return (
 		typeof value.platform === "string" &&
@@ -80,6 +81,7 @@ function signatureOf(archive: string): string {
 	if (!existsSync(`${archive}.sig`)) {
 		throw new Error(`${archive} has no signature file; the build was not signed (set TAURI_SIGNING_PRIVATE_KEY)`);
 	}
+
 	return readFileSync(`${archive}.sig`, "utf8").trim();
 }
 
@@ -87,9 +89,11 @@ function signatureOf(archive: string): string {
 export function findUpdaterArchive(bundleDir: string, platform: InstallerPlatform): string {
 	const suffix = INSTALLER_SUFFIX[platform];
 	const [archive, ...others] = filesUnder(bundleDir).filter((file) => file.endsWith(suffix));
+
 	if (archive === undefined || others.length > 0) {
 		throw new Error(`expected one ${suffix} archive for ${platform} under ${bundleDir}, found ${1 + others.length}`);
 	}
+
 	signatureOf(archive);
 	return archive;
 }
@@ -114,9 +118,11 @@ export function stage(bundleDir: string, outDir: string, platform: InstallerPlat
 /// so only its name and signature are recorded. A name with a space would not match the uploaded asset.
 export function stageArchive(archive: string, outDir: string, platform: PortablePlatform): Fragment {
 	const file = path.basename(archive);
+
 	if (WHITESPACE.test(file)) {
 		throw new Error(`${file} has a space in its name; GitHub would rename the asset`);
 	}
+
 	const fragment: Fragment = { platform, file, signature: signatureOf(archive) };
 	writeFragment(outDir, fragment);
 	return fragment;
@@ -127,14 +133,18 @@ export function buildManifest(fragments: Fragment[], version: string, repo: stri
 	if (!SEMVER.test(version)) {
 		throw new Error(`invalid version: ${version}`);
 	}
+
 	if (!REPO.test(repo)) {
 		throw new Error(`invalid repository: ${repo}`);
 	}
+
 	const entry = (platform: Platform): PlatformEntry => {
 		const fragment = fragments.find((item) => item.platform === platform);
+
 		if (!fragment) {
 			throw new Error(`no staged updater for ${platform}; every platform must be built before the manifest`);
 		}
+
 		return {
 			signature: fragment.signature,
 			url: `https://github.com/${repo}/releases/download/v${version}/${fragment.file}`,
@@ -156,11 +166,14 @@ export function buildManifest(fragments: Fragment[], version: string, repo: stri
 /// Reads every fragment in `inDir` and writes the manifest.
 export function merge(inDir: string, outFile: string, version: string, repo: string, notes: string): Manifest {
 	const fragments: Fragment[] = [];
+
 	for (const name of readdirSync(inDir)) {
 		if (!name.endsWith(".fragment.json")) continue;
 		const parsed: unknown = JSON.parse(readFileSync(path.join(inDir, name), "utf8"));
+
 		if (isFragment(parsed)) fragments.push(parsed);
 	}
+
 	const manifest = buildManifest(fragments, version, repo, notes, new Date());
 	mkdirSync(path.dirname(outFile), { recursive: true });
 	writeFileSync(outFile, `${JSON.stringify(manifest, null, 2)}\n`);
@@ -175,6 +188,7 @@ function fail(message: string): never {
 function main(argv: string[]) {
 	const [command, ...args] = argv;
 	const [first, second, third, fourth, fifth] = args;
+
 	try {
 		if (command === "stage" && args.length === 3 && first !== undefined && second !== undefined && third !== undefined) {
 			if (!(isPlatform(third) && isInstallerPlatform(third))) fail(`not an installer platform: ${third}`);

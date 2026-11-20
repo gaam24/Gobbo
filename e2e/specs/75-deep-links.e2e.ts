@@ -16,6 +16,7 @@ describe("desktop deep links", () => {
 		const id = uniqueId("deeplink");
 		const name = `E2E Deep Link ${id}`;
 		const { fixture } = await seedGame({ id, name, provider: "nexus" });
+
 		try {
 			await invoke("plugin:event|emit", {
 				event: "deep-link://new-url",

@@ -58,6 +58,7 @@ export function HistoryDialog({
 	};
 
 	let previewBody: ReactNode;
+
 	if (selectedEntry === null) {
 		previewBody = (
 			<Empty className="border border-dashed p-6">
@@ -76,6 +77,7 @@ export function HistoryDialog({
 	}
 
 	let body: ReactNode;
+
 	if (failure !== null && entries === undefined) {
 		body = <FieldError>{failure}</FieldError>;
 	} else if (entries === undefined) {

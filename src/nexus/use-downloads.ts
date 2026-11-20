@@ -67,11 +67,14 @@ export function useDownloads({ onStarted, onImported, onFailed }: UseDownloadsOp
 				failed: new Set(queue.filter((download) => download.state === "failed").map((download) => download.id)),
 			};
 			known = seen;
+
 			for (const download of queue) {
 				if (!seen.ids.has(download.id)) {
 					seen.ids.add(download.id);
+
 					if (download.state === "downloading") handlers.current.onStarted(download);
 				}
+
 				if (download.state === "failed" && !seen.failed.has(download.id)) {
 					seen.failed.add(download.id);
 					handlers.current.onFailed(download);
@@ -80,10 +83,12 @@ export function useDownloads({ onStarted, onImported, onFailed }: UseDownloadsOp
 		};
 		const show = (queue: Download[]) => {
 			if (!scope.active) return;
+
 			if (!initialized) {
 				buffered.push({ kind: "queue", queue });
 				return;
 			}
+
 			setDownloads(queue);
 			observe(queue);
 		};
@@ -91,21 +96,26 @@ export function useDownloads({ onStarted, onImported, onFailed }: UseDownloadsOp
 		/// the baseline queue is known, a progress event for an unknown id is a late event for a removed download.
 		const merge = (download: Download) => {
 			if (!scope.active) return;
+
 			if (!initialized) {
 				buffered.push({ kind: "progress", download });
 				return;
 			}
+
 			setDownloads((queue) => {
 				const at = queue.findIndex((entry) => entry.id === download.id);
+
 				if (at < 0) return known ? queue : [...queue, download];
 				const next = [...queue];
 				next[at] = download;
 				return next;
 			});
+
 			if (known) observe([download]);
 		};
 		const flush = () => {
 			initialized = true;
+
 			for (const event of buffered.splice(0)) {
 				if (event.kind === "queue") {
 					setDownloads(event.queue);
@@ -123,8 +133,10 @@ export function useDownloads({ onStarted, onImported, onFailed }: UseDownloadsOp
 			}),
 		]);
 		scope.add(...unlisten);
+
 		try {
 			const initial = await commands.listDownloads();
+
 			if (!scope.active) return;
 			initialized = true;
 			setDownloads(initial);

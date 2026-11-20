@@ -21,12 +21,14 @@ export function createStatusCache() {
 		},
 		merge(gameId: string, next: Status): Status | null {
 			const current = byGame.get(gameId);
+
 			if (current) {
 				if (next.build < current.build) return null;
 				const merged = applyStatus(current, next);
 				byGame.set(gameId, merged);
 				return merged;
 			}
+
 			if (next.patch) return null;
 			byGame.set(gameId, next);
 			return next;
@@ -56,6 +58,7 @@ export function useGameState(
 	/// State belongs to one game, so a switch keeps the previous slot in the cache and seeds this one from it. The
 	/// backend refresh below still runs, so a stale cache never becomes the source of truth.
 	const [prevGameId, setPrevGameId] = useState(id);
+
 	if (id !== prevGameId) {
 		setPrevGameId(id);
 		setStatus(id ? (statusOf?.(id) ?? null) : null);

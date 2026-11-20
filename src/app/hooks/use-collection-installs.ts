@@ -148,8 +148,10 @@ export function useCollectionInstalls({ onOpen }: UseCollectionInstallsOptions):
 					removeTask(taskId(key));
 					registered.current.delete(key);
 				}
+
 				return;
 			}
+
 			const counts = install.session?.counts;
 			const done = counts ? counts.installed + counts.manual : 0;
 			const total = counts ? counts.total - counts.skipped - counts.unsupported : 0;
@@ -159,7 +161,9 @@ export function useCollectionInstalls({ onOpen }: UseCollectionInstallsOptions):
 			// A hand-picked file the download will supply is a passive wait, not a choice the user has to make.
 			const waitingOnly = install.prompts.waiting !== null && install.prompts.choice === null && install.prompts.manual === null;
 			let title = t("tasks.collectionInstalling", { name: install.identity.name });
+
 			if (hasPrompt) title = t("tasks.collectionWaiting");
+
 			if (waitingOnly) title = t("tasks.waitingForYou");
 			const task: RegisteredTask = {
 				id: taskId(key),
@@ -180,6 +184,7 @@ export function useCollectionInstalls({ onOpen }: UseCollectionInstallsOptions):
 					},
 				},
 			};
+
 			if (registered.current.has(key)) updateTask(taskId(key), task);
 			else {
 				registerTask(task);
@@ -193,11 +198,14 @@ export function useCollectionInstalls({ onOpen }: UseCollectionInstallsOptions):
 	const patchImpl = useCallback(
 		(key: string, fn: (current: CollectionInstallState) => CollectionInstallState) => {
 			const current = installsRef.current.get(key);
+
 			if (!current) return;
 			let next = fn(current);
+
 			if (!next.stopped && next.session?.counts.pending === 0) {
 				next = { ...next, stopped: true, busy: false };
 			}
+
 			write(key, next);
 			syncTask(key, next);
 		},
@@ -229,11 +237,13 @@ export function useCollectionInstalls({ onOpen }: UseCollectionInstallsOptions):
 	const stop = useCallback(
 		(key: string) => {
 			const install = installsRef.current.get(key);
+
 			if (!install || install.stopped) return;
 			const { identity, prompts } = install;
 			patch(key, (current) => ({ ...current, stopped: true, busy: false }));
 			void commands.collectionStop(identity.gameId, identity.profile, identity.collection);
 			const owner = prompts.waiting?.owner;
+
 			if (owner !== undefined) void commands.forgetCollectionDownload(owner);
 		},
 		[patch],
@@ -244,7 +254,9 @@ export function useCollectionInstalls({ onOpen }: UseCollectionInstallsOptions):
 
 	const fetchSession = useCallback(async (key: string): Promise<CollectionSessionView_Serialize | null> => {
 		const install = installsRef.current.get(key);
+
 		if (!install?.session) return install?.session ?? null;
+
 		try {
 			return await unwrap(commands.collectionStatus(install.identity.gameId, install.session.profile, install.identity.collection));
 		} catch {
@@ -282,6 +294,7 @@ export function useCollectionInstalls({ onOpen }: UseCollectionInstallsOptions):
 			const choice = round.install.needs_choice[0];
 			const manualKey = round.install.needs_user[0];
 			const manualItem = manualKey ? round.install.session.plan.items.find((item) => item.key === manualKey) : undefined;
+
 			for (const warning of round.install.warnings) notify(translate(warning));
 			patch(key, (state) => ({
 				...state,
@@ -324,6 +337,7 @@ export function useCollectionInstalls({ onOpen }: UseCollectionInstallsOptions):
 	const drive = useCallback(
 		async (key: string, invoke: (channel: Channel<CollectionProgress>) => Promise<CommandResult<CollectionRoundView_Serialize>>) => {
 			const install = installsRef.current.get(key);
+
 			if (!install || install.stopped) return;
 			const game = install.identity.gameId;
 			patch(key, (state) => ({ ...state, busy: true, failure: null }));
@@ -332,11 +346,13 @@ export function useCollectionInstalls({ onOpen }: UseCollectionInstallsOptions):
 			// oxlint-disable-next-line unicorn/prefer-add-event-listener
 			channel.onmessage = (step) => {
 				const live = installsRef.current.get(key);
+
 				if (!live) return;
 				const next = new Map(live.progress);
 				next.set(step.key, step);
 				write(key, { ...live, progress: next });
 			};
+
 			try {
 				const round = await unwrap(invoke(channel));
 				applyRound(key, round);
@@ -344,6 +360,7 @@ export function useCollectionInstalls({ onOpen }: UseCollectionInstallsOptions):
 			} catch (error) {
 				fail(key, error);
 			}
+
 			patch(key, (state) => ({ ...state, busy: false }));
 		},
 		[applyRound, fail, patch, reload, write],
@@ -352,6 +369,7 @@ export function useCollectionInstalls({ onOpen }: UseCollectionInstallsOptions):
 	const resolve = useCallback(
 		async (key: string, item: string, decision: CollectionDecision_Deserialize) => {
 			const install = installsRef.current.get(key);
+
 			if (!install) return;
 			await drive(key, (channel) =>
 				commands.collectionResolvePrompt(
@@ -370,11 +388,14 @@ export function useCollectionInstalls({ onOpen }: UseCollectionInstallsOptions):
 	const run = useCallback(
 		async (key: string, _mode: CollectionMode, session: CollectionSessionView_Serialize) => {
 			const install = installsRef.current.get(key);
+
 			if (!install || install.stopped) return;
+
 			if (session.counts.pending === 0) {
 				patch(key, (state) => ({ ...state, session, busy: false }));
 				return;
 			}
+
 			await drive(key, (channel) =>
 				commands.collectionRunRound(install.identity.gameId, install.identity.profile, install.identity.collection, channel),
 			);
@@ -385,6 +406,7 @@ export function useCollectionInstalls({ onOpen }: UseCollectionInstallsOptions):
 	const guide = useCallback(
 		async (key: string) => {
 			const fresh = await fetchSession(key);
+
 			if (fresh) await run(key, "guided", fresh);
 		},
 		[fetchSession, run],
@@ -393,6 +415,7 @@ export function useCollectionInstalls({ onOpen }: UseCollectionInstallsOptions):
 	const chooseFomod = useCallback(
 		async (key: string, choices: FomodChoice[]) => {
 			const choice = installsRef.current.get(key)?.prompts.choice;
+
 			if (!choice) return;
 			await resolve(key, choice.key, { kind: "choice", path: choice.path, choices });
 		},
@@ -403,7 +426,9 @@ export function useCollectionInstalls({ onOpen }: UseCollectionInstallsOptions):
 		async (key: string, path: string) => {
 			const install = installsRef.current.get(key);
 			const manual = install?.prompts.manual;
+
 			if (!(install && manual)) return;
+
 			try {
 				await resolve(key, manual.item, { kind: "file", path });
 			} catch (error) {
@@ -415,10 +440,12 @@ export function useCollectionInstalls({ onOpen }: UseCollectionInstallsOptions):
 				// wizard can render, without restarting the round here.
 				try {
 					const inspect = await unwrap(commands.inspectZip(install.identity.gameId, path));
+
 					if (inspect.kind !== "fomod") {
 						fail(key, error);
 						return;
 					}
+
 					patch(key, (state) => ({
 						...state,
 						prompts: {
@@ -445,6 +472,7 @@ export function useCollectionInstalls({ onOpen }: UseCollectionInstallsOptions):
 	const markDone = useCallback(
 		async (key: string) => {
 			const manual = installsRef.current.get(key)?.prompts.manual;
+
 			if (!manual) return;
 			await resolve(key, manual.item, { kind: "mark_done" });
 		},
@@ -454,16 +482,21 @@ export function useCollectionInstalls({ onOpen }: UseCollectionInstallsOptions):
 	const skip = useCallback(
 		async (key: string, permanent: boolean) => {
 			const install = installsRef.current.get(key);
+
 			if (!install) return;
 			const item = install.prompts.waiting?.item ?? install.prompts.choice?.key ?? install.prompts.manual?.item ?? install.session?.next;
+
 			if (!item) return;
 			const owner = install.prompts.waiting?.owner;
+
 			if (owner !== undefined) {
 				void commands.forgetCollectionDownload(owner);
+
 				for (const download of downloadsRef.current) {
 					if (download.owner === owner) void commands.removeDownload(download.id);
 				}
 			}
+
 			await resolve(key, item, { kind: "skip", permanent });
 		},
 		[resolve],
@@ -472,9 +505,11 @@ export function useCollectionInstalls({ onOpen }: UseCollectionInstallsOptions):
 	const finish = useCallback(
 		async (key: string) => {
 			const install = installsRef.current.get(key);
+
 			if (!install?.session) return;
 			const game = install.identity.gameId;
 			patch(key, (state) => ({ ...state, busy: true }));
+
 			try {
 				const view = await unwrap(commands.finishCollection(game, install.session.profile, install.identity.collection));
 				patch(key, (state) => ({ ...state, session: view }));
@@ -482,6 +517,7 @@ export function useCollectionInstalls({ onOpen }: UseCollectionInstallsOptions):
 			} catch (error) {
 				fail(key, error);
 			}
+
 			patch(key, (state) => ({ ...state, busy: false }));
 		},
 		[fail, patch, reload],
@@ -490,12 +526,15 @@ export function useCollectionInstalls({ onOpen }: UseCollectionInstallsOptions):
 	// A new status answer means the library or a profile changed. Re-read every running session with its own game id.
 	useEffect(() => {
 		if (!status) return;
+
 		for (const [key, install] of installsRef.current) {
 			if (install.stopped || !install.session) continue;
 			void (async () => {
 				const current = installsRef.current.get(key);
+
 				if (!current?.session) return;
 				const fresh = await fetchSession(key);
+
 				if (fresh && installsRef.current.get(key)?.session === current.session) {
 					patch(key, (state) => ({ ...state, session: fresh }));
 				}
@@ -535,9 +574,11 @@ export function useCollectionInstalls({ onOpen }: UseCollectionInstallsOptions):
 	useEffect(() => {
 		for (const [key, install] of installsRef.current) {
 			const item = install.prompts.waiting?.item ?? install.prompts.manual?.item;
+
 			if (install.stopped || !item || install.importing || !install.session) continue;
 			const owner = install.prompts.waiting?.owner ?? `collection:${install.identity.profile}:${item}`;
 			const download = downloads.find((entry) => entry.state === "ready" && entry.path && !entry.error && entry.owner === owner);
+
 			if (!download?.path) continue;
 			write(key, { ...install, importing: true });
 			void (async () => {

@@ -24,10 +24,13 @@ export function UpdateLine({
 	onUnignore?: () => void;
 }) {
 	const { t } = useTranslation();
+
 	if (!update) return null;
+
 	if (update.error) {
 		return <p className="text-destructive text-sm">{errorText(update.error)}</p>;
 	}
+
 	if (update.state === "ignored") {
 		return (
 			<div className="grid gap-1">
@@ -41,6 +44,7 @@ export function UpdateLine({
 			</div>
 		);
 	}
+
 	if (update.has_update) {
 		if (!update.latest) return <p className="text-muted-foreground text-sm">{t("mods.version.upToDate")}</p>;
 		const installed = update.latest_installed;
@@ -55,6 +59,7 @@ export function UpdateLine({
 			</>
 		);
 		let line: ReactNode;
+
 		if (onOpen && !installed) {
 			line = (
 				<Button
@@ -81,6 +86,7 @@ export function UpdateLine({
 		} else {
 			line = <p className="text-update flex items-center gap-1.5 text-sm font-medium">{content}</p>;
 		}
+
 		return (
 			<div className="grid gap-1">
 				{line}
@@ -90,6 +96,7 @@ export function UpdateLine({
 			</div>
 		);
 	}
+
 	if (update.state === "current") return <p className="text-muted-foreground text-sm">{t("mods.version.upToDate")}</p>;
 	return <p className="text-muted-foreground text-sm">{t("mods.version.notChecked")}</p>;
 }

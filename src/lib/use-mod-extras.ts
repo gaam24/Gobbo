@@ -8,6 +8,7 @@ import { unwrap } from "@/lib/ipc";
 export function trimCache<T>(cache: Map<string, T>, wanted: ReadonlySet<string>, limit = 256): void {
 	for (const folder of cache.keys()) {
 		if (cache.size <= limit) break;
+
 		if (!wanted.has(folder)) cache.delete(folder);
 	}
 }
@@ -35,6 +36,7 @@ export function useModExtras(gameId: string, token: unknown, folders: readonly s
 		// the whole list after someone scrolls through it once with a text column open.
 		trimCache(cache.current, new Set(folders));
 		const missing = missingFolders(cache.current, folders);
+
 		if (missing.length === 0) return;
 		let active = true;
 		void (async () => {
@@ -43,6 +45,7 @@ export function useModExtras(gameId: string, token: unknown, folders: readonly s
 				// The game changed, or a newer list replaced this one while the answer was in flight.
 				// oxlint-disable-next-line typescript/no-unnecessary-condition -- the cleanup flips `active`.
 				if (!active) return;
+
 				for (const extra of extras) cache.current.set(extra.folder, extra);
 				setLoaded(new Map(cache.current));
 			} catch {

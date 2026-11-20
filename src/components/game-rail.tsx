@@ -60,6 +60,7 @@ export function GameRail({
 }) {
 	const { t } = useTranslation();
 	let badgeTone = "bg-primary";
+
 	if (downloads.failed > 0) badgeTone = "bg-destructive";
 	else if (downloads.running > 0) badgeTone = "bg-foreground";
 	const unread = unreadSummary(notices);

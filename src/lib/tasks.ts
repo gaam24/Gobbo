@@ -44,15 +44,23 @@ export interface Task {
 /// [`TaskDedupe::Other`], which is how a row restored from an older journal is grouped.
 export function dedupeKey(dedupe: TaskDedupe, id = "", backend = false, backendKind?: string): string {
 	if (dedupe === "Other") return keyFromId(id, backend, backendKind);
+
 	if ("Apply" in dedupe && dedupe.Apply) return `apply:${dedupe.Apply.game}`;
+
 	if ("Import" in dedupe && dedupe.Import) return `import:${dedupe.Import.game}:${dedupe.Import.path}`;
+
 	if ("Update" in dedupe && dedupe.Update) return `update:${dedupe.Update.game}`;
+
 	if ("UpdateAll" in dedupe && dedupe.UpdateAll) return `update-all:${dedupe.UpdateAll.game}`;
+
 	if ("Requirement" in dedupe && dedupe.Requirement) return `requirement:${dedupe.Requirement.game}`;
+
 	if ("Collection" in dedupe && dedupe.Collection) {
 		return `collection:${dedupe.Collection.game}:${dedupe.Collection.profile}:${dedupe.Collection.collection}`;
 	}
+
 	if ("Pack" in dedupe && dedupe.Pack) return `pack:${dedupe.Pack.game}:${dedupe.Pack.path}`;
+
 	if ("PackLink" in dedupe) return `pack-link:${dedupe.PackLink.game}:${dedupe.PackLink.link}`;
 	return id;
 }
@@ -61,12 +69,14 @@ export function dedupeKey(dedupe: TaskDedupe, id = "", backend = false, backendK
 /// value means the row must fall back to its id, so a new backend field can never break an older feature row.
 export function taskDedupeOf(value: unknown): TaskDedupe | undefined {
 	if (value === undefined) return undefined;
+
 	if (isTaskDedupe(value)) return value;
 	return undefined;
 }
 
 function isTaskDedupe(value: unknown): value is TaskDedupe {
 	if (value === "Other") return true;
+
 	if (typeof value !== "object" || value === null) return false;
 	const variants = ["Apply", "Import", "Update", "UpdateAll", "Requirement", "Collection", "Pack", "PackLink"];
 	return variants.some((variant) => variant in value);
@@ -87,10 +97,13 @@ function keyFromId(id: string, backend: boolean, backendKind?: string): string {
 	// A local row names only the workflows that register it; every other id is already its own identity.
 	if (!backend) {
 		if (prefix === "collection") return withDetail("collection");
+
 		if (prefix === "pack-import" || prefix === "pack-download") return withDetail("pack");
+
 		if (prefix === "pack-link") return withDetail("pack-link");
 		return id;
 	}
+
 	switch (prefix) {
 		case "apply":
 			return `apply:${game}`;
@@ -138,6 +151,7 @@ export interface TaskCounts {
 /// the live region can key off them instead of announcing every update.
 export function taskCounts(tasks: readonly Task[]): TaskCounts {
 	const counts: TaskCounts = { running: 0, waiting: 0, failed: 0 };
+
 	for (const task of tasks) counts[task.state] += 1;
 	return counts;
 }
@@ -160,6 +174,7 @@ export interface TaskGroup {
 /// Code-point order, not `localeCompare`: the card must sort the same way on every machine and in every locale.
 function compareText(a: string, b: string): -1 | 0 | 1 {
 	if (a < b) return -1;
+
 	if (a > b) return 1;
 	return 0;
 }
@@ -170,6 +185,7 @@ function compareTasks(a: Task, b: Task): -1 | 0 | 1 {
 
 function compareGames(a: TaskGameGroup, b: TaskGameGroup): -1 | 0 | 1 {
 	if (a.game === null) return b.game === null ? 0 : -1;
+
 	if (b.game === null) return 1;
 	return compareText(a.gameName ?? "", b.gameName ?? "") || compareText(a.game, b.game);
 }
@@ -179,24 +195,31 @@ function compareGames(a: TaskGameGroup, b: TaskGameGroup): -1 | 0 | 1 {
 /// explicit and deterministic instead of relying on when a task happened to be registered.
 export function groupedTasks(tasks: readonly Task[]): TaskGroup[] {
 	const byState = new Map<TaskState, Map<string | null, Task[]>>();
+
 	for (const task of tasks) {
 		let byGame = byState.get(task.state);
+
 		if (!byGame) {
 			byGame = new Map<string | null, Task[]>();
 			byState.set(task.state, byGame);
 		}
+
 		const game = task.game ?? null;
 		const rows = byGame.get(game);
+
 		if (rows) rows.push(task);
 		else byGame.set(game, [task]);
 	}
 
 	const groups: TaskGroup[] = [];
+
 	for (const state of TASK_STATE_ORDER) {
 		const byGame = byState.get(state);
+
 		if (!byGame) continue;
 		const games: TaskGameGroup[] = [];
 		let count = 0;
+
 		for (const [game, rows] of byGame) {
 			const sorted = rows.toSorted(compareTasks);
 			count += sorted.length;
@@ -207,8 +230,10 @@ export function groupedTasks(tasks: readonly Task[]): TaskGroup[] {
 				tasks: sorted,
 			});
 		}
+
 		groups.push({ state, count, games: games.toSorted(compareGames) });
 	}
+
 	return groups;
 }
 
@@ -217,7 +242,9 @@ export function groupedTasks(tasks: readonly Task[]): TaskGroup[] {
 /// the two announcements do not say the same thing twice.
 export function taskAnnouncement(previous: TaskCounts, current: TaskCounts, label: (key: TaskGroupLabelKey) => string): string {
 	if (current.waiting !== previous.waiting) return `${label(TASK_GROUP_LABEL.waiting)}: ${current.waiting}`;
+
 	if (current.failed !== previous.failed) return `${label(TASK_GROUP_LABEL.failed)}: ${current.failed}`;
+
 	if (current.running !== previous.running) return `${label(TASK_GROUP_LABEL.running)}: ${current.running}`;
 	return "";
 }

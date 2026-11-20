@@ -34,6 +34,7 @@ const SettingsDataContext = createContext<SettingsData | null>(null);
 
 export function useSettingsData(): SettingsData {
 	const context = useContext(SettingsDataContext);
+
 	if (!context) {
 		throw new Error("useSettingsData must be used inside <SettingsProvider>.");
 	}
@@ -66,6 +67,7 @@ const SettingsActionsContext = createContext<SettingsActions | null>(null);
 
 export function useSettingsActions(): SettingsActions {
 	const context = useContext(SettingsActionsContext);
+
 	if (!context) {
 		throw new Error("useSettingsActions must be used inside <SettingsProvider>.");
 	}

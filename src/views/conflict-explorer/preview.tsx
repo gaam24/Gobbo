@@ -27,6 +27,7 @@ export function ConflictPreviewPanel({
 	const [family, setFamily] = useState(families[0]?.id ?? "");
 	const preview = useLoad(`conflict-preview:${gameId}:${path}:${family}`, () => unwrap(commands.conflictFilePreview(gameId, path, family)));
 	let previewBody: ReactNode;
+
 	if (!preview) {
 		previewBody = <p className="text-muted-foreground text-sm">{t("conflicts.loading")}</p>;
 	} else if (preview.data_url) {

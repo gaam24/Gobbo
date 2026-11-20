@@ -10,6 +10,7 @@ import { FomodWizard } from "@/views/fomod/fomod-wizard";
 export function CollectionDialog({ onClose }: { onClose: () => void }) {
 	const collections = useCollections();
 	const close = () => onClose();
+
 	if (collections.choice) {
 		const choice = collections.choice;
 		return (
@@ -24,6 +25,7 @@ export function CollectionDialog({ onClose }: { onClose: () => void }) {
 			/>
 		);
 	}
+
 	switch (collections.screen) {
 		case "preview":
 			return collections.preview ? <CollectionPreviewView preview={collections.preview} onClose={close} /> : null;

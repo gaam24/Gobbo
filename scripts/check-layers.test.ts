@@ -16,6 +16,7 @@ test("a lower layer cannot use a higher layer or a feature module", () => {
 
 test("the scanner names the file and the forbidden module", () => {
 	const root = mkdtempSync(join(tmpdir(), "gobbo-layer-"));
+
 	try {
 		mkdirSync(join(root, "domain"));
 		writeFileSync(join(root, "domain", "bad.rs"), "use crate::context::Data;\n");

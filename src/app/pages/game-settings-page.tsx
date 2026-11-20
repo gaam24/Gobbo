@@ -21,6 +21,7 @@ export function GameSettingsPage() {
 	const exportDefinition = async () => {
 		if (!game) return;
 		const path = await pickSaveFile(`${game.id}.zip`, t("settings.game.exportFilter"), "zip");
+
 		if (!path) return;
 		await attempt(async () => {
 			await unwrap(commands.exportDefinition(game.id, path));
@@ -29,6 +30,7 @@ export function GameSettingsPage() {
 	};
 
 	if (!gameId) return null;
+
 	if (!status) {
 		return statusError ? <StatusError error={statusError} onRetry={retryStatus} /> : null;
 	}

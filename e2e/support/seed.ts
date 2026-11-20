@@ -80,6 +80,7 @@ export async function importMods(
 	source: { provider: string; mod_id: string; part_id?: string | null } | null = null,
 ): Promise<ImportView[]> {
 	const imported: ImportView[] = [];
+
 	for (const archive of paths) {
 		const { value } = await invokeWithChannel<ImportView>("import_zip", {
 			game,
@@ -89,6 +90,7 @@ export async function importMods(
 		});
 		imported.push(value);
 	}
+
 	await syncProfiles(game);
 	return imported;
 }
@@ -123,6 +125,7 @@ export function switchProfile(game: string, id: string): Promise<Status> {
 export async function waitForStage(game: string, stage: string, timeout = 30_000): Promise<Status> {
 	const deadline = Date.now() + timeout;
 	let current = await statusOf(game);
+
 	while (current.stage.kind !== stage) {
 		if (Date.now() > deadline) throw new Error(`the game did not reach ${stage}; it is ${current.stage.kind}`);
 		await new Promise<void>((resolve) => {
@@ -130,6 +133,7 @@ export async function waitForStage(game: string, stage: string, timeout = 30_000
 		});
 		current = await statusOf(game);
 	}
+
 	return current;
 }
 
@@ -138,6 +142,7 @@ export async function waitForStage(game: string, stage: string, timeout = 30_000
 export async function waitForStatus(game: string, predicate: (status: Status) => boolean, timeout = 30_000): Promise<Status> {
 	const deadline = Date.now() + timeout;
 	let current = await statusOf(game);
+
 	while (!predicate(current)) {
 		if (Date.now() > deadline) throw new Error(`the status of ${game} did not reach the expected state`);
 		await new Promise<void>((resolve) => {
@@ -145,6 +150,7 @@ export async function waitForStatus(game: string, predicate: (status: Status) =>
 		});
 		current = await statusOf(game);
 	}
+
 	return current;
 }
 
@@ -156,21 +162,25 @@ export async function cleanupGame(game: string): Promise<void> {
 	} catch {
 		// A game that is not running is the normal case.
 	}
+
 	try {
 		await invoke("undo", { game });
 	} catch {
 		// Nothing to undo is the normal case.
 	}
+
 	try {
 		await invoke<ManagedGame[]>("remove_game", { game });
 	} catch {
 		// A game that is still deployed refuses removal; the next cleanup of the same id will try again.
 	}
+
 	try {
 		await invoke("delete_removed_game", { game });
 	} catch {
 		// A game that was not removed has no removed folder.
 	}
+
 	removeTree(path.join(definitionsDir, game));
 	removeTree(path.join(rootsDir, game));
 	removeTree(path.join(dataDir, "e2e-user", game));

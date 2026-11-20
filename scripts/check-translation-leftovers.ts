@@ -18,15 +18,18 @@ const LOCALE_FILE = /locales\/(en|pl)\.ts$/;
 function flatten(tree: Messages, prefix = "", into = new Map<string, string>()): Map<string, string> {
 	for (const [key, value] of Object.entries(tree)) {
 		const path = prefix + key;
+
 		if (typeof value === "string") into.set(path, value);
 		else flatten(value, `${path}.`, into);
 	}
+
 	return into;
 }
 
 function sources(dir: string, extension: RegExp): string[] {
 	return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
 		const path = join(dir, entry.name);
+
 		if (entry.isDirectory()) return sources(path, extension);
 		return extension.test(entry.name) ? [path] : [];
 	});
@@ -45,6 +48,7 @@ const backendCodes = new Set([...backend.matchAll(/"([a-z][a-zA-Z0-9_]*\.[a-zA-Z
 
 // Prefixes of typed template-literal keys, such as t(`mods.col.${id}`).
 const prefixes = new Set<string>();
+
 for (const match of corpus.matchAll(/`([a-zA-Z0-9_.]+\$\{)/g)) {
 	const prefix = match[1]?.replace(/\$\{$/, "");
 	if (prefix) prefixes.add(prefix);

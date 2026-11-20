@@ -43,6 +43,7 @@ export function SnapshotDialog({ gameId, onClose }: { gameId: string; onClose: (
 		setBusy(key);
 		setFailure(null);
 		setNotice(null);
+
 		try {
 			setNotice(await action());
 			setVersion((count) => count + 1);
@@ -92,6 +93,7 @@ export function SnapshotDialog({ gameId, onClose }: { gameId: string; onClose: (
 	const canRestore = pending !== null && !pending.preview.running && pending.preview.enough_space && busy === null;
 
 	let listBody: ReactNode;
+
 	if (!snapshots) {
 		listBody = <p className="text-muted-foreground text-sm">{t("snapshots.loading")}</p>;
 	} else if (snapshots.length === 0) {

@@ -35,6 +35,7 @@ export function UpdatesSection() {
 			} catch {
 				setVersion(null);
 			}
+
 			try {
 				setChannel(await unwrap(commands.updateChannel()));
 			} catch {
@@ -48,6 +49,7 @@ export function UpdatesSection() {
 		setState({ kind: "installing", applying: false });
 		let downloaded = 0;
 		let total = 0;
+
 		try {
 			await update.downloadAndInstall((event) => {
 				switch (event.event) {
@@ -85,6 +87,7 @@ export function UpdatesSection() {
 				setState({ kind: "installing", applying: true });
 			}
 		});
+
 		try {
 			await unwrap(commands.portableUpdateInstall(progress));
 		} catch (failure) {
@@ -94,12 +97,14 @@ export function UpdatesSection() {
 
 	const checkNow = async () => {
 		setState({ kind: "checking" });
+
 		try {
 			if (channel === "portable") {
 				const found = await unwrap(commands.portableUpdateCheck());
 				setState(found ? { kind: "available", version: found.version, install: () => void installPortable() } : { kind: "current" });
 				return;
 			}
+
 			const update = await check();
 			setState(update ? { kind: "available", version: update.version, install: () => void installUpdate(update) } : { kind: "current" });
 		} catch (failure) {

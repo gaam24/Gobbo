@@ -96,12 +96,14 @@ export function AppDialogs() {
 		(owner: string, changes: UpdateChange[], failures: string[]) => {
 			// A run can finish in the background while another dialog is on top; only close our own dialog.
 			closeDialogIfManual();
+
 			if (changes.length > 0) {
 				notify(t("notice.modsUpdated", { count: changes.length }), {
 					label: t("notice.undo"),
 					onClick: () => gameActions.undoUpdates(owner, changes),
 				});
 			}
+
 			if (failures.length > 0) notifyError(failures.join("\n"));
 		},
 		[closeDialogIfManual, gameActions, notify, notifyError, t],
@@ -254,6 +256,7 @@ export function AppDialogs() {
 								} catch {
 									// The action reports its own failure; the task only stops showing work.
 								}
+
 								removeTask(id);
 							})();
 						}}

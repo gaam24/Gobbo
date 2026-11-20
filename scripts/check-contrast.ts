@@ -12,6 +12,7 @@ const declarations = new Map<string, string>();
 for (const match of css.matchAll(/--([a-z0-9-]+)\s*:\s*([^;]+);/gi)) {
 	const name = match[1];
 	const value = match[2];
+
 	if (name && value) declarations.set(name, value.trim());
 }
 
@@ -19,8 +20,10 @@ function resolve(name: string, seen = new Set<string>()): string {
 	if (seen.has(name)) throw new Error(`cyclic token --${name}`);
 	seen.add(name);
 	const value = declarations.get(name);
+
 	if (!value) throw new Error(`missing token --${name}`);
 	const variable = value.match(VAR_PATTERN);
+
 	if (variable?.[1]) return resolve(variable[1], seen);
 	return value;
 }
@@ -37,6 +40,7 @@ function linearToSrgb(channel: number): number {
 
 function hexToRgb(hex: string): RGB {
 	const match = hex.match(HEX_PATTERN);
+
 	if (!match?.[1]) throw new Error(`not a hex colour: ${hex}`);
 	const value =
 		match[1].length === 3
@@ -55,18 +59,22 @@ function hexToRgb(hex: string): RGB {
 function rgbStringToRgb(value: string): RGB {
 	const match = value.match(RGB_PATTERN);
 	const [, r, g, b] = match ?? [];
+
 	if (r === undefined || g === undefined || b === undefined) {
 		throw new Error(`not an rgb() colour: ${value}`);
 	}
+
 	return [Number(r) / 255, Number(g) / 255, Number(b) / 255];
 }
 
 function oklchToSrgb(value: string): RGB {
 	const match = value.match(OKLCH_PATTERN);
 	const [, lightness, chroma, hue] = match ?? [];
+
 	if (lightness === undefined || chroma === undefined || hue === undefined) {
 		throw new Error(`not an oklch colour: ${value}`);
 	}
+
 	const L = Number.parseFloat(lightness);
 	const C = Number.parseFloat(chroma);
 	const H = (Number.parseFloat(hue) * Math.PI) / 180;
@@ -92,6 +100,7 @@ function oklchToSrgb(value: string): RGB {
 
 function parseColor(value: string): RGB {
 	if (HEX_PATTERN.test(value)) return hexToRgb(value);
+
 	if (RGB_PATTERN.test(value)) return rgbStringToRgb(value);
 	return oklchToSrgb(value);
 }
@@ -228,12 +237,15 @@ const checks: Array<{ label: string; foreground: string; background: string; min
 ];
 
 let failed = 0;
+
 for (const check of checks) {
 	const foreground = toColor(check.foreground);
 	const background = toColor(check.background);
 	const ratio = contrastRgb(foreground, background);
 	const passed = ratio >= check.minimum;
+
 	if (!passed) failed += 1;
+
 	if (!passed) console.error(`FAIL ${check.label}: ${ratio.toFixed(2)}:1 (minimum ${check.minimum}:1)`);
 }
 

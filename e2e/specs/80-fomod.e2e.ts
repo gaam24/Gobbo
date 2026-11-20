@@ -56,15 +56,18 @@ async function extrasOf(prepared: FomodGame, folder: string): Promise<ModExtras 
 async function waitForInstalledOption(prepared: FomodGame, folder: string, option: string): Promise<ModExtras> {
 	const deadline = Date.now() + 30_000;
 	let extras = await extrasOf(prepared, folder);
+
 	while (extras?.fomod[0]?.option !== option) {
 		if (Date.now() > deadline) {
 			throw new Error(`the installer answer did not become ${option}: ${JSON.stringify(extras?.fomod)}`);
 		}
+
 		await new Promise<void>((resolve) => {
 			setTimeout(resolve, 100);
 		});
 		extras = await extrasOf(prepared, folder);
 	}
+
 	return extras;
 }
 
@@ -139,6 +142,7 @@ describe("fomod installer", () => {
 	});
 	it("refuses a choice that the installer does not define", async () => {
 		const prepared = await start("fomod-bad-choice");
+
 		try {
 			await invokeWithChannel("import_zip", {
 				game: prepared.id,
@@ -151,6 +155,7 @@ describe("fomod installer", () => {
 			assert.ok(error instanceof CommandFailure, "the import failed with an unexpected error");
 			assert.equal(error.code, "fomod.unknown_option");
 		}
+
 		assert.equal((await statusOf(prepared.id)).mods.length, 0);
 		await cleanup(prepared);
 	});

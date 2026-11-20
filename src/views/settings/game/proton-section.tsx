@@ -39,6 +39,7 @@ export function ProtonSection({
 }) {
 	const { t } = useTranslation();
 	const platform = usePlatform();
+
 	if (platform !== "linux") return null;
 	const chosen = status.settings.proton_options ?? [];
 	// The backend can offer an id this build does not label; hide its group when nothing is left to show.

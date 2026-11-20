@@ -37,6 +37,7 @@ export function GameEditor({ id, onClose }: { id: string | null; onClose: () => 
 	}
 
 	let footerStatus: string | null = null;
+
 	if (editor.dirty) footerStatus = t("editor.unsaved");
 	else if (editor.check?.ok) footerStatus = t("editor.ready");
 	const titleName = editor.draft.name.trim() !== "" ? editor.draft.name : (id ?? "");

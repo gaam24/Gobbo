@@ -33,6 +33,7 @@ export function ArchiveReportDialog({
 	const otherSkipped = report?.skipped.filter((file) => file.reason !== "no_rule") ?? [];
 
 	let body: ReactNode;
+
 	if (failure) {
 		body = (
 			<FieldError className="flex items-start gap-2">

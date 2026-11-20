@@ -8,6 +8,7 @@ const cache = new Map<string, Promise<string | null>>();
 
 function iconOf(id: string): Promise<string | null> {
 	let icon = cache.get(id);
+
 	if (!icon) {
 		icon = (async () => {
 			try {
@@ -19,6 +20,7 @@ function iconOf(id: string): Promise<string | null> {
 		})();
 		cache.set(id, icon);
 	}
+
 	return icon;
 }
 
@@ -30,6 +32,7 @@ export function GameIcon({ id, name, className }: { id: string; name: string; cl
 	if (icon) {
 		return <img src={icon} alt="" aria-hidden className={cn("size-4 shrink-0 rounded-sm object-cover", className)} />;
 	}
+
 	return (
 		<span
 			aria-hidden

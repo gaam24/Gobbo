@@ -78,9 +78,11 @@ describe("README screenshots", () => {
 
 		const before = await statusOf(GAME_ID);
 		const active = before.profiles.find((profile) => profile.active) ?? before.profiles[0];
+
 		if (active && active.name !== "Main") {
 			await invoke("rename_profile", { game: GAME_ID, id: active.id, name: "Main" });
 		}
+
 		await createProfile(GAME_ID, "Testing", null);
 
 		await reloadWindow();

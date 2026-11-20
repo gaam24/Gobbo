@@ -19,6 +19,7 @@ async function emitTask(event: E2eTaskEvent, payload: E2eTaskPayload): Promise<v
 		async (name: E2eTaskEvent, data: E2eTaskPayload) => {
 			// oxlint-disable-next-line eslint/no-underscore-dangle -- the hook follows the existing __GOBBO_E2E_* naming convention.
 			const hook = window.__GOBBO_E2E_TASKS__;
+
 			if (!hook) throw new Error("the E2E task event hook is missing");
 			await hook(name, data);
 		},
@@ -48,6 +49,7 @@ describe("background tasks", () => {
 		const nameB = "Beta Game";
 		await seedGame({ id: idA, name: nameA });
 		await seedGame({ id: idB, name: nameB });
+
 		try {
 			// Start the work on game A.
 			await clickGame(nameA);

@@ -19,8 +19,10 @@ export interface UpdateTarget {
 /// Every mod with a saved update, in list order.
 export function updateTargets(mods: readonly Mod[]): UpdateTarget[] {
 	const targets: UpdateTarget[] = [];
+
 	for (const mod of mods) {
 		const update = mod.update;
+
 		if (!update?.has_update) continue;
 		targets.push({
 			id: mod.id,
@@ -34,6 +36,7 @@ export function updateTargets(mods: readonly Mod[]): UpdateTarget[] {
 			installed: update.latest_installed,
 		});
 	}
+
 	return targets;
 }
 
@@ -47,10 +50,12 @@ export function splitUpdateTargets(
 ): { direct: UpdateTarget[]; manual: UpdateTarget[] } {
 	const direct: UpdateTarget[] = [];
 	const manual: UpdateTarget[] = [];
+
 	for (const target of targets) {
 		if (browserOnly.has(target.provider)) manual.push(target);
 		else direct.push(target);
 	}
+
 	return { direct, manual };
 }
 
@@ -58,7 +63,9 @@ export function splitUpdateTargets(
 /// when both names it. A provider that does not name files matches on the mod alone.
 export function matchesUpdateDownload(target: UpdateTarget, download: Download, gameId: string): boolean {
 	const source = download.source;
+
 	if (!source || source.provider !== target.provider || source.mod_id !== target.modId) return false;
+
 	if (download.game !== "" && download.game !== gameId) return false;
 	return !(target.latestFileId && source.file_id) || source.file_id === target.latestFileId;
 }

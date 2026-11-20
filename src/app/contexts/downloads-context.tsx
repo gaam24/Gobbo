@@ -21,6 +21,7 @@ const DownloadsContext = createContext<Downloads | null>(null);
 
 export function useDownloadsContext(): Downloads {
 	const context = useContext(DownloadsContext);
+
 	if (!context) {
 		throw new Error("useDownloads must be used inside <DownloadsProvider>.");
 	}
@@ -72,6 +73,7 @@ export function DownloadsProvider({
 		(download: Download) => {
 			void attempt(async () => {
 				const claimed = await commands.claimDownload(download.id);
+
 				if (claimed?.path) {
 					// The backend has dropped its wait; reflect that at once so a cancelled wizard can be retried from
 					// the ordinary waiting install row instead of leaving a dead wizard row behind.
@@ -88,6 +90,7 @@ export function DownloadsProvider({
 	const wizardTasks = useRef<Set<string>>(new Set());
 	useEffect(() => {
 		const live = new Set<string>();
+
 		for (const download of downloads) {
 			if (download.state !== "ready" || !download.auto_install) continue;
 			const id = `download-wizard:${download.id}`;
@@ -102,9 +105,11 @@ export function DownloadsProvider({
 				source: "local",
 			});
 		}
+
 		for (const id of wizardTasks.current) {
 			if (!live.has(id)) removeTask(id);
 		}
+
 		wizardTasks.current = live;
 	}, [downloads, installWizard, t]);
 	const removeDownload = useCallback(

@@ -42,13 +42,16 @@ export function PanelHandle({
 	const endDrag = (event: ReactPointerEvent<HTMLDivElement>, commit: boolean) => {
 		const start = drag.current;
 		drag.current = null;
+
 		if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+
 		if (start?.panel) {
 			// Put back the value React rendered. On a commit the state below writes the new one; on a cancel the panel
 			// keeps the width it had before the drag.
 			if (start.previous) start.panel.style.setProperty("--inspector-width", start.previous);
 			else start.panel.style.removeProperty("--inspector-width");
 		}
+
 		if (commit && start?.moved) onResize(start.last);
 	};
 
@@ -93,6 +96,7 @@ export function PanelHandle({
 				const now = current(event.currentTarget);
 				const keys: Record<string, number> = { ArrowLeft: now + step, ArrowRight: now - step, Home: max, End: min };
 				const next = keys[event.key];
+
 				if (event.key === "Enter") onReset();
 				else if (next !== undefined) onResize(clamped(next));
 				else return;

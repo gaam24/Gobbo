@@ -15,6 +15,7 @@ const cache = new Map<string, Promise<string | null>>();
 
 function pictureOf(key: string, gameId: string, provider: string, file: string): Promise<string | null> {
 	let picture = cache.get(key);
+
 	if (picture) {
 		// Move a picture that is still in use to the end, so the oldest unused one leaves first.
 		cache.delete(key);
@@ -28,12 +29,16 @@ function pictureOf(key: string, gameId: string, provider: string, file: string):
 				return null;
 			}
 		})();
+
 		if (cache.size >= PICTURE_CACHE_MAX) {
 			const oldest = cache.keys().next().value;
+
 			if (oldest !== undefined) cache.delete(oldest);
 		}
+
 		cache.set(key, picture);
 	}
+
 	return picture;
 }
 

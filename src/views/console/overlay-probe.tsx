@@ -15,22 +15,27 @@ export function OverlayProbe({ gameId }: { gameId: string }) {
 		setRunning(true);
 		setFailure(null);
 		setReports(null);
+
 		try {
 			setReports(await unwrap(commands.runOverlayProbe(gameId)));
 		} catch (error) {
 			setFailure(messageOf(error));
 		}
+
 		setRunning(false);
 	};
 
 	const openFolder = async () => {
 		setFailure(null);
+
 		try {
 			const path = await unwrap(commands.overlayState(gameId));
+
 			if (path === null) {
 				setFailure(t("console.probeNoOverlay"));
 				return;
 			}
+
 			await unwrap(commands.openPath(gameId, path, false));
 		} catch (error) {
 			setFailure(messageOf(error));

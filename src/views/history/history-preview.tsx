@@ -114,6 +114,7 @@ function ChangeGroup<T extends { id: string; name: string }>({
 	describe: (item: T) => string;
 }) {
 	const { t } = useTranslation();
+
 	if (items.length === 0) return null;
 	return (
 		<Disclosure title={title} defaultOpen={items.length <= 8}>

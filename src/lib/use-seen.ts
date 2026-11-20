@@ -9,6 +9,7 @@ export function useSeen<T extends Element>(active = true): [RefObject<T | null>,
 	const [seen, setSeen] = useState(() => !active || typeof IntersectionObserver === "undefined");
 	useEffect(() => {
 		const element = ref.current;
+
 		if (!active || seen || !element) return;
 		const observer = new IntersectionObserver(
 			([entry]) => {

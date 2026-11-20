@@ -10,13 +10,16 @@ import { clickByLabel, clickByText, clickTab, waitForText } from "../support/ui"
 
 async function waitForRunning(game: string, wanted: boolean, timeout = 15_000): Promise<boolean> {
 	const deadline = Date.now() + timeout;
+
 	while (Date.now() < deadline) {
 		const running = await invoke<boolean>("game_running", { game });
+
 		if (running === wanted) return running;
 		await new Promise<void>((resolve) => {
 			setTimeout(resolve, 100);
 		});
 	}
+
 	throw new Error(`the game did not become ${wanted ? "running" : "stopped"}`);
 }
 
@@ -35,13 +38,16 @@ async function launchWithDraft(game: string): Promise<boolean | null> {
 
 async function waitForExit(game: string): Promise<RunReport> {
 	const deadline = Date.now() + 30_000;
+
 	while (Date.now() < deadline) {
 		const report = await invoke<RunReport | null>("last_run", { game });
+
 		if (report && report.finished_at !== null) return report;
 		await new Promise<void>((resolve) => {
 			setTimeout(resolve, 100);
 		});
 	}
+
 	throw new Error("the launch report did not record an exit");
 }
 
@@ -74,12 +80,14 @@ describe("launch and console", () => {
 		await importMods(id, [modZip(`launch-mod-${id}.zip`, "Launch")]);
 		await enableMods(id);
 		const started = await launchWithDraft(id);
+
 		if (started === null) {
 			await cleanupGame(id);
 			removeTree(path.join(definitionsDir, id));
 			removeTree(fixture.root);
 			return;
 		}
+
 		assert.equal(started, true);
 		const report = await waitForExit(id);
 		assert.equal(report.game_exit_code, 0);
@@ -112,21 +120,25 @@ describe("launch and console", () => {
 		await importMods(id, [modZip(`launch-stop-${id}.zip`, "Stop")]);
 		await enableMods(id);
 		const started = await launchWithDraft(id);
+
 		if (started === null) {
 			await cleanupGame(id);
 			removeTree(path.join(definitionsDir, id));
 			removeTree(fixture.root);
 			return;
 		}
+
 		assert.equal(started, true);
 		await waitForRunning(id, true);
 		let applyError: CommandFailure | null = null;
+
 		try {
 			await invokeWithChannel("apply", { game: id });
 		} catch (error) {
 			if (error instanceof CommandFailure) applyError = error;
 			else throw error;
 		}
+
 		assert.ok(applyError, "the apply while running was expected to fail");
 		assert.equal(applyError.code, "deploy.game_running");
 		const stopped = await invoke<boolean>("stop_game", { game: id });

@@ -58,8 +58,10 @@ export function PackLinkDialog({ gameId, link: initial, onClose }: { gameId: str
 			setPercent(step.percent);
 			updateTask(id, { percent: step.percent });
 		};
+
 		try {
 			const result = await unwrap(commands.downloadPackLink(gameId, wanted, progress));
+
 			if (mounted.current) {
 				removeTask(id);
 				openForGame(gameId, { kind: "pack-import", path: result.path });
@@ -80,6 +82,7 @@ export function PackLinkDialog({ gameId, link: initial, onClose }: { gameId: str
 			}
 		} catch (error) {
 			updateTask(id, { state: "failed", detail: messageOf(error) });
+
 			if (mounted.current) setFailure(messageOf(error));
 		}
 		// Both the success and the failure path clear the progress here; React Compiler skips a `finally`.

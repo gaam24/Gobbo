@@ -12,17 +12,21 @@ interface Messages {
 
 function flatten(messages: Messages, prefix = ""): Map<string, string> {
 	const out = new Map<string, string>();
+
 	for (const [key, value] of Object.entries(messages)) {
 		const path = prefix + key;
+
 		if (typeof value === "string") out.set(path, value);
 		else for (const [inner, text] of flatten(value, `${path}.`)) out.set(inner, text);
 	}
+
 	return out;
 }
 
 function rustFiles(dir: string): string[] {
 	return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
 		const path = join(dir, entry.name);
+
 		if (entry.isDirectory()) return rustFiles(path);
 		return path.endsWith(".rs") ? [path] : [];
 	});
@@ -42,18 +46,22 @@ function isCode(text: string): boolean {
 /// unnoticed — the old guard checked only `AppError::new`.
 function errorCodes(dir: string): Set<string> {
 	const codes = new Set<string>();
+
 	for (const file of rustFiles(dir)) {
 		for (const line of readFileSync(file, "utf8").split("\n")) {
 			// Test-only codes are not sent to the window. Inline test modules sit at the end of a file.
 			if (line.includes("#[cfg(test)]")) break;
 			// A code used only inside an assertion is a test sentinel, not one the app can send.
 			if (line.includes("assert")) continue;
+
 			for (const match of line.matchAll(ERROR_CALL_PATTERN)) {
 				const code = match[1];
+
 				if (code !== undefined && isCode(code)) codes.add(code);
 			}
 		}
 	}
+
 	return codes;
 }
 
@@ -61,10 +69,13 @@ function errorCodes(dir: string): Set<string> {
 /// Without this, a code used only through a constant would silently escape the guard.
 function namedCodes(errorFile: string): Set<string> {
 	const codes = new Set<string>();
+
 	for (const match of readFileSync(errorFile, "utf8").matchAll(CODE_CONST_PATTERN)) {
 		const code = match[1];
+
 		if (code !== undefined && isCode(code)) codes.add(code);
 	}
+
 	return codes;
 }
 

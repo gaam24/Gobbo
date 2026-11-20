@@ -20,17 +20,21 @@ async function scrollSteps(): Promise<{ steps: number[]; scrollTop: number }> {
 		(frames: number, step: number, done: (value: { steps: number[]; scrollTop: number }) => void) => {
 			const row = document.querySelector<HTMLElement>("[data-mod]");
 			let container: HTMLElement | null = row;
+
 			while (container && !["auto", "scroll", "overlay"].includes(getComputedStyle(container).overflowY)) {
 				container = container.parentElement;
 			}
+
 			if (!container) return done({ steps: [], scrollTop: -1 });
 			const steps: number[] = [];
 			let count = 0;
 			const tick = () => {
 				const before = container ? container.scrollTop : 0;
+
 				if (container) container.scrollTop += step;
 				steps.push((container ? container.scrollTop : 0) - before);
 				count += 1;
+
 				if (count < frames) requestAnimationFrame(tick);
 				else done({ steps, scrollTop: container ? container.scrollTop : -1 });
 			};
@@ -45,6 +49,7 @@ describe("mod list scroll stability", () => {
 	it("keeps every scroll step when the virtual window changes", async () => {
 		const id = uniqueId("scroll-stability");
 		const { fixture } = await seedGame({ id, name: `E2E Scroll ${id}` });
+
 		try {
 			const archives = Array.from({ length: MODS }, (_, index) => modZip(`scroll-${id}-${index}.zip`, `Scroll ${index}`));
 			await importMods(id, archives);

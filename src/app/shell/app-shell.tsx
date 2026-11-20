@@ -31,6 +31,7 @@ export function AppShell() {
 	if (e2eForcedFailure("shell")) {
 		throw new Error("E2E forced render failure in the shell");
 	}
+
 	return (
 		<TooltipProvider>
 			<Toaster position="top-right" closeButtonAriaLabel={t("toasts.dismiss")} containerAriaLabel={t("notifications.title")} />

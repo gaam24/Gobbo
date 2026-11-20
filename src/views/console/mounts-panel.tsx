@@ -124,6 +124,7 @@ export function MountsPanel({ gameId }: { gameId: string }) {
 
 	const toggle = (path: string, checked: boolean) => {
 		const next = new Set(selected);
+
 		if (checked) next.add(path);
 		else next.delete(path);
 		setSelected(next);
@@ -132,11 +133,13 @@ export function MountsPanel({ gameId }: { gameId: string }) {
 	const clean = async () => {
 		setConfirming(false);
 		const paths = [...selected];
+
 		if (paths.length === 0) return;
 		const ok = await attempt(async () => {
 			await unwrap(commands.cleanOrphanLayers(gameId, paths));
 			notify(t("console.mountsCleanDone"));
 		});
+
 		if (!ok) return;
 		setSelected(new Set());
 		setReloadKey((key) => key + 1);

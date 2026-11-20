@@ -43,6 +43,7 @@ export function GameRow({
 	const { game, status, root, ready } = entry;
 
 	let action: ReactNode = null;
+
 	if (status === "found") {
 		action = (
 			<Button variant="outline" size="sm" className="border-primary text-primary" onClick={() => root && void onAdd(game.id, root)}>

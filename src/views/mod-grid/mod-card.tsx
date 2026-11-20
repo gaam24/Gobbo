@@ -62,6 +62,7 @@ export const ModCard = memo(function ModCard({
 	});
 	const style = { transform: CSS.Transform.toString(transform), transition };
 	let signal: CardSignal | null = null;
+
 	if (mod.unmet_requirements > 0) {
 		signal = { kind: "missing", text: t("mods.col.missing") };
 	} else if (update?.has_update && update.latest) {
@@ -73,6 +74,7 @@ export const ModCard = memo(function ModCard({
 				: t("mods.version.updateAvailable", { version: update.latest }),
 		};
 	}
+
 	const category = mod.source?.category;
 
 	return (

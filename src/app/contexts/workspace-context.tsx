@@ -107,6 +107,7 @@ const WorkspaceActionsContext = createContext<WorkspaceActions | null>(null);
 /// The stable actions of the workspace, for a component that does not draw the status.
 export function useWorkspaceActions(): WorkspaceActions {
 	const context = useContext(WorkspaceActionsContext);
+
 	if (!context) {
 		throw new Error("useWorkspaceActions must be used inside <WorkspaceProvider>.");
 	}
@@ -116,6 +117,7 @@ export function useWorkspaceActions(): WorkspaceActions {
 
 export function useWorkspace(): Workspace {
 	const context = useContext(WorkspaceContext);
+
 	if (!context) {
 		throw new Error("useWorkspace must be used inside <WorkspaceProvider>.");
 	}
@@ -164,6 +166,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 	useEffect(() => {
 		void (async () => {
 			const link = await commands.takePackLink();
+
 			if (link) openPackLink(link);
 		})();
 	}, [openPackLink]);
@@ -183,6 +186,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
 	const [selection, setSelection] = useState<string[]>([]);
 	const [prevId, setPrevId] = useState(id);
+
 	if (id !== prevId) {
 		setPrevId(id);
 		setSelection([]);
@@ -214,12 +218,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 	const setStatusFor = useCallback(
 		(gameId: string, next: Status) => {
 			const merged = statusCache.current.merge(gameId, next);
+
 			if (!merged) return false;
 			// Any game's status lands in the cache; only the shown game's row is drawn.
 			if (gameId === shownGame.current) {
 				latestStatus.current = { game: gameId, status: merged };
 				setStatus(merged);
 			}
+
 			return true;
 		},
 		[setStatus],
@@ -237,6 +243,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 	const openSource = useCallback(
 		(provider: string, modId: string, tab?: "files") => {
 			const key = game?.providers.find((item) => item.id === provider)?.key;
+
 			if (!key) return;
 			void attempt(async () => {
 				await commands.openSourcePage(provider, key, modId, tab ?? null);
@@ -326,6 +333,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 		},
 		onSourceImport: (gameId, ids) => {
 			if (gameId !== shownGame.current) return;
+
 			for (const modId of ids) void modUpdates.checkModFromMenu(modId);
 		},
 		onError: notifyError,
@@ -426,10 +434,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 			/// Only an explicit "apply" opens the preview. A plain play starts the game as it is, which is how a game with
 			/// no enabled mods can start without a deployment.
 			const needsPreview = applyDraft && status !== null && (!status.deployed || status.draft_changes > 0);
+
 			if (needsPreview) {
 				openDialog({ kind: "deploy", launch: true, executable, request: Date.now() });
 				return;
 			}
+
 			await runLaunch(executable, applyDraft);
 		},
 		[openDialog, runLaunch, status],

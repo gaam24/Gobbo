@@ -15,6 +15,7 @@ const KINDS = ["bundle", "translation"] as const satisfies readonly ModGroupKind
 export function nextGroupId(groups: readonly ModGroup[]): string {
 	const used = new Set(groups.map((group) => group.id));
 	let index = 1;
+
 	while (used.has(`grp${index}`)) index += 1;
 	return `grp${index}`;
 }

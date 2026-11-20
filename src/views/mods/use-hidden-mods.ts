@@ -45,6 +45,7 @@ export function useHiddenMods({
 		(ids: string[], hide: boolean) =>
 			setEdits((previous) => {
 				const next = new Map(previous?.key === key ? previous.choices : saved);
+
 				for (const id of ids) next.set(id, hide);
 				return { key, choices: next };
 			}),

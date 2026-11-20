@@ -42,10 +42,12 @@ const store = createStore<RegisteredTask[]>([]);
 export function registerTask(task: RegisteredTask): void {
 	const current = store.get();
 	const at = current.findIndex((item) => item.id === task.id);
+
 	if (at < 0) {
 		store.set([...current, task]);
 		return;
 	}
+
 	const next = [...current];
 	next[at] = task;
 	store.set(next);
@@ -54,6 +56,7 @@ export function registerTask(task: RegisteredTask): void {
 /// Patches one field group of a task without needing its other callbacks again.
 export function updateTask(id: string, patch: Partial<Omit<RegisteredTask, "id">>): void {
 	const current = store.get();
+
 	if (!current.some((task) => task.id === id)) return;
 	store.set(current.map((task) => (task.id === id ? { ...task, ...patch } : task)));
 }
@@ -62,6 +65,7 @@ export function updateTask(id: string, patch: Partial<Omit<RegisteredTask, "id">
 export function removeTask(id: string): void {
 	const current = store.get();
 	const next = current.filter((task) => task.id !== id);
+
 	if (next.length === current.length) return;
 	store.set(next);
 }
@@ -166,6 +170,7 @@ export function backendTaskTitle(code: string, t: Translate): string {
 
 function backendState(state: string): RegisteredTaskState {
 	if (state === "failed") return "failed";
+
 	if (state === "waiting") return "waiting";
 	return "running";
 }
@@ -185,12 +190,16 @@ export function backendTaskFromPayload(payload: BackendTaskPayload, title: strin
 		sourceKind: payload.kind,
 		dedupe: payload.dedupe,
 	};
+
 	if (task.state === "failed" || task.state === "waiting") {
 		const retry = actions.retry?.(payload);
 		const open = actions.open?.(payload);
+
 		if (retry) task.retry = retry;
+
 		if (open) task.open = open;
 	}
+
 	return task;
 }
 
@@ -229,9 +238,11 @@ export function useBackendTasks(): void {
 		/// from the `listTasks` snapshot go through the same mapping as live events, so a restart keeps their actions.
 		const fromBackend = (payload: BackendTaskPayload): RegisteredTask => {
 			const task = backendTaskFromPayload(payload, backendTaskTitle(payload.kind, t), backendActionsOf(payload.kind));
+
 			if (task.state === "running") {
 				task.cancel = { label: t("common.cancel"), run: () => void commands.cancelTask(payload.id) };
 			}
+
 			return task;
 		};
 		const unlisten = await Promise.all([
@@ -249,7 +260,9 @@ export function useBackendTasks(): void {
 		]);
 		scope.add(...unlisten);
 		const listed = await listBackendTasks();
+
 		if (!scope.active) return;
+
 		for (const item of listed) registerTask(fromBackend(item));
 	}, t);
 }

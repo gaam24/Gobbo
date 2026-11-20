@@ -118,6 +118,7 @@ export function useGameActions({
 	/// The visible row is derived, not written by a long action: a retry from an older render updates the map under its
 	/// own game id, so it can never put that game's busy flag into the game that happens to be shown now.
 	const shown = busyByGame.get(displayGame ?? "") ?? IDLE_BUSY;
+
 	if (displayGame !== id) setDisplayGame(id);
 	const setBusyOf = useCallback((gameId: string | undefined, patch: Partial<GameBusy>) => {
 		if (!gameId) return;
@@ -151,6 +152,7 @@ export function useGameActions({
 		async (action: (gameId: string) => Promise<void>, reportFailure = true) => {
 			if (!id) return false;
 			await gameQueues.forGame(id).idle();
+
 			if (reportFailure) return attempt(() => action(id));
 			// The caller owns a durable failure row (apply): a second, transient error toast would report the same event.
 			try {
@@ -175,6 +177,7 @@ export function useGameActions({
 	/// overwrite each other with rows computed from the old profile. The game id is taken before the queue waits.
 	const queued = (action: (gameId: string) => Promise<void>) => {
 		const gameId = id;
+
 		if (!gameId) return Promise.resolve();
 		return gameQueues.forGame(gameId).run(() => attempt(() => action(gameId)));
 	};
@@ -183,6 +186,7 @@ export function useGameActions({
 	const changeQueued = (call: (gameId: string) => Promise<CommandResult<Status>>, notice?: string) =>
 		queued(async (gameId) => {
 			setStatusFor(gameId, await unwrap(call(gameId)));
+
 			if (notice) notify(notice);
 		});
 
@@ -249,8 +253,10 @@ export function useGameActions({
 	const saveProfile = (edit: ListEdit) =>
 		queued(async (gameId) => {
 			const current = currentStatus(gameId);
+
 			if (!current) return;
 			const rows = edit(statusItems(current));
+
 			if (!rows) return;
 			const fresh = await unwrap(commands.saveProfile(gameId, rows, knownRows(current)));
 			// The user may have moved to another game while the edit ran.
@@ -300,6 +306,7 @@ export function useGameActions({
 		let detail: string | undefined;
 		let errorCode: string | null = null;
 		let deployed = false;
+
 		try {
 			const applied = await unwrap(commands.apply(gameId, progress));
 			notify(t("notice.deployedOverlay", { files: applied.files }));
@@ -309,8 +316,10 @@ export function useGameActions({
 			detail = messageOf(failure);
 			errorCode = codeOf(failure);
 		}
+
 		setBusyOf(gameId, { busy: null });
 		setDeployProgress(null, gameId);
+
 		if (!deployed) {
 			if (errorCode === "state.busy") {
 				// The global lock belongs to another apply. Show a waiting row instead of a failure and retry when that
@@ -340,6 +349,7 @@ export function useGameActions({
 				});
 			}
 		}
+
 		return deployed;
 	};
 	const runDeploy = () => applyFor(id);
@@ -371,7 +381,9 @@ export function useGameActions({
 			scope.listen<BackendTaskPayload>("task-finished", (event) => {
 				if (!scope.active || autoRetrying.current) return;
 				const waitingGame = waitingApplyGame.current;
+
 				if (!waitingGame) return;
+
 				if (event.payload.kind !== "apply" || event.payload.game !== waitingGame) return;
 				autoRetrying.current = true;
 				waitingApplyGame.current = null;
@@ -390,6 +402,7 @@ export function useGameActions({
 				const { reload: reloadNow, statusOf: statusNow, notify: notifyNow, t: translateNow } = latestTool.current;
 				const { game, tool, code, cancelled } = event.payload;
 				const name = statusNow?.(game)?.tools.find((item) => item.id === tool)?.name ?? tool;
+
 				if (cancelled) notifyNow(translateNow("notice.toolCancelled", { name }));
 				else notifyNow(translateNow(code === 0 ? "notice.toolDone" : "notice.toolFailed", { name, code: code ?? -1 }));
 				void reloadNow(game);
@@ -411,6 +424,7 @@ export function useGameActions({
 	const discardChanges = () =>
 		queued(async (gameId) => {
 			const current = currentStatus(gameId);
+
 			if (!current) return;
 			const byId = new Map(current.mods.map((mod) => [mod.id, mod]));
 			const deployed = current.deployed_list.flatMap((row) => {
@@ -462,11 +476,14 @@ export function useGameActions({
 			() =>
 				attempt(async () => {
 					const start = currentStatus(gameId);
+
 					if (!start) return;
 					let fresh = start;
+
 					for (const change of changes) {
 						fresh = await unwrap(commands.setModVersion(gameId, change.id, change.previous));
 					}
+
 					setStatusFor(gameId, fresh);
 					notify(t("notice.updatesUndone", { count: changes.length }));
 				}),
@@ -494,29 +511,36 @@ export function useGameActions({
 	/// provider list is read again so the rest of the run uses the page too.
 	const updateMod = async (modId: string, name: string, update: UpdateReport) => {
 		const ownerGame = id;
+
 		if (!ownerGame) return;
+
 		if (currentBrowserProviders().has(update.provider)) {
 			await openUpdatePage(modId, update.provider);
 			return;
 		}
+
 		beginUpdate(ownerGame, "update", name);
 		const progress = newProgressChannel<UpdateProgress>((step) => setUpdateProgress(step, ownerGame));
 		await forGameResult(async (gameId) => {
 			const previous = currentStatus(gameId)?.mods.find((mod) => mod.id === modId)?.folder;
 			let fresh: Status;
+
 			try {
 				fresh = await unwrap(commands.updateMod(gameId, modId, update.provider, progress));
 			} catch (failure) {
 				const choicePath = needsChoicePathOf(failure);
+
 				if (choicePath) {
 					installWithChoices(gameId, choicePath);
 					return;
 				}
+
 				if (!paymentRequiredOf(failure)) throw failure;
 				await openUpdatePage(modId, update.provider);
 				await refreshProviders();
 				return;
 			}
+
 			setStatusFor(gameId, fresh);
 			const selected = fresh.mods.find((mod) => mod.id === modId)?.folder;
 			const text = t("notice.modUpdated", { name });
@@ -537,12 +561,16 @@ export function useGameActions({
 	const updateAll = async () => {
 		const updateGameId = id;
 		const current = updateGameId ? currentStatus(updateGameId) : null;
+
 		if (!(updateGameId && current)) return;
 		const targets = updateTargets(current.mods);
+
 		if (targets.length === 0) return;
 		const { direct, manual } = splitUpdateTargets(targets, currentBrowserProviders());
 		const directIds = direct.map((target) => target.id);
+
 		if (manual.length > 0) openManualUpdates(manual);
+
 		if (directIds.length === 0) return;
 
 		beginUpdate(updateGameId, "update", null);
@@ -551,6 +579,7 @@ export function useGameActions({
 		await forGameResult(async (gameId) => {
 			const result = await unwrap(commands.updateAll(gameId, directIds, progress));
 			setStatusFor(gameId, result.status);
+
 			if (result.updated > 0) {
 				const text = t("notice.modsUpdated", { count: result.updated });
 				const undoAction =
@@ -558,7 +587,9 @@ export function useGameActions({
 				if (undoAction) notifyDurable(text, undoAction);
 				else notify(text);
 			}
+
 			if (result.cancelled) notify(t("notice.updateAllCancelled"));
+
 			if (result.failed.length > 0) {
 				notifyError(translateJoin(result.failed, "\n"));
 			}
@@ -585,6 +616,7 @@ export function useGameActions({
 	/// link as the only way, so this is called only when the requirement says the provider can.
 	const installRequirement = async (source: SourceRef, name: string) => {
 		const ownerGame = id;
+
 		if (!ownerGame) return false;
 		const progress = requirementProgress(ownerGame, name);
 		const installed = await forGameResult(async (gameId) => {
@@ -600,13 +632,16 @@ export function useGameActions({
 	/// undo; blocked steps and failed downloads come back as messages while the rest still runs.
 	const installRequirements = async (folder: string) => {
 		const ownerGame = id;
+
 		if (!ownerGame) return false;
 		const progress = requirementProgress(ownerGame, null);
 		const installed = await forGameResult(async (gameId) => {
 			const result = await unwrap(commands.installRequirements(gameId, folder, progress));
 			setStatusFor(gameId, result.status);
+
 			if (result.installed > 0) notify(t("notice.requirementsInstalled", { count: result.installed }));
 			const problems = [...result.blocked, ...result.failed];
+
 			if (problems.length > 0) notifyError(translateJoin(problems, "\n"));
 		});
 		finishRequirement(ownerGame);
@@ -623,12 +658,15 @@ export function useGameActions({
 			const result = await unwrap(commands.importCommunityProfile(gameId, path, name));
 			setStatusFor(gameId, result.status);
 			notify(t("notice.communityImported", { profile: name, mods: result.mods }));
+
 			if (result.missing.length > 0) {
 				notifyError(t("notice.communityMissing", { count: result.missing.length }), result.missing.join(", "));
 			}
+
 			if (result.other_versions.length > 0) {
 				notifyError(t("notice.communityVersions", { count: result.other_versions.length }), result.other_versions.join(", "));
 			}
+
 			imported = true;
 		});
 		setBusyOf(ownerGame, { busy: null });
@@ -639,6 +677,7 @@ export function useGameActions({
 	/// does not wait for the profile queue: a stuck game must be stoppable at once.
 	const stopNow = async () => {
 		const gameId = id;
+
 		if (!gameId) return;
 		await attempt(async () => {
 			const stopped = await unwrap(commands.stopGame(gameId));
@@ -654,9 +693,11 @@ export function useGameActions({
 
 	const saveSettings = (patch: Partial<SettingsData>) => {
 		const gameId = id;
+
 		if (!gameId) return Promise.resolve();
 		return settingsQueue.run(async () => {
 			const base = currentStatus(gameId)?.settings;
+
 			if (!base) return;
 			await attempt(async () => {
 				setStatusFor(gameId, await unwrap(commands.saveSettings(gameId, { ...base, ...patch })));
@@ -674,6 +715,7 @@ export function useGameActions({
 	/// fresh status, so the list shown is the one it saved. It waits in the settings queue like a save.
 	const settingsChange = (call: (gameId: string) => Promise<CommandResult<Status>>) => {
 		const gameId = id;
+
 		if (!gameId) return Promise.resolve();
 		return settingsQueue.run(() =>
 			attempt(async () => {
@@ -690,8 +732,10 @@ export function useGameActions({
 	const setProfileUserData = (set: string, isolated: boolean) =>
 		queued(async (gameId) => {
 			const profile = activeProfileId(gameId);
+
 			if (!profile) return;
 			const fresh = await unwrap(commands.setProfileUserData(gameId, profile, set, isolated));
+
 			if (!currentStatus(gameId)) return;
 			setStatusFor(gameId, fresh);
 			notify(t("notice.userDataSaved"));
@@ -700,8 +744,10 @@ export function useGameActions({
 	/// The size of the profile's own data for one set, read on demand. A read does not join the queue.
 	const userDataSize = (set: string): Promise<number> => {
 		const gameId = id;
+
 		if (!gameId) return Promise.resolve(0);
 		const profile = activeProfileId(gameId);
+
 		if (!profile) return Promise.resolve(0);
 		return unwrap(commands.userDataSize(gameId, profile, set));
 	};
@@ -711,8 +757,10 @@ export function useGameActions({
 	const moveProfileUserData = (set: string) =>
 		queued(async (gameId) => {
 			const profile = activeProfileId(gameId);
+
 			if (!profile) return;
 			const fresh = await unwrap(commands.moveProfileUserData(gameId, profile, set));
+
 			if (!currentStatus(gameId)) return;
 			setStatusFor(gameId, fresh);
 			notify(t("notice.userDataMoved"));
@@ -743,6 +791,7 @@ export function useGameActions({
 		const name = shownStatus()?.profiles.find((profile) => profile.id === profileId)?.name ?? profileId;
 		await changeQueued((gameId) => commands.switchProfile(gameId, profileId));
 		resetListSelection();
+
 		if (gameRunning) notify(t("notice.profileSwitchedRunning", { name }));
 	};
 
@@ -764,6 +813,7 @@ export function useGameActions({
 	const deleteModPage = async (pageId: string) => {
 		const parts = pagePartsOf(shownStatus()?.mods ?? [], pageId);
 		const first = parts[0];
+
 		if (!first) return;
 		const name = first.page_name ?? first.info.name;
 		await changeQueued((gameId) => commands.deleteModPage(gameId, first.id), t("notice.pageDeleted", { name }));
@@ -867,12 +917,14 @@ export function useGameActions({
 	/// Makes the active profile's list the one of a Mod Organizer 2 `modlist.txt` the user picks. Undo brings the old list back.
 	const importMo2List = async () => {
 		const [path] = await pickFiles("modlist.txt", ["txt"], false);
+
 		if (!path) return;
 		await queued(async (gameId) => {
 			const report = await unwrap(commands.importMo2List(gameId, path));
 			await reload(gameId);
 			setSelection([]);
 			notify(t("notice.mo2Imported", { mods: report.mods, separators: report.separators }));
+
 			if (report.missing.length > 0) {
 				notifyError(t("notice.mo2Missing", { count: report.missing.length }), report.missing.join(", "));
 			}
@@ -884,6 +936,7 @@ export function useGameActions({
 	/// so the step can show it next to the mod.
 	const selectUpdateVersion = async (modId: string, provider: string) => {
 		const gameId = id;
+
 		if (!gameId) return;
 		await queueProfile(async () => {
 			const fresh = await unwrap(commands.selectUpdateVersion(gameId, modId, provider));

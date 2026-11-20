@@ -12,10 +12,13 @@ function status(stage: GameStage_Serialize, overrides: Partial<Status_Serialize>
 function blockerOfStage(stage: GameStage_Serialize, overrides: Partial<Status_Serialize>): BlockerKey | null {
 	if (stage.kind === "setup") {
 		if (stage.step === "game") return overrides.needs_settings_dir ? "game_and_settings" : "game_folder";
+
 		if (stage.step === "settings") return "game_and_settings";
 		return "mods_folder";
 	}
+
 	if (stage.kind === "blocked") return "problems";
+
 	if (stage.kind === "empty" || stage.kind === "no_enabled") return "no_mods";
 	return null;
 }
@@ -24,6 +27,7 @@ function nextActionOf(stage: GameStage_Serialize): NextAction {
 	switch (stage.kind) {
 		case "setup":
 			if (stage.step === "game") return "set_game_folder";
+
 			if (stage.step === "settings") return "set_settings_folder";
 			return "set_mods_folder";
 		case "blocked":

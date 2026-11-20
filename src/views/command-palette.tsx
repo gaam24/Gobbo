@@ -55,6 +55,7 @@ export function CommandPalette({
 						<CommandEmpty className="px-3 py-6 text-center text-sm">{t("palette.empty")}</CommandEmpty>
 						{PALETTE_GROUPS.map((group) => {
 							const inGroup = results.filter((item) => item.group === group);
+
 							if (inGroup.length === 0) return null;
 							return (
 								<CommandGroup key={group} heading={t(`palette.groups.${group}`)}>

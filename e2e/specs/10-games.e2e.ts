@@ -72,6 +72,7 @@ describe("games", () => {
 		await waitForText("Found on this computer");
 		await waitForText("E2E Steam Game");
 		await clickInRow(name, "Add");
+
 		if ((await dialogCount()) > 0) await closeTopDialog();
 		await waitForText(name);
 		const managed = await invoke<ManagedGame[]>("managed_games");

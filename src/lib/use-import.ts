@@ -65,6 +65,7 @@ export function forgetChoices(cache: FomodChoicesCache, gameId: string, wizardKe
 /// Drops the answers of one cancelled archive, looked up by its path.
 export function forgetArchivedChoices(cache: FomodChoicesCache, gameId: string, wizardKeys: Map<string, string>, path: string): void {
 	const key = wizardKeys.get(path);
+
 	if (key) forgetChoices(cache, gameId, key);
 }
 
@@ -126,6 +127,7 @@ function collectUnplaced(
 ): void {
 	const folder = view.folders[0];
 	const files = view.skipped_files.filter((file) => file.reason === "no_rule");
+
 	if (!folder || files.length === 0) return;
 	into.push({ folder, name: view.mods.find((mod) => mod.folder === folder)?.name ?? fallbackName, files });
 }
@@ -216,10 +218,12 @@ export function useImport({
 	const settleImport = useCallback(
 		(gameId: string, fresh: Status, imported: string[], added: ImportedModView[], fromSource: boolean) => {
 			onStatus(gameId, fresh);
+
 			if (imported.length > 0) notify(t("import.added", { list: imported.join(", ") }));
 			// A version added to a family that already has a selected one waits for the user: an import must not silently
 			// replace the version the profile uses.
 			const versions = added.filter((item) => fresh.mods.some((mod) => mod.id === item.family && mod.folder !== item.folder));
+
 			if (versions.length > 0) {
 				setPending((current) => ({
 					game: gameId,
@@ -247,6 +251,7 @@ export function useImport({
 				notify(t("notice.downloadAlreadyInLibrary", { name: event.name }));
 				return;
 			}
+
 			const skippedFiles: Array<{ folder: string; name: string; files: SkippedFile[] }> = [];
 			collectUnplaced(event.view, event.name, skippedFiles);
 			announceSkipped(skippedFiles, event.game);
@@ -263,6 +268,7 @@ export function useImport({
 			// A download installs where it is; only the user's own archives bring the list into view.
 			if (!source) onShowMods();
 			const archives = paths.filter((path) => isArchive(path));
+
 			for (const path of archives) clearFailedTask(importTaskId(path));
 			const imported: string[] = [];
 			const added: ImportedModView[] = [];
@@ -275,19 +281,24 @@ export function useImport({
 			// archive is remembered so its saved answers can be dropped when this import ends.
 			const jobs: ImportJob[] = [];
 			const wizardKeys = new Map<string, string>();
+
 			for (const [index, path] of archives.entries()) {
 				const name = fileName(path);
+
 				try {
 					const inspect = await unwrap(commands.inspectZip(gameId, path));
 					let choices: FomodChoice[] | null = null;
+
 					if (inspect.kind === "fomod") {
 						wizardKeys.set(path, fomodWizardKey(name, inspect.module_name));
 						choices = await openFomodWizard(gameId, inspect, name, path);
+
 						if (choices === null) {
 							skippedByUser.push(name);
 							continue;
 						}
 					}
+
 					jobs.push({ path, index, choices });
 				} catch (failure) {
 					failed.push(`${name}: ${messageOf(failure)}`);
@@ -310,6 +321,7 @@ export function useImport({
 						gameId,
 					),
 				);
+
 				try {
 					const view = await unwrap(commands.importZip(gameId, path, choices, source?.source ?? null, progress));
 					imported.push(...view.folders);
@@ -330,15 +342,19 @@ export function useImport({
 						failedImports.push({ path, name, message });
 					}
 				}
+
 				setImportProgress(path, null, gameId);
 			});
 			announceSkipped(skippedFiles, gameId);
+
 			if (skippedByUser.length > 0) failed.push(t("import.skippedArchives", { list: skippedByUser.join(", ") }));
+
 			if (paths.length > archives.length) failed.push(t("import.notArchives"));
 			// Each failed import now has one durable, retryable row in the Working panel. Do not also emit a toast and a
 			// persisted notice for the same failure. Notes with no recovery row (skipped archives, non-archives) still
 			// get reported when no import failed, so they are never silently dropped.
 			if (failed.length > 0 && failedImports.length === 0) onError(failed.join("\n"));
+
 			for (const item of failedImports) {
 				recordFailedTask({
 					id: importTaskId(item.path),
@@ -352,6 +368,7 @@ export function useImport({
 					dedupeKey: dedupeKey({ Import: { game: gameId, path: item.path } }),
 				});
 			}
+
 			try {
 				const fresh = await unwrap(commands.syncProfiles(gameId));
 				clearFailedTask(syncTaskId(gameId));
@@ -386,10 +403,12 @@ export function useImport({
 		(paths: string[], source?: ImportSource) => {
 			// Capture the game before the first await; a later switch must not move this import to the new game's queue.
 			const gameId = source?.game ?? selectedGame;
+
 			if (!gameId) {
 				onError(t("import.noGame"));
 				return Promise.resolve();
 			}
+
 			return enqueueImport(paths, source, gameId);
 		},
 		[enqueueImport, onError, selectedGame, t],
@@ -398,6 +417,7 @@ export function useImport({
 	useEffect(() => {
 		retryImport.current = (paths, source, gameId) => {
 			const target = source?.game ?? gameId;
+
 			if (target) void enqueueImport(paths, source, target);
 		};
 	}, [enqueueImport]);
@@ -406,6 +426,7 @@ export function useImport({
 	const pickArchives = useCallback(async () => {
 		try {
 			const picked = await pickFiles(t("import.filterName"), ARCHIVE_EXTENSIONS, true);
+
 			if (picked.length > 0) await importPaths(picked);
 		} catch (failure) {
 			onError(messageOf(failure));
@@ -426,9 +447,11 @@ export function useImport({
 	/// Skipping resolves with `null` and deliberately leaves no answers behind.
 	const confirmFomod = (choices: FomodChoice[]) => {
 		const wizard = selectedGame ? wizards[selectedGame] : undefined;
+
 		if (selectedGame && wizard) {
 			rememberChoices(fomodChoicesCache, selectedGame, fomodWizardKey(wizard.fileName, wizard.moduleName), choices);
 		}
+
 		settleWizard(selectedGame ?? undefined, choices);
 	};
 

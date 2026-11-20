@@ -41,6 +41,7 @@ export function CollectionInstallView({ onClose }: { onClose: () => void }) {
 	const session = collections.session;
 	const progress = collections.progress;
 	const items = useMemo(() => (session ? orderedItems(session.plan) : []), [session]);
+
 	if (!session) {
 		return (
 			<ModalDialog title={t("collection.dialog.install")} onClose={onClose}>
@@ -67,18 +68,23 @@ export function CollectionInstallView({ onClose }: { onClose: () => void }) {
 	const warnings = collections.installView?.warnings ?? [];
 	const liveState = (item: { key: string }) => {
 		const step = progress.get(item.key);
+
 		if (step) return step.percent > 0 && step.percent < 100 ? `${t(STATE_LABEL[step.state])} ${step.percent}%` : t(STATE_LABEL[step.state]);
+
 		if (collections.waiting?.item === item.key) return t("collection.state.waiting");
 		return null;
 	};
 	const stateText = () => {
 		if (finished) return t("collection.install.done");
+
 		if (collections.busy) return t("collection.install.working");
+
 		if (collections.installView?.cancelled) return t("collection.state.paused");
 		return t("collection.install.idle");
 	};
 	const chooseManual = async () => {
 		const [path] = await pickFiles(t("collection.fileFilter"), ARCHIVE_EXTENSIONS, false);
+
 		if (path) await collections.importManual(path);
 	};
 

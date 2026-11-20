@@ -143,6 +143,7 @@ export function SourceRequirements({ mod }: { mod: FullMod }) {
 					className="border-border bg-muted/25 grid gap-2 rounded-lg border p-3"
 					onSubmit={(event) => {
 						event.preventDefault();
+
 						if (valid) void add();
 					}}
 				>

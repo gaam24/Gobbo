@@ -28,6 +28,7 @@ export function recordFailedTask(task: FailedTask) {
 export function clearFailedTask(id: string) {
 	const current = store.get();
 	const next = current.filter((task) => task.id !== id);
+
 	if (next.length === current.length) return;
 	store.set(next);
 }

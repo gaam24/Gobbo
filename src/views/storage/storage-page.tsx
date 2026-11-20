@@ -153,6 +153,7 @@ export function StorageView({
 				onConfirm={() => {
 					const entry = confirmDelete;
 					setConfirmDelete(null);
+
 					if (entry) void onDelete(entry.id);
 				}}
 			/>

@@ -40,6 +40,7 @@ export function FilterBar({ searchRef, filter, setFilter, query, setQuery, tagFi
 	const shownFilters = FILTERS.filter(({ value }) => value !== "hidden" || counts.hidden > 0 || filter === "hidden");
 	const changeFilter = (value: string) => {
 		const next = FILTERS.find((item) => item.value === value);
+
 		if (next) setFilter(next.value);
 	};
 
@@ -55,6 +56,7 @@ export function FilterBar({ searchRef, filter, setFilter, query, setQuery, tagFi
 					onKeyDown={(event) => {
 						// Escape clears a search first, and leaves the field when there is nothing to clear.
 						if (event.key !== "Escape") return;
+
 						if (query) setQuery("");
 						else event.currentTarget.blur();
 						event.stopPropagation();

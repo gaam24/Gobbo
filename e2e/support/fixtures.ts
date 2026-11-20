@@ -64,11 +64,15 @@ export function gameToml(options: GameOptions): string {
 	const slotMarker = options.slotMarker ?? (layout === "loader" ? undefined : "content");
 	const slotPrefix = options.slotPrefix ?? "mod";
 	let providers = "providers = {}";
+
 	if (options.provider === "nexus") providers = `providers = { nexus = { key = ${tomlString(options.id)} } }`;
+
 	if (options.provider === "thunderstore") providers = `providers = { thunderstore = { key = ${tomlString(options.id)} } }`;
+
 	if (options.provider === "both") {
 		providers = `providers = { nexus = { key = ${tomlString(options.id)} }, thunderstore = { key = ${tomlString(options.id)} } }`;
 	}
+
 	const markers = options.markers ?? ["bin/game.exe"];
 	const lines: string[] = [
 		"schema = 1",
@@ -77,18 +81,23 @@ export function gameToml(options: GameOptions): string {
 		...(layout === "loader" ? ['loader = "e2e-loader"'] : []),
 		providers,
 	];
+
 	if (options.loadOrder) {
 		lines.push("[load_order]", 'format = "mods_settings"', 'file = "{settings}/mods.settings"');
 	}
+
 	if (options.profileData) {
 		lines.push(`profile_data = ${array([`{home}/e2e-profile/${options.id}/settings.ini`])}`);
 	}
+
 	if (options.requires) {
 		lines.push(`requires = ${array(["loader.dll"])}`);
 	}
+
 	if (options.verified) {
 		lines.push("[verified]", 'date = "2026-11-12"', 'os = ["linux"]');
 	}
+
 	lines.push(
 		"[detect]",
 		`markers = ${array(markers)}`,
@@ -103,16 +112,22 @@ export function gameToml(options: GameOptions): string {
 		...(options.executable === "sleep-binary" ? ['args = ["30"]'] : []),
 		"",
 	);
+
 	if (options.requires) {
 		lines.push("[[requirements]]", 'name = "E2E Loader"', 'path = "loader.dll"', 'url = "https://example.invalid/loader"');
 	}
+
 	if (layout === "slot" || layout === "loader" || layout === "protected") {
 		lines.push("[deploy]");
+
 		if (options.rootFiles) lines.push(`root_files = ${array(["winhttp.dll"])}`);
+
 		if (options.protected || layout === "protected") lines.push(`protected = ${array(["bin/config"])}`);
+
 		if (options.aliases || layout === "loader") {
 			lines.push("[deploy.aliases]", 'plugins = "BepInEx/plugins"');
 		}
+
 		lines.push(
 			"[[deploy.slots]]",
 			`dir = ${tomlString(slotDir)}`,
@@ -120,10 +135,12 @@ export function gameToml(options: GameOptions): string {
 			...(slotMarker ? [`marker = ${tomlString(slotMarker)}`] : []),
 			...(layout === "loader" ? [`root_extensions = ${array([".dll"])}`, `root_folder_extensions = ${array([".dll"])}`] : []),
 		);
+
 		if (options.shared ?? true) {
 			lines.push("[[deploy.shared]]", 'dir = "content"', `extensions = ${array([".ws"])}`);
 		}
 	}
+
 	if (layout === "mirror") {
 		lines.push(
 			"[deploy]",
@@ -138,6 +155,7 @@ export function gameToml(options: GameOptions): string {
 			`extensions = ${array([".dll"])}`,
 		);
 	}
+
 	if (layout === "flat") {
 		lines.push(
 			"[deploy]",
@@ -148,6 +166,7 @@ export function gameToml(options: GameOptions): string {
 			`root_extensions = ${array([".pak"])}`,
 		);
 	}
+
 	if (options.userData) {
 		lines.push(
 			"[[user_data]]",
@@ -159,6 +178,7 @@ export function gameToml(options: GameOptions): string {
 			`inherit = ${options.userDataInherit ?? true}`,
 		);
 	}
+
 	if (options.steps) {
 		lines.push(
 			"[[steps]]",
@@ -169,9 +189,11 @@ export function gameToml(options: GameOptions): string {
 			'log = "step.log"',
 		);
 	}
+
 	if (options.tools) {
 		lines.push("[[tools]]", 'id = "hello"', 'name = "Hello Tool"', `detect = ${array(["bin/tool.sh"])}`, 'output = "content/tool.txt"');
 	}
+
 	if (options.extraToml) lines.push(options.extraToml);
 	return `${lines.join("\n").trim()}\n`;
 }
@@ -233,19 +255,25 @@ export function writeGameRoot(options: GameOptions, root = path.join(rootsDir, o
 	writeFile(path.join(root, "bin/second.sh"), SECOND_SCRIPT, 0o755);
 	writeFile(path.join(root, "bin/step.sh"), STEP_SCRIPT, 0o755);
 	writeFile(path.join(root, "bin/tool.sh"), TOOL_SCRIPT, 0o755);
+
 	if (options.executable === "sleep-binary") {
 		const sleep = existsSync("/bin/sleep") ? "/bin/sleep" : "/usr/bin/sleep";
 		copyFileSync(sleep, path.join(root, "bin/sleep"));
 	}
+
 	for (const marker of options.markers ?? ["bin/game.exe"]) {
 		writeFile(path.join(root, marker), "");
 	}
+
 	if (options.loadOrder) makeDir(path.join(root, "settings"));
+
 	if (options.layout === "loader") {
 		writeFile(path.join(root, "BepInEx/core/E2E2.dll"), "loader");
 		writeFile(path.join(root, "winhttp.dll"), "proxy");
 	}
+
 	if (options.userData) makeDir(path.join(homeDir, "e2e-user", options.id, "saves"));
+
 	if (options.profileData) makeDir(path.join(homeDir, "e2e-profile", options.id));
 	writeFile(path.join(homeDir, "e2e-user", options.id, "saves", "real.dat"), "real");
 	writeFile(path.join(homeDir, "e2e-profile", options.id, "settings.ini"), "real=1\n");
@@ -265,6 +293,7 @@ export function prepareGame(options: GameOptions): GameFixture {
 
 export function modZip(name: string, folder: string, files?: Record<string, string>): string {
 	const entries: Record<string, string> = {};
+
 	for (const [relative, content] of Object.entries(files ?? { "content/x.ws": "x" })) entries[`Mods/${folder}/${relative}`] = content;
 	const file = path.join(fixturesDir, name);
 	writeZip(file, entries);
@@ -279,6 +308,7 @@ export function wrappedModZip(name: string, wrapper: string, folder: string): st
 
 export function multiModZip(name: string, folders: string[]): string {
 	const entries: Record<string, string> = {};
+
 	for (const folder of folders) entries[`Mods/${folder}/content/${folder}.ws`] = folder;
 	const file = path.join(fixturesDir, name);
 	writeZip(file, entries);

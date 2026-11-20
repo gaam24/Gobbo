@@ -31,6 +31,7 @@ export function HealthDialog({ gameId, onClose }: { gameId: string; onClose: () 
 
 	const run = (kind: HealthActionKind) => {
 		onClose();
+
 		if (kind === "open_settings") openGameSettings();
 		else if (kind === "show_mods") openMods();
 		else if (kind === "open_overwrite") openDialog({ kind: "overwrite" });
@@ -38,6 +39,7 @@ export function HealthDialog({ gameId, onClose }: { gameId: string; onClose: () 
 	};
 
 	let body: ReactNode;
+
 	if (!report) {
 		body = <p className="text-muted-foreground text-sm">{t("health.loading")}</p>;
 	} else if (report.items.length === 0) {

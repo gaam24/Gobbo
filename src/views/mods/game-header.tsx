@@ -129,6 +129,7 @@ export function GameHeader({ gameId, status }: { gameId: string; status: Status 
 		const label = t(presentation.primary.labelKey, presentation.primary.params);
 		/// The selector already replaces the primary action with Stop while the game runs; Stop itself stays enabled.
 		const blocked = presentation.primary.disabled ?? false;
+
 		if (blocked && presentation.primary.reasonKey && !gameRunning) {
 			return (
 				<Tooltip>
@@ -143,6 +144,7 @@ export function GameHeader({ gameId, status }: { gameId: string; status: Status 
 				</Tooltip>
 			);
 		}
+
 		return (
 			<Button
 				variant={presentation.primary.id === "stop" ? "destructive" : "default"}

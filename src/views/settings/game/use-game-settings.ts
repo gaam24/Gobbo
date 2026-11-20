@@ -86,6 +86,7 @@ export function useGameSettings(status: Status, onSave: (patch: Partial<Settings
 
 	const pickProton = async () => {
 		const picked = await pickFolder();
+
 		if (picked) void setProtonBuild(picked);
 	};
 
@@ -93,6 +94,7 @@ export function useGameSettings(status: Status, onSave: (patch: Partial<Settings
 
 	const addProfileData = async (directory: boolean) => {
 		const picked = directory ? await pickFolder() : await pickFile();
+
 		if (picked) await lists.addProfileData(picked);
 	};
 

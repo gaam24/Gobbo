@@ -34,6 +34,7 @@ export function SetupDialog({ gameId, onClose }: { gameId: string; onClose: () =
 	});
 
 	let body: ReactNode;
+
 	if (failure) {
 		body = (
 			<>
@@ -158,6 +159,7 @@ function CheckRow({
 	const Icon = ICON[check.state];
 	const action = (() => {
 		if (check.state === "ok") return null;
+
 		if (check.id === "game_folder" || check.id === "settings_folder" || check.id === "mods_folder" || check.id === "overlay") {
 			return (
 				<Button variant="outline" size="sm" onClick={onOpenSettings}>
@@ -165,6 +167,7 @@ function CheckRow({
 				</Button>
 			);
 		}
+
 		if (check.id === "loader" && check.requirement_path) {
 			const path = check.requirement_path;
 			const name = check.requirement_name ?? path;
@@ -174,6 +177,7 @@ function CheckRow({
 				</Button>
 			);
 		}
+
 		if (check.id === "loader" || check.id === "problems" || check.id === "mods") {
 			return (
 				<Button variant="outline" size="sm" onClick={onShowMods}>
@@ -181,6 +185,7 @@ function CheckRow({
 				</Button>
 			);
 		}
+
 		if (check.id === "space") {
 			return (
 				<Button variant="outline" size="sm" onClick={onOpenStorage}>
@@ -188,6 +193,7 @@ function CheckRow({
 				</Button>
 			);
 		}
+
 		return null;
 	})();
 

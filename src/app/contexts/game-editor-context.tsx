@@ -17,9 +17,11 @@ const GameEditorContext = createContext<GameEditor | null>(null);
 
 export function useGameEditor(): GameEditor {
 	const context = useContext(GameEditorContext);
+
 	if (!context) {
 		throw new Error("useGameEditor must be used inside <GameEditorProvider>.");
 	}
+
 	return context;
 }
 

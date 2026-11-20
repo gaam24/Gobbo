@@ -48,11 +48,13 @@ export function PackExportDialog({
 	const exportNow = async () => {
 		if (exporting) return;
 		setExporting(true);
+
 		try {
 			await onExport(options);
 		} catch {
 			// The parent reports the failure; the dialog stays usable for another try.
 		}
+
 		setExporting(false);
 	};
 

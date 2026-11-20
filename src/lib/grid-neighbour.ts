@@ -13,17 +13,21 @@ const ROW_TOLERANCE = 2;
 /// is closest to the centre of `id`. `null` when there is no such card, or when `id` is not on the screen.
 export function gridNeighbour(cells: readonly GridCell[], id: string, direction: "up" | "down"): string | null {
 	const from = cells.find((cell) => cell.id === id);
+
 	if (!from) return null;
 	const above = direction === "up";
 	const candidates = cells.filter((cell) => (above ? cell.top < from.top - ROW_TOLERANCE : cell.top > from.top + ROW_TOLERANCE));
+
 	if (candidates.length === 0) return null;
 	const edge = candidates.reduce((best, cell) => (above ? Math.max(best, cell.top) : Math.min(best, cell.top)), candidates[0]?.top ?? 0);
 	const row = candidates.filter((cell) => Math.abs(cell.top - edge) <= ROW_TOLERANCE);
 	const centre = (cell: GridCell) => (cell.left + cell.right) / 2;
 	const target = centre(from);
 	let best: GridCell | undefined;
+
 	for (const cell of row) {
 		if (!best || Math.abs(centre(cell) - target) < Math.abs(centre(best) - target)) best = cell;
 	}
+
 	return best?.id ?? null;
 }

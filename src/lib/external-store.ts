@@ -16,6 +16,7 @@ export function createStore<T>(initial: T): Store<T> {
 		set(next) {
 			if (Object.is(next, value)) return;
 			value = next;
+
 			for (const listener of listeners) listener();
 		},
 		subscribe(listener) {

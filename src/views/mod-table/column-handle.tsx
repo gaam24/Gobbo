@@ -30,6 +30,7 @@ export function ColumnHandle({
 
 	const endDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
 		drag.current = null;
+
 		if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
 	};
 
@@ -52,6 +53,7 @@ export function ColumnHandle({
 			}}
 			onPointerMove={(event) => {
 				const start = drag.current;
+
 				if (start) onResize(Math.max(min, start.width + event.clientX - start.x));
 			}}
 			onPointerUp={endDrag}
@@ -63,6 +65,7 @@ export function ColumnHandle({
 					onFit();
 					return;
 				}
+
 				if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
 				event.preventDefault();
 				const step = event.shiftKey ? 32 : 8;

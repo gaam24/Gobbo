@@ -28,6 +28,7 @@ export function useSourceFill({
 			const run = async () => {
 				try {
 					const filled = await unwrap(commands.fillSourceInfo(gameId));
+
 					if (filled === 0) return true;
 					await queueProfile(async () => {
 						const fresh = await unwrap(commands.getStatus(gameId));
@@ -58,6 +59,7 @@ export function useSourceFill({
 		filledGames.current.add(activeGameId);
 		void (async () => {
 			const filled = await fillSourceInfo(activeGameId);
+
 			if (!filled) filledGames.current.delete(activeGameId);
 		})();
 	}, [activeGameId, enabled, fillSourceInfo]);

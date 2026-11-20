@@ -45,8 +45,10 @@ describe("command contracts", () => {
 			const error = await invokeError(command, args);
 			assert.equal(error.code, "io.failed", `${command} answered ${error.code}`);
 		}
+
 		assert.equal((await invokeError("export_definition", { game: "e2e-missing", path: "/tmp/never.zip" })).code, "games.unknown");
 		assert.deepEqual(await invoke("snapshots", { game: "e2e-missing" }), []);
+
 		try {
 			await invokeWithChannel("apply", { game: "e2e-missing" });
 			throw new Error("apply was expected to fail");
@@ -73,6 +75,7 @@ describe("command contracts", () => {
 		assert.equal((await invokeError("delete_mod", { game: id, id: "local:nope" })).code, "library.mod_missing");
 		assert.equal((await invokeError("set_mod_version", { game: id, id: "local:nope", folder: "nope" })).code, "library.version_unknown");
 		assert.equal((await invokeError("delete_mod_version", { game: id, folder: "nope", replacement: null })).code, "library.mod_missing");
+
 		try {
 			await invokeWithChannel("undo", { game: id });
 			throw new Error("undo was expected to fail");
@@ -80,6 +83,7 @@ describe("command contracts", () => {
 			assert.ok(error instanceof CommandFailure);
 			assert.equal(error.code, "deploy.nothing_to_undo");
 		}
+
 		assert.equal((await invokeError("preview_restore", { game: id, id: 999 })).code, "history.unknown");
 		assert.equal((await invokeError("restore_list", { game: id, id: 999 })).code, "history.unknown");
 		await dispose(id, game.root);
@@ -91,6 +95,7 @@ describe("command contracts", () => {
 			game: id,
 			settings: { ...game.status.settings, game_root: "", settings_dir: "" },
 		});
+
 		try {
 			await invokeWithChannel("apply", { game: id });
 			throw new Error("the apply without a game folder was expected to fail");
@@ -99,10 +104,12 @@ describe("command contracts", () => {
 			assert.equal(error.code, "settings.game_folder_missing");
 			assert.equal((error.recovery as { action?: string } | undefined)?.action, "set_game_folder");
 		}
+
 		await invoke("save_settings", {
 			game: id,
 			settings: { ...game.status.settings, settings_dir: "" },
 		});
+
 		try {
 			await invokeWithChannel("apply", { game: id });
 			throw new Error("the apply without a settings folder was expected to fail");
@@ -111,6 +118,7 @@ describe("command contracts", () => {
 			assert.equal(error.code, "settings.settings_folder_missing");
 			assert.equal((error.recovery as { action?: string } | undefined)?.action, "set_settings_folder");
 		}
+
 		await dispose(id, game.root);
 	});
 	it("refuses an unknown profile data set, an unknown tool and an unsafe path", async () => {

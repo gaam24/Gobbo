@@ -208,6 +208,7 @@ export function SavesSection({
 				onConfirm={async () => {
 					const id = moving?.id;
 					setMoving(null);
+
 					if (id) await onMoveUserData(id);
 				}}
 			/>
@@ -227,6 +228,7 @@ function UserDataSize({ setId, onSize }: { setId: string; onSize: (set: string) 
 		const load = async () => {
 			try {
 				const kb = await onSize(setId);
+
 				if (!cancelled) setSize(kb);
 			} catch {
 				// A failed read keeps the line out; the set itself is still usable.

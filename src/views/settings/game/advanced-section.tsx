@@ -59,6 +59,7 @@ export function AdvancedSection({
 /// The facts of the game definition: id, origin, loader, Steam ids and the places it writes to.
 export function DefinitionFacts({ game }: { game: GameView | undefined }) {
 	const { t } = useTranslation();
+
 	if (!game) return <p className="text-muted-foreground text-sm">{t("settings.game.missing")}</p>;
 	return (
 		<dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-6 gap-y-3 text-sm">

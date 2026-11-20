@@ -92,6 +92,7 @@ export function GamesPanel({
 
 	const importDefinition = async () => {
 		const [path] = await pickFiles(t("settings.game.exportFilter"), ARCHIVE_EXTENSIONS, false);
+
 		if (path) openDialog({ kind: "definition-import", path });
 	};
 

@@ -15,11 +15,14 @@ const PLACEHOLDER = /{{\s*(\w+)\s*}}/g;
 /// Flattens nested messages to dotted keys, e.g. `settings.language.system`.
 function flatten(messages: Messages, prefix = ""): Map<string, string> {
 	const out = new Map<string, string>();
+
 	for (const [key, value] of Object.entries(messages)) {
 		const path = prefix + key;
+
 		if (typeof value === "string") out.set(path, value);
 		else for (const [inner, text] of flatten(value, `${path}.`)) out.set(inner, text);
 	}
+
 	return out;
 }
 
@@ -39,28 +42,36 @@ const polishCategories = new Intl.PluralRules("pl").resolvedOptions().pluralCate
 describe("translations", () => {
 	test("every English key has a Polish translation", () => {
 		const missing: string[] = [];
+
 		for (const key of englishKeys.keys()) {
 			const base = baseOf(key);
 			const isPlural = base !== key;
+
 			if (!isPlural) {
 				if (!polishKeys.has(key)) missing.push(key);
 				continue;
 			}
+
 			for (const category of polishCategories) {
 				if (!polishKeys.has(`${base}_${category}`)) missing.push(`${base}_${category}`);
 			}
 		}
+
 		expect(missing).toEqual([]);
 	});
 
 	test("placeholders match the English text", () => {
 		const mismatched: string[] = [];
+
 		for (const [key, text] of polishKeys) {
 			const base = baseOf(key);
 			const source = englishKeys.get(key) ?? englishKeys.get(`${base}_other`) ?? englishKeys.get(`${base}_one`);
+
 			if (source === undefined) continue;
+
 			if (JSON.stringify(placeholders(text)) !== JSON.stringify(placeholders(source))) mismatched.push(key);
 		}
+
 		expect(mismatched).toEqual([]);
 	});
 

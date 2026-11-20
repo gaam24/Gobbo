@@ -19,6 +19,7 @@ export function newProgressChannel<T>(onStep: (step: T) => void): Channel<T> {
 /// Asks where to save a file of one kind. `null` when the user cancels.
 export async function pickSaveFile(defaultPath: string, name: string, extension: string): Promise<string | null> {
 	const test = e2eDialogs();
+
 	if (test?.saveFile !== undefined) return test.saveFile;
 	const { save } = await loadDialog();
 	return save({ defaultPath, filters: [{ name, extensions: [extension] }] });
@@ -32,6 +33,7 @@ export async function pickFiles(name: string, extensions: string[], multiple: bo
 	if (test?.files !== undefined) return multiple ? test.files.splice(0) : test.files.splice(0, 1);
 	const { open } = await loadDialog();
 	const picked = await open({ multiple, filters: [{ name, extensions }] });
+
 	if (picked === null) return [];
 	return typeof picked === "string" ? [picked] : picked;
 }
@@ -39,6 +41,7 @@ export async function pickFiles(name: string, extensions: string[], multiple: bo
 /// Asks for one folder, for a game, a Proton build or a per-profile folder.
 export async function pickFolder(): Promise<string | null> {
 	const test = e2eDialogs();
+
 	if (test?.folder !== undefined) return test.folder;
 	const { open } = await loadDialog();
 	const picked = await open({ directory: true, multiple: false });
@@ -48,6 +51,7 @@ export async function pickFolder(): Promise<string | null> {
 /// Asks for one file of any kind, for a per-profile single-file path.
 export async function pickFile(): Promise<string | null> {
 	const test = e2eDialogs();
+
 	if (test?.file !== undefined) return test.file;
 	const { open } = await loadDialog();
 	const picked = await open({ multiple: false });

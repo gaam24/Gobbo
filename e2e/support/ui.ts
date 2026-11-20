@@ -83,6 +83,7 @@ export async function clickByLabel(label: string, scope?: string): Promise<void>
 			browser.execute(
 				(wanted: string, selector: string | null) => {
 					const root = selector ? document.querySelector(selector) : document;
+
 					if (!root) return false;
 					return [...root.querySelectorAll("[aria-label]")].some((element) => element.getAttribute("aria-label") === wanted);
 				},
@@ -111,6 +112,7 @@ export async function openTooltipByLabel(label: string): Promise<void> {
 		const trigger = [...document.querySelectorAll<HTMLElement>("[aria-label]")].find(
 			(candidate) => candidate.getAttribute("aria-label") === wanted,
 		);
+
 		if (!trigger) throw new Error(`the tooltip trigger ${wanted} was not found`);
 		const box = trigger.getBoundingClientRect();
 		trigger.focus();
@@ -169,6 +171,7 @@ export async function clickByText(
 			browser.execute(
 				(wanted: string, css: string, scopeSelector: string | null) => {
 					const root = scopeSelector ? document.querySelector(scopeSelector) : document;
+
 					if (!root) return false;
 					return [...root.querySelectorAll(css)].some((element) => element.textContent?.toLowerCase().includes(wanted.toLowerCase()));
 				},
@@ -196,13 +199,16 @@ export async function clickByText(
 /// a tab trigger.
 export async function clickTab(text: string): Promise<void> {
 	const tabs = await browser.$$("[role='tab']");
+
 	for (const tab of tabs) {
 		if (!(await tab.isDisplayed())) continue;
+
 		if ((await tab.getText()).toLowerCase().includes(text.toLowerCase())) {
 			await tab.click();
 			return;
 		}
 	}
+
 	throw new Error(`the tab ${text} was not found`);
 }
 
@@ -210,13 +216,16 @@ export async function clickTab(text: string): Promise<void> {
 /// spec that needs the real pointer path uses this helper instead of `clickByText`.
 export async function clickNativeByText(text: string, selector = "button", scope?: string): Promise<void> {
 	const elements = await browser.$$(scope ? `${scope} ${selector}` : selector);
+
 	for (const element of elements) {
 		if (!(await element.isDisplayed())) continue;
+
 		if ((await element.getText()).toLowerCase().includes(text.toLowerCase())) {
 			await element.click();
 			return;
 		}
 	}
+
 	throw new Error(`the control with text ${text} was not found`);
 }
 
@@ -228,15 +237,18 @@ export async function clickInRow(rowText: string, buttonText: string): Promise<v
 			const candidates = [...document.querySelectorAll<HTMLElement>("li, [role='row'], [data-grid-card]")].filter((element) =>
 				(element.textContent ?? "").includes(row),
 			);
+
 			for (const candidate of candidates) {
 				const button = [...candidate.querySelectorAll<HTMLElement>("button")].find((element) =>
 					(element.textContent ?? "").includes(action),
 				);
+
 				if (button) {
 					button.click();
 					return;
 				}
 			}
+
 			throw new Error(`the action ${action} was not found in the row ${row}`);
 		},
 		rowText,
@@ -249,6 +261,7 @@ export async function openContextMenuByLabel(label: string): Promise<void> {
 		const element = [...document.querySelectorAll<HTMLElement>("[aria-label]")].find(
 			(candidate) => candidate.getAttribute("aria-label") === wanted,
 		);
+
 		if (!element) throw new Error(`the control ${wanted} was not found`);
 		const box = element.getBoundingClientRect();
 		element.dispatchEvent(
@@ -272,20 +285,26 @@ export async function typeInto(labelOrSelector: string, value: string): Promise<
 		(target: string, text: string, selector: boolean) => {
 			const root = document;
 			let element: HTMLInputElement | HTMLTextAreaElement | null = null;
+
 			if (selector) {
 				element = root.querySelector<HTMLInputElement | HTMLTextAreaElement>(target);
 			} else {
 				element =
 					[...root.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>("input, textarea")].find((candidate) => {
 						if (candidate.getAttribute("aria-label") === target) return true;
+
 						if ((candidate.placeholder ?? "").includes(target)) return true;
+
 						if (candidate.id) {
 							const label = root.querySelector(`label[for="${CSS.escape(candidate.id)}"]`);
+
 							if (label?.textContent?.includes(target)) return true;
 						}
+
 						return candidate.closest("label")?.textContent?.includes(target) ?? false;
 					}) ?? null;
 			}
+
 			if (!element) throw new Error(`the field ${target} was not found`);
 			element.focus();
 			const prototype = element instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
@@ -306,8 +325,10 @@ export async function setSwitch(label: string, on: boolean): Promise<void> {
 			const control = [...document.querySelectorAll<HTMLElement>("[role='switch']")].find(
 				(element) => element.getAttribute("aria-label") === wanted || element.id === wanted,
 			);
+
 			if (!control) throw new Error(`the switch ${wanted} was not found`);
 			const checked = control.getAttribute("aria-checked") === "true" || (control as HTMLInputElement).checked;
+
 			if (checked !== desired) control.click();
 		},
 		label,
@@ -350,6 +371,7 @@ export async function pressKeyOnMod(name: string, key: string, modifiers: { cont
 			const element = [...document.querySelectorAll<HTMLElement>("[data-mod]")].find((candidate) =>
 				(candidate.textContent ?? "").includes(wanted),
 			);
+
 			if (!element) throw new Error(`the mod ${wanted} was not found`);
 			element.focus();
 			element.dispatchEvent(
@@ -377,13 +399,16 @@ export async function clickMenuTrigger(label: string): Promise<void> {
 		await browser.keys("Escape");
 		await waitForNoSelector("[role='menu']");
 	}
+
 	await browser.execute((wanted: string) => {
 		const element = [...document.querySelectorAll<HTMLElement>("[aria-label]")].find(
 			(candidate) => candidate.getAttribute("aria-label") === wanted,
 		);
+
 		if (!element) throw new Error(`the menu trigger ${wanted} was not found`);
 		element.focus();
 		const box = element.getBoundingClientRect();
+
 		for (const type of ["pointerdown", "pointerup"] as const) {
 			element.dispatchEvent(
 				new PointerEvent(type, {
@@ -397,6 +422,7 @@ export async function clickMenuTrigger(label: string): Promise<void> {
 				}),
 			);
 		}
+
 		element.click();
 	}, label);
 	await waitForSelector("[role='menu']");
@@ -407,11 +433,13 @@ export async function clickMenuTrigger(label: string): Promise<void> {
 export async function chooseSelect(triggerSelector: string, optionText: string): Promise<void> {
 	const opened = await browser.execute((css: string) => {
 		const element = document.querySelector<HTMLElement>(css);
+
 		if (!element) return false;
 		element.focus();
 		element.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }));
 		return true;
 	}, triggerSelector);
+
 	if (!opened) throw new Error(`the select ${triggerSelector} was not found`);
 	await waitForSelector("[role='option']");
 	// A Radix select acts on the item that has the focus. Focus the wanted option and press Enter, so no pointer path
@@ -420,12 +448,14 @@ export async function chooseSelect(triggerSelector: string, optionText: string):
 		const option = [...document.querySelectorAll<HTMLElement>("[role='option']")].find((element) =>
 			(element.textContent ?? "").toLowerCase().includes(wanted.toLowerCase()),
 		);
+
 		if (!option) return false;
 		option.focus();
 		option.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }));
 		option.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
 		return true;
 	}, optionText);
+
 	if (!picked) throw new Error(`the option ${optionText} was not found`);
 	await waitForNoSelector("[role='option']");
 }
@@ -468,7 +498,9 @@ export async function clickMod(name: string, modifiers: { control?: boolean; shi
 			const element = [...document.querySelectorAll<HTMLElement>("[data-mod]")].find((candidate) =>
 				(candidate.textContent ?? "").includes(wanted),
 			);
+
 			if (!element) throw new Error(`the mod ${wanted} was not found`);
+
 			if (ctrl || shift) {
 				element.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, ctrlKey: ctrl, shiftKey: shift }));
 			} else {
@@ -499,6 +531,7 @@ export async function openModMenu(name: string): Promise<void> {
 		const element = [...document.querySelectorAll<HTMLElement>("[data-mod]")].find((candidate) =>
 			(candidate.textContent ?? "").includes(wanted),
 		);
+
 		if (!element) throw new Error(`the mod ${wanted} was not found`);
 		const box = element.getBoundingClientRect();
 		element.dispatchEvent(
@@ -522,10 +555,12 @@ export async function clickMenuItem(text: string): Promise<void> {
 		const item = [...document.querySelectorAll<HTMLElement>("[role='menu'] [data-radix-collection-item]")].find((candidate) =>
 			(candidate.textContent ?? "").toLowerCase().includes(wanted.toLowerCase()),
 		);
+
 		if (!item) return false;
 		item.setAttribute("data-e2e-menu-item", "1");
 		return true;
 	}, text);
+
 	if (!marked) throw new Error(`the menu item ${text} was not found`);
 	const item = await browser.$("[data-e2e-menu-item='1']");
 	await item.click();
@@ -541,17 +576,20 @@ export async function activateMenuItem(text: string): Promise<void> {
 	const found = await browser.execute((wanted: string) => {
 		const items = [...document.querySelectorAll<HTMLElement>("[role='menu'] [data-radix-collection-item]")];
 		const item = items.find((candidate) => (candidate.textContent ?? "").toLowerCase().includes(wanted.toLowerCase()));
+
 		if (!item) return false;
 		item.focus();
 		item.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
 		return true;
 	}, text);
+
 	if (!found) throw new Error(`the menu item ${text} was not found`);
 }
 
 export async function setThrow(view: string | null): Promise<void> {
 	await browser.execute((value: string | null) => {
 		window.__GOBBO_E2E_THROW__ = value;
+
 		if (value === null) sessionStorage.removeItem("gobbo.e2e.throw");
 		else sessionStorage.setItem("gobbo.e2e.throw", value);
 	}, view);

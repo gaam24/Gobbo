@@ -17,6 +17,7 @@ export class CommandError extends Error {
 
 export async function unwrap<T>(call: Promise<CommandResult<T>>): Promise<T> {
 	const result = await call;
+
 	if (result.status === "error") throw new CommandError(result.error);
 	return result.data;
 }
@@ -27,6 +28,7 @@ export async function unwrap<T>(call: Promise<CommandResult<T>>): Promise<T> {
 /// string.
 export function translateCode(code: string, params: Record<string, string> = {}): string {
 	const values: Record<string, string | number> = { ...params };
+
 	if ("count" in params) values.count = Number(params.count);
 	return translateDynamic(code, values);
 }

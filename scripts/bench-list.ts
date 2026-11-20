@@ -48,11 +48,13 @@ function percentile(sorted: number[], fraction: number): number {
 function measure(name: string, run: () => void): void {
 	for (let warmup = 0; warmup < 5; warmup += 1) run();
 	const times: number[] = [];
+
 	for (let index = 0; index < 100; index += 1) {
 		const start = performance.now();
 		run();
 		times.push(performance.now() - start);
 	}
+
 	times.sort((left, right) => left - right);
 	const p50 = percentile(times, 0.5);
 	const p95 = percentile(times, 0.95);

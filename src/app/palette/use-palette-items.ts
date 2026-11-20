@@ -83,16 +83,20 @@ export function usePaletteItems(): () => PaletteItem[] {
 		};
 		const updateCount = gameStatus.mods.reduce((count, mod) => count + (mod.update?.has_update ? 1 : 0), 0);
 		let launchReason: string | undefined;
+
 		if (gameRunning) launchReason = t("palette.reason.running");
 		else if (!presentation.canPlay) launchReason = t("palette.reason.cannotPlay");
 		let applyReason: string | undefined;
+
 		if (gameRunning) applyReason = t("palette.reason.running");
 		else if (!presentation.canApply) applyReason = t("palette.reason.cannotApply");
 		let updateAllReason: string | undefined;
+
 		if (!updatesReady) updateAllReason = t("updates.needKey");
 		else if (updateCount === 0) updateAllReason = t("palette.reason.noUpdates");
 		const enabledCount = gameStatus.mods.filter((mod) => mod.enabled).length;
 		let bisectReason: string | undefined;
+
 		if (gameStatus.bisect !== null) bisectReason = t("palette.reason.bisectRunning");
 		else if (enabledCount < 2) bisectReason = t("palette.reason.bisectNeedsTwo");
 		const actions: Array<Omit<PaletteItem, "group">> = [

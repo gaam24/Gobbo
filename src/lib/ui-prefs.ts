@@ -8,6 +8,7 @@ const PREFIX = "gobbo.";
 export function readPref<T>(key: string, fallback: T, valid: (value: unknown) => value is T): T {
 	try {
 		const text = localStorage.getItem(PREFIX + key);
+
 		if (text === null) return fallback;
 		const value: unknown = JSON.parse(text);
 		return valid(value) ? value : fallback;

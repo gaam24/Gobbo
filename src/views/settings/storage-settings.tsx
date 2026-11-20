@@ -12,6 +12,7 @@ const MODE_KEYS = {
 
 export function StorageSettings({ storage }: { storage: StorageInfo | null }) {
 	const { t } = useTranslation();
+
 	if (!storage) return null;
 
 	return (

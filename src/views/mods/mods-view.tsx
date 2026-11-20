@@ -204,6 +204,7 @@ export function ModsView({ gameId, status }: ModsViewProps) {
 	/// The ends of the full list for a move across a separator; a copy of every mod is not needed.
 	let firstModId: string | null = null;
 	let lastModId: string | null = null;
+
 	for (const item of items) {
 		if (item.kind !== "mod") continue;
 		// oxlint-disable-next-line typescript/prefer-nullish-coalescing -- React Compiler cannot compile `??=`.
@@ -361,6 +362,7 @@ export function ModsView({ gameId, status }: ModsViewProps) {
 							onFoldAll={foldAll}
 							onCloseAutoFocus={(event) => {
 								const action = takeAfterListMenu();
+
 								if (!action) return;
 								event.preventDefault();
 								action();

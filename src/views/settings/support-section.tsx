@@ -19,6 +19,7 @@ export function SupportSection({ gameId }: { gameId: string | null }) {
 	const create = async () => {
 		setBusy(true);
 		setFailure(null);
+
 		try {
 			setPath(await unwrap(commands.createSupportBundle(gameId)));
 		} catch (error) {

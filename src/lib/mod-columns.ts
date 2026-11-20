@@ -197,11 +197,13 @@ export function restoreLayout(saved: SavedLayout | null): ColumnLayout {
 	if (!saved) return DEFAULT_LAYOUT;
 	const order = [...new Set([...(saved.order ?? []), ...DEFAULT_LAYOUT.order])];
 	const widths: ColumnLayout["widths"] = {};
+
 	for (const [id, width] of Object.entries(saved.widths)) {
 		if (!isColumnId(id) || typeof width !== "number") continue;
 		const min = COLUMNS.find((column) => column.id === id)?.min ?? 1;
 		widths[id] = Math.max(min, width);
 	}
+
 	return {
 		widths,
 		hidden: saved.hidden.filter((id) => !isPinned(id)),
@@ -212,6 +214,7 @@ export function restoreLayout(saved: SavedLayout | null): ColumnLayout {
 export function moveColumnTo(order: ColumnId[], id: ColumnId, target: ColumnId): ColumnId[] {
 	const from = order.indexOf(id);
 	const to = order.indexOf(target);
+
 	if (from < 0 || to < 0 || from === to) return order;
 	const next = [...order];
 	next.splice(from, 1);
@@ -224,9 +227,11 @@ export function moveColumnTo(order: ColumnId[], id: ColumnId, target: ColumnId):
 export function stepColumn(order: ColumnId[], visible: ColumnId[], id: ColumnId, step: -1 | 1): ColumnId[] {
 	const at = visible.indexOf(id);
 	const neighbour = at < 0 ? undefined : visible[at + step];
+
 	if (neighbour === undefined) return order;
 	const from = order.indexOf(id);
 	const to = order.indexOf(neighbour);
+
 	if (from < 0 || to < 0) return order;
 	const next = [...order];
 	next[from] = neighbour;

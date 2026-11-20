@@ -9,11 +9,14 @@ const warnings: string[] = [];
 
 function walk(dir: string): string[] {
 	const files: string[] = [];
+
 	for (const entry of readdirSync(dir, { withFileTypes: true })) {
 		const path = join(dir, entry.name);
+
 		if (entry.isDirectory()) files.push(...walk(path));
 		else if (entry.isFile() && (entry.name.endsWith(".ts") || entry.name.endsWith(".tsx"))) files.push(path);
 	}
+
 	return files;
 }
 
@@ -40,9 +43,11 @@ for (const path of files) {
 		for (const forbidden of ["@/i18n", "@/app/", "@/lib/", "@/views/"]) {
 			if (text.includes(forbidden)) report(path, `the generated ui layer must not import ${forbidden}`);
 		}
+
 		for (const token of ["bg-surf", "text-ink", "border-line", "bg-brand", "text-brand", "text-danger", "bg-danger"]) {
 			if (text.includes(token)) report(path, `the generated ui layer must not use the app token ${token}`);
 		}
+
 		continue;
 	}
 
@@ -52,7 +57,9 @@ for (const path of files) {
 				report(path, `raw <${element}> outside src/components/ui; use the shadcn component`);
 			}
 		}
+
 		const buttons = [...text.matchAll(/<button\b/g)].length;
+
 		if (buttons > 0) warn(path, `${buttons} raw <button> element(s); use Button unless this is a documented custom control`);
 	}
 
@@ -62,22 +69,26 @@ for (const path of files) {
 }
 
 const indexCss = readFileSync(join(src, "index.css"), "utf8");
+
 if (!indexCss.includes("@custom-variant dark")) {
 	failures.push("src/index.css: missing @custom-variant dark; dark: variants depend on the OS theme");
 }
 
 const indexHtml = join(root, "index.html");
+
 if (!readFileSync(indexHtml, "utf8").includes('class="dark"')) {
 	failures.push('index.html: <html> needs class="dark" so the app theme, not the OS theme, selects dark variants');
 }
 
 if (warnings.length > 0) {
 	console.warn(`UI warnings (${warnings.length}):`);
+
 	for (const warning of warnings) console.warn(`  ${warning}`);
 }
 
 if (failures.length > 0) {
 	console.error(`UI check failed (${failures.length}):`);
+
 	for (const failure of failures) console.error(`  ${failure}`);
 	process.exit(1);
 }

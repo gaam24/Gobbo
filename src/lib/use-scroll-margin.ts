@@ -14,6 +14,7 @@ export function useScrollMargin(
 		const update = () => {
 			const scroll = scrollRef?.current;
 			const list = listRef?.current;
+
 			if (!(scroll && list)) return;
 			const next = list.getBoundingClientRect().top - scroll.getBoundingClientRect().top + scroll.scrollTop;
 			// The list's height changes on every resize; only its top matters here, so ignore those updates. Comparing
@@ -22,7 +23,9 @@ export function useScrollMargin(
 		};
 		const frame = requestAnimationFrame(update);
 		const observer = new ResizeObserver(update);
+
 		if (scrollRef?.current) observer.observe(scrollRef.current);
+
 		if (listRef?.current) observer.observe(listRef.current);
 		window.addEventListener("resize", update);
 		return () => {

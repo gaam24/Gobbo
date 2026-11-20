@@ -7,6 +7,7 @@ import { strToU8, unzipSync, zipSync } from "fflate";
 export function writeFile(file: string, content: string | Uint8Array, mode?: number): void {
 	mkdirSync(path.dirname(file), { recursive: true });
 	writeFileSync(file, content);
+
 	if (mode !== undefined) chmodSync(file, mode);
 }
 
@@ -48,13 +49,16 @@ export function removeTree(target: string): void {
 	const unlock = (entry: string): void => {
 		try {
 			const stat = lstatSync(entry);
+
 			if (stat.isSymbolicLink()) return;
+
 			if (stat.isDirectory()) {
 				try {
 					chmodSync(entry, 0o700);
 				} catch {
 					// A folder on a read-only mount is left for rmSync to report.
 				}
+
 				for (const child of readdirSync(entry)) unlock(`${entry}/${child}`);
 			} else {
 				try {
@@ -78,9 +82,11 @@ export function makeDir(dir: string): void {
 /// A ZIP with text files. Paths use `/`, as an archive does.
 export function writeZip(file: string, entries: Record<string, string | Uint8Array>): void {
 	const files: Record<string, Uint8Array> = {};
+
 	for (const [name, content] of Object.entries(entries)) {
 		files[name] = typeof content === "string" ? strToU8(content) : content;
 	}
+
 	writeFile(file, zipSync(files, { level: 6 }));
 }
 

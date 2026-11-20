@@ -20,6 +20,7 @@ export function CollectionBadge({ profile }: { profile: ProfileView | undefined 
 	const { t } = useTranslation();
 	const { openPanel, openLink, installs, checkUpdates, checking } = useCollections();
 	const collections = profile?.collections ?? [];
+
 	if (collections.length === 0) return null;
 	const active = [...installs.values()].some(
 		(install) =>

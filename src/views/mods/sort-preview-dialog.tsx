@@ -29,6 +29,7 @@ export function SortPreviewDialog({ gameId, onClose }: { gameId: string; onClose
 	};
 
 	let body: ReactNode;
+
 	if (!preview) {
 		body = <p className="text-muted-foreground text-sm">{t("sortPreview.loading")}</p>;
 	} else if (preview.moves.length === 0) {

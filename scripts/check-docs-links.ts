@@ -21,6 +21,7 @@ function markdownFiles(dir: string): string[] {
 			if (SKIP.has(entry.name)) return [];
 			return markdownFiles(join(dir, entry.name));
 		}
+
 		return entry.name.endsWith(".md") ? [join(dir, entry.name)] : [];
 	});
 }
@@ -40,13 +41,16 @@ function headingAnchors(text: string): Set<string> {
 	const anchors = new Set<string>();
 	const counts = new Map<string, number>();
 	let inFence = false;
+
 	for (const line of text.split("\n")) {
 		if (line.trim().startsWith("```")) {
 			inFence = !inFence;
 			continue;
 		}
+
 		if (inFence) continue;
 		const match = HEADING.exec(line);
+
 		if (!match) continue;
 		const heading = (match[1] ?? "")
 			.replace(/<[^>]*>/g, "")
@@ -138,6 +142,7 @@ for (const path of markdownFiles(ROOT)) {
 	for (const stale of STALE) {
 		if (text.includes(stale)) problems.push(`${shown}: stale path \`${stale}\``);
 	}
+
 	for (const link of linksIn(text)) {
 		if (link.image) {
 			if (link.alt === null) {
@@ -146,7 +151,9 @@ for (const path of markdownFiles(ROOT)) {
 				problems.push(`${shown}:${link.line}: Markdown image without alt text \`${link.raw}\``);
 			}
 		}
+
 		const target = cleanTarget(link.raw);
+
 		if (target === null) continue;
 		// Plans are local and git-ignored, so a fresh clone cannot resolve them. The backlog may still point at one;
 		// report it without failing the gate until the file moves out of the repository.
@@ -154,26 +161,32 @@ for (const path of markdownFiles(ROOT)) {
 			warnings.push(`${shown}:${link.line}: local plan \`${target}\``);
 			continue;
 		}
+
 		const hash = target.indexOf("#");
 		const pathPart = hash === -1 ? target : target.slice(0, hash);
 		const fragment = hash === -1 ? "" : target.slice(hash + 1);
 		const cleanPath = pathPart.split("?")[0] ?? "";
 		const base = cleanPath.startsWith("/") ? ROOT : dirname(path);
 		let resolved = path;
+
 		if (cleanPath !== "") {
 			resolved = isAbsolute(cleanPath) ? cleanPath : resolve(base, cleanPath);
 		}
+
 		if (!existsSync(resolved)) {
 			problems.push(`${shown}:${link.line}: missing \`${link.raw}\``);
 			continue;
 		}
+
 		if (fragment === "" || !resolved.endsWith(".md") || /^L\d+/.test(fragment)) continue;
 		let wanted = fragment;
+
 		try {
 			wanted = decodeURIComponent(fragment);
 		} catch {
 			// A malformed escape is left as it is and fails the anchor check below.
 		}
+
 		if (!(anchorsOf(resolved).has(wanted) || anchorsOf(resolved).has(wanted.toLowerCase()))) {
 			problems.push(`${shown}:${link.line}: missing anchor \`#${fragment}\` in \`${relative(ROOT, resolved)}\``);
 		}
@@ -182,11 +195,15 @@ for (const path of markdownFiles(ROOT)) {
 
 if (warnings.length > 0) {
 	console.warn(`Docs links: ${warnings.length} local plan link(s), skipped.`);
+
 	for (const warning of warnings) console.warn(`  ${warning}`);
 }
+
 if (problems.length > 0) {
 	console.error(`Docs links: ${problems.length} problem(s).`);
+
 	for (const problem of problems) console.error(`  ${problem}`);
 	process.exit(1);
 }
+
 process.stdout.write("Docs links: every relative link, anchor and image alt resolves.\n");

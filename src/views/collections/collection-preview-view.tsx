@@ -45,11 +45,13 @@ export function CollectionPreviewView({ preview, onClose }: { preview: Collectio
 	const unsupported = plan.issues.filter((issue) => issue.severity === "unsupported").length;
 
 	let modeHint = t("collection.mode.premiumOnly");
+
 	if (mode === "automatic") modeHint = t("collection.mode.automaticHint");
 	else if (preview.direct_download) modeHint = t("collection.mode.guidedHint");
 	const toggle = (key: string, checked: boolean) =>
 		setSelected((current) => {
 			const next = new Set(current);
+
 			if (checked) next.add(key);
 			else next.delete(key);
 			return next;

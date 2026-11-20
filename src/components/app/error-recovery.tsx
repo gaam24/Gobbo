@@ -20,6 +20,7 @@ const LABEL: Record<Recovery["action"], TranslationKey> = {
 /// recovery action the same way. A failure without a recovery keeps its message and its Retry only.
 export function ErrorRecovery({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
 	const recovery = recoveryOf(error);
+
 	if (!recovery) return null;
 	return <RecoveryButton recovery={recovery} onRetry={onRetry} />;
 }

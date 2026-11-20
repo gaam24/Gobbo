@@ -46,27 +46,33 @@ function wordsOf(value: string): string[] {
 /** Whole-token match: `needle` must appear as a consecutive run of words in `haystack`. */
 function containsSequence(haystack: readonly string[], needle: readonly string[]): boolean {
 	if (needle.length === 0 || needle.length > haystack.length) return false;
+
 	for (let start = 0; start <= haystack.length - needle.length; start += 1) {
 		let matched = true;
+
 		for (let offset = 0; offset < needle.length; offset += 1) {
 			if (haystack[start + offset] !== needle[offset]) {
 				matched = false;
 				break;
 			}
 		}
+
 		if (matched) return true;
 	}
+
 	return false;
 }
 
 /** The first matching language in table order, so a text naming several is deterministic. */
 export function detectLanguage(text: string): string | null {
 	const words = wordsOf(text);
+
 	for (const entry of languageTokens) {
 		for (const token of entry.tokens) {
 			if (containsSequence(words, wordsOf(token))) return entry.code;
 		}
 	}
+
 	return null;
 }
 
@@ -79,7 +85,9 @@ function searchableText(mod: ModView): string {
 function nameReference(base: ModView, translation: ModView): 0 | 0.6 | 1 {
 	const baseWords = wordsOf(base.info.name);
 	const candidateWords = wordsOf(searchableText(translation));
+
 	if (baseWords.length === 0) return 0;
+
 	if (containsSequence(candidateWords, baseWords)) return 1;
 	const meaningful = baseWords.filter((word) => word.length >= 3 && !stopWords.has(word));
 	return meaningful.some((word) => candidateWords.includes(word)) ? 0.6 : 0;
@@ -89,6 +97,7 @@ function nameReference(base: ModView, translation: ModView): 0 | 0.6 | 1 {
 function pageScore(base: ModView, translation: ModView): -0.2 | 0 | 0.15 {
 	const basePage = base.page_id ?? null;
 	const translationPage = translation.page_id ?? null;
+
 	if (basePage === null || translationPage === null) return 0;
 	return basePage === translationPage ? -0.2 : 0.15;
 }
@@ -99,19 +108,24 @@ function pageScore(base: ModView, translation: ModView): -0.2 | 0 | 0.15 {
  */
 export function suggestTranslationPairs(mods: ModView[], existingGroups: ModGroup[]): TranslationHint[] {
 	const grouped = new Set<string>();
+
 	for (const group of existingGroups) {
 		for (const member of group.members) grouped.add(member);
 	}
+
 	const pool = mods.filter((mod) => !grouped.has(mod.id));
 	const hints: TranslationHint[] = [];
 
 	for (const base of pool) {
 		if (detectLanguage(base.info.name) !== null) continue;
+
 		for (const translation of pool) {
 			if (base.id === translation.id) continue;
 			const language = detectLanguage(searchableText(translation));
+
 			if (language === null) continue;
 			const reference = nameReference(base, translation);
+
 			if (reference === 0) continue;
 			const raw = LANGUAGE_WEIGHT + NAME_WEIGHT * reference + pageScore(base, translation);
 			const confidence = Math.round(Math.min(1, Math.max(0, raw)) * 100) / 100;
@@ -121,7 +135,9 @@ export function suggestTranslationPairs(mods: ModView[], existingGroups: ModGrou
 
 	hints.sort((a, b) => {
 		if (a.confidence !== b.confidence) return b.confidence - a.confidence;
+
 		if (a.baseId !== b.baseId) return a.baseId < b.baseId ? -1 : 1;
+
 		if (a.translationId !== b.translationId) return a.translationId < b.translationId ? -1 : 1;
 		return 0;
 	});
@@ -133,12 +149,15 @@ export function sharedConflictPaths(base: ModDetails, translation: ModDetails): 
 	const otherPaths = new Set(translation.conflicts.map((conflict) => conflict.path));
 	const seen = new Set<string>();
 	const shared: string[] = [];
+
 	for (const conflict of base.conflicts) {
 		const path = conflict.path;
+
 		if (otherPaths.has(path) && !seen.has(path)) {
 			seen.add(path);
 			shared.push(path);
 		}
 	}
+
 	return shared;
 }

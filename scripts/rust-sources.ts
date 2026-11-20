@@ -24,6 +24,7 @@ export function rustFiles(dir: string, skip: (name: string) => boolean = () => f
 	return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
 		if (skip(entry.name)) return [];
 		const path = join(dir, entry.name);
+
 		if (entry.isDirectory()) return entry.name === "tests" ? [] : rustFiles(path, skip);
 		return entry.name.endsWith(".rs") ? [path] : [];
 	});

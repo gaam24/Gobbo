@@ -40,6 +40,7 @@ export function PackImportDialog({
 	const run = closeThen(onClose);
 
 	let content: ReactNode;
+
 	if (failure) {
 		content = <FieldError>{failure}</FieldError>;
 	} else if (preview === undefined) {

@@ -26,9 +26,12 @@ export const GAME_ROW_GRID = "grid grid-cols-[40px_minmax(0,1fr)_minmax(0,1.4fr)
 export function buildGameEntries(games: GameView[], managed: ManagedGame[], scans: GameScan[] | null, scanFailed = false): GameEntry[] {
 	return games.map((game) => {
 		const added = managed.find((item) => item.id === game.id);
+
 		if (added) return { game, status: "added", root: added.game_root || null, ready: added.ready };
+
 		if (scans === null) return { game, status: scanFailed ? "unsearched" : "searching", root: null, ready: false };
 		const scan = scans.find((item) => item.id === game.id);
+
 		if (scan?.found) return { game, status: "found", root: scan.found.game_root, ready: false };
 		return { game, status: "missing", root: null, ready: false };
 	});

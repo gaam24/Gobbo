@@ -73,23 +73,28 @@ function toView(
 		installed: target.installed,
 	}));
 	const steps: Record<string, ManualStep> = {};
+
 	for (const [id, step] of Object.entries(backend.steps)) steps[id] = step;
 	const errors: Record<string, string> = {};
+
 	for (const [id, code] of Object.entries(backend.errors)) errors[id] = translateCode(code);
 	const index = backend.index;
 	const current = targets[index];
 	let livePercent: number | null = null;
+
 	if (current) {
 		const match = downloads
 			.filter((download) => matchesDownload(current, download))
 			.reduce<Download | null>((left, right) => (!left || right.id > left.id ? right : left), null);
 		if (match && match.total_kb > 0) livePercent = Math.min(100, Math.floor((match.received_kb * 100) / match.total_kb));
 	}
+
 	const state = current ? (steps[current.id] ?? "waiting") : "waiting";
 	const status = (() => {
 		if (state === "downloading") {
 			return livePercent === null ? t("updates.manual.downloading") : t("updates.manual.downloadingPercent", { percent: livePercent });
 		}
+
 		if (state === "failed") return errors[current?.id ?? ""] ?? t("updates.manual.failedShort");
 		return t(STEP_STATUS[state]);
 	})();
@@ -171,6 +176,7 @@ export function useManualUpdates({
 	/// themselves, exactly like the dialog's Close did before.
 	const stop = useCallback(() => {
 		const game = gameRef.current;
+
 		if (!game) return;
 		void commands.manualUpdateCancel(game);
 		removeTask(taskId(game));
@@ -193,6 +199,7 @@ export function useManualUpdates({
 				switchGame(game);
 				return;
 			}
+
 			void commands.manualUpdateReopen(game);
 			openDialog({ kind: "manual-updates", targets });
 		},
@@ -205,6 +212,7 @@ export function useManualUpdates({
 	const openFromTask = useCallback((game: string, targets: UpdateTarget[]) => openManualDialogRef.current(game, targets), []);
 	useEffect(() => {
 		const pending = pendingOpen.current;
+
 		if (!pending || pending.game !== shownGame) return;
 		pendingOpen.current = null;
 		void commands.manualUpdateReopen(pending.game);
@@ -217,7 +225,9 @@ export function useManualUpdates({
 		async (targets: UpdateTarget[], game: string, actions: ManualActions) => {
 			const started = startedRef.current;
 			const ids = targets.map((target) => target.id).join("|");
+
 			if (started?.game === game && started.ids === ids) return;
+
 			if (started) removeTask(taskId(started.game));
 			actionsRef.current = actions;
 			gameRef.current = game;
@@ -251,6 +261,7 @@ export function useManualUpdates({
 	useTauriListener(async (scope) => {
 		const off = await scope.listen<{ game: string; id: string; name: string; provider: string }>(PAGE_EVENT, (event) => {
 			const actions = actionsRef.current;
+
 			if (!actions || event.payload.game !== gameRef.current) return;
 			// The page request names the mod and its provider; the normal page action only needs those two fields.
 			actions.openPage({
@@ -274,24 +285,31 @@ export function useManualUpdates({
 		const game = gameRef.current;
 		const actions = actionsRef.current;
 		const current = currentRef.current;
+
 		if (!(game && actions && current)) return;
 		const matches = downloads.filter((download) => actions.matchesDownload(current, download));
 		const latest = matches.reduce<Download | null>((left, right) => (!left || right.id > left.id ? right : left), null);
+
 		if (!latest) return;
+
 		if (latest.state === "failed") {
 			if (!reported.current.has(`${current.id}:failed`)) {
 				reported.current.add(`${current.id}:failed`);
+
 				if (latest.error) notifyError(actions.describeDownloadError(latest.error));
 				void commands.manualUpdateStep(game, current.id, "failed");
 			}
+
 			return;
 		}
+
 		if (latest.state === "installed") {
 			void (async () => {
 				setBackend(await unwrap(commands.manualUpdateDownloadDone(game, current.id)));
 			})();
 			return;
 		}
+
 		void commands.manualUpdateStep(game, current.id, latest.state === "downloading" ? "downloading" : "installing");
 	}, [downloads, notifyError]);
 
@@ -299,9 +317,11 @@ export function useManualUpdates({
 	/// message and a Finish button; `finish` closes the dialog, so this cannot restart a settled run.
 	useEffect(() => {
 		if (!backend?.active || backend.index < backend.targets.length) return;
+
 		if (Object.keys(backend.errors).length > 0) return;
 		const game = gameRef.current;
 		const actions = actionsRef.current;
+
 		if (!(game && actions)) return;
 		void (async () => {
 			const handoff = await commands.manualUpdateFinish(game);
@@ -316,6 +336,7 @@ export function useManualUpdates({
 	/// The percentage in the Working panel follows how many mods are settled, not how many pages were opened.
 	useEffect(() => {
 		const game = gameRef.current;
+
 		if (!(game && backend) || backend.targets.length === 0) return;
 		updateTask(taskId(game), { percent: backend.percent });
 	}, [backend]);
@@ -323,6 +344,7 @@ export function useManualUpdates({
 	/// A manual Next skips a mod the user does not want to touch.
 	const next = useCallback(async () => {
 		const game = gameRef.current;
+
 		if (!game) return;
 		setBackend(await commands.manualUpdateNext(game));
 	}, []);
@@ -330,12 +352,14 @@ export function useManualUpdates({
 	const openCurrentPage = useCallback(() => {
 		const current = currentRef.current;
 		const actions = actionsRef.current;
+
 		if (current && actions) actions.openPage(current);
 	}, []);
 
 	const finish = useCallback(async () => {
 		const game = gameRef.current;
 		const actions = actionsRef.current;
+
 		if (!(game && actions)) return;
 		const handoff = await commands.manualUpdateFinish(game);
 		removeTask(taskId(game));

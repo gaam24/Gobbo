@@ -28,6 +28,7 @@ export function TranslationHintsDialog({ onClose }: { onClose: () => void }) {
 
 	const dismiss = (hint: TranslationHint) => {
 		const key = pairKey(hint);
+
 		if (dismissed.includes(key)) return;
 		const next = [...dismissed, key];
 		setDismissed(next);

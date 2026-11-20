@@ -25,15 +25,18 @@ export type TranslationValues = Readonly<Record<string, string | number | boolea
 interface Tree {
 	readonly [key: string]: string | Tree;
 }
+
 type Messages = Partial<Record<string, string>>;
 
 /// Turns a nested bundle (`mods.info.size`) into one table keyed by the dotted path. Built once per language.
 function flatten(tree: Tree, prefix = "", into: Record<string, string> = {}): Record<string, string> {
 	for (const [name, value] of Object.entries(tree)) {
 		const path = `${prefix}${name}`;
+
 		if (typeof value === "string") into[path] = value;
 		else flatten(value, `${path}.`, into);
 	}
+
 	return into;
 }
 
@@ -41,6 +44,7 @@ function flatten(tree: Tree, prefix = "", into: Record<string, string> = {}): Re
 // the initial chunk unless it is the language the system asks for.
 const initialLocale = resolveLocale("system");
 const messages: Partial<Record<Locale, Messages>> = { en: flatten(en) };
+
 if (initialLocale === "pl") messages.pl = flatten((await import("./locales/pl")).default);
 
 let language: Locale = initialLocale;
@@ -51,21 +55,27 @@ if (typeof document !== "undefined") document.documentElement.lang = language;
 const pluralRules = new Map<Locale, Intl.PluralRules>();
 function pluralFormOf(locale: Locale, count: number): string {
 	let rules = pluralRules.get(locale);
+
 	if (!rules) {
 		rules = new Intl.PluralRules(locale);
 		pluralRules.set(locale, rules);
 	}
+
 	return rules.select(count);
 }
 
 /// The text of a key in one language. A plural message picks its form for `count` and falls back to `_other`.
 function messageIn(locale: Locale, key: string, count?: number): string | undefined {
 	const table = messages[locale];
+
 	if (!table) return undefined;
+
 	if (count !== undefined) {
 		const plural = table[`${key}_${pluralFormOf(locale, count)}`] ?? table[`${key}_other`];
+
 		if (plural !== undefined) return plural;
 	}
+
 	return table[key];
 }
 
@@ -138,8 +148,11 @@ export function useTranslation(): { t: typeof translateKey; i18n: { language: Lo
 /// Switches the interface language and the document language. Components re-render on their own.
 export async function applyLanguage(setting: LanguageSetting): Promise<void> {
 	const locale: Locale = resolveLocale(setting);
+
 	if (locale === "pl" && !messages.pl) messages.pl = flatten((await import("./locales/pl")).default);
+
 	if (typeof document !== "undefined") document.documentElement.lang = locale;
 	language = locale;
+
 	for (const listener of listeners) listener();
 }

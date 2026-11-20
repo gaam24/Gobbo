@@ -13,10 +13,13 @@ if (!existsSync(assets)) {
 }
 
 const hits: string[] = [];
+
 for (const name of readdirSync(assets)) {
 	const path = join(assets, name);
+
 	if (!/\.(?:js|css|html)$/.test(name)) continue;
 	const text = readFileSync(path, "utf8");
+
 	for (const marker of markers) {
 		if (text.includes(marker)) hits.push(`${name}: ${marker}`);
 	}
@@ -24,7 +27,9 @@ for (const name of readdirSync(assets)) {
 
 if (hits.length > 0) {
 	console.error("Production bundle contains E2E test hooks:");
+
 	for (const hit of hits) console.error(`  ${hit}`);
 	process.exit(1);
 }
+
 process.stdout.write("Production bundle has no E2E test hooks.\n");

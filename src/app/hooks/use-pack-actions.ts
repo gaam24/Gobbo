@@ -54,6 +54,7 @@ export function usePackActions({
 				selectGame(gameId);
 				return;
 			}
+
 			openDialog(dialog);
 		},
 		[activeGameId, deferOpen, openDialog, selectGame],
@@ -80,6 +81,7 @@ export function usePackActions({
 	const exportPack = (options: PackOptions) =>
 		forGame(async (gameId) => {
 			const path = await pickSaveFile(`${options.info.name || gameId}.gobbopack`, t("pack.filterName"), "gobbopack");
+
 			if (!path) return;
 			closeDialog();
 			const result = await unwrap(commands.exportPack(gameId, path, options));
@@ -89,6 +91,7 @@ export function usePackActions({
 	const pickPack = () => {
 		void attempt(async () => {
 			const [path] = await pickFiles(t("pack.filterName"), ["gobbopack"], false);
+
 			if (path) openDialog({ kind: "pack-import", path });
 		});
 	};
@@ -136,6 +139,7 @@ export function usePackActions({
 			// skip the whole component.
 			const importing = commands.importPackWithProgress(gameId, path, progress);
 			let result: PackImportView;
+
 			try {
 				result = await unwrap(importing);
 			} catch (failure) {
@@ -143,6 +147,7 @@ export function usePackActions({
 				removeTask(id);
 				throw failure;
 			}
+
 			setProgress(path, null, gameId);
 			removeTask(id);
 			packImported(result);
@@ -179,6 +184,7 @@ export function usePackActions({
 			// The bar goes however the download ends; `unwrap` then reports a failure. No `finally`: React Compiler
 			// would skip the whole component.
 			const download = commands.downloadPackMods(gameId, path, progress);
+
 			try {
 				await download;
 			} catch (failure) {
@@ -186,6 +192,7 @@ export function usePackActions({
 				removeTask(id);
 				throw failure;
 			}
+
 			setProgress(path, null, gameId);
 			removeTask(id);
 			packImported(await unwrap(download));

@@ -45,10 +45,12 @@ export function AdvancedDeploy({
 	const addAlias = () => {
 		let name = "alias";
 		let suffix = 2;
+
 		while (name in (deploy.aliases ?? {})) {
 			name = `alias${suffix}`;
 			suffix += 1;
 		}
+
 		aliasRows({ ...deploy.aliases, [name]: "" });
 	};
 

@@ -107,6 +107,7 @@ export function ModDetails({
 		setSeenRequest(detailsRequest);
 		setTab(detailsTab);
 	}
+
 	const [details, setDetails] = useState<ModDetailsData | null>(null);
 	// Keyed by folder so a check that finishes after a selection change never shows another mod's result.
 	const [integrity, setIntegrity] = useState<{ folder: string; status: IntegrityStatus } | null>(null);
@@ -168,6 +169,7 @@ export function ModDetails({
 			} catch (failure) {
 				onError(messageOf(failure));
 			}
+
 			setVerifying(false);
 		})();
 	};

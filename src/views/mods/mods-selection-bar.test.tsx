@@ -66,6 +66,7 @@ const bar = (picked: Mod[], hidden: ReadonlySet<string>) =>
 // one in the server-rendered markup.
 const actionButton = (html: string, label: string) => {
 	const at = html.indexOf(label);
+
 	if (at < 0) return null;
 	const start = html.lastIndexOf("<button", at);
 	return html.slice(start, html.indexOf(">", start) + 1);

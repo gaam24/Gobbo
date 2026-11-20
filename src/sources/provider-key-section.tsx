@@ -50,11 +50,13 @@ export function ProviderKeySection({
 		setChecking(true);
 		const outcome = await onValidate(requested || null);
 		setChecking(false);
+
 		if (currentValue.current.trim() === requested) setResult(outcome);
 	};
 
 	const save = async (key: string) => {
 		const saved = await onSave(key);
+
 		if (!saved) return;
 		setValue("");
 		currentValue.current = "";

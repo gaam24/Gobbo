@@ -98,11 +98,14 @@ export function pagePartsOf(mods: readonly Mod[], pageId: string): Mod[] {
 /// The index just after the run of entries from `start` whose key is `page`. The first entry with another key ends it.
 function runEnd<T>(entries: readonly T[], start: number, page: string, keyOf: (entry: T) => string | null): number {
 	let end = start;
+
 	while (end < entries.length) {
 		const entry = entries[end];
+
 		if (entry === undefined || keyOf(entry) !== page) break;
 		end += 1;
 	}
+
 	return end;
 }
 
@@ -124,12 +127,15 @@ function pageGroupOf(pageId: string, mods: Mod[]): PageGroup {
 /// which the group lists them, and a removed member is simply absent. A mod is in at most one group.
 export function userGroups(mods: readonly Mod[], groups: readonly ModGroup[]): UserGroup[] {
 	const result: UserGroup[] = [];
+
 	for (const group of groups) {
 		const members = new Set(group.members);
 		const parts = mods.filter((mod) => members.has(mod.id));
+
 		if (parts.length < 2) continue;
 		result.push({ source: "user", id: groupRowId(group.id), name: group.name, parts, group });
 	}
+
 	return result;
 }
 
@@ -139,20 +145,26 @@ function groupsOf(items: readonly ListItem[], stored: readonly ModGroup[]): Map<
 	const byId = new Map<string, Group>();
 	const visible = items.flatMap((item) => (item.kind === "mod" ? [item.mod] : []));
 	const covered = new Set<string>();
+
 	for (const group of userGroups(visible, stored)) {
 		for (const part of group.parts) {
 			byId.set(part.id, group);
 			covered.add(part.id);
 		}
 	}
+
 	let at = 0;
+
 	while (at < items.length) {
 		const row = items[at];
+
 		if (row?.kind !== "mod" || covered.has(row.id)) {
 			at += 1;
 			continue;
 		}
+
 		const pageId = pageKeyOf(row.mod);
+
 		if (pageId === null) {
 			at += 1;
 			continue;
@@ -160,16 +172,19 @@ function groupsOf(items: readonly ListItem[], stored: readonly ModGroup[]): Map<
 		// A covered mod or a separator ends the run, so page groups only form over rows still free of a user group.
 		const keyOf = (item: ListItem): string | null => (item.kind === "mod" && !covered.has(item.id) ? pageKeyOf(item.mod) : null);
 		const next = runEnd(items, at, pageId, keyOf);
+
 		if (next - at >= 2) {
 			const mods = items.slice(at, next).flatMap((entry) => (entry.kind === "mod" ? [entry.mod] : []));
 			const page = pageGroupOf(pageId, mods);
 			const group: Group = { source: "page", id: page.id, name: page.name, parts: mods, page };
+
 			for (const mod of mods) byId.set(mod.id, group);
 			at = next;
 		} else {
 			at += 1;
 		}
 	}
+
 	return byId;
 }
 
@@ -193,37 +208,49 @@ export function tableItems(rows: ListItem[], foldedPages: ReadonlySet<string> = 
 	const items: TableItem[] = [];
 	const emitted = new Set<string>();
 	let at = 0;
+
 	while (at < rows.length) {
 		const row = rows[at];
+
 		if (!row) break;
+
 		if (row.kind === "separator") {
 			items.push(row);
 			at += 1;
 			continue;
 		}
+
 		const group = byId.get(row.id);
+
 		if (!group) {
 			items.push({ kind: "mod", id: row.id, mod: row.mod });
 			at += 1;
 			continue;
 		}
+
 		if (emitted.has(group.id)) {
 			at += 1;
 			continue;
 		}
+
 		emitted.add(group.id);
 		const key = group.page?.pageId ?? group.id;
 		items.push(group.page ? { kind: "page", id: group.id, page: group.page } : { kind: "group", id: group.id, group });
+
 		if (!foldedPages.has(group.id)) {
 			for (const mod of group.parts) items.push({ kind: "mod", id: mod.id, mod, nested: true, groupKey: key });
 		}
+
 		at += 1;
+
 		while (at < rows.length) {
 			const part = rows[at];
+
 			if (part && byId.get(part.id)?.id === group.id) at += 1;
 			else break;
 		}
 	}
+
 	return items;
 }
 
@@ -240,6 +267,7 @@ export function gridItems(table: readonly TableItem[], columns: number): GridIte
 		items.push({ kind: "cards", mods: cards });
 		cards = [];
 	};
+
 	for (const item of table) {
 		if (item.kind !== "mod") {
 			flush();
@@ -249,11 +277,15 @@ export function gridItems(table: readonly TableItem[], columns: number): GridIte
 		// A part belongs to the header above it, keyed by `groupKey` (a page id or a user group row id); a mod outside a
 		// header is only a card. A new group starts a new card row.
 		const key = item.nested === true ? (item.groupKey ?? pageKeyOf(item.mod)) : null;
+
 		if (cards.length > 0 && key !== cardKey) flush();
+
 		if (cards.length === 0) cardKey = key;
 		cards.push(item.mod);
+
 		if (cards.length === width) flush();
 	}
+
 	flush();
 	return items;
 }
@@ -266,15 +298,20 @@ export function foldedPageParts(mods: readonly Mod[], foldedPages: ReadonlySet<s
 	const byId = groupsOf(items, groups);
 	const hidden = new Set<string>();
 	const done = new Set<string>();
+
 	for (const mod of mods) {
 		if (done.has(mod.id)) continue;
 		const group = byId.get(mod.id);
+
 		if (!group) continue;
+
 		for (const part of group.parts) {
 			done.add(part.id);
+
 			if (foldedPages.has(group.id)) hidden.add(part.id);
 		}
 	}
+
 	return hidden;
 }
 
@@ -294,19 +331,24 @@ export function listItems(mods: Mod[], separators: Separator[]): ListItem[] {
 	const ids = new Set(mods.map((mod) => mod.id));
 	const above = new Map<string, Separator[]>();
 	const atEnd: Separator[] = [];
+
 	for (const separator of separators) {
 		const before = separator.before ?? null;
+
 		if (before !== null && ids.has(before)) {
 			above.set(before, [...(above.get(before) ?? []), separator]);
 		} else {
 			atEnd.push(separator);
 		}
 	}
+
 	const header = (separator: Separator): ListItem => ({ kind: "separator", id: separator.id, name: separator.name });
 	const items: ListItem[] = [];
+
 	for (const mod of mods) {
 		items.push(...(above.get(mod.id) ?? []).map((separator) => header(separator)), { kind: "mod", id: mod.id, mod });
 	}
+
 	items.push(...atEnd.map((separator) => header(separator)));
 	return items;
 }
@@ -329,6 +371,7 @@ export function knownRows(status: Status): KnownRows {
 /// rows replace theirs, new rows take the order the backend sent, and removed ids leave. A full status replaces all.
 export function applyStatus(previous: Status | null, next: Status): Status {
 	if (!next.patch) return next;
+
 	if (!previous) return next;
 	const rows = new Map<string, { mod: Mod; revision: string }>();
 	previous.mods.forEach((mod, index) => {
@@ -337,6 +380,7 @@ export function applyStatus(previous: Status | null, next: Status): Status {
 	next.mods.forEach((mod, index) => {
 		rows.set(mod.id, { mod, revision: next.revisions[index] ?? "" });
 	});
+
 	for (const id of next.removed) rows.delete(id);
 	const order = next.order ?? previous.mods.map((mod) => mod.id);
 	const mods = order.flatMap((id) => {

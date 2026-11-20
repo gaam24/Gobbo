@@ -22,6 +22,7 @@ const NavigationContext = createContext<Navigation | null>(null);
 
 export function useNavigation(): Navigation {
 	const context = useContext(NavigationContext);
+
 	if (!context) {
 		throw new Error("useNavigation must be used inside <NavigationProvider>.");
 	}
@@ -58,6 +59,7 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
 	const navigate = useCallback(
 		(next: AppView) => {
 			const current = viewRef.current;
+
 			if (current === next) return;
 			requestLeave(() => {
 				viewRef.current = next;
@@ -70,6 +72,7 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
 	/// Back pops the last screen. The forward history is not kept: this is a desktop tool, not a browser.
 	const back = useCallback(() => {
 		const previous = history.at(-1);
+
 		if (previous === undefined) return;
 		requestLeave(() => {
 			viewRef.current = previous;

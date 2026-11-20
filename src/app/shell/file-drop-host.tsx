@@ -16,6 +16,7 @@ export function FileDropHost() {
 	const { notifyError } = useNoticeActions();
 	const dragging = useFileDrop(async (paths) => {
 		const path = paths[0];
+
 		if (paths.length === 1 && path !== undefined && isArchive(path)) {
 			try {
 				await unwrap(commands.inspectDefinitionPackage(path));
@@ -23,12 +24,14 @@ export function FileDropHost() {
 				return;
 			} catch (failure) {
 				const notADefinition = failure instanceof CommandError && failure.appError.code === "games.package_empty";
+
 				if (!notADefinition) {
 					notifyError(messageOf(failure), failure instanceof Error ? failure.message : undefined);
 					return;
 				}
 			}
 		}
+
 		await importPaths(paths);
 	});
 

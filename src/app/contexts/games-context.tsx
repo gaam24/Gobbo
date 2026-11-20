@@ -35,6 +35,7 @@ const GamesContext = createContext<Games | null>(null);
 
 export function useGames(): Games {
 	const context = useContext(GamesContext);
+
 	if (!context) {
 		throw new Error("useGames must be used inside <GamesProvider>.");
 	}
@@ -67,6 +68,7 @@ export function GamesProvider({ children }: { children: ReactNode }) {
 			setDefinitionProblems(catalog.problems);
 			setManaged(added);
 			setCatalogError(null);
+
 			if (added.length === 0) navigate("games");
 		} catch (failure) {
 			setCatalogError(messageOf(failure));
@@ -101,6 +103,7 @@ export function GamesProvider({ children }: { children: ReactNode }) {
 				setScanError(messageOf(failure));
 				throw failure;
 			}
+
 			scanningRef.current = false;
 			setScanning(false);
 		});

@@ -24,6 +24,7 @@ export function GameConsole({ gameId, onClose }: { gameId: string; onClose: () =
 	});
 
 	let body: ReactNode = null;
+
 	if (report !== undefined && report !== null) {
 		body = <LaunchBody report={report} gameId={gameId} />;
 	}

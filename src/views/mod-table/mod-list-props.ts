@@ -27,7 +27,9 @@ export interface GroupMenuActions {
 /// selection belongs elsewhere. The selection only supplies a group when the clicked mod is not grouped itself.
 export function menuGroupFor(modId: string, groups: readonly ModGroup[], selection: readonly string[]): ModGroup | null {
 	const clicked = groups.find((group) => group.members.includes(modId)) ?? null;
+
 	if (clicked) return clicked;
+
 	if (selection.length <= 1 || !selection.includes(modId)) return null;
 	return groups.find((group) => selection.every((id) => group.members.includes(id))) ?? null;
 }

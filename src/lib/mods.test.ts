@@ -91,6 +91,7 @@ test("adjacent parts of one page become one page header with the parts under it"
 	const table = tableItems(items);
 	expect(table.map((row) => row.kind)).toEqual(["page", "mod", "mod", "mod"]);
 	expect(table[0]).toMatchObject({ kind: "page", id: pageRowId("nexus:225"), page: { name: "AudioXL", author: "DigitalVixen" } });
+
 	if (table[0]?.kind === "page") expect(table[0].page.mods.map((mod) => mod.info.name)).toEqual(["Base", "Addon"]);
 	expect(foldedPageParts([part("a", "100", "Base"), part("b", "200", "Addon")], new Set([pageRowId("nexus:225")]))).toEqual(
 		new Set(["a", "b"]),
@@ -149,6 +150,7 @@ test("two user groups each get one header with their parts under it", () => {
 	const table = tableItems(listItems(shown, []), new Set(), groups);
 	expect(table.map((row) => row.kind)).toEqual(["group", "mod", "mod", "group", "mod", "mod", "mod"]);
 	expect(table[0]).toMatchObject({ kind: "group", id: groupRowId("g1"), group: { name: "Group g1" } });
+
 	if (table[0]?.kind === "group") expect(table[0].group.parts.map((p) => p.id)).toEqual(["mod-a", "mod-b"]);
 	const grid = gridItems(table, 2);
 	expect(grid.map((unit) => unit.kind)).toEqual(["group", "cards", "group", "cards", "cards"]);

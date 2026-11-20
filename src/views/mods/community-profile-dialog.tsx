@@ -41,8 +41,10 @@ export function CommunityProfileDialog({ gameId, onClose }: { gameId: string; on
 	const pick = async () => {
 		setFailure(null);
 		const [file] = await pickFiles(t("community.filter"), ["yml", "yaml"], false);
+
 		if (!file) return;
 		setBusy(true);
+
 		try {
 			const inspected = await unwrap(commands.inspectCommunityProfile(gameId, file));
 			setPath(file);
@@ -71,13 +73,16 @@ export function CommunityProfileDialog({ gameId, onClose }: { gameId: string; on
 		setFailure(null);
 		let imported = false;
 		let problem: string | null = null;
+
 		try {
 			imported = await gameActions.importCommunityProfile(path, name);
 		} catch (error) {
 			problem = messageOf(error);
 		}
+
 		removeTask(id);
 		setBusy(false);
+
 		if (imported) onClose();
 		else setFailure(problem ?? t("community.importFailed"));
 	};

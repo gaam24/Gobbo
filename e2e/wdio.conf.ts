@@ -64,6 +64,7 @@ const selected = process.env.E2E_SPECS?.split(",")
 const smoke = process.env.E2E_SMOKE === "1";
 
 let specs = defaultSpecs;
+
 if (selected && selected.length > 0) specs = selected;
 else if (smoke) specs = smokeSpecs;
 
@@ -108,17 +109,20 @@ export const config = {
 		if (!result.error) return;
 		const folder = path.join(artifacts, `${Date.now()}-${test.title.replaceAll(/[^a-z0-9]+/gi, "-").slice(0, 60)}`);
 		mkdirSync(folder, { recursive: true });
+
 		try {
 			await browser.saveScreenshot(path.join(folder, "screen.png"));
 		} catch (error) {
 			writeFileSync(path.join(folder, "screenshot-error.txt"), String(error));
 		}
+
 		try {
 			const logs = await browser.getLogs("browser");
 			writeFileSync(path.join(folder, "browser.log"), JSON.stringify(logs, null, 2));
 		} catch {
 			// The Tauri driver does not always expose browser logs; the screenshot is still useful.
 		}
+
 		try {
 			writeFileSync(path.join(folder, "dom.html"), await browser.execute(() => document.documentElement.outerHTML));
 			writeFileSync(
@@ -126,6 +130,7 @@ export const config = {
 				JSON.stringify(
 					await browser.execute(() => {
 						const values: Record<string, string | null> = {};
+
 						for (const key of Object.keys(localStorage)) values[key] = localStorage.getItem(key);
 						return values;
 					}),
@@ -136,8 +141,10 @@ export const config = {
 		} catch {
 			// The window may be gone after a crash; the error file below says what failed.
 		}
+
 		writeFileSync(path.join(folder, "error.txt"), result.error.stack ?? result.error.message);
 		writeFileSync(path.join(folder, "data.txt"), `GOBBO_DATA_DIR=${dataDir}\nHOME=${homeDir}\n`);
+
 		if (existsSync(path.join(dataDir, "gobbo.log"))) {
 			copyFileSync(path.join(dataDir, "gobbo.log"), path.join(folder, "gobbo.log"));
 		}

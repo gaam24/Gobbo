@@ -4,6 +4,7 @@ import type { FomodChoice } from "@/lib/fomod";
 /// Where a step sits in the walk through the installer: behind, current, or ahead.
 export function stepState(index: number, current: number): "fomod.step.done" | "fomod.step.current" | "fomod.step.upcoming" {
 	if (index < current) return "fomod.step.done";
+
 	if (index === current) return "fomod.step.current";
 	return "fomod.step.upcoming";
 }

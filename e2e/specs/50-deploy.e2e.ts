@@ -78,6 +78,7 @@ describe("deploy", () => {
 		const game = await deployGame("deploy-launch");
 		const status = await statusOf(game.id);
 		assert.ok(status.mods[0]);
+
 		try {
 			await apply(game.id);
 		} catch (error) {
@@ -90,6 +91,7 @@ describe("deploy", () => {
 			await cleanup(game);
 			return;
 		}
+
 		await waitForStage(game.id, "applied");
 		// The mount lives in the app's namespace, so `stat` from this process cannot see it. The game started through
 		// Gobbo can: its script copies the mod file it finds in the merged game folder.

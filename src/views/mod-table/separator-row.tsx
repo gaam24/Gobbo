@@ -71,6 +71,7 @@ export const SeparatorRow = memo(function SeparatorRow({
 		setEditing(false);
 		onRenameDone();
 		const trimmed = value.trim();
+
 		if (!cancelled.current && trimmed && trimmed !== name) void onRenameSeparator(id, trimmed);
 		cancelled.current = false;
 	};
@@ -125,6 +126,7 @@ export const SeparatorRow = memo(function SeparatorRow({
 							onBlur={(event) => rename(event.currentTarget.value)}
 							onKeyDown={(event) => {
 								if (event.key === "Escape") cancelled.current = true;
+
 								if (event.key === "Enter" || event.key === "Escape") event.currentTarget.blur();
 							}}
 						/>

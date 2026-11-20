@@ -148,11 +148,13 @@ function DownloadRow({ download, gameName, showMods, locale, onInstall, onRemove
 	const install = async () => {
 		if (installing) return;
 		setInstalling(true);
+
 		try {
 			await onInstall(download);
 		} catch {
 			// The provider reports the failure; the button must become usable again.
 		}
+
 		setInstalling(false);
 	};
 	const percent = total > 0 ? Math.min(100, Math.floor((received * 100) / total)) : null;
@@ -165,12 +167,16 @@ function DownloadRow({ download, gameName, showMods, locale, onInstall, onRemove
 					? t("downloads.progress", { received: formatSize(received, locale), total: formatSize(total, locale) })
 					: formatSize(received, locale),
 			];
+
 			if (speed > 0) {
 				parts.push(t("downloads.speed", { speed: formatSize(speed, locale) }));
+
 				if (total > received) parts.push(t("downloads.left", { time: formatDuration((total - received) / speed, locale) }));
 			}
+
 			return parts.join(" · ");
 		}
+
 		return total > 0 ? formatSize(total, locale) : "";
 	})();
 

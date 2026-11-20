@@ -57,6 +57,7 @@ const UiStateContext = createContext<UiState | null>(null);
 
 export function useUiState(): UiState {
 	const context = useContext(UiStateContext);
+
 	if (!context) {
 		throw new Error("useUiState must be used inside <UiProvider>.");
 	}
@@ -85,6 +86,7 @@ const UiActionsContext = createContext<UiActions | null>(null);
 
 export function useUiActions(): UiActions {
 	const context = useContext(UiActionsContext);
+
 	if (!context) {
 		throw new Error("useUiActions must be used inside <UiProvider>.");
 	}
@@ -123,12 +125,14 @@ export function UiProvider({ children }: { children: ReactNode }) {
 			setDrawerOpen((open) => !open);
 			return Promise.resolve();
 		}
+
 		return saveInspectorCollapsed(!inspectorCollapsed);
 	}, [inspectorCollapsed, saveInspectorCollapsed, wide]);
 	const showDetails = useCallback(
 		(tab: DetailsTab = "overview") => {
 			setDetailsTab(tab);
 			setDetailsRequest((request) => request + 1);
+
 			if (!wide) setDrawerOpen(true);
 			else if (inspectorCollapsed) void toggleInspector();
 		},

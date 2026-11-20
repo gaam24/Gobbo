@@ -82,6 +82,7 @@ function LoadedPicture({
 	const [revealed, setRevealed] = useState(false);
 	// Still loading: the muted box stands in for the picture.
 	if (picture === undefined) return null;
+
 	if (picture === null) return <Placeholder />;
 	const hidden = adult && !revealed;
 	return (

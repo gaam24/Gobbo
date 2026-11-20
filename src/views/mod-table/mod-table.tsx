@@ -121,6 +121,7 @@ export function ModTable({
 	const [room, setRoom] = useState<number | null>(null);
 	useEffect(() => {
 		const element = scroller.current;
+
 		if (!element) return;
 		const observer = new ResizeObserver(([entry]) => {
 			if (entry) setRoom(Math.floor(entry.contentRect.width));
@@ -162,11 +163,13 @@ export function ModTable({
 	const extrasFolders = useMemo(() => {
 		if (!needsExtras || showAllRows) return [];
 		const folders = new Set<string>();
+
 		for (const row of table.slice(first, last)) {
 			if (row.kind === "mod") folders.add(row.mod.folder);
 			else if (row.kind === "page") for (const mod of row.page.mods) folders.add(mod.folder);
 			else if (row.kind === "group") for (const mod of row.group.parts) folders.add(mod.folder);
 		}
+
 		return [...folders];
 	}, [first, last, needsExtras, showAllRows, table]);
 	const extras = useModExtras(gameId, rows, extrasFolders);
@@ -183,6 +186,7 @@ export function ModTable({
 	/// commit, not in the key handler, where the row does not exist yet.
 	useEffect(() => {
 		const id = selection.at(-1);
+
 		if (!id) return;
 		const frame = requestAnimationFrame(() => {
 			listRef.current?.querySelector<HTMLElement>(`[data-mod="${CSS.escape(id)}"]`)?.focus();
@@ -201,10 +205,12 @@ export function ModTable({
 	/// The side of a drop is only the drag direction; the backend resolves page and user-group blocks from the two ids.
 	const dropped = (event: DragEndEvent) => {
 		const target = event.over?.id;
+
 		if (target === undefined) return;
 		const from = String(event.active.id);
 		const fromAt = rows.findIndex((item) => item.id === from);
 		const toAt = rows.findIndex((item) => item.id === target);
+
 		if (fromAt < 0 || toAt < 0) return;
 		onReorder(from, String(target), fromAt < toAt ? "below" : "above");
 	};
@@ -213,6 +219,7 @@ export function ModTable({
 	const reorderColumns = (event: DragEndEvent) => {
 		const dragged = event.active.id;
 		const target = event.over?.id;
+
 		if (isColumnId(dragged) && isColumnId(target) && dragged !== target) {
 			setLayout({ ...layout, order: moveColumnTo(layout.order, dragged, target) });
 		}
@@ -246,22 +253,28 @@ export function ModTable({
 		// explicit action; lay out an even sample (at most FIT_SAMPLE) and let the browser skip the rest. Measuring every
 		// row of a 10k list would freeze the window for one click.
 		const rowElements = sampleRows([...element.querySelectorAll<HTMLElement>("[data-grid-row]")]);
+
 		for (const row of rowElements) row.style.contentVisibility = "visible";
 		// The header row is always there; without at least one mod row there is nothing to measure.
 		if (rowElements.length <= 1) {
 			element.style.setProperty("--mod-columns", template);
+
 			for (const row of rowElements) row.style.removeProperty("content-visibility");
 			return;
 		}
+
 		const widths = { ...layout.widths };
+
 		for (const id of ids) {
 			const at = columns.findIndex((column) => column.id === id);
 			const column = columns[at];
+
 			if (!column) continue;
 			// The grip is the first child of every row.
 			const widest = Math.max(0, ...rowElements.map((row) => row.children[at + 1]?.getBoundingClientRect().width ?? 0));
 			widths[id] = Math.min(FIT_MAX, Math.max(column.min, Math.ceil(widest) + 2));
 		}
+
 		for (const row of rowElements) row.style.removeProperty("content-visibility");
 		element.style.setProperty("--mod-columns", template);
 		setLayout({ ...layout, widths });
@@ -277,6 +290,7 @@ export function ModTable({
 			});
 			return;
 		}
+
 		fitColumnsNow(ids);
 	};
 	const fitAllColumns = () => fitColumns(columns.filter((column) => column.id !== "mod").map((column) => column.id));
@@ -366,6 +380,7 @@ export function ModTable({
 				/>
 			);
 		}
+
 		if (row.kind === "page" || row.kind === "group") {
 			// `tableItems` keeps the page details on a page row, so wrap them in the same `Group` a user row already is.
 			const header: Group =
@@ -404,6 +419,7 @@ export function ModTable({
 				/>
 			);
 		}
+
 		return (
 			<ModRow
 				key={row.id}
@@ -505,6 +521,7 @@ export function ModTable({
 									? table.map((row, index) => renderRow(row, index))
 									: virtualRows.map((item) => {
 											const row = table[item.index];
+
 											if (!row) return null;
 											return (
 												<div

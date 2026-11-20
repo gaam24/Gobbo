@@ -34,24 +34,31 @@ export const allowed = (layer: Layer, target: string): boolean => {
 /// Every low-layer file that names a feature module or a higher layer.
 export function layerProblems(root: string): string[] {
 	const problems: string[] = [];
+
 	for (const { name, module, text } of productionSources(root, (file) => file === "tests.rs")) {
 		const layer = layerOf(module);
+
 		if (layer === undefined) continue;
+
 		for (const match of text.matchAll(CRATE_REF)) {
 			const target = match[1];
+
 			if (target !== undefined && !allowed(layer, target)) {
 				problems.push(`${name}: ${layer} must not use crate::${target}`);
 			}
 		}
 	}
+
 	return problems;
 }
 
 if (import.meta.main) {
 	const problems = layerProblems(ROOT);
+
 	if (problems.length > 0) {
 		process.stderr.write(`${problems.join("\n")}\n`);
 		process.exit(1);
 	}
+
 	process.stdout.write("Layer check passed.\n");
 }

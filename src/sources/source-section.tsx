@@ -65,8 +65,10 @@ export function SourceSection({
 	const check = async () => {
 		setChecking(true);
 		setFailure(null);
+
 		try {
 			const report = await onCheck(mod.id);
+
 			if (report.error?.kind === "bug") onError(errorText(report.error));
 		} catch (error) {
 			const kind = error instanceof CommandError ? error.appError.kind : "retryable";
@@ -78,6 +80,7 @@ export function SourceSection({
 
 	const checkedText = () => {
 		if (checkedAt === undefined) return t("mods.sources.neverChecked");
+
 		if (isToday(checkedAt)) return t("mods.sources.checkedToday", { time: formatTime(checkedAt, i18n.language) });
 		return t("mods.sources.checkedOn", { date: formatDate(checkedAt, i18n.language) });
 	};
@@ -117,6 +120,7 @@ export function SourceSection({
 					className="border-border bg-muted/25 grid gap-2 rounded-lg border p-3"
 					onSubmit={(event) => {
 						event.preventDefault();
+
 						if (!canAdd) return;
 						void onSetSource(mod.id, chosen, newId.trim());
 						setNewId("");
@@ -217,6 +221,7 @@ function SourceRow({
 			setError(t("mods.sources.idEmpty"));
 			return;
 		}
+
 		setError(null);
 		await onSave(mod.id, provider, value.trim());
 	};

@@ -36,6 +36,7 @@ export function DeployPreviewDialog({
 	});
 	const blocked = (preview?.problems.length ?? 0) > 0;
 	let body: ReactNode;
+
 	if (preview !== undefined) body = <PreviewBody preview={preview} />;
 	else if (failure) body = <FieldError>{failure}</FieldError>;
 	else body = <p className="text-muted-foreground text-sm">{t("preview.loading")}</p>;

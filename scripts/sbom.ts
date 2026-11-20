@@ -26,6 +26,7 @@ function isObject(value: unknown): value is Record<string, unknown> {
 
 function npmLicense(value: unknown): string | undefined {
 	if (typeof value === "string") return value;
+
 	if (isObject(value) && typeof value.type === "string") return value.type;
 	return undefined;
 }
@@ -37,7 +38,9 @@ function add(component: Component) {
 /// `MIT OR Apache-2.0` is an SPDX expression; one identifier is a license id.
 function cargoLicense(value: string | null | undefined): Component["licenses"] {
 	const license = value?.trim();
+
 	if (!license) return [{ license: { name: "unknown" } }];
+
 	if (LICENSE_EXPRESSION.test(license)) return [{ expression: license }];
 	return [{ license: { id: license } }];
 }
@@ -66,7 +69,9 @@ const metadata: unknown = JSON.parse(
 		},
 	),
 );
+
 if (!(isObject(metadata) && Array.isArray(metadata.packages))) throw new Error("cargo metadata has no packages");
+
 for (const pkg of metadata.packages) {
 	if (!isObject(pkg) || typeof pkg.name !== "string" || typeof pkg.version !== "string") continue;
 	add({
@@ -82,16 +87,21 @@ for (const pkg of metadata.packages) {
 /// dependencies; a package folder is the simple source of its license.
 function javascriptPackages(dir: string) {
 	if (!existsSync(dir)) return;
+
 	for (const entry of readdirSync(dir, { withFileTypes: true })) {
 		if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
 		const path = join(dir, entry.name);
+
 		if (entry.name.startsWith("@")) {
 			javascriptPackages(path);
 			continue;
 		}
+
 		const manifest = join(path, "package.json");
+
 		if (!existsSync(manifest)) continue;
 		const pkg: unknown = JSON.parse(readFileSync(manifest, "utf8"));
+
 		if (!isObject(pkg) || typeof pkg.name !== "string" || typeof pkg.version !== "string") continue;
 		const license = npmLicense(pkg.license);
 		add({
@@ -103,6 +113,7 @@ function javascriptPackages(dir: string) {
 		});
 	}
 }
+
 javascriptPackages(join(root, "node_modules"));
 
 const sorted = [...components.values()].toSorted(

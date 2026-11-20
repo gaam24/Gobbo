@@ -81,10 +81,13 @@ export function sampleRows<T>(rows: T[], limit = FIT_SAMPLE): T[] {
 	if (rows.length <= limit) return rows;
 	const picked: T[] = [];
 	const step = rows.length / limit;
+
 	for (let index = 0; index < limit; index += 1) {
 		const row = rows[Math.floor(index * step)];
+
 		if (row !== undefined) picked.push(row);
 	}
+
 	return picked;
 }
 
@@ -169,8 +172,10 @@ export const COLUMN_ICONS: Record<ColumnId, LucideIcon> = {
 export function trackList(columns: ColumnSpec[], widths: ColumnLayout["widths"], sizing: Partial<Record<ColumnId, string>> = {}): string {
 	const tracks = columns.map((column) => {
 		const replaced = sizing[column.id];
+
 		if (replaced !== undefined) return replaced;
 		const width = widths[column.id];
+
 		if (width !== undefined) return `${width}px`;
 		return column.id === "mod" ? `minmax(${column.min}px,${FIT_MAX}px)` : `${column.width}px`;
 	});
@@ -242,10 +247,12 @@ export function neededWidth(columns: ColumnSpec[], widths: ColumnLayout["widths"
 export function fitting(columns: ColumnSpec[], widths: ColumnLayout["widths"], room: number | null): ColumnSpec[] {
 	if (room === null) return columns;
 	let shown = columns;
+
 	for (const id of GIVE_WAY) {
 		if (neededWidth(shown, widths) <= room) break;
 		shown = shown.filter((column) => column.id !== id);
 	}
+
 	return shown;
 }
 

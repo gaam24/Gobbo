@@ -9,10 +9,12 @@ export function createGameQueues() {
 	const queues = new Map<string, ReturnType<typeof createQueue>>();
 	const forGame = (gameId: string) => {
 		let queue = queues.get(gameId);
+
 		if (!queue) {
 			queue = createQueue();
 			queues.set(gameId, queue);
 		}
+
 		return queue;
 	};
 	const run = (action: () => Promise<unknown>, gameId: string) => forGame(gameId).run(action);
@@ -21,6 +23,7 @@ export function createGameQueues() {
 			await forGame(gameId).idle();
 			return;
 		}
+
 		await Promise.all([...queues.values()].map((queue) => queue.idle()));
 	};
 	return { forGame, run, idle };
@@ -84,6 +87,7 @@ export function setActiveGame(gameId: string | undefined) {
 export function setDeployProgress(value: DeployProgress | null, gameId?: string) {
 	const key = keyOf(gameId);
 	const current = slotOf(key);
+
 	if (current.deploy === value) return;
 	write(key, { ...current, deploy: value });
 }
@@ -91,6 +95,7 @@ export function setDeployProgress(value: DeployProgress | null, gameId?: string)
 export function setUpdateProgress(value: UpdateProgress | null, gameId?: string) {
 	const key = keyOf(gameId);
 	const current = slotOf(key);
+
 	if (current.update === value) return;
 	write(key, { ...current, update: value });
 }
@@ -98,6 +103,7 @@ export function setUpdateProgress(value: UpdateProgress | null, gameId?: string)
 export function setUpdateAllProgress(value: UpdateAllProgress | null, gameId?: string) {
 	const key = keyOf(gameId);
 	const current = slotOf(key);
+
 	if (current.updateAll === value) return;
 	write(key, { ...current, updateAll: value });
 }
@@ -107,6 +113,7 @@ export function setUpdateAllProgress(value: UpdateAllProgress | null, gameId?: s
 export function setUpdateAllCancel(value: (() => void) | null, gameId?: string) {
 	const key = keyOf(gameId);
 	const current = slotOf(key);
+
 	if (current.updateAllCancel === value) return;
 	write(key, { ...current, updateAllCancel: value });
 }
@@ -116,6 +123,7 @@ export function setImportProgress(key: string, state: ImportState | null, gameId
 	const slotKey = keyOf(gameId);
 	const current = slotOf(slotKey);
 	const next = new Map(current.importing);
+
 	if (state) next.set(key, state);
 	else if (!next.delete(key)) return;
 	write(slotKey, { ...current, importing: next });
@@ -125,7 +133,9 @@ export function setImportProgress(key: string, state: ImportState | null, gameId
 /// what made long-running work disappear. An action clears its own slot when it starts and when it ends.
 export function resetProgress(gameId?: string) {
 	if (gameId === undefined) return;
+
 	if (!byGame.delete(gameId)) return;
+
 	if (gameId === keyOf()) store.set(slotOf(gameId));
 }
 

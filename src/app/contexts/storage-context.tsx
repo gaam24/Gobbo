@@ -23,6 +23,7 @@ const StorageContext = createContext<Storage | null>(null);
 
 export function useStorage(): Storage {
 	const context = useContext(StorageContext);
+
 	if (!context) {
 		throw new Error("useStorage must be used inside <StorageProvider>.");
 	}
@@ -73,6 +74,7 @@ export function StorageProvider({ children }: { children: ReactNode }) {
 				setManaged(await unwrap(commands.restoreGame(id)));
 				notify(t("notice.gameRestored", { name }));
 			});
+
 			if (ok) await reload(true);
 			return ok;
 		},
@@ -86,6 +88,7 @@ export function StorageProvider({ children }: { children: ReactNode }) {
 				await unwrap(commands.deleteRemovedGame(id));
 				notify(t("notice.gameDataDeleted", { name }));
 			});
+
 			if (ok) await reload(true);
 			return ok;
 		},

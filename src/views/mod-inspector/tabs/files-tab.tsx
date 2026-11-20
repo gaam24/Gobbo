@@ -43,7 +43,9 @@ export function FilesTab({
 		Changed: t("mods.integrity.changed"),
 		Recorded: t("mods.integrity.recorded"),
 	}[integrity ?? "Recorded"];
+
 	if (files === null) return <p className="text-muted-foreground text-sm">{t("mods.files.loading")}</p>;
+
 	if (files.length === 0) {
 		return (
 			<Empty className="border border-dashed">

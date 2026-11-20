@@ -46,8 +46,10 @@ export function useLoad<T>(
 			if (pollMs !== undefined && document.hidden) return;
 			const current = request + 1;
 			request = current;
+
 			try {
 				const value = await latest.current.load();
+
 				if (isCurrentReply(active, request, current)) {
 					setAnswer((previous) => answerState(previous, key, value));
 					latest.current.onSuccess?.(value);
@@ -57,11 +59,13 @@ export function useLoad<T>(
 			}
 		};
 		void run();
+
 		if (pollMs === undefined) {
 			return () => {
 				active = false;
 			};
 		}
+
 		const timer = window.setInterval(() => void run(), pollMs);
 		// A window that comes back asks at once instead of waiting for the next tick.
 		const onVisible = () => {

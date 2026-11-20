@@ -41,6 +41,7 @@ export function VersionCell({
 		// version count, which the call site uses as its key.
 		if (versions !== null) return;
 		setFailed(false);
+
 		try {
 			setVersions(await unwrap(commands.modVersions(gameId, mod.folder)));
 		} catch {
@@ -52,10 +53,12 @@ export function VersionCell({
 	/// one and the user does not have to open the picker to understand that "Installed 1.4" means "1.4 is ready to use".
 	const selectInstalled = async () => {
 		const folder = update?.installed_folder;
+
 		if (folder) await onSelectVersion(mod.id, folder);
 	};
 
 	let line: ReactNode;
+
 	if (update?.error) {
 		line = <span className="text-subtle-foreground">{t("mods.version.checkFailed")}</span>;
 	} else if (update?.has_update && update.latest) {
@@ -142,6 +145,7 @@ function UpdateLink({ version, onUpdate }: { version: string; onUpdate?: () => v
 			{onUpdate && <Download className="size-3 opacity-70" aria-hidden />}
 		</>
 	);
+
 	if (!onUpdate) return <span className="text-update flex max-w-full min-w-0 items-center gap-1 font-medium">{content}</span>;
 	return (
 		<Button
@@ -167,6 +171,7 @@ export function ConflictCell({ mod, onOpen }: { mod: Mod; onOpen?: () => void })
 export function ConflictText({ wins, loses, onOpen }: { wins: number; loses: number; onOpen?: () => void }) {
 	const { t } = useTranslation();
 	let content: ReactNode;
+
 	if (wins > 0 && loses > 0) {
 		content = <span className="text-muted-foreground text-xs">{t("mods.conflictCell.both", { wins, loses })}</span>;
 	} else if (loses > 0) {
@@ -176,6 +181,7 @@ export function ConflictText({ wins, loses, onOpen }: { wins: number; loses: num
 	} else {
 		content = <span className="text-subtle-foreground text-xs">{EMPTY}</span>;
 	}
+
 	if (!onOpen || (wins === 0 && loses === 0)) return content;
 	return (
 		<Button

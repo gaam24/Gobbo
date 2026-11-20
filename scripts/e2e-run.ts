@@ -15,6 +15,7 @@ const candidates = [process.env.E2E_NODE, "node", "/usr/bin/node"].filter(
 
 for (const candidate of candidates) {
 	const version = spawnSync(candidate, ["--version"], { encoding: "utf8" });
+
 	if (version.status === 0 && /^v\d+\./.test(version.stdout.trim())) {
 		const result = run(candidate, ["node_modules/@wdio/cli/bin/wdio.js", "run", "e2e/wdio.conf.ts"]);
 		process.exit(result.status ?? 1);

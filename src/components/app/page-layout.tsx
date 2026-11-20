@@ -142,6 +142,7 @@ export function SettingsLayout<Id extends string>({
 			value={value}
 			onValueChange={(next) => {
 				const found = sections.find((section) => section.id === next);
+
 				if (found) onValueChange(found.id);
 			}}
 			orientation="vertical"

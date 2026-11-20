@@ -13,9 +13,11 @@ function withoutHidden(items: ListItem[], hidden: ReadonlySet<string>): ListItem
 	let members: ListItem[] = [];
 	const flush = () => {
 		const shown = members.filter((item) => !hidden.has(item.id));
+
 		if (header && (members.length === 0 || shown.length > 0)) result.push(header);
 		result.push(...shown);
 	};
+
 	for (const item of items) {
 		if (item.kind === "separator") {
 			flush();
@@ -25,6 +27,7 @@ function withoutHidden(items: ListItem[], hidden: ReadonlySet<string>): ListItem
 			members.push(item);
 		}
 	}
+
 	flush();
 	return result;
 }
@@ -82,19 +85,24 @@ export function useListRows({
 	const groupSizes = useMemo(() => {
 		const sizes = new Map<string, number>();
 		let current: string | null = null;
+
 		for (const item of matching) {
 			if (item.kind === "separator") current = item.id;
 			else if (current !== null) sizes.set(current, (sizes.get(current) ?? 0) + 1);
 		}
+
 		return sizes;
 	}, [matching]);
 	const rows = useMemo((): ListItem[] => {
 		const result: ListItem[] = [];
 		let folded = false;
+
 		for (const item of matching) {
 			if (item.kind === "separator") folded = activeCollapsed.has(item.id);
+
 			if (item.kind === "separator" || !folded) result.push(item);
 		}
+
 		return result;
 	}, [matching, activeCollapsed]);
 	/// A search shows every match, also a part of a folded page: the fold belongs to the unfiltered list, and hiding a
@@ -113,6 +121,7 @@ export function useListRows({
 		(id: string) =>
 			setCollapsed((previous) => {
 				const next = new Set(previous);
+
 				if (!next.delete(id)) next.add(id);
 				return next;
 			}),
@@ -124,6 +133,7 @@ export function useListRows({
 		(id: string) =>
 			setFoldedPages((previous) => {
 				const next = new Set(previous);
+
 				if (!next.delete(id)) next.add(id);
 				return next;
 			}),

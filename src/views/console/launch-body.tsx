@@ -32,12 +32,14 @@ export function LaunchBody({ report, gameId }: { report: RunReport; gameId: stri
 	/// found nothing new must not move the field.
 	useEffect(() => {
 		const field = outputRef.current;
+
 		if (field && pinned.current) field.scrollTop = field.scrollHeight;
 		// oxlint-disable-next-line react/exhaustive-effect-dependencies -- outputText is the trigger; the field is read through the ref.
 	}, [outputText]);
 	const dllCount = (report.dlls?.injected.length ?? 0) + (report.dlls?.layer.length ?? 0);
 	const logCount = (report.game_logs?.length ?? 0) + (report.mod_logs?.length ?? 0) + ((report.app_log?.length ?? 0) > 0 ? 1 : 0);
 	let gameState = t("runs.gameNotStarted");
+
 	if (report.game_started) {
 		if (report.game_exit_code === null) gameState = t("runs.gameRunning");
 		else if (report.game_exit_code === 0) gameState = t("runs.gameClosed");

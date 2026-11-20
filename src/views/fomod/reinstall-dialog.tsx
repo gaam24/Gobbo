@@ -48,6 +48,7 @@ export function ReinstallDialog({
 	}
 
 	let body = <p className="text-muted-foreground text-sm">{t("fomod.reading")}</p>;
+
 	if (failure) {
 		body = <FieldError>{t("fomod.readFailed", { detail: failure })}</FieldError>;
 	} else if (inspect?.kind === "plain") {

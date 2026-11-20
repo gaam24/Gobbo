@@ -36,6 +36,7 @@ export function createListenerScope(listen: Listen): { scope: ListenerScope; clo
 		scope,
 		close() {
 			active = false;
+
 			for (const stop of stops.splice(0)) stop();
 		},
 	};
@@ -57,6 +58,7 @@ export function useTauriListener(subscribe: (scope: ListenerScope) => Promise<vo
 		void (async () => {
 			try {
 				const { listen } = await loadEvents();
+
 				if (state.closed) return;
 				const opened = createListenerScope(listen);
 				close = opened.close;

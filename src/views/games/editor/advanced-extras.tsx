@@ -22,10 +22,12 @@ export function AdvancedExtras({ draft, onChange }: { draft: GameDraft; onChange
 	const addProvider = () => {
 		let id = "nexus";
 		let suffix = 2;
+
 		while (id in (draft.providers ?? {})) {
 			id = `provider${suffix}`;
 			suffix += 1;
 		}
+
 		setProviders({ ...draft.providers, [id]: { key: "" } });
 	};
 

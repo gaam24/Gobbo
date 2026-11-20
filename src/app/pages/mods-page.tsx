@@ -25,6 +25,7 @@ export function ModsPage() {
 			</div>
 		);
 	}
+
 	if (!gameId) {
 		return (
 			<div className="mx-auto flex max-w-md flex-col items-center gap-4 p-10 text-center">
@@ -34,6 +35,7 @@ export function ModsPage() {
 			</div>
 		);
 	}
+
 	if (!status) {
 		if (statusError) return <StatusError error={statusError} onRetry={retryStatus} />;
 		return <ModsLoading />;

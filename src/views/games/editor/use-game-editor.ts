@@ -127,14 +127,18 @@ export function useGameEditor(id: string | null, onClose: () => void): GameEdito
 		void (async () => {
 			try {
 				const list = await unwrap(commands.loaderPresets());
+
 				if (!live.current) return;
 				setPresets(list);
 			} catch (failure) {
 				if (live.current) setPresetError(messageOf(failure));
 			}
+
 			if (!id) return;
+
 			try {
 				const definition = await unwrap(commands.definitionSource(id));
+
 				if (!live.current) return;
 				const parsed = parseDraft(definition.text);
 				setDraft(parsed);
@@ -142,6 +146,7 @@ export function useGameEditor(id: string | null, onClose: () => void): GameEdito
 				setOrigin(definition.origin);
 				setLayout(inferLayout(parsed));
 				const gameRoot = managedRef.current?.find((game) => game.id === id)?.game_root;
+
 				if (gameRoot) setFolder(gameRoot);
 				setLoaded(true);
 			} catch (failure) {
@@ -157,24 +162,29 @@ export function useGameEditor(id: string | null, onClose: () => void): GameEdito
 
 	const inspect = useCallback(async (path: string) => {
 		const trimmed = path.trim();
+
 		if (!trimmed) return;
 		setInspecting(true);
 		setInspectError(null);
+
 		try {
 			const result = await unwrap(commands.inspectGameFolder(trimmed));
 			setInspection(result);
 			const current = draftRef.current;
 			const next = applySuggestions(current, result);
+
 			if (JSON.stringify(next) !== JSON.stringify(current)) {
 				setDraft(next);
 				setDirty(true);
 			}
+
 			if (!current.loader && (current.deploy.slots?.length ?? 0) === 0 && (current.deploy.mirror?.length ?? 0) === 0) {
 				setLayout(result.loaders.length > 0 ? "loader" : "slot");
 			}
 		} catch (failure) {
 			setInspectError(messageOf(failure));
 		}
+
 		setInspecting(false);
 	}, []);
 
@@ -182,6 +192,7 @@ export function useGameEditor(id: string | null, onClose: () => void): GameEdito
 	useEffect(() => {
 		if (!loaded) return;
 		const trimmed = folder.trim();
+
 		if (!trimmed || inspected.current === trimmed) return;
 		const timer = window.setTimeout(() => {
 			inspected.current = trimmed;
@@ -192,6 +203,7 @@ export function useGameEditor(id: string | null, onClose: () => void): GameEdito
 
 	const formText = useMemo(() => {
 		if (!dirty && initialText !== null) return initialText;
+
 		try {
 			return serializeDraft(draft);
 		} catch {
@@ -207,6 +219,7 @@ export function useGameEditor(id: string | null, onClose: () => void): GameEdito
 			void (async () => {
 				try {
 					const result = await unwrap(commands.validateDefinition(activeText));
+
 					if (!live.current) return;
 					setCheck(result);
 					setCheckError(null);
@@ -230,16 +243,21 @@ export function useGameEditor(id: string | null, onClose: () => void): GameEdito
 
 	const chooseLayout = (next: LayoutMode, presetId?: string) => {
 		setLayout(next);
+
 		if (next === "custom") return;
 		setDirty(true);
 		setSourceDirty(false);
+
 		if (next === "loader") {
 			const preset = presets.find((entry) => entry.id === (presetId ?? "")) ?? presets.find((entry) => entry.problems.length === 0);
+
 			if (preset) {
 				setDraft(setLoader({ ...draft, deploy: { ...draft.deploy, slots: [], mirror: [] } }, preset.id, ""));
 			}
+
 			return;
 		}
+
 		if (next === "slot") {
 			setDraft({
 				...draft,
@@ -252,6 +270,7 @@ export function useGameEditor(id: string | null, onClose: () => void): GameEdito
 			});
 			return;
 		}
+
 		setDraft({
 			...draft,
 			loader: undefined,
@@ -271,6 +290,7 @@ export function useGameEditor(id: string | null, onClose: () => void): GameEdito
 
 	const browse = async () => {
 		const picked = await pickFolder();
+
 		if (picked) {
 			inspected.current = null;
 			changeFolder(picked);
@@ -287,10 +307,12 @@ export function useGameEditor(id: string | null, onClose: () => void): GameEdito
 		try {
 			const parsed = parseDraft(source);
 			const result = await unwrap(commands.validateDefinition(source));
+
 			if (!result.ok) {
 				setSourceError(result.problems.map((problem) => problem.message).join("\n"));
 				return;
 			}
+
 			setDraft(parsed);
 			setSourceDirty(false);
 			setSourceError(null);
@@ -303,6 +325,7 @@ export function useGameEditor(id: string | null, onClose: () => void): GameEdito
 	const idWarning = (() => {
 		if (origin === "bundled") return t("editor.quick.idBundled");
 		const bundled = games.some((game) => game.id === draft.id.trim() && game.origin === "bundled");
+
 		if (bundled) return t("editor.quick.idBundled");
 		const taken = !editing && games.some((game) => game.id === draft.id.trim() && game.origin === "user");
 		return taken ? t("editor.quick.idTaken") : null;
@@ -318,6 +341,7 @@ export function useGameEditor(id: string | null, onClose: () => void): GameEdito
 	const exportDefinition = async () => {
 		if (id === null) return;
 		const path = await pickSaveFile(`${id}.zip`, t("settings.game.exportFilter"), "zip");
+
 		if (path === null) return;
 		await attempt(async () => {
 			await unwrap(commands.exportDefinition(id, path));
@@ -327,6 +351,7 @@ export function useGameEditor(id: string | null, onClose: () => void): GameEdito
 
 	const save = async () => {
 		if (blocked) return;
+
 		if (sourceDirty) {
 			try {
 				parseDraft(source);
@@ -335,6 +360,7 @@ export function useGameEditor(id: string | null, onClose: () => void): GameEdito
 				return;
 			}
 		}
+
 		const text = sourceDirty ? source : activeText;
 		setSaving(true);
 		await attempt(async () => {
@@ -343,6 +369,7 @@ export function useGameEditor(id: string | null, onClose: () => void): GameEdito
 			setShellDirty(false);
 			onClose();
 			await reloadGames();
+
 			if (!editing && folder.trim()) {
 				await gameActions.addGame(saved.id, folder.trim());
 			} else {

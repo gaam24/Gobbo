@@ -15,6 +15,7 @@ export function ImportVersionBanner({
 	onDismiss: (item: ImportedModView) => void;
 }) {
 	const { t } = useTranslation();
+
 	if (mods.length === 0) return null;
 
 	return (

@@ -20,6 +20,7 @@ function PageFor({ view }: { view: AppView }) {
 	if (e2eForcedFailure(view)) {
 		throw new Error(`E2E forced render failure in ${view}`);
 	}
+
 	switch (view) {
 		case "games":
 			return <GamesPage />;

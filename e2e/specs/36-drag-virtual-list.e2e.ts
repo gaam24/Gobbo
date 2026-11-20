@@ -21,6 +21,7 @@ async function points(fromSelector: string, fromIndex: number, toSelector: strin
 		(fromSel: string, fromAt: number, toSel: string, toAt: number) => {
 			const from = document.querySelectorAll<HTMLElement>(fromSel)[fromAt]?.getBoundingClientRect();
 			const to = document.querySelectorAll<HTMLElement>(toSel)[toAt]?.getBoundingClientRect();
+
 			if (!(from && to)) return null;
 			return {
 				from: { x: Math.round(from.left + from.width / 2), y: Math.round(from.top + from.height / 2) },
@@ -54,9 +55,11 @@ async function drag(from: Point, to: Point) {
 async function orderAfter(id: string, before: string[]): Promise<string[]> {
 	for (let attempt = 0; attempt < 30; attempt += 1) {
 		const after = (await statusOf(id)).mods.map((mod) => mod.folder);
+
 		if (after.join(",") !== before.join(",")) return after;
 		await browser.pause(200);
 	}
+
 	return (await statusOf(id)).mods.map((mod) => mod.folder);
 }
 
@@ -73,6 +76,7 @@ async function game(prefix: string) {
 describe("drag in a virtualized mod list", () => {
 	it("moves a table row onto a row inside the window", async () => {
 		const { id, fixture } = await game("drag-table");
+
 		try {
 			await waitForMod(`drag-${id}-0`);
 			const before = (await statusOf(id)).mods.map((mod) => mod.folder);
@@ -92,6 +96,7 @@ describe("drag in a virtualized mod list", () => {
 
 	it("moves a grid card onto a card inside the window", async () => {
 		const { id, fixture } = await game("drag-grid");
+
 		try {
 			await clickByLabel("Grid view");
 			await waitForSelector("[data-grid-card]");
@@ -112,6 +117,7 @@ describe("drag in a virtualized mod list", () => {
 
 	it("keeps dragging while auto-scroll passes the window", async () => {
 		const { id, fixture } = await game("drag-scroll");
+
 		try {
 			await waitForMod(`drag-${id}-0`);
 			const before = (await statusOf(id)).mods.map((mod) => mod.folder);
@@ -120,7 +126,9 @@ describe("drag in a virtualized mod list", () => {
 			const edge = (await browser.execute(() => {
 				const row = document.querySelector<HTMLElement>("[data-mod]");
 				let element: HTMLElement | null = row;
+
 				while (element && !["auto", "scroll"].includes(getComputedStyle(element).overflowY)) element = element.parentElement;
+
 				if (!element) return null;
 				const box = element.getBoundingClientRect();
 				return { x: Math.round(box.left + box.width / 2), bottom: Math.round(box.bottom) };

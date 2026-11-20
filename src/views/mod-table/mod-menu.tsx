@@ -297,6 +297,7 @@ export function ModMenu({ children, ...props }: ModMenuProps) {
 				<ContextMenuContent
 					onCloseAutoFocus={(event) => {
 						const action = afterClose.current;
+
 						if (!action) return;
 						afterClose.current = null;
 						event.preventDefault();

@@ -25,8 +25,10 @@ const x86 = "i686-pc-windows-msvc";
 
 function cargoBuild(pkg: string, target: string | undefined, bin?: string) {
 	const args = ["build", "-p", pkg, ...(bin ? ["--bin", bin] : []), ...(target ? ["--target", target] : [])];
+
 	if (profile === "release") args.push("--release");
 	const result = spawnSync("cargo", args, { cwd: srcTauri, stdio: "inherit" });
+
 	if (result.status !== 0) {
 		if (target === x86) console.error("The 32-bit build needs: rustup target add i686-pc-windows-msvc");
 		process.exit(result.status ?? 1);
@@ -55,13 +57,16 @@ const artifacts: Array<[string, string, boolean]> = [
 ];
 
 mkdirSync(stagedDir, { recursive: true });
+
 for (const [source, name, optional] of artifacts) {
 	if (!existsSync(source)) {
 		if (optional) continue;
 		console.error(`${name} was not built at ${source}.`);
 		process.exit(1);
 	}
+
 	copyFileSync(source, path.join(stagedDir, name));
 	const besideApp = path.join(targetDir, profile, name);
+
 	if (path.resolve(source) !== path.resolve(besideApp)) copyFileSync(source, besideApp);
 }

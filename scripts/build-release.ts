@@ -17,6 +17,7 @@ function run(command: string, args: string[], cwd = root) {
 		env: process.env,
 		stdio: "inherit",
 	});
+
 	if (result.status !== 0) {
 		process.exit(result.status ?? 1);
 	}
@@ -36,15 +37,18 @@ if (process.platform === "win32" && !existsSync(path.join(targetDir, "release", 
 // `--updater` signs the updater archives with TAURI_SIGNING_PRIVATE_KEY, so the release can publish latest.json. A build
 // without the key would ship no update path, so it is refused here rather than left to the signer.
 const updater = process.argv.includes("--updater");
+
 if (updater && !process.env.TAURI_SIGNING_PRIVATE_KEY) {
 	console.error("--updater needs TAURI_SIGNING_PRIVATE_KEY: an unsigned release cannot publish an update manifest.");
 	process.exit(1);
 }
+
 run("bun", ["run", "tauri", "build", ...(updater ? ["--config", "src-tauri/tauri.updater.conf.json"] : [])]);
 
 if (process.platform === "win32") {
 	for (const name of ["gobbo_overlay_hook.pdb", "gobbo_overlay_hook32.pdb"]) {
 		const file = path.join(targetDir, "release", name);
+
 		if (!existsSync(file)) {
 			console.error(`The release build has no ${name} at ${file}.`);
 			process.exit(1);

@@ -24,7 +24,9 @@ type FolderCheck =
 /// The result of the folder check as text, with an icon for a passed check. Errors are text too, announced as an alert.
 function CheckStatus({ check }: { check: FolderCheck }) {
 	const { t } = useTranslation();
+
 	if (check.state === "idle") return null;
+
 	if (check.state === "checking") {
 		return (
 			<p className="text-muted-foreground flex items-center gap-2 text-sm">
@@ -33,6 +35,7 @@ function CheckStatus({ check }: { check: FolderCheck }) {
 			</p>
 		);
 	}
+
 	if (check.state === "error") {
 		return (
 			<Alert variant="destructive">
@@ -40,6 +43,7 @@ function CheckStatus({ check }: { check: FolderCheck }) {
 			</Alert>
 		);
 	}
+
 	return (
 		<p role="status" className="text-primary flex items-center gap-2 text-sm font-medium">
 			<Check aria-hidden className="size-4" />
@@ -51,6 +55,7 @@ function CheckStatus({ check }: { check: FolderCheck }) {
 /// The check to show for a folder: idle when it is empty, the stored result when it belongs to this folder, and running otherwise.
 function currentCheck(folder: string, checked: { folder: string; result: FolderCheck } | null): FolderCheck {
 	if (!folder) return { state: "idle" };
+
 	if (checked?.folder === folder) return checked.result;
 	return { state: "checking" };
 }
@@ -82,11 +87,13 @@ export function LocateDialog({
 		const timer = window.setTimeout(() => {
 			void (async () => {
 				let result: FolderCheck;
+
 				try {
 					result = { state: "found", marker: await onCheck(id, trimmed) };
 				} catch (failure) {
 					result = { state: "error", message: messageOf(failure) };
 				}
+
 				if (current) setChecked({ folder: trimmed, result });
 			})();
 		}, CHECK_DELAY_MS);
@@ -101,6 +108,7 @@ export function LocateDialog({
 
 	const browse = async () => {
 		const picked = await pickFolder();
+
 		if (picked) setFolder(picked);
 	};
 
@@ -109,6 +117,7 @@ export function LocateDialog({
 		setBusy(true);
 		const added = await onAdd(id, trimmed);
 		setBusy(false);
+
 		if (added) onClose();
 	};
 

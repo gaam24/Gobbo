@@ -27,6 +27,7 @@ export function CrashPrompt({
 
 	if (gameRunning || bisectRunning || !report) return null;
 	const endedBadly = report.game_started && report.finished_at !== null && !report.stopped_by_user && report.game_exit_code !== 0;
+
 	if (!endedBadly || dismissed === report.started_at) return null;
 
 	return (

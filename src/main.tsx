@@ -29,6 +29,7 @@ window.addEventListener("unhandledrejection", (event) => {
 
 window.addEventListener("contextmenu", (event) => {
 	const editable = event.target instanceof Element && event.target.closest("input, textarea, [contenteditable='true']");
+
 	if (editable || (import.meta.env.DEV && event.shiftKey)) return;
 	event.preventDefault();
 });
@@ -43,17 +44,20 @@ async function start() {
 	}
 
 	const root = document.getElementById("root");
+
 	if (root) {
 		if (import.meta.env.DEV && new URLSearchParams(window.location.search).has("gallery")) {
 			const { UiGallery } = await import("./dev/ui-gallery");
 			ReactDOM.createRoot(root).render(<UiGallery />);
 			return;
 		}
+
 		if (import.meta.env.DEV && new URLSearchParams(window.location.search).has("settings-mockup")) {
 			const { SettingsMockup } = await import("./dev/settings-mockup");
 			ReactDOM.createRoot(root).render(<SettingsMockup />);
 			return;
 		}
+
 		ReactDOM.createRoot(root).render(
 			<React.StrictMode>
 				<App />

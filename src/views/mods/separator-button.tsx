@@ -13,6 +13,7 @@ export function SeparatorButton({ disabled, onAdd }: { disabled: boolean; onAdd:
 	const [name, setName] = useState("");
 	const add = () => {
 		const trimmed = name.trim();
+
 		if (!trimmed) return;
 		setOpen(false);
 		setName("");

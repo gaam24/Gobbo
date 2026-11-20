@@ -84,10 +84,12 @@ export function PageToggle({ all, none, onToggle, label }: { all: boolean; none:
 	const { t } = useTranslation();
 	const mixed = !(all || none);
 	let title = t("mods.page.enableAll");
+
 	if (all) title = t("mods.page.disableAll");
 	else if (mixed) title = t("mods.page.mixed");
 	// The same size and colours as the mod rows' switch, so a header and its parts read as one column.
 	let thumb = "bg-foreground translate-x-0";
+
 	if (all) thumb = "bg-primary-foreground translate-x-[calc(100%-2px)]";
 	else if (mixed) thumb = "bg-primary-foreground translate-x-[7px]";
 	return (

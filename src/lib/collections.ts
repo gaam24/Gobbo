@@ -47,6 +47,7 @@ export function orderedItems(plan: CollectionPlan_Serialize): CollectionItem_Ser
 	const byKey = new Map(plan.items.map((item) => [item.key, item]));
 	const ordered = plan.order.flatMap((key) => {
 		const item = byKey.get(key);
+
 		if (!item) return [];
 		byKey.delete(key);
 		return [item];
@@ -120,6 +121,7 @@ export function statusVersion(status: CollectionItemStatus | undefined): string 
 	if (status?.kind === "satisfied" || status?.kind === "different_version" || status?.kind === "in_library_different_version") {
 		return status.current;
 	}
+
 	return undefined;
 }
 
@@ -152,17 +154,20 @@ export function filterCounts(
 	statuses: Partial<Record<string, CollectionItemStatus>>,
 ): Record<MemberFilter, number> {
 	const counts: Record<MemberFilter, number> = { all: 0, todo: 0, done: 0, optional: 0, issues: 0 };
+
 	for (const item of items) {
 		for (const filter of MEMBER_FILTERS) {
 			if (matchesFilter(item, statuses[item.key], filter)) counts[filter] += 1;
 		}
 	}
+
 	return counts;
 }
 
 /// Whether a member matches the search text: its name, author or version.
 export function matchesSearch(item: CollectionItem_Serialize, query: string): boolean {
 	const text = query.trim().toLowerCase();
+
 	if (!text) return true;
 	return [item.name, item.author ?? "", item.version ?? ""].some((value) => value.toLowerCase().includes(text));
 }
@@ -186,6 +191,7 @@ export function downloadSizeKb(
 /// window waits for the download the user has to start.
 export function collectionItemLabel(items: readonly CollectionItem_Serialize[], key: string): string {
 	const item = items.find((entry) => entry.key === key);
+
 	if (!item) return key;
 	return [item.name, item.version].filter(Boolean).join(" ");
 }

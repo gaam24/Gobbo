@@ -24,6 +24,7 @@ export function CollectionPanelView({ onClose }: { onClose: () => void }) {
 	const [confirmRemove, setConfirmRemove] = useState(false);
 	const session = collections.session;
 	const items = useMemo(() => (session ? orderedItems(session.plan) : []), [session]);
+
 	if (!session) {
 		return (
 			<ModalDialog title={t("collection.dialog.panel")} onClose={onClose}>
@@ -93,6 +94,7 @@ export function CollectionPanelView({ onClose }: { onClose: () => void }) {
 					className="min-h-48 flex-1 grid-rows-[auto_minmax(0,1fr)]"
 					renderAction={(item) => {
 						const status = session.statuses[item.key];
+
 						if (status?.kind === "skipped") {
 							return (
 								<Button
@@ -107,6 +109,7 @@ export function CollectionPanelView({ onClose }: { onClose: () => void }) {
 								</Button>
 							);
 						}
+
 						if (needsWork(status)) {
 							return (
 								<Button
@@ -121,6 +124,7 @@ export function CollectionPanelView({ onClose }: { onClose: () => void }) {
 								</Button>
 							);
 						}
+
 						return <span className="size-7 shrink-0" />;
 					}}
 				/>

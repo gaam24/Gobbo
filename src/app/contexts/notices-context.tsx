@@ -23,6 +23,7 @@ const NoticeActionsContext = createContext<NoticeActions | null>(null);
 
 export function useNoticeActions(): NoticeActions {
 	const context = useContext(NoticeActionsContext);
+
 	if (!context) {
 		throw new Error("useNoticeActions must be used inside <NoticesProvider>.");
 	}
@@ -38,6 +39,7 @@ const NoticeListContext = createContext<NoticeList | null>(null);
 
 export function useNoticeList(): NoticeList {
 	const context = useContext(NoticeListContext);
+
 	if (!context) {
 		throw new Error("useNoticeList must be used inside <NoticesProvider>.");
 	}

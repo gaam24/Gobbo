@@ -49,6 +49,7 @@ export async function invokeResult<T>(command: string, args: Record<string, unkn
 			void (async () => {
 				try {
 					const bridge = window.__TAURI__;
+
 					if (!bridge) throw new Error("the Tauri bridge is not available");
 					const value = await bridge.core.invoke(cmd, callArgs);
 					done({ e2e: { ok: true, value } });
@@ -62,6 +63,7 @@ export async function invokeResult<T>(command: string, args: Record<string, unkn
 	);
 	const envelope = raw as { e2e: { ok: true; value: T } | { ok: false; error: string } };
 	const result = envelope.e2e;
+
 	if (result.ok) return result;
 	return { ok: false, error: result.error };
 }
@@ -69,6 +71,7 @@ export async function invokeResult<T>(command: string, args: Record<string, unkn
 /// Invokes a command and throws `CommandFailure` for an `AppError`. Use it when a failure is a test failure.
 export async function invoke<T>(command: string, args: Record<string, unknown> = {}): Promise<T> {
 	const result = await invokeResult<T>(command, args);
+
 	if (!result.ok) throw new CommandFailure(JSON.parse(result.error) as CommandError);
 	return result.value;
 }
@@ -92,6 +95,7 @@ export async function invokeWithChannel<T>(command: string, args: Record<string,
 			void (async () => {
 				try {
 					const bridge = window.__TAURI__;
+
 					if (!bridge) throw new Error("the Tauri bridge is not available");
 					const progress = new bridge.core.Channel();
 					progress.onmessage = (message: unknown) => events.push(message);
@@ -109,6 +113,7 @@ export async function invokeWithChannel<T>(command: string, args: Record<string,
 		e2e: { ok: true; value: T; events: unknown[] } | { ok: false; error: string; events: unknown[] };
 	};
 	const result = envelope.e2e;
+
 	if (!result.ok) throw new CommandFailure(JSON.parse(result.error) as CommandError);
 	return { value: result.value, events: result.events };
 }
@@ -130,6 +135,7 @@ export async function reloadWindow(): Promise<void> {
 	} catch {
 		// A navigation can close the execution context before the answer arrives.
 	}
+
 	await waitForShell();
 }
 

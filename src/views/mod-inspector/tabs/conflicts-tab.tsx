@@ -22,6 +22,7 @@ export function ConflictsTab({
 	onMoveBeside: (modId: string, otherId: string, side: "above" | "below") => void | Promise<void>;
 }) {
 	const { t } = useTranslation();
+
 	if (conflicts.size === 0) {
 		return (
 			<Empty className="border border-dashed">
@@ -100,6 +101,7 @@ interface FileWinnersProps {
 /// The files this mod shares with others, and which copy wins. Only `Mirror` lets Gobbo choose; elsewhere the game does.
 export function FileWinners({ modId, conflicts, status, canChoose, onSetWinner }: FileWinnersProps) {
 	const { t } = useTranslation();
+
 	if (conflicts.length === 0) return null;
 	const nameOf = (id: string) => modName(status.mods, id);
 

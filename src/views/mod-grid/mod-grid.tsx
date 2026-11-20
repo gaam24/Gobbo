@@ -24,6 +24,7 @@ const INITIAL_WIDTH = 800;
 /// The height a grid unit reserves; the classes of the separator and the page header must match these numbers.
 function unitHeight(unit: GridItem, cardHeight: number): number {
 	if (unit.kind === "separator") return SEPARATOR;
+
 	if (unit.kind === "page" || unit.kind === "group") return PAGE_HEADER;
 	return cardHeight;
 }
@@ -93,6 +94,7 @@ export function ModGrid({
 
 	useLayoutEffect(() => {
 		const element = grid.current;
+
 		if (!element) return;
 		// The card width changes the list's height on every resize. Observing the list itself would report that height
 		// as a resize and could echo the measurement back into the layout, so the stable container is observed.
@@ -145,9 +147,11 @@ export function ModGrid({
 	/// One rendered card is enough: all cards of a row have the same width, fixed picture ratio and truncated text.
 	useLayoutEffect(() => {
 		const card = grid.current?.querySelector<HTMLElement>("[data-grid-card]");
+
 		if (!card) return;
 		const frame = requestAnimationFrame(() => {
 			const height = Math.round(card.getBoundingClientRect().height);
+
 			if (height > 0 && Math.abs(height - cardHeight) > 1) {
 				setMeasured({ width: cardWidth, height });
 			}
@@ -167,10 +171,12 @@ export function ModGrid({
 	/// The side of a drop is only the drag direction; the backend resolves page and user-group blocks from the two ids.
 	const dropped = (event: DragEndEvent) => {
 		const target = event.over?.id;
+
 		if (target === undefined) return;
 		const from = String(event.active.id);
 		const fromAt = rows.findIndex((item) => item.id === from);
 		const toAt = rows.findIndex((item) => item.id === target);
+
 		if (fromAt < 0 || toAt < 0) return;
 		onReorder(from, String(target), fromAt < toAt ? "below" : "above");
 	};
@@ -184,8 +190,10 @@ export function ModGrid({
 						{virtualUnits.flatMap((item) => {
 							const at = item.index;
 							const unit = units[at];
+
 							if (!unit) return [];
 							const top = item.start - scrollMargin;
+
 							if (unit.kind === "page" || unit.kind === "group") {
 								// A page row keeps its details on `page`; wrap them in the same `Group` a user row already is.
 								const header: Group =
@@ -218,6 +226,7 @@ export function ModGrid({
 									/>,
 								];
 							}
+
 							if (unit.kind === "separator") {
 								return [
 									<SeparatorRow
@@ -238,6 +247,7 @@ export function ModGrid({
 									/>,
 								];
 							}
+
 							return unit.mods.map((mod, column) => (
 								<ModCard
 									key={mod.id}
