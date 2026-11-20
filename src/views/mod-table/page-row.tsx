@@ -85,6 +85,7 @@ export function PageRow({
 	let status = t("mods.version.upToDate");
 
 	if (updateCount > 0) status = t("mods.page.updates", { count: updateCount });
+	else if (mods.some((mod) => updates[mod.id]?.error)) status = t("mods.version.checkFailed");
 	else if (checkedAt == null) status = t("mods.version.notChecked");
 	const conflicts = mods.reduce(
 		(total, mod) => {

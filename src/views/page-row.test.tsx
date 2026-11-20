@@ -1,7 +1,7 @@
 import { afterAll, expect, mock, test } from "bun:test";
 import type { ReactNode } from "react";
 import { renderToString } from "react-dom/server";
-
+import type { UpdateReport } from "@/bindings";
 import { applyLanguage } from "@/i18n";
 import type { Group, Mod } from "@/lib/mods";
 
@@ -78,14 +78,14 @@ function part(id: string, name: string, version: string): Mod {
 const nameColumns = COLUMNS.slice(0, 3);
 const withCategory = [...nameColumns, ...COLUMNS.filter((column) => column.id === "category")];
 
-function render(group: Group, columns = nameColumns) {
+function render(group: Group, columns = nameColumns, updates: Record<string, UpdateReport> = {}) {
 	return renderToString(
 		<PageRow
 			group={group}
 			columns={columns}
 			folded={false}
 			filtering={false}
-			updates={{}}
+			updates={updates}
 			extras={new Map()}
 			locale="en"
 			onToggle={nothing}
@@ -148,3 +148,32 @@ test("a translation group shows its language and the translation action", () => 
 });
 
 afterAll(() => mock.restore());
+
+test("a page header says the check failed when a part's check failed, not up to date", () => {
+	const page = {
+		id: "page:nexus:225",
+		pageId: "nexus:225",
+		name: "KS Page",
+		author: null,
+		category: null,
+		mods: [part("nexus:225", "Base", "1.0"), part("nexus:225#200", "Addon", "2.0")],
+	};
+	const group: Group = { source: "page", id: page.id, name: page.name, parts: page.mods, page };
+	const failed: UpdateReport = {
+		id: "nexus:225",
+		provider: "nexus",
+		mod_id: "225",
+		current: "1.0",
+		latest: null,
+		latest_file_id: null,
+		state: "unknown",
+		latest_installed: false,
+		installed_folder: null,
+		has_update: false,
+		error: { code: "source.check_failed", params: {}, kind: "user_action" },
+	};
+	const versionColumns = COLUMNS.filter((column) => column.id === "version");
+	const html = render(group, versionColumns, { "nexus:225": failed });
+	expect(html).toContain("Check failed");
+	expect(html).not.toContain("Up to date");
+});
