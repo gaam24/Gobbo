@@ -70,15 +70,15 @@ function settings(registered: boolean) {
 
 test("a link another program handles shows the warning and the take-back action", () => {
 	const html = renderToString(settings(false));
-	expect(html).toContain("The download links do not open in Gobbo");
+	expect(html).toContain("Download links don&#x27;t open in Gobbo");
 	expect(html).toContain("nxm://");
-	expect(html).toContain("Take the links back");
+	expect(html).toContain("Get the links back");
 });
 
 test("a link Gobbo handles shows no warning", () => {
 	const html = renderToString(settings(true));
-	expect(html).not.toContain("The download links do not open in Gobbo");
-	expect(html).not.toContain("Take the links back");
+	expect(html).not.toContain("Download links don&#x27;t open in Gobbo");
+	expect(html).not.toContain("Get the links back");
 });
 
 test("only the selected settings tab is visible", () => {

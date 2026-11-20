@@ -42,15 +42,15 @@ test("translate uses a known message code and falls back to the code", () => {
 });
 
 test("translateCode reads a status code and pluralizes its string count", () => {
-	expect(translateCode("health.overwrite")).toBe("The game or a tool wrote files into the overlay.");
-	expect(translateCode("health.requirements", { count: "1" })).toBe("1 mod needs something that is missing.");
-	expect(translateCode("health.requirements", { count: "8" })).toBe("8 mods need something that is missing.");
+	expect(translateCode("health.overwrite")).toBe("The game or a tool wrote files while the mods were applied.");
+	expect(translateCode("health.requirements", { count: "1" })).toBe("1 mod needs something that's missing.");
+	expect(translateCode("health.requirements", { count: "8" })).toBe("8 mods need something that's missing.");
 	expect(translateCode("health.unknown_code")).toBe("health.unknown_code");
 });
 
 test("errorText translates a known error and adds the retry hint", () => {
 	const text = errorText(appError("state.busy", "retryable"));
-	expect(text).toContain("Another Gobbo operation");
+	expect(text).toContain("Gobbo is still busy");
 	expect(text).toContain("Try again");
 });
 

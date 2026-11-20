@@ -72,7 +72,7 @@ test("an isolated redirect offers the move back into the game folder", () => {
 
 test("a running game disables the move and says why", () => {
 	const html = render(redirect, { gameRunning: true });
-	expect(html).toContain("Close the game before moving its data.");
+	expect(html).toContain("Close the game before you move its data.");
 	expect(html).toContain('disabled=""');
 });
 
@@ -84,5 +84,5 @@ test("an active apply explains that it keeps using the layer", () => {
 test("a copied set offers no move back", () => {
 	const html = render({ ...redirect, mode: "copy" });
 	expect(html).not.toContain("Move data back to the game folder");
-	expect(html).toContain("copied before the game starts");
+	expect(html).toContain("copied in before the game starts");
 });

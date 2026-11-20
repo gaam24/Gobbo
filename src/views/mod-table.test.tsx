@@ -86,7 +86,7 @@ function tableProps(overrides: Partial<ModListProps> = {}): ModListProps {
 
 test("an empty result says so", () => {
 	const html = renderToString(<ModTable {...tableProps()} />);
-	expect(html).toContain("No mod matches the filter.");
+	expect(html).toContain("No mods match the filter.");
 });
 
 /// One installed mod, with the fields the row and the group header read.
@@ -134,7 +134,7 @@ test("a user group gets one full-width header with its name and mod count", () =
 	const html = renderToString(<ModTable {...tableProps({ rows: groupRows, groups: bundle })} />);
 	expect(html).toContain("Quality tweaks");
 	expect(html).toContain("2 mods");
-	expect(html).toContain('aria-label="Switch every mod of this group"');
+	expect(html).toContain('aria-label="Turn every mod in this group on or off"');
 	expect(html).toContain('aria-label="Actions for Quality tweaks"');
 	// The parts stay real rows below the header.
 	expect(html).toContain('data-mod="alpha"');

@@ -211,14 +211,14 @@ test("a card shows a newer version it can fetch", () => {
 
 test("an empty result says so and offers to clear the filters", () => {
 	const html = renderToString(<ModGrid {...gridProps({ rows: [] })} />);
-	expect(html).toContain("No mod matches the filter.");
+	expect(html).toContain("No mods match the filter.");
 });
 
 test("two adjacent parts of one page get one compact header with its count and menu", () => {
 	const html = renderToString(<ModGrid {...gridProps({ rows: pageRows })} />);
 	expect(html).toContain("AudioXL");
 	expect(html).toContain("2 parts");
-	expect(html).toContain('aria-label="Switch every part of this page"');
+	expect(html).toContain('aria-label="Turn every part of this page on or off"');
 	expect(html).toContain('aria-label="Actions for AudioXL"');
 	expect(html).toContain("Delete page…");
 	expect(html).toContain('data-mod="nexus:225"');
@@ -244,7 +244,7 @@ test("a folded page keeps its header and hides its cards", () => {
 
 test("a page with one visible part stays a plain card", () => {
 	const html = renderToString(<ModGrid {...gridProps({ rows: rowsOf([pagePart("nexus:225", "Base")]) })} />);
-	expect(html).not.toContain('aria-label="Switch every part of this page"');
+	expect(html).not.toContain('aria-label="Turn every part of this page on or off"');
 	expect(html).toContain('data-mod="nexus:225"');
 });
 
@@ -254,7 +254,7 @@ test("two mods of a user group get one compact header with a mod count and their
 	const html = renderToString(<ModGrid {...gridProps({ rows: rowsOf([alpha, beta]), groups: bundle })} />);
 	expect(html).toContain("Quality tweaks");
 	expect(html).toContain("2 mods");
-	expect(html).toContain('aria-label="Switch every mod of this group"');
+	expect(html).toContain('aria-label="Turn every mod in this group on or off"');
 	expect(html).toContain('aria-label="Actions for Quality tweaks"');
 	expect(html).toContain("Rename group");
 	expect(html).toContain('data-mod="alpha"');

@@ -93,7 +93,7 @@ test("keeps a disabled hide action when every selected mod is enabled", () => {
 	const button = actionButton(html, "Hide from this list");
 	expect(button).not.toBeNull();
 	expect(button).toContain('disabled=""');
-	expect(button).toContain('title="Disable a mod before you can hide it from this list"');
+	expect(button).toContain('title="Turn a mod off before you hide it from this list"');
 	expect(html).not.toContain("Show in the list");
 });
 
