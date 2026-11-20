@@ -19,20 +19,67 @@ pub fn legacy_data(state: &Path) -> PathBuf {
     state.join("data")
 }
 
-/// Makes `profile` the materialized profile for both stores. Each store journals its own switch; when the second one
-/// fails, the first is switched back to its previous owner, so a partial state-level switch does not leave the legacy
-/// store on the new profile while the user-data sets stay on the old one. A rollback that fails leaves that store's
-/// journal for the next switch, which recovers it first.
+/// Which of the two stores a profile owns, that is, whose files are in the real folders now.
+#[derive(Clone, Copy)]
+pub struct Stores {
+    pub data: bool,
+    pub user_data: bool,
+}
+
+/// The stores `profile` owns.
+pub fn owned_by(data: &Data, profile: &str) -> Result<Stores, AppError> {
+    Ok(Stores {
+        data: data::owner(data)?.as_deref() == Some(profile),
+        user_data: user_data::owner(data)?.as_deref() == Some(profile),
+    })
+}
+
+/// Makes `profile` the materialized profile for both stores.
 pub fn switch(
     data: &Data,
     game: &GameDef,
     settings: &Settings,
     profile: &Profile,
 ) -> Result<(), AppError> {
+    let both = Stores {
+        data: true,
+        user_data: true,
+    };
+    switch_stores(data, game, settings, profile, both)
+}
+
+/// Hands the stores `from` owns over to `to`, for a profile that is being deleted. A store `from` does not own is left
+/// alone.
+pub fn hand_over(
+    data: &Data,
+    game: &GameDef,
+    settings: &Settings,
+    from: &str,
+    to: &Profile,
+) -> Result<(), AppError> {
+    let stores = owned_by(data, from)?;
+    switch_stores(data, game, settings, to, stores)
+}
+
+/// Each store journals its own switch; when the user-data switch fails, the legacy store is switched back to its
+/// previous owner, so a partial switch does not leave the two stores on different profiles. A rollback that fails
+/// leaves that store's journal for the next switch, which recovers it first.
+fn switch_stores(
+    data: &Data,
+    game: &GameDef,
+    settings: &Settings,
+    profile: &Profile,
+    stores: Stores,
+) -> Result<(), AppError> {
     let previous = data::owner(data)?;
-    data::switch(data, game, settings, &profile.id)?;
-    if let Err(error) = user_data::switch(data, game, settings, profile) {
-        if let Some(previous) = previous.filter(|previous| previous != &profile.id)
+    if stores.data {
+        data::switch(data, game, settings, &profile.id)?;
+    }
+    if stores.user_data
+        && let Err(error) = user_data::switch(data, game, settings, profile)
+    {
+        if stores.data
+            && let Some(previous) = previous.filter(|previous| previous != &profile.id)
             && let Err(rollback) = data::switch(data, game, settings, &previous)
         {
             let target = &profile.id;

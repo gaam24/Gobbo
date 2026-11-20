@@ -15,12 +15,10 @@ use crate::context::load_game;
 use crate::context::load_library;
 use crate::context::load_profiles;
 use crate::context::load_settings;
-use crate::context::profile::data as profile_data;
 use crate::context::profile::history::save_profiles;
 use crate::context::profile::history::{self, forget_profile};
 use crate::context::profile::lock_profiles;
 use crate::context::profile::state as profile_state;
-use crate::context::profile::user_data as profile_user_data;
 use crate::context::running::game_running;
 use crate::deploy::state_is_overlay;
 use crate::deploy::target::journal_roots;
@@ -352,13 +350,7 @@ pub fn delete_profile(root: &Data, game_id: &str, id: &str) -> Result<(), AppErr
         } else {
             profiles.active.clone()
         };
-        if profile_data::owner(&data)?.as_deref() == Some(id) {
-            profile_data::switch(&data, &game, &settings, &next)?;
-        }
-        if profile_user_data::owner(&data)?.as_deref() == Some(id) {
-            let target = profiles.get(&next)?;
-            profile_user_data::switch(&data, &game, &settings, target)?;
-        }
+        profile_state::hand_over(&data, &game, &settings, id, profiles.get(&next)?)?;
     }
     crate::snapshots::before_delete(root, &game, &settings, id)?;
     let state = data.profile_state(id);

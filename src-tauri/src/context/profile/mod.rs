@@ -29,10 +29,11 @@ pub fn restore_owned(
     profile: &str,
     remove_missing: bool,
 ) -> Result<(), AppError> {
-    if data::owner(data)?.as_deref() == Some(profile) {
+    let owned = state::owned_by(data, profile)?;
+    if owned.data {
         data::restore_profile(data, game, settings, profile, remove_missing)?;
     }
-    if user_data::owner(data)?.as_deref() == Some(profile) {
+    if owned.user_data {
         user_data::restore_profile(data, game, settings, profile, remove_missing)?;
     }
     Ok(())
