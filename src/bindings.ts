@@ -561,7 +561,7 @@ export const commands = {
 };
 
 /* Constants */
-export const TASK_KINDS = ["import","update","update-all","requirement","apply","pack","pack-link","collection"] as const;
+export const TASK_KINDS = ["import","update","update-all","requirement","apply","pack","pack-link","collection","launch","install"] as const;
 
 /* Types */
 /**  An error returned by a command. */
@@ -5007,29 +5007,29 @@ export type TaskDedupe =
 ({ Apply: {
 	/**  The game the deployment belongs to. */
 	game: string,
-} }) & { Collection?: never; Import?: never; Pack?: never; PackLink?: never; Requirement?: never; Update?: never; UpdateAll?: never } | 
+} }) & { Collection?: never; Import?: never; Pack?: never; PackLink?: never; Requirement?: never; Tool?: never; Update?: never; UpdateAll?: never } | 
 /**  A loose archive import, keyed by game and archive path. */
 ({ Import: {
 	/**  The game the archive is imported into. */
 	game: string,
 	/**  The archive that is being imported. */
 	path: string,
-} }) & { Apply?: never; Collection?: never; Pack?: never; PackLink?: never; Requirement?: never; Update?: never; UpdateAll?: never } | 
+} }) & { Apply?: never; Collection?: never; Pack?: never; PackLink?: never; Requirement?: never; Tool?: never; Update?: never; UpdateAll?: never } | 
 /**  The update of one mod. The mod is not part of the group: one game has one update row at a time. */
 ({ Update: {
 	/**  The game the mod belongs to. */
 	game: string,
-} }) & { Apply?: never; Collection?: never; Import?: never; Pack?: never; PackLink?: never; Requirement?: never; UpdateAll?: never } | 
+} }) & { Apply?: never; Collection?: never; Import?: never; Pack?: never; PackLink?: never; Requirement?: never; Tool?: never; UpdateAll?: never } | 
 /**  The bulk update of one game. */
 ({ UpdateAll: {
 	/**  The game being updated. */
 	game: string,
-} }) & { Apply?: never; Collection?: never; Import?: never; Pack?: never; PackLink?: never; Requirement?: never; Update?: never } | 
+} }) & { Apply?: never; Collection?: never; Import?: never; Pack?: never; PackLink?: never; Requirement?: never; Tool?: never; Update?: never } | 
 /**  A requirement install, single or from a plan. One game has one requirement row at a time. */
 ({ Requirement: {
 	/**  The game the requirement is installed for. */
 	game: string,
-} }) & { Apply?: never; Collection?: never; Import?: never; Pack?: never; PackLink?: never; Update?: never; UpdateAll?: never } | 
+} }) & { Apply?: never; Collection?: never; Import?: never; Pack?: never; PackLink?: never; Tool?: never; Update?: never; UpdateAll?: never } | 
 /**  An automatic collection install, keyed by its game, profile and collection. */
 ({ Collection: {
 	/**  The game the collection is installed into. */
@@ -5038,21 +5038,28 @@ export type TaskDedupe =
 	profile: string,
 	/**  The collection being installed. */
 	collection: string,
-} }) & { Apply?: never; Import?: never; Pack?: never; PackLink?: never; Requirement?: never; Update?: never; UpdateAll?: never } | 
+} }) & { Apply?: never; Import?: never; Pack?: never; PackLink?: never; Requirement?: never; Tool?: never; Update?: never; UpdateAll?: never } | 
 /**  A pack import or a pack mod download. Both share one group, so the richer local row replaces the backend one. */
 ({ Pack: {
 	/**  The game the pack is imported into. */
 	game: string,
 	/**  The pack file that is being used. */
 	path: string,
-} }) & { Apply?: never; Collection?: never; Import?: never; PackLink?: never; Requirement?: never; Update?: never; UpdateAll?: never } | 
+} }) & { Apply?: never; Collection?: never; Import?: never; PackLink?: never; Requirement?: never; Tool?: never; Update?: never; UpdateAll?: never } | 
 /**  A pack link download, keyed by game and link. */
 ({ PackLink: {
 	/**  The game the pack is downloaded for. */
 	game: string,
 	/**  The link that is being downloaded. */
 	link: string,
-} }) & { Apply?: never; Collection?: never; Import?: never; Pack?: never; Requirement?: never; Update?: never; UpdateAll?: never } | 
+} }) & { Apply?: never; Collection?: never; Import?: never; Pack?: never; Requirement?: never; Tool?: never; Update?: never; UpdateAll?: never } | 
+/**  A tool run or a tool's prerequisite install, keyed by game and tool. */
+({ Tool: {
+	/**  The game the tool belongs to. */
+	game: string,
+	/**  The tool's id in the game definition. */
+	tool: string,
+} }) & { Apply?: never; Collection?: never; Import?: never; Pack?: never; PackLink?: never; Requirement?: never; Update?: never; UpdateAll?: never } | 
 /**  Work without a typed identity yet, such as a row restored from a journal written before this field existed. */
 "Other";
 

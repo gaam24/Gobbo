@@ -9,7 +9,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use crate::context::Data;
 use crate::error::AppError;
 use crate::games::paths::home_dir;
-use crate::infra::tasks::{TaskFlags, state};
+use crate::infra::tasks::{TaskFlags, TaskKey, kind, state};
 use crate::launch::report::RunReport;
 
 crate::commands::game_commands! {
@@ -20,11 +20,6 @@ crate::commands::game_commands! {
     /// Stops every process of the game, also one started outside Gobbo. Returns `true` when a process was stopped.
     /// The last launch of a game: its steps and how the game ended. `None` before the first launch from Gobbo.
     query last_run() -> Option<RunReport> = |root, game| Ok(crate::launch::report::last_run(root, game));
-}
-
-/// The task key of one tool operation. The same key is passed to `cancel_task` from the Working panel.
-fn tool_task_key(kind: &str, game: &str, tool: &str) -> String {
-    format!("tool:{kind}:{game}:{tool}")
 }
 
 /// The state a tool run leaves in the task registry. A cancelled run is never an exit code: the user stopped it, so
@@ -108,7 +103,7 @@ pub async fn run_tool(
     game: String,
     tool: String,
 ) -> Result<(), AppError> {
-    let key = tool_task_key("launch", &game, &tool);
+    let key: String = TaskKey::tool(kind::LAUNCH, &game, &tool).into();
     let notice_key = key.clone();
     let notice_game = game.clone();
     let notice_tool = tool.clone();
@@ -118,7 +113,7 @@ pub async fn run_tool(
         &tasks,
         key,
         game,
-        "launch",
+        kind::LAUNCH,
         move |root, game, cancel, handle| {
             let notice = tool_exit_notice(
                 app.clone(),
@@ -151,13 +146,13 @@ pub async fn install_tool_prerequisites(
     game: String,
     tool: String,
 ) -> Result<(), AppError> {
-    let key = tool_task_key("install", &game, &tool);
+    let key: String = TaskKey::tool(kind::INSTALL, &game, &tool).into();
     crate::commands::start_task(
         data,
         &tasks,
         key,
         game,
-        "install",
+        kind::INSTALL,
         move |root, game, cancel, _handle| {
             crate::infra::tasks::stop_if(Some(cancel.as_ref()), "tools.cancelled")?;
             crate::launch::tools::install_prerequisites(root, game, &tool, &home_dir()?)

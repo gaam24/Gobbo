@@ -115,6 +115,8 @@ const REQUIRED_BACKEND_KINDS: Record<BackendTaskCode, KindEntry> = {
 	pack: { kind: "import", label: "tasks.kind.pack" },
 	"pack-link": { kind: "download", label: "tasks.kind.pack-link" },
 	collection: { kind: "collection", label: "tasks.kind.collection" },
+	launch: { kind: "launch", label: "tasks.kind.launch" },
+	install: { kind: "install", label: "tasks.kind.install" },
 };
 
 /// The lookup also keeps a few frontend-only codes that older callers pass in; every backend code comes from the typed
@@ -122,10 +124,8 @@ const REQUIRED_BACKEND_KINDS: Record<BackendTaskCode, KindEntry> = {
 const BACKEND_KINDS: Record<string, KindEntry> = {
 	...REQUIRED_BACKEND_KINDS,
 	deploy: { kind: "apply", label: "tasks.kind.deploy" },
-	launch: { kind: "launch", label: "tasks.kind.launch" },
 	stop: { kind: "stop", label: "tasks.kind.stop" },
 	download: { kind: "download", label: "tasks.kind.download" },
-	install: { kind: "install", label: "tasks.kind.install" },
 	scan: { kind: "scan", label: "tasks.kind.scan" },
 };
 

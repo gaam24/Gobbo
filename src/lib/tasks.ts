@@ -61,7 +61,9 @@ export function dedupeKey(dedupe: TaskDedupe, id = "", backend = false, backendK
 
 	if ("Pack" in dedupe && dedupe.Pack) return `pack:${dedupe.Pack.game}:${dedupe.Pack.path}`;
 
-	if ("PackLink" in dedupe) return `pack-link:${dedupe.PackLink.game}:${dedupe.PackLink.link}`;
+	if ("PackLink" in dedupe && dedupe.PackLink) return `pack-link:${dedupe.PackLink.game}:${dedupe.PackLink.link}`;
+
+	if ("Tool" in dedupe) return `tool:${dedupe.Tool.game}:${dedupe.Tool.tool}`;
 	return id;
 }
 
@@ -78,7 +80,7 @@ function isTaskDedupe(value: unknown): value is TaskDedupe {
 	if (value === "Other") return true;
 
 	if (typeof value !== "object" || value === null) return false;
-	const variants = ["Apply", "Import", "Update", "UpdateAll", "Requirement", "Collection", "Pack", "PackLink"];
+	const variants = ["Apply", "Import", "Update", "UpdateAll", "Requirement", "Collection", "Pack", "PackLink", "Tool"];
 	return variants.some((variant) => variant in value);
 }
 

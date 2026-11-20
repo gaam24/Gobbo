@@ -92,6 +92,13 @@ pub enum TaskDedupe {
         /// The link that is being downloaded.
         link: String,
     },
+    /// A tool run or a tool's prerequisite install, keyed by game and tool.
+    Tool {
+        /// The game the tool belongs to.
+        game: String,
+        /// The tool's id in the game definition.
+        tool: String,
+    },
     /// Work without a typed identity yet, such as a row restored from a journal written before this field existed.
     #[default]
     Other,
@@ -106,6 +113,17 @@ pub struct TaskKey {
 }
 
 impl TaskKey {
+    /// The key of one tool operation: `kind` is [`kind::LAUNCH`] or [`kind::INSTALL`].
+    pub fn tool(kind: &str, game: &str, tool: &str) -> Self {
+        Self {
+            id: format!("tool:{kind}:{game}:{tool}"),
+            dedupe: TaskDedupe::Tool {
+                game: game.to_string(),
+                tool: tool.to_string(),
+            },
+        }
+    }
+
     /// The key of a deployment of one game's active profile.
     pub fn apply(game: &str) -> Self {
         Self {
@@ -252,6 +270,17 @@ impl TaskKey {
                 game: game.to_string(),
                 link: rest,
             },
+            // `tool:<kind>:<game>:<tool>`: the game and the tool are the last two fields.
+            "tool" => game
+                .rsplit_once(':')
+                .and_then(|(head, tool)| {
+                    let (_, game) = head.split_once(':')?;
+                    Some(TaskDedupe::Tool {
+                        game: game.to_string(),
+                        tool: tool.to_string(),
+                    })
+                })
+                .unwrap_or_default(),
             _ => TaskDedupe::Other,
         }
     }
@@ -282,6 +311,8 @@ pub const TASK_KINDS: &[&str] = &[
     "pack",
     "pack-link",
     "collection",
+    "launch",
+    "install",
 ];
 
 /// Stable kind codes, named for the call sites that emit them. Each one indexes [`TASK_KINDS`], so there is no second
@@ -303,6 +334,10 @@ pub mod kind {
     pub const PACK_LINK: &str = super::TASK_KINDS[6];
     /// An automatic collection install.
     pub const COLLECTION: &str = super::TASK_KINDS[7];
+    /// A tool run.
+    pub const LAUNCH: &str = super::TASK_KINDS[8];
+    /// A tool's prerequisite install.
+    pub const INSTALL: &str = super::TASK_KINDS[9];
 }
 
 /// Stable state codes of a task record.
@@ -726,7 +761,9 @@ mod tests {
                 "apply",
                 "pack",
                 "pack-link",
-                "collection"
+                "collection",
+                "launch",
+                "install",
             ]
         );
         let distinct: std::collections::HashSet<&str> = TASK_KINDS.iter().copied().collect();
@@ -846,6 +883,8 @@ mod tests {
             TaskKey::pack_import("game-a", "recipe.zip"),
             TaskKey::pack_download("game-a", "recipe.zip"),
             TaskKey::pack_link("game-a", "nxm://link"),
+            TaskKey::tool(kind::LAUNCH, "game-a", "xedit"),
+            TaskKey::tool(kind::INSTALL, "game-a", "xedit"),
         ];
 
         for key in keys {
