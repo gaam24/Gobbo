@@ -270,10 +270,13 @@ export function useGameActions({
 	const setSeparator = (separatorId: string, name: string) => changeQueued((gameId) => commands.setSeparator(gameId, separatorId, name));
 	const setModGroup = (modId: string, groupId: string | null) => changeQueued((gameId) => commands.setModGroup(gameId, modId, groupId));
 
-	const selectVersion = async (modId: string, folder: string) => {
-		await changeQueued((gameId) => commands.setModVersion(gameId, modId, folder));
+	/// A change to one mod that also drops this session's update failure for it.
+	const changeMod = async (modId: string, call: (gameId: string) => Promise<CommandResult<Status>>, notice?: string) => {
+		await changeQueued(call, notice);
 		forget(modId);
 	};
+
+	const selectVersion = (modId: string, folder: string) => changeMod(modId, (gameId) => commands.setModVersion(gameId, modId, folder));
 
 	/// The game whose apply waits on the global state lock. The single task listener reads this ref to match a finish
 	/// event to the waiting row, without resubscribing when the shown game or language changes.
@@ -394,10 +397,6 @@ export function useGameActions({
 		]);
 		scope.add(...unlisteners);
 	});
-
-	/// Moves one mod above or below another, as the conflict tab does when order decides the winner. The backend resolves
-	/// the group and order rules; this name is kept for the inspector that already takes it.
-	const moveModBeside = (modId: string, otherId: string, side: "above" | "below") => moveMod(modId, otherId, side);
 
 	const undo = () =>
 		queued(async (gameId) => {
@@ -773,10 +772,8 @@ export function useGameActions({
 
 	/// One installed version. A profile that still selects it moves to `replacement`; the backend undoes a prepared
 	/// deployment that holds the version before its files go.
-	const deleteModVersion = async (modId: string, folder: string, replacement: string | null, version: string) => {
-		await changeQueued((gameId) => commands.deleteModVersion(gameId, folder, replacement), t("notice.versionDeleted", { version }));
-		forget(modId);
-	};
+	const deleteModVersion = (modId: string, folder: string, replacement: string | null, version: string) =>
+		changeMod(modId, (gameId) => commands.deleteModVersion(gameId, folder, replacement), t("notice.versionDeleted", { version }));
 
 	const deleteUnusedVersions = () => changeQueued((gameId) => commands.deleteUnusedVersions(gameId), t("notice.unusedVersionsDeleted"));
 
@@ -857,14 +854,10 @@ export function useGameActions({
 
 	/// A changed source ID or version drops the failure of this session for that mod. The saved check is the library's: it
 	/// follows the version the profile selects, and a changed ID clears it in the library.
-	const setModSource = async (modId: string, provider: string, sourceId: string | null) => {
-		await changeQueued((gameId) => commands.setModSource(gameId, modId, provider, sourceId), t("notice.sourceIdSaved"));
-		forget(modId);
-	};
-	const setModInfo = async (modId: string, folder: string, info: ModInfoEdit) => {
-		await changeQueued((gameId) => commands.setModInfo(gameId, modId, folder, info), t("notice.modInfoSaved"));
-		forget(modId);
-	};
+	const setModSource = (modId: string, provider: string, sourceId: string | null) =>
+		changeMod(modId, (gameId) => commands.setModSource(gameId, modId, provider, sourceId), t("notice.sourceIdSaved"));
+	const setModInfo = (modId: string, folder: string, info: ModInfoEdit) =>
+		changeMod(modId, (gameId) => commands.setModInfo(gameId, modId, folder, info), t("notice.modInfoSaved"));
 	/// Hides the provider's current version until it lists another one, or shows it again.
 	const ignoreVersion = (modId: string, provider: string) =>
 		changeQueued((gameId) => commands.ignoreVersion(gameId, modId, provider), t("notice.versionIgnored"));
@@ -919,7 +912,6 @@ export function useGameActions({
 		setModGroup,
 		selectVersion,
 		runDeploy,
-		moveModBeside,
 		undo,
 		discardChanges,
 		runLaunch,

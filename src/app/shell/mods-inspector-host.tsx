@@ -57,7 +57,7 @@ function ModsInspectorView() {
 				onSetInstructions={gameActions.setModInstructions}
 				onSetRelations={gameActions.setModRelations}
 				onSetFileWinner={gameActions.setFileWinner}
-				onMoveBeside={gameActions.moveModBeside}
+				onMoveBeside={gameActions.moveMod}
 				onSetSource={gameActions.setModSource}
 				onIgnoreVersion={gameActions.ignoreVersion}
 				onUnignoreVersion={gameActions.unignoreVersion}
