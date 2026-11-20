@@ -16,12 +16,13 @@ use crate::deploy::DeployProgress;
 use crate::deploy::DeployStage;
 use crate::deploy::apply_with_progress;
 use crate::deploy::overlay;
-use crate::deploy::plan;
+use crate::deploy::plan_with_mode;
 use crate::deploy::state_is_overlay;
 use crate::deploy::target::journal_roots;
 use crate::deploy::target::target_for;
 use crate::deploy::undo;
 use crate::domain::profiles::Entry as ProfileEntry;
+use crate::domain::resolver::PlanMode;
 use crate::error::AppError;
 use crate::error::Message;
 use crate::error::deployment_active;
@@ -113,10 +114,11 @@ pub fn apply_deployment_cancellable(
         let library = data.save_library(library)?;
         (library, mods)
     };
-    let deploy_plan = plan(
+    let deploy_plan = plan_with_mode(
         &game.deploy,
         &library.inputs(&mods),
         &profiles.active().winners,
+        PlanMode::Full,
     );
 
     if !game.requires.is_empty() {

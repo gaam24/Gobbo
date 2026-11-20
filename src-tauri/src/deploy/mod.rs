@@ -9,6 +9,7 @@
 
 mod apply;
 mod error;
+#[cfg(test)]
 mod plan;
 mod progress;
 mod undo;
@@ -23,6 +24,7 @@ use std::path::{Path, PathBuf};
 
 use crate::domain::user_data::Set as UserDataSet;
 
+pub use crate::domain::resolver::plan_with_mode;
 #[cfg(any(test, feature = "bench"))]
 pub use apply::apply;
 pub use apply::apply_with_progress;
@@ -32,7 +34,6 @@ pub use error::DeployError;
 use journal::Journal;
 #[cfg(test)]
 pub use plan::plan_from_disk;
-pub use plan::{plan, plan_with_mode};
 #[cfg(test)]
 pub use progress::fail_after;
 pub use undo::undo;
