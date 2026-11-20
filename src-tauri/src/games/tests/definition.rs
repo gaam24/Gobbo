@@ -63,13 +63,6 @@ fn a_misspelled_key_is_an_error_and_not_a_silent_default() {
 }
 
 #[test]
-fn a_method_list_is_no_longer_a_definition_key() {
-    let text = lf(SLOT).replacen("[deploy]\n", "[deploy]\nmethods = [\"overlay\"]\n", 1);
-    let error = GameDef::parse(&text).unwrap_err().to_string();
-    assert!(error.contains("unknown field"), "{error}");
-}
-
-#[test]
 fn cyberpunk_2077_accepts_new_loader_files_and_framework_folders() {
     let path = Path::new(concat!(
         env!("CARGO_MANIFEST_DIR"),

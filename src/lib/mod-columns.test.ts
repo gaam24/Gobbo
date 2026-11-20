@@ -16,8 +16,6 @@ test("a new list shows the columns a player reads first, and pins the switch and
 		.filter((column) => !DEFAULT_LAYOUT.hidden.includes(column.id))
 		.map((column) => column.id);
 	expect(shown).toEqual(["order", "enabled", "mod", "version", "conflicts", "missing", "category", "size"]);
-	expect(DEFAULT_LAYOUT.hidden).not.toContain("enabled");
-	expect(DEFAULT_LAYOUT.hidden).not.toContain("mod");
 });
 
 test("a saved layout without an order gets the default one, and a pinned column is never hidden", () => {

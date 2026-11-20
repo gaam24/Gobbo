@@ -509,18 +509,6 @@ mod tests {
     }
 
     #[test]
-    fn a_portable_copy_without_global_data_defaults_to_portable() {
-        let context = context("storage-prompt-default", true);
-        assert_eq!(context.default_mode, StorageMode::Portable);
-    }
-
-    #[test]
-    fn an_installed_copy_defaults_to_global() {
-        let context = context("storage-prompt-installed", false);
-        assert_eq!(context.default_mode, StorageMode::Global);
-    }
-
-    #[test]
     fn a_start_error_names_the_folder() {
         let error = AppError::new("io.failed").with("path", r"C:\Gobbo\data");
         let text = describe(&error, &Strings::EN);

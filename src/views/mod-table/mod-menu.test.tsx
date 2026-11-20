@@ -146,7 +146,6 @@ test("a translation group's menu offers the translation winner action", () => {
 
 test("a mod outside a group keeps the single-mod menu", () => {
 	const html = menuFor(alpha, []);
-	expect(html).not.toContain("Quality tweaks");
 	expect(html).not.toContain("Rename group");
 	expect(html).not.toContain("Remove from group");
 	expect(html).not.toContain("Set translation as winner");

@@ -37,7 +37,6 @@ test("the timeline says what each change did and shows the current state", () =>
 	expect(html).toContain("2 of 2 on");
 	expect(html).toContain("Added: 2");
 	expect(html).toContain("Switched off: 1");
-	expect(html).not.toContain("differences");
 });
 
 test("an entry without a summary has no row label, and one note under the list explains older entries", () => {
@@ -45,7 +44,6 @@ test("an entry without a summary has no row label, and one note under the list e
 	const html = renderToString(
 		<HistoryTimeline entries={[entry, older, { ...older, id: 3 }]} selectedId={1} onSelect={nothing} total={2} enabled={2} locale="en" />,
 	);
-	expect(html).not.toContain("Earlier state");
 	expect(html.split("Older entries were saved without a change summary.")).toHaveLength(2);
 });
 

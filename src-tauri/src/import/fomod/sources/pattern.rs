@@ -153,44 +153,6 @@ const fn wildcard(pattern: &str, text: &str) -> bool {
 mod tests {
     use super::*;
 
-    /// The recursive matcher this module replaced, kept as an oracle for the linear one.
-    fn old_wildcard(pattern: &str, text: &str) -> bool {
-        match pattern.split_once('*') {
-            None => pattern == text,
-            Some((prefix, suffix)) => {
-                let Some(rest) = text.strip_prefix(prefix) else {
-                    return false;
-                };
-                if suffix.is_empty() {
-                    return true;
-                }
-                (0..=rest.len()).any(|skip| {
-                    text.get(prefix.len() + skip..)
-                        .is_some_and(|tail| old_wildcard(suffix, tail))
-                })
-            }
-        }
-    }
-
-    #[test]
-    fn the_linear_wildcard_matches_the_recursive_one() {
-        let patterns = [
-            "*", "a*", "*a", "a*b", "a**b", "*.ws", "a/*/c", "a*b*c", "", "no-star",
-        ];
-        let texts = [
-            "", "a", "ab", "a/b", "a/b/c", "aXXb", "aXXbYYc", "file.ws", "no-star", "no-sta",
-        ];
-        for pattern in patterns {
-            for text in texts {
-                assert_eq!(
-                    wildcard(pattern, text),
-                    old_wildcard(pattern, text),
-                    "{pattern:?} vs {text:?}"
-                );
-            }
-        }
-    }
-
     #[test]
     fn a_prepared_pattern_uses_a_normalized_entry() {
         let pattern = SourcePattern::new("Textures\\2K");

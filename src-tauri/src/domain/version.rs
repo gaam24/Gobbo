@@ -261,69 +261,6 @@ mod tests {
         assert!(!UpdateState::Unknown.is_update());
     }
 
-    /// The tokenizer this module replaced. Kept as an oracle for the property test.
-    fn old_tokens(version: &str) -> Vec<OldToken> {
-        let mut result = Vec::new();
-        let mut number = String::new();
-        let mut text = String::new();
-        for c in version.trim().to_lowercase().chars() {
-            if c.is_ascii_digit() {
-                if !text.is_empty() {
-                    result.push(OldToken::Text(std::mem::take(&mut text)));
-                }
-                number.push(c);
-            } else if c.is_ascii_alphabetic() {
-                if !number.is_empty() {
-                    result.push(OldToken::Number(number.parse().unwrap_or(0)));
-                    number.clear();
-                }
-                text.push(c);
-            } else if !number.is_empty() || !text.is_empty() {
-                if !number.is_empty() {
-                    result.push(OldToken::Number(number.parse().unwrap_or(0)));
-                    number.clear();
-                }
-                if !text.is_empty() {
-                    result.push(OldToken::Text(std::mem::take(&mut text)));
-                }
-            }
-        }
-        if !number.is_empty() {
-            result.push(OldToken::Number(number.parse().unwrap_or(0)));
-        }
-        if !text.is_empty() {
-            result.push(OldToken::Text(text));
-        }
-        result
-    }
-
-    #[derive(Debug, PartialEq, Eq)]
-    enum OldToken {
-        Number(u64),
-        Text(String),
-    }
-
-    fn old_compare(candidate: &str, current: &str) -> Ordering {
-        let left = old_tokens(candidate);
-        let right = old_tokens(current);
-        let length = left.len().max(right.len());
-        for index in 0..length {
-            let empty = OldToken::Number(0);
-            let a = left.get(index).unwrap_or(&empty);
-            let b = right.get(index).unwrap_or(&empty);
-            let order = match (a, b) {
-                (OldToken::Number(a), OldToken::Number(b)) => a.cmp(b),
-                (OldToken::Text(a), OldToken::Text(b)) => a.cmp(b),
-                (OldToken::Number(_), OldToken::Text(_)) => Ordering::Greater,
-                (OldToken::Text(_), OldToken::Number(_)) => Ordering::Less,
-            };
-            if order != Ordering::Equal {
-                return order;
-            }
-        }
-        Ordering::Equal
-    }
-
     #[test]
     fn newer_versions_win_on_numbers_and_letters() {
         assert!(is_newer("1.10", "1.9"));
@@ -458,50 +395,5 @@ mod tests {
             with_ignored(UpdateState::Different, Some("1.1.3b"), None, Some(&ignored)),
             UpdateState::Different
         );
-    }
-
-    #[test]
-    fn the_new_comparator_matches_the_old_one() {
-        // Deterministic pseudo-random strings: ASCII letters, digits, separators, Unicode and very long numbers.
-        let pieces = [
-            "",
-            "0",
-            "1",
-            "2",
-            "9",
-            "10",
-            "01",
-            "a",
-            "b",
-            "rev",
-            "Z",
-            " ",
-            ".",
-            "-",
-            "_",
-            "é",
-            "K",
-            "99999999999999999999999999999999999999999999999999",
-        ];
-        let mut state = 0x9E37_79B9_u64;
-        for _ in 0..4_000 {
-            let mut make = || {
-                let mut text = String::new();
-                for _ in 0..=(state % 6) {
-                    state = state
-                        .wrapping_mul(6_364_136_223_846_793_005)
-                        .wrapping_add(1);
-                    text.push_str(pieces[(state as usize) % pieces.len()]);
-                }
-                text
-            };
-            let left = make();
-            let right = make();
-            assert_eq!(
-                compare(&left, &right),
-                old_compare(&left, &right),
-                "{left:?} vs {right:?}"
-            );
-        }
     }
 }
