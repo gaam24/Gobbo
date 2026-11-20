@@ -50,6 +50,9 @@ struct Listing {
     /// a handle reused for another folder must rebuild the listing, and a matching one needs no `String`.
     rel: String,
     raw: Vec<u16>,
+    /// The name filter the listing was built with. A query on the same handle with another name needs a new snapshot:
+    /// the entries and the cursor below belong to this filter.
+    mask: String,
     /// The whiteout snapshot the listing was built from. A newer snapshot falls back to the visibility check.
     whiteouts: Arc<Whiteouts>,
     layers: ListingLayers,
@@ -127,10 +130,13 @@ fn snapshot_fresh(listing: &Listing) -> bool {
     Arc::ptr_eq(&listing.whiteouts, &listing.mount.whiteouts_snapshot())
 }
 
-/// Whether a cached merged listing can keep answering a query for `rel` on `mount`: the same folder of the same
-/// mount, built against the mount's current whiteout snapshot.
-fn serves_cached(listing: &Listing, mount: &Mount, rel: &str) -> bool {
-    listing.rel == rel && std::ptr::eq(listing.mount, mount) && snapshot_fresh(listing)
+/// Whether a cached merged listing can keep answering this query: the same folder of the same mount, built with the
+/// caller's name filter against the mount's current whiteout snapshot.
+fn serves_cached(listing: &Listing, mount: &Mount, rel: &str, mask: &str) -> bool {
+    listing.rel == rel
+        && listing.mask == mask
+        && std::ptr::eq(listing.mount, mount)
+        && snapshot_fresh(listing)
 }
 
 /// One handle in the listing table: a plain folder the original NT query serves, or a merged snapshot.
@@ -350,6 +356,10 @@ unsafe fn query(
         return None;
     }
 
+    // A cached listing was built for one name filter; a query with another name must not continue its cursor, so the
+    // filter is read before the cached-listing lookup.
+    let mask = mask(name)?;
+
     if let Some(path_length) = raw_length
         && restart == 0
     {
@@ -367,7 +377,9 @@ unsafe fn query(
                     return None;
                 }
 
-                TableEntry::Merged(listing) if listing.matches(raw) && snapshot_fresh(listing) => {
+                TableEntry::Merged(listing)
+                    if listing.matches(raw) && listing.mask == mask && snapshot_fresh(listing) =>
+                {
                     listing.used = stamp;
                     let (status, bytes, _) = listing.respond(class, info, length, single != 0);
                     write_iosb(iosb, status, bytes);
@@ -393,9 +405,9 @@ unsafe fn query(
             handles::relative_in_layers(&real)?
         }
     };
-    let own = match shown(mount, &rel) {
+    let (own_layer, own) = match shown(mount, &rel) {
         // A handle to a file is not a directory; the original call reports `STATUS_NOT_A_DIRECTORY`.
-        Ok(Some((_, path, _))) if path.is_dir() => path,
+        Ok(Some((layer, path, _))) if path.is_dir() => (layer, path),
         Ok(Some(_)) => return None,
         // The folder is hidden by a whiteout or missing: the handle must not list a lower layer through it.
         Ok(None) => {
@@ -408,9 +420,10 @@ unsafe fn query(
             return Some(status);
         }
     };
-    let mask = mask(name)?;
-
-    if plain_folder(mount, &rel, mask.as_ref()) {
+    // A redirected open sits on the top layer, so enumerating that handle can never show a name that lives only in
+    // the root layer: a single-name query would answer "not found". Only a handle on the root layer itself names the
+    // real folder and may pass through to the original.
+    if own_layer == Layer::Root && plain_folder(mount, &rel, mask.as_ref()) {
         // The merged view is the real game folder; remember the handle so continuation calls pass through without
         // probing the layers again.
         crate::stat_lock();
@@ -442,7 +455,7 @@ unsafe fn query(
     let rebuild = restart != 0
         || match listings.get(&(handle as usize)) {
             None => true,
-            Some(TableEntry::Merged(listing)) => !serves_cached(listing, mount, &rel),
+            Some(TableEntry::Merged(listing)) => !serves_cached(listing, mount, &rel, &mask),
             Some(TableEntry::Plain { raw, .. }) => {
                 raw_length.is_none_or(|length| raw.as_slice() != &raw_buffer[..length])
             }
@@ -480,6 +493,7 @@ unsafe fn query(
                 mount,
                 rel: rel.clone(),
                 raw: raw_length.map_or_else(Vec::new, |length| raw_buffer[..length].to_vec()),
+                mask: mask.as_ref().to_string(),
                 whiteouts: mount.whiteouts_snapshot(),
                 layers,
                 next: 0,
@@ -713,6 +727,7 @@ mod tests {
             mount,
             rel: rel.clone(),
             raw: Vec::new(),
+            mask: "*".to_string(),
             whiteouts,
             layers: ListingLayers {
                 taken: crate::search::Taken::leading(Vec::new()),
@@ -725,16 +740,29 @@ mod tests {
             used: 0,
         };
 
-        assert!(serves_cached(&listing(Arc::clone(&snapshot)), mount, &rel));
+        assert!(serves_cached(
+            &listing(Arc::clone(&snapshot)),
+            mount,
+            &rel,
+            "*"
+        ));
         assert!(!serves_cached(
             &listing(Arc::new(Whiteouts::default())),
             mount,
-            &rel
+            &rel,
+            "*"
         ));
         assert!(!serves_cached(
             &listing(Arc::clone(&snapshot)),
             mount,
-            "other"
+            "other",
+            "*"
+        ));
+        assert!(!serves_cached(
+            &listing(Arc::clone(&snapshot)),
+            mount,
+            &rel,
+            "name.txt"
         ));
     }
 }

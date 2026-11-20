@@ -891,6 +891,76 @@ fn an_nt_single_entry_query_lists_each_entry_once() {
     undo(&target.journal_roots()).unwrap();
 }
 
+/// Asks for one exact name through a handle on a modded folder, as a program that checks for a file does. The answer is
+/// the class-37 entry and its name, or the NT status of the query.
+const NT_QUERY_NAMED: &str = r#"
+$ErrorActionPreference = 'Stop'
+Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public static class NtQueryNamed {
+[StructLayout(LayoutKind.Sequential)]
+public struct IoStatus { public int Status; public IntPtr Information; }
+[StructLayout(LayoutKind.Sequential)]
+public struct UnicodeString { public ushort Length; public ushort MaximumLength; public IntPtr Buffer; }
+[DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+public static extern IntPtr CreateFileW(string name, uint access, uint share, IntPtr security, uint disposition, uint flags, IntPtr template);
+[DllImport("ntdll.dll")]
+public static extern int NtQueryDirectoryFile(IntPtr handle, IntPtr evt, IntPtr apc, IntPtr context, out IoStatus status, IntPtr info, uint length, uint cls, byte single, IntPtr name, byte restart);
+[DllImport("kernel32.dll")]
+public static extern bool CloseHandle(IntPtr handle);
+public static string Of(string folder, string matchName) {
+    IntPtr handle = CreateFileW(folder, 0x1, 7, IntPtr.Zero, 3, 0x02000000, IntPtr.Zero);
+    if (handle == new IntPtr(-1)) throw new Exception("open " + Marshal.GetLastWin32Error());
+    IntPtr buffer = Marshal.AllocHGlobal(65536);
+    IntPtr text = Marshal.StringToHGlobalUni(matchName);
+    IntPtr name = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(UnicodeString)));
+    try {
+        var pattern = new UnicodeString { Length = (ushort)(matchName.Length * 2), MaximumLength = (ushort)(matchName.Length * 2 + 2), Buffer = text };
+        Marshal.StructureToPtr(pattern, name, false);
+        IoStatus io;
+        int status = NtQueryDirectoryFile(handle, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, out io, buffer, 65536, 37, 1, name, 1);
+        if (status != 0) return "status " + status.ToString("x8");
+        int length = Marshal.ReadInt32(buffer, 60);
+        return Marshal.PtrToStringUni(new IntPtr(buffer.ToInt64() + 104), length / 2);
+    } finally {
+        Marshal.FreeHGlobal(name);
+        Marshal.FreeHGlobal(text);
+        Marshal.FreeHGlobal(buffer);
+        CloseHandle(handle);
+    }
+}
+}
+'@
+[NtQueryNamed]::Of($args[0], $args[1]) | Out-File -Encoding ascii $args[2]
+"#;
+
+/// A single-name NT query on a handle to a modded folder must find a name that only the game folder has. The open of the
+/// folder is redirected to the top layer, so a pass-through to the original on that handle misses root-only names.
+#[test]
+fn a_single_name_nt_query_on_a_modded_folder_finds_a_root_only_file() {
+    let (library, root, target) = fixture("nt-named");
+    let session = deploy_mod_a(&library, &target);
+    let folder = root.join(r"archive\pc\mod");
+    let out = scratch!("nt-named-out");
+    let script = out.join("named.ps1");
+    fs::write(&script, NT_QUERY_NAMED).unwrap();
+    run_script_file(
+        &session,
+        &script,
+        &[
+            folder.display().to_string(),
+            "a.archive".to_string(),
+            out.join("answer.txt").display().to_string(),
+        ],
+    );
+    assert_eq!(
+        fs::read_to_string(out.join("answer.txt")).unwrap().trim(),
+        "a.archive"
+    );
+    undo(&target.journal_roots()).unwrap();
+}
+
 #[test]
 fn a_path_with_dot_dot_writes_to_the_upper_layer_like_the_plain_path() {
     let (library, root, target) = fixture("dotdot");

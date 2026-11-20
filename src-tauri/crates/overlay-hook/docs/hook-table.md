@@ -29,9 +29,14 @@ reason, and it costs nothing on a pass-through call. The Win32 hooks that stay, 
 - `MoveFileExW`, `MoveFileWithProgressW`: a rename by path. A rename of a file through an open handle is not redirected
   (see the limits above), and `MOVEFILE_DELAY_UNTIL_REBOOT` would schedule a change to the game folder at the next boot.
 - `RemoveDirectoryW`: removing a folder of a lower layer leaves a whiteout. The NT path leaves the folder in place.
-- `FindFirstFile*`, `FindNextFileW`, `FindClose`: the NT directory query answers `attrib` and `move` differently
-  (`attrib` reports a symbolic link that does not exist; `move` fails) when these hooks are off. The cause is not yet
-  known; the removal waits for it.
+- `FindFirstFile*`, `FindNextFileW`, `FindClose`: with these hooks off, `attrib` and `move` used to fail. The cause was
+  that the redirected open puts the handle on the top layer, so the plain pass-through enumerated that layer and hid
+  root-only names from single-name queries; the plain path is now gated on the handle's own layer being the root, and
+  other handles are answered from the merged listing, whose cursor also follows the caller's exact name filter. The
+  hooks stay because they are load-bearing: a measured kernelbase discrepancy remains with them off (repeated
+  exact-name lookups on reused handle values answer differently through the merged path), so full Win32 parity is not
+  achievable without them today — and they are faster too, since Win32 enumerations through them cost less than
+  kernelbase's NT walk through the merged path.
 
 Rules for adding a hook:
 
