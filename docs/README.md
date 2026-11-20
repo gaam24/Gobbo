@@ -34,7 +34,6 @@ The [README](../README.md) is the front door: what Gobbo is, what it does and ho
 | [Definition of done](agent/definition-of-done.md) | What a change must include. |
 | [Quality reports](agent/quality.md) | Security, local reports and E2E. |
 | [Run the app](agent/run-app.md) | The MCP bridge, screenshots and performance checks. |
-| [Release](release.md) | Versioning, signing, SBOM and publishing. |
 | [State machines](state-machines.md) | Game states, the primary action and long-running tasks. |
 | [Collections architecture](agent/collections.md) | The collection plan, the provider port, the cache and the security rules. |
 | [Glossary](ux/glossary.md) | One label per concept, and the words the interface uses. |

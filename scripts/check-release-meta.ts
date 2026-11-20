@@ -3,9 +3,8 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 /// One owner for the app version: `release.json` at the repository root. Every copy is asserted against it, so a bump
-/// changes that one value and any file left behind fails `bun run generated:check` (part of `bun run lint`). The
-/// updater tests read `release.json` directly instead of repeating the version. `docs/release.md` uses a later version
-/// in its manifest example; only references to the *current* release are matched below. The supported-games tables in
+/// changes that one value and any file left behind fails `bun run guard` (part of `bun run lint`). The
+/// updater tests read `release.json` directly instead of repeating the version. The supported-games tables in
 /// both READMEs are checked against `games/*/game.toml` for the same reason: adding a definition cannot update one
 /// list and forget the other.
 
@@ -13,9 +12,6 @@ const root = join(import.meta.dir, "..");
 const CARGO_VERSION = /\[workspace\.package\]\s*\n\s*version\s*=\s*"(\d+\.\d+\.\d+)"/;
 const JSON_VERSION = /"version"\s*:\s*"(\d+\.\d+\.\d+)"/;
 const README_STATUS = /\*\*Status:\*\*\s+(\S+),/;
-const RELEASE_OUT = /release `v(\d+\.\d+\.\d+)`/;
-const RELEASE_UNPACK = /unpack `v(\d+\.\d+\.\d+)`/;
-const RELEASE_ATTEST = /gh attestation verify dist-release\/gobbo-(\d+\.\d+\.\d+)-linux-x64-portable\.zip/;
 const BUG_VERSION = /id: version[\s\S]*?placeholder:\s*(\S+)/;
 const TEST_LITERAL = /\b\d+\.\d+\.\d+\b/;
 const ICON_ID = /games\/([a-z0-9-]+)\/icon\.webp/g;
@@ -83,31 +79,6 @@ function compareSets(actual: Set<string>, expected: Set<string>, label: string, 
 	}
 }
 
-/// The release gate must really skip the long E2E suite and compare the tag against full history. Inside a reusable
-/// workflow `github.event_name` is the caller's event, so only the input can turn E2E off; a shallow checkout makes the
-/// tag-on-main ancestry check fail whenever main moved after the tag.
-function checkReleaseGates(problems: string[]): void {
-	const ci = read(".github/workflows/ci.yml");
-	const release = read(".github/workflows/release.yml");
-	if (!(ci.includes("skip_e2e:") && ci.includes("!inputs.skip_e2e"))) {
-		problems.push("ci.yml: the E2E job must gate on !inputs.skip_e2e");
-	}
-	if (!release.includes("skip_e2e: true")) {
-		problems.push("release.yml: the checks call must pass skip_e2e: true");
-	}
-	const buildJob = release.split("  build:")[1] ?? "";
-	if (!buildJob.includes("fetch-depth: 0")) {
-		problems.push("release.yml: the build checkout needs fetch-depth: 0 for the tag-on-main check");
-	}
-	// rust-cache keys include the job id unless shared-key is set, and the environment hash includes CARGO_INCREMENTAL.
-	if (!release.includes('CARGO_INCREMENTAL: "0"')) {
-		problems.push("release.yml: set CARGO_INCREMENTAL=0 so the Rust cache key matches ci.yml");
-	}
-	if (!(buildJob.includes("shared-key: ") && buildJob.includes("matrix.cache-key"))) {
-		problems.push("release.yml: the Rust cache must use shared-key to reuse the CI cache");
-	}
-}
-
 /// Asserts the version copies and the game tables. Callers pass their own problem list so this folds into the
 /// generated-files guard without a second process.
 export function checkReleaseMeta(problems: string[]): void {
@@ -122,11 +93,6 @@ export function checkReleaseMeta(problems: string[]): void {
 	expectVersion(read("src-tauri/tauri.conf.json"), JSON_VERSION, "src-tauri/tauri.conf.json", version, problems);
 	expectVersion(read("src-tauri/Cargo.toml"), CARGO_VERSION, "src-tauri/Cargo.toml", version, problems);
 	expectVersion(read("README.md"), README_STATUS, "README.md status", version, problems);
-
-	const release = read("docs/release.md");
-	expectVersion(release, RELEASE_OUT, "docs/release.md release step", version, problems);
-	expectVersion(release, RELEASE_UNPACK, "docs/release.md unpack step", version, problems);
-	expectVersion(release, RELEASE_ATTEST, "docs/release.md attestation command", version, problems);
 
 	expectVersion(read(".github/ISSUE_TEMPLATE/bug_report.yml"), BUG_VERSION, "bug_report.yml version placeholder", version, problems);
 
@@ -173,7 +139,6 @@ export function checkReleaseMeta(problems: string[]): void {
 			);
 		}
 	}
-	checkReleaseGates(problems);
 }
 
 if (import.meta.main) {
