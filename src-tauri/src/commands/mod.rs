@@ -56,8 +56,8 @@ pub async fn for_game<T: Send + 'static>(
 }
 
 /// Runs one long operation for one game as a task. It starts the task record under `key`, runs `work` on a blocking
-/// thread with the task's cancel flag and progress handle, and then finishes the record as done or failed. A task the
-/// user cancelled keeps its cancelled state, which `TaskFlags::finish` already guarantees.
+/// thread with the task's cancel flag and progress handle, and then finishes the record with `task_state_for_failure`'s
+/// rule. A task the user cancelled keeps its cancelled state, which `TaskFlags::finish` already guarantees.
 pub async fn run_task<T: Send + 'static>(
     data: State<'_, Data>,
     tasks: &task_commands::TaskFlags,
@@ -74,14 +74,11 @@ pub async fn run_task<T: Send + 'static>(
         work(root, game, flag.as_ref(), handle)
     })
     .await;
-    tasks.finish(
-        &key,
-        if result.is_ok() {
-            task_commands::state::DONE
-        } else {
-            task_commands::state::FAILED
-        },
-    );
+    let state = match &result {
+        Ok(_) => task_commands::state::DONE,
+        Err(error) => task_state_for_failure(error),
+    };
+    tasks.finish(&key, state);
     result
 }
 
