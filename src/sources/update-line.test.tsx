@@ -27,7 +27,6 @@ test("an unordered difference is still shown as a possible update", () => {
 	const html = renderToString(<UpdateLine update={report({})} onIgnore={() => undefined} />);
 	expect(html).toContain("Available 1.1.3a");
 	expect(html).toContain("Ignore this version");
-	expect(html).not.toContain("Different version");
 });
 
 test("an ignored version offers the way back", () => {

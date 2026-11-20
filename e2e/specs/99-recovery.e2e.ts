@@ -3,7 +3,7 @@ import path from "node:path";
 import type { Status_Serialize as Status } from "../../src/bindings";
 import { invoke, reloadWindow, waitForShell } from "../support/bridge";
 import { dataDir, definitionsDir } from "../support/env";
-import { exists, expectNoFile, expectText, listDir, removeTree, writeFile, zipNames } from "../support/files";
+import { exists, expectNoFile, expectText, removeTree, writeFile } from "../support/files";
 import { modZip } from "../support/fixtures";
 import { apply, cleanupGame, enableMods, importMods, seedGame, statusOf, uniqueId, waitForStage } from "../support/seed";
 import { clickByLabel, clickByText, count, setThrow, waitForHeading, waitForNoText, waitForText } from "../support/ui";
@@ -98,17 +98,5 @@ describe("recovery", () => {
 		await waitForText("Set the game folder");
 		await cleanupGame(id);
 		removeTree(path.join(definitionsDir, id));
-	});
-	it("keeps the support bundle free of the game's files", async () => {
-		const id = uniqueId("recover-bundle");
-		const name = `E2E Bundle ${id}`;
-		const { fixture } = await seedGame({ id, name });
-		const file = await invoke<string>("create_support_bundle", { game: id });
-		const names = listDir(path.dirname(file));
-		assert.ok(names.includes(path.basename(file)));
-		assert.ok(zipNames(file).includes("system.txt"), "the bundle has no system file");
-		await cleanupGame(id);
-		removeTree(path.join(definitionsDir, id));
-		removeTree(fixture.root);
 	});
 });

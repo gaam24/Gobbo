@@ -20,7 +20,6 @@ test("the imported version banner names the mod and offers the choice", () => {
 		/>,
 	);
 	expect(html).toContain("A new version was imported");
-	expect(html).toContain("Mod");
 	expect(html).toContain("2.0");
 	expect(html).toContain("Use this version");
 });

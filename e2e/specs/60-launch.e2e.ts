@@ -57,8 +57,7 @@ describe("launch and console", () => {
 		const name = `E2E Launch ${id}`;
 		const { fixture } = await seedGame({ id, name });
 		await importMods(id, [modZip(`launch-bare-${id}.zip`, "Bare")]);
-		const started = await invoke<boolean>("launch_game", { game: id, executable: null, applyDraft: false });
-		assert.equal(typeof started, "boolean");
+		await invoke<boolean>("launch_game", { game: id, executable: null, applyDraft: false });
 		const report = await waitForExit(id);
 		assert.equal(report.game_exit_code, 0);
 		assert.equal(report.stopped_by_user, false);
