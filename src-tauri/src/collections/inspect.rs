@@ -167,7 +167,11 @@ pub fn open(
         plan.info.url = url;
     }
 
-    let _ = cache::write_plan(&data, &plan);
+    // The cache only saves a fetch next time; the plan in hand is complete without it.
+    if let Err(error) = cache::write_plan(&data, &plan) {
+        crate::infra::log::warn(format!("could not cache the collection plan: {error}"));
+    }
+
     let archive = cache::archive(&data, &plan.info);
     Ok(Opened { plan, archive })
 }
@@ -191,7 +195,5 @@ fn read_or_fetch(
     };
     let dir = cache::prepare_dir(data, info)?;
     let archive = collection.download_archive(key, game_key, link, &dir, &mut |_, _| true)?;
-    let plan = manifest::read_plan(&archive, revision, game_key)?;
-    cache::write_plan(data, &plan)?;
-    Ok(plan)
+    manifest::read_plan(&archive, revision, game_key)
 }
