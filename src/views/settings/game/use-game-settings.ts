@@ -96,8 +96,6 @@ export function useGameSettings(status: Status, onSave: (patch: Partial<Settings
 		if (picked) await lists.addProfileData(picked);
 	};
 
-	const removeProfileData = (path: string) => lists.removeProfileData(path);
-
 	return {
 		gameRoot,
 		setGameRoot,
@@ -121,7 +119,7 @@ export function useGameSettings(status: Status, onSave: (patch: Partial<Settings
 		setProtonFpsLimit,
 		profileData,
 		addProfileData,
-		removeProfileData,
+		removeProfileData: lists.removeProfileData,
 		toolState,
 		saveTextFields,
 		saveNow,
