@@ -289,7 +289,7 @@ On Windows, also build both hooks, the 32-bit injector and run the overlay tests
 cargo build -p gobbo-overlay-hook
 cargo build -p gobbo-overlay-hook --target i686-pc-windows-msvc
 cargo build -p gobbo-overlay-launch --bin gobbo_overlay_inject32 --target i686-pc-windows-msvc
-# The test binaries look one folder above `target/debug/deps`:
+# The test binaries find these helpers in `target/debug` (Cargo nests them deeper):
 Copy-Item target/i686-pc-windows-msvc/debug/gobbo_overlay_hook.dll target/debug/gobbo_overlay_hook32.dll
 Copy-Item target/i686-pc-windows-msvc/debug/gobbo_overlay_inject32.exe target/debug/gobbo_overlay_inject32.exe
 cargo test -p gobbo --lib deploy::overlay::windows

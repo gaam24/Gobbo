@@ -116,9 +116,6 @@ pub fn run_probe(root: &Data, game_id: &str) -> Result<Vec<OverlayProbeReport>, 
 
 /// The probe binaries next to the Gobbo executable, native first. The dev layout has the Cargo binary name.
 fn probe_programs() -> Vec<(&'static str, PathBuf)> {
-    let Ok(exe) = std::env::current_exe() else {
-        return Vec::new();
-    };
     let candidates = [
         ("x64", ["gobbo_overlay_probe.exe", "overlay-probe.exe"]),
         ("x86", ["gobbo_overlay_probe32.exe", "overlay-probe32.exe"]),
@@ -126,23 +123,13 @@ fn probe_programs() -> Vec<(&'static str, PathBuf)> {
     let mut found = Vec::new();
     for (arch, names) in candidates {
         for name in names {
-            if let Some(path) = adjacent(&exe, name) {
+            if let Some(path) = crate::infra::binaries::adjacent(name) {
                 found.push((arch, path));
                 break;
             }
         }
     }
     found
-}
-
-/// A file next to the executable, or one folder above it in the dev layout.
-fn adjacent(exe: &Path, name: &str) -> Option<PathBuf> {
-    let next_to_exe = exe.with_file_name(name);
-    if next_to_exe.is_file() {
-        return Some(next_to_exe);
-    }
-    let one_up = exe.parent()?.parent()?.join(name);
-    one_up.is_file().then_some(one_up)
 }
 
 /// The checks, the unique probe folder and the layers of one report. A missing or broken report gives one failed

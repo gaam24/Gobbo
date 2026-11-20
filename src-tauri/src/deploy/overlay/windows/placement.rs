@@ -29,28 +29,14 @@ pub(super) fn reserved(name: &str) -> bool {
 pub(super) fn hook_dll() -> Result<PathBuf, DeployError> {
     let exe = std::env::current_exe().map_err(|e| FileError::new(Path::new("gobbo"), e))?;
     let next_to_exe = exe.with_file_name(HOOK_FILE);
-    hook_file(HOOK_FILE).ok_or(DeployError::OverlayHookMissing { path: next_to_exe })
+    crate::infra::binaries::adjacent(HOOK_FILE)
+        .ok_or(DeployError::OverlayHookMissing { path: next_to_exe })
 }
 
 /// The hook for a 32-bit game. `None` when Gobbo was built without it; a 32-bit launch then fails with a clear error
 /// instead of running the game unhooked.
 pub(super) fn hook_dll32() -> Option<PathBuf> {
-    hook_file(HOOK32_FILE)
-}
-
-/// A hook file next to the Gobbo executable, or one folder above it. The one above is the dev layout (`target/debug`);
-/// the one next to it is the installed layout.
-fn hook_file(name: &str) -> Option<PathBuf> {
-    let exe = std::env::current_exe().ok()?;
-    let next_to_exe = exe.with_file_name(name);
-    let one_up = exe
-        .parent()
-        .and_then(Path::parent)
-        .map(|dir| dir.join(name));
-    [Some(next_to_exe), one_up]
-        .into_iter()
-        .flatten()
-        .find(|path| path.is_file())
+    crate::infra::binaries::adjacent(HOOK32_FILE)
 }
 
 #[cfg(test)]

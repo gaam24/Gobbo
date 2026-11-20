@@ -83,6 +83,31 @@ function compareSets(actual: Set<string>, expected: Set<string>, label: string, 
 	}
 }
 
+/// The release gate must really skip the long E2E suite and compare the tag against full history. Inside a reusable
+/// workflow `github.event_name` is the caller's event, so only the input can turn E2E off; a shallow checkout makes the
+/// tag-on-main ancestry check fail whenever main moved after the tag.
+function checkReleaseGates(problems: string[]): void {
+	const ci = read(".github/workflows/ci.yml");
+	const release = read(".github/workflows/release.yml");
+	if (!(ci.includes("skip_e2e:") && ci.includes("!inputs.skip_e2e"))) {
+		problems.push("ci.yml: the E2E job must gate on !inputs.skip_e2e");
+	}
+	if (!release.includes("skip_e2e: true")) {
+		problems.push("release.yml: the checks call must pass skip_e2e: true");
+	}
+	const buildJob = release.split("  build:")[1] ?? "";
+	if (!buildJob.includes("fetch-depth: 0")) {
+		problems.push("release.yml: the build checkout needs fetch-depth: 0 for the tag-on-main check");
+	}
+	// rust-cache keys include the job id unless shared-key is set, and the environment hash includes CARGO_INCREMENTAL.
+	if (!release.includes('CARGO_INCREMENTAL: "0"')) {
+		problems.push("release.yml: set CARGO_INCREMENTAL=0 so the Rust cache key matches ci.yml");
+	}
+	if (!(buildJob.includes("shared-key: ") && buildJob.includes("matrix.cache-key"))) {
+		problems.push("release.yml: the Rust cache must use shared-key to reuse the CI cache");
+	}
+}
+
 /// Asserts the version copies and the game tables. Callers pass their own problem list so this folds into the
 /// generated-files guard without a second process.
 export function checkReleaseMeta(problems: string[]): void {
@@ -148,6 +173,7 @@ export function checkReleaseMeta(problems: string[]): void {
 			);
 		}
 	}
+	checkReleaseGates(problems);
 }
 
 if (import.meta.main) {

@@ -27,6 +27,7 @@ permissions:
 env:
   LEFTHOOK: "0" # skip git hooks installed by the `prepare` script
   BUN_VERSION: "1.4.4"
+  CARGO_INCREMENTAL: "0" # part of the Rust cache key in ci.yml; without it the release job cannot restore that cache
 
 jobs:
   # Release gate: a tag on a broken commit must not produce artifacts. The same checks run in ci.yml on every push.
@@ -36,7 +37,7 @@ jobs:
     with:
       # A nightly E2E run is environment-dependent and takes ~16 min; it must not hold a release. The web, Rust and
       # Windows gates below are the release gate, and E2E still runs on its own nightly and manual schedule.
-      e2e: false
+      skip_e2e: true
 
   build:
     name: Build ${{ matrix.os }}
@@ -48,9 +49,11 @@ jobs:
           - os: ubuntu-latest
             platform: linux-x86_64
             portable: linux-x86_64-portable
+            cache-key: backend-ubuntu # the key ci.yml uses for its Linux Rust job
           - os: windows-latest
             platform: windows-x86_64
             portable: windows-x86_64-portable
+            cache-key: backend-windows # the key ci.yml uses for its Windows Rust job
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     permissions:
@@ -65,6 +68,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+          fetch-depth: 0 # the tag-on-main check below needs history; with depth 1 it rejects a tag on an older main commit
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
@@ -86,11 +90,13 @@ jobs:
           restore-keys: ${{ runner.os }}-bun-
           lookup-only: true # restore a cache, never write one from a release build
 
-      # The release only restores this cache (save-if: false); it never writes one from published artifacts.
+      # The release only restores this cache (save-if: false); it never writes one from published artifacts. The
+      # shared-key is what lets it reuse ci.yml's cache instead of recompiling the whole workspace for the release.
       - name: Cache Rust build
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2 # zizmor: ignore[cache-poisoning]
         with:
           workspaces: src-tauri
+          shared-key: ${{ matrix.cache-key }}
           save-if: false
 
       - name: Tag is on main

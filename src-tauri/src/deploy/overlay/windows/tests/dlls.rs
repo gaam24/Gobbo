@@ -432,15 +432,9 @@ fn build_game_dll(root: &Path, arch: &str) -> Option<PathBuf> {
     status.success().then_some(dll)
 }
 
-/// A binary next to the test executable or one folder above it (`target/debug/deps` -> `target/debug`).
+/// A helper binary next to the test executable or in the Cargo dev layout above it.
 fn adjacent_binary(name: &str) -> Option<PathBuf> {
-    let exe = std::env::current_exe().ok()?;
-    let next = exe.with_file_name(name);
-    if next.is_file() {
-        return Some(next);
-    }
-    let one_up = exe.parent()?.parent()?.join(name);
-    one_up.is_file().then_some(one_up)
+    crate::infra::binaries::adjacent(name)
 }
 
 /// A DLL of the game folder that imports `mod.dll` and exports one marker, which returns the marker of `mod.dll`.

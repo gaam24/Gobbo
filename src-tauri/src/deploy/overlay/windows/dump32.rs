@@ -114,15 +114,9 @@ pub(super) fn spawn(state: &Path) -> Option<Pending> {
     })
 }
 
-/// The helper next to the Gobbo executable, or one folder above it in the dev layout.
+/// The helper next to the Gobbo executable, or in the Cargo dev layout above it.
 fn helper() -> Option<PathBuf> {
-    let exe = std::env::current_exe().ok()?;
-    let next = exe.with_file_name("gobbo_overlay_dump32.exe");
-    if next.is_file() {
-        return Some(next);
-    }
-    let one_up = exe.parent()?.parent()?.join("gobbo_overlay_dump32.exe");
-    one_up.is_file().then_some(one_up)
+    crate::infra::binaries::adjacent("gobbo_overlay_dump32.exe")
 }
 
 /// The environment name is re-exported for the launch code.

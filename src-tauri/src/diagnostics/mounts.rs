@@ -232,9 +232,10 @@ mod tests {
             .map(|orphan| (orphan.path.clone(), orphan.reason.clone()))
             .collect();
         assert!(
-            reasons
-                .iter()
-                .any(|(path, reason)| path.contains("userdata/old") && reason == "set"),
+            reasons.iter().any(|(path, reason)| {
+                // The path comes from `display()`, so Windows uses backslashes here.
+                path.replace('\\', "/").contains("userdata/old") && reason == "set"
+            }),
             "{reasons:?}"
         );
         assert!(

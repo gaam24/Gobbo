@@ -5,6 +5,8 @@ use std::path::Path;
 
 use gobbo_overlay_core::{ENV_MOUNTS, Layers, MountConfig, MountSpec};
 
+use crate::paths::long_path;
+
 /// The most mounts a session accepts: the game and seven user-data sets. The pass-through path checks every mount, so
 /// the list stays small on purpose.
 const MAX_MOUNTS: usize = 8;
@@ -14,10 +16,10 @@ pub(crate) fn load() -> Option<MountConfig> {
     if let Some(path) = std::env::var_os(ENV_MOUNTS) {
         let text = std::fs::read_to_string(&path).ok()?;
         let config: MountConfig = serde_json::from_str(&text).ok()?;
-        return valid(config);
+        return valid(config).map(long_names);
     }
     let layers = Layers::from_env(|name| std::env::var(name).ok())?;
-    Some(MountConfig {
+    Some(long_names(MountConfig {
         version: MountConfig::VERSION,
         mounts: vec![MountSpec {
             id: "game".to_string(),
@@ -26,7 +28,27 @@ pub(crate) fn load() -> Option<MountConfig> {
             staging: layers.staging.clone(),
             upper: layers.upper.clone(),
         }],
-    })
+    }))
+}
+
+/// Stores mount paths in the form Windows reports for handles and modules. A program may spell a folder with 8.3 names,
+/// but `GetFinalPathNameByHandleW` and `GetModuleFileNameW` answer with the long form; comparing a short prefix against
+/// a long answer would make every layer handle look external and leave the game folder untouched by the overlay.
+fn long_names(config: MountConfig) -> MountConfig {
+    MountConfig {
+        version: config.version,
+        mounts: config
+            .mounts
+            .into_iter()
+            .map(|mount| MountSpec {
+                id: mount.id,
+                guest: long_path(&mount.guest),
+                root: long_path(&mount.root),
+                staging: mount.staging.as_deref().map(long_path),
+                upper: long_path(&mount.upper),
+            })
+            .collect(),
+    }
 }
 
 /// Checks the shape the hook relies on: a known version, the game first, a bounded number of absolute paths and unique

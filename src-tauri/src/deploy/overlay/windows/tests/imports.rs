@@ -39,13 +39,7 @@ fn the_hook_does_not_preload_a_common_proxy_dll() {
     }
 }
 
-/// The hook next to the test executable or one folder above it (`target/debug/deps` -> `target/debug`).
+/// The hook next to the test executable or in the Cargo dev layout above it.
 fn hook_dll() -> Option<PathBuf> {
-    let exe = std::env::current_exe().ok()?;
-    let next = exe.with_file_name("gobbo_overlay_hook.dll");
-    if next.is_file() {
-        return Some(next);
-    }
-    let one_up = exe.parent()?.parent()?.join("gobbo_overlay_hook.dll");
-    one_up.is_file().then_some(one_up)
+    crate::infra::binaries::adjacent("gobbo_overlay_hook.dll")
 }

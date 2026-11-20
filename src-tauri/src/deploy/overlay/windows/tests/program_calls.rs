@@ -284,15 +284,9 @@ fn a_crash_without_a_monitor_writes_the_in_process_dump() {
     undo(&target.journal_roots()).unwrap();
 }
 
-/// A binary built next to the test executable (`target/debug`) or one folder above it (`target/debug/deps`).
+/// A helper binary next to the test executable or in the Cargo dev layout above it.
 fn adjacent_binary(name: &str) -> Option<std::path::PathBuf> {
-    let exe = std::env::current_exe().ok()?;
-    let next = exe.with_file_name(name);
-    if next.is_file() {
-        return Some(next);
-    }
-    let one_up = exe.parent()?.parent()?.join(name);
-    one_up.is_file().then_some(one_up)
+    crate::infra::binaries::adjacent(name)
 }
 
 #[test]

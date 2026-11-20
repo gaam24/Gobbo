@@ -1,6 +1,7 @@
 //! Disk, network and archive access: everything that touches the outside world, under one name.
 
 pub mod archive;
+pub mod binaries;
 pub mod clock;
 pub mod credentials;
 pub mod deployment;

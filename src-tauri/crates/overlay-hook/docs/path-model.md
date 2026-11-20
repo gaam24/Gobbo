@@ -8,7 +8,10 @@ The path layer is the most important part of the crate. Do not add another ad-ho
   its own whiteout snapshot. `Mounts` holds the game mount first and the user-data redirects after it.
 - `MountConfig` (`overlay-core`) - the JSON file named by `GOBBO_OVERLAY_MOUNTS`, version 1, the game mount first and
   at most seven redirects. The hook refuses an unknown version, a missing game mount, a relative path or a duplicate id.
-  Without the file it falls back to `GOBBO_OVERLAY_ROOT/STAGING/UPPER` for one game mount.
+  Without the file it falls back to `GOBBO_OVERLAY_ROOT/STAGING/UPPER` for one game mount. `session_config::load`
+  converts every path to its long form (`paths::long_path`): a program may spell a folder with 8.3 names, but the APIs
+  that name handles and modules report the long form, and comparing a short prefix against a long answer would make
+  every layer handle look external. `MountPaths` still caches the 8.3 alias so both incoming spellings classify.
 - `MountPaths` (`paths/session.rs`) - the cached guest path of one mount plus `guest_utf16` (without a trailing
   separator, compared case-insensitively by the fast path) and `short_guest_utf16` (the 8.3 form when Windows gives one
   that differs). Built during install and never rebuilt.

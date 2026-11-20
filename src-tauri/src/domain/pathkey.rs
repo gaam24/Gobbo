@@ -80,6 +80,11 @@ pub fn fold_case(text: &str) -> String {
 /// Whether `path` is `root` or lies below it. Windows compares ignoring case; Linux compares the paths as they
 /// are. This is the one containment rule for profile data, user data and the game folder.
 pub fn is_inside(root: &Path, path: &Path) -> bool {
+    // An unset game folder is not a root that contains every path. Without this, an empty key is the prefix of every
+    // Windows path and a game with no saved folder looks running in diagnostics and in the state lock.
+    if root.as_os_str().is_empty() {
+        return false;
+    }
     if cfg!(windows) {
         let root = windows_key(&root.to_string_lossy());
         let path = windows_key(&path.to_string_lossy());
@@ -175,6 +180,13 @@ mod tests {
         assert!(is_inside(Path::new("a"), Path::new("a/b")));
         assert!(is_inside(Path::new("a"), Path::new("a")));
         assert!(!is_inside(Path::new("a"), Path::new("ab/b")));
+    }
+
+    #[test]
+    fn an_empty_root_contains_nothing() {
+        assert!(!is_inside(Path::new(""), Path::new("a/b")));
+        #[cfg(windows)]
+        assert!(!is_inside(Path::new(""), Path::new(r"C:\Games")));
     }
 
     #[cfg(windows)]

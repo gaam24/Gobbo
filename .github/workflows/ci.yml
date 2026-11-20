@@ -13,11 +13,11 @@ on:
   workflow_dispatch:
   workflow_call:
     inputs:
-      e2e:
-        description: "Also run the full E2E suite (off for the release gate)"
+      skip_e2e:
+        description: "Skip the full E2E suite (used by the release gate; E2E still runs on its own nightly and manual schedule)"
         type: boolean
         required: false
-        default: true
+        default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -258,9 +258,10 @@ jobs:
     name: E2E
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    # A pull request and a push to main stay fast; the nightly run, a tag and a manual dispatch run every spec. A
-    # reusable call can turn it off, which is how the release gate skips this long, environment-dependent suite.
-    if: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')) && (github.event_name != 'workflow_call' || inputs.e2e) }}
+    # A pull request and a push to main stay fast; the nightly run, a tag and a manual dispatch run every spec. The
+    # release gate skips this long, environment-dependent suite. `github.event_name` is the caller's event inside a
+    # reusable workflow, so only the input can tell the two apart.
+    if: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')) && !inputs.skip_e2e }}
     env:
       # WebKitGTK under Xvfb has no DMA-BUF renderer.
       WEBKIT_DISABLE_DMABUF_RENDERER: "1"

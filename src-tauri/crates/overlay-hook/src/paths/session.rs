@@ -7,7 +7,7 @@ use std::os::windows::ffi::OsStringExt;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
-use windows_sys::Win32::Storage::FileSystem::GetShortPathNameW;
+use windows_sys::Win32::Storage::FileSystem::{GetLongPathNameW, GetShortPathNameW};
 
 use crate::state::mounts;
 use crate::text::wide;
@@ -74,6 +74,36 @@ pub(crate) fn root_units(root: &Path) -> Option<Vec<u16>> {
         units.pop();
     }
     Some(units)
+}
+
+/// The long-name form of a path. Programs may spell a folder with 8.3 names (`RUNNER~1`) while the Windows APIs that
+/// name handles and modules report the long form (`runneradmin`). Mount prefixes must use that same form or no handle
+/// is recognized as a layer handle. A leaf that does not exist yet is resolved as far as its nearest existing parent
+/// and the missing tail is appended; a path Windows cannot resolve at all is kept as it came.
+pub(crate) fn long_path(path: &Path) -> PathBuf {
+    long_name(path).unwrap_or_else(|| path.to_path_buf())
+}
+
+/// Resolves `path` with `GetLongPathNameW`, walking up over missing leaves. `None` when even the volume is unusable.
+fn long_name(path: &Path) -> Option<PathBuf> {
+    let mut buffer = [0u16; 1024];
+    let mut missing: Vec<PathBuf> = Vec::new();
+    let mut current = path;
+    loop {
+        let name = wide(current.as_os_str());
+        // SAFETY: `name` is NUL-terminated, and the buffer holds 1024 writable units.
+        let length =
+            unsafe { GetLongPathNameW(name.as_ptr(), buffer.as_mut_ptr(), buffer.len() as u32) };
+        if length > 0 && (length as usize) < buffer.len() {
+            let mut result = PathBuf::from(OsString::from_wide(&buffer[..length as usize]));
+            for part in missing.iter().rev() {
+                result.push(part);
+            }
+            return Some(result);
+        }
+        missing.push(PathBuf::from(current.file_name()?));
+        current = current.parent()?;
+    }
 }
 
 /// The 8.3 form of a path, when it exists and differs from the long form. `None` when the volume has 8.3 names disabled
