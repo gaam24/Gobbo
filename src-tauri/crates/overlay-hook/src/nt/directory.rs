@@ -121,12 +121,16 @@ impl Listing {
     }
 }
 
-/// Whether a cached merged listing can keep answering a query for `rel` on `mount`. A whiteout change replaces the
+/// Whether the whiteout snapshot a listing was built from is still the mount's current one. A change replaces the
 /// mount's `Arc`, so a pointer mismatch means the entries were built against the old visibility and must be rebuilt.
+fn snapshot_fresh(listing: &Listing) -> bool {
+    Arc::ptr_eq(&listing.whiteouts, &listing.mount.whiteouts_snapshot())
+}
+
+/// Whether a cached merged listing can keep answering a query for `rel` on `mount`: the same folder of the same
+/// mount, built against the mount's current whiteout snapshot.
 fn serves_cached(listing: &Listing, mount: &Mount, rel: &str) -> bool {
-    listing.rel == rel
-        && std::ptr::eq(listing.mount, mount)
-        && Arc::ptr_eq(&listing.whiteouts, &mount.whiteouts_snapshot())
+    listing.rel == rel && std::ptr::eq(listing.mount, mount) && snapshot_fresh(listing)
 }
 
 /// One handle in the listing table: a plain folder the original NT query serves, or a merged snapshot.
@@ -363,12 +367,7 @@ unsafe fn query(
                     return None;
                 }
 
-                // No `rel`/`mount` has been resolved here yet (that would need a `String`), so the listing's own
-                // identity stands in for them and only the snapshot freshness is checked.
-                TableEntry::Merged(listing)
-                    if listing.matches(raw)
-                        && serves_cached(listing, listing.mount, &listing.rel) =>
-                {
+                TableEntry::Merged(listing) if listing.matches(raw) && snapshot_fresh(listing) => {
                     listing.used = stamp;
                     let (status, bytes, _) = listing.respond(class, info, length, single != 0);
                     write_iosb(iosb, status, bytes);

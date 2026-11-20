@@ -43,8 +43,12 @@ pub(crate) unsafe extern "system" fn nt_create_file(
     // As `CreateFileW`: keep the guard for the whole call, so the hook does not see its own redirected name again.
     let guard = Guard::enter();
     let writing = writes_requested(access) || (disposition != FILE_OPEN);
-    // The device check stays ahead of classification: the name here is still the one the program passed.
-    if let Some(status) = unsafe { refuse_device_write(attributes, writing, "NtCreateFile") } {
+    // The device check stays ahead of classification — the name here is still the one the program passed — and, like
+    // the taken check, needs a session: without one there is nothing to refuse, and the hook's own re-entrant calls
+    // pass through untouched.
+    if guard.is_some()
+        && let Some(status) = unsafe { refuse_device_write(attributes, writing, "NtCreateFile") }
+    {
         return status;
     }
     // A new file over a name the layers show fails before anything is copied.
@@ -116,7 +120,10 @@ pub(crate) unsafe extern "system" fn nt_open_file(
     unsafe { trace_nt("NtOpenFile", attributes) };
     let guard = Guard::enter();
     let writing = writes_requested(access);
-    if let Some(status) = unsafe { refuse_device_write(attributes, writing, "NtOpenFile") } {
+    // As `NtCreateFile`: a device-namespace write is refused before classification, and only with a session.
+    if guard.is_some()
+        && let Some(status) = unsafe { refuse_device_write(attributes, writing, "NtOpenFile") }
+    {
         return status;
     }
     let redirected = unsafe {

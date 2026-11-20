@@ -24,7 +24,8 @@ reason, and it costs nothing on a pass-through call. The Win32 hooks that stay, 
   instead of one, and the whiteout row of the benchmark went from about 90 to about 129 µs (p50, one run). The answers
   are the same.
 - `CreateFileW`: refuses a device-namespace write (`\\.\C:`). The system turns that name into `\??\C:\...` before the NT
-  layer sees it, so the refusal can only be made here.
+  layer sees it, so the refusal can only be made here. `NtCreateFile`/`NtOpenFile` refuse a device-namespace write ahead of
+  classification the same way, and `NtSetInformationFile` refuses a rename onto one.
 - `MoveFileExW`, `MoveFileWithProgressW`: a rename by path. A rename of a file through an open handle is not redirected
   (see the limits above), and `MOVEFILE_DELAY_UNTIL_REBOOT` would schedule a change to the game folder at the next boot.
 - `RemoveDirectoryW`: removing a folder of a lower layer leaves a whiteout. The NT path leaves the folder in place.

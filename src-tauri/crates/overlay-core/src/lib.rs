@@ -1643,7 +1643,8 @@ mod tests {
 
     #[test]
     fn a_utf16_name_longer_than_the_stack_buffer_uses_the_lossy_path() {
-        let prefix = "a".repeat(260);
+        // The folded name must exceed the 1024-byte stack buffer, so the fold fails and the lossy `String` path runs.
+        let prefix = "a".repeat(1100);
         let mut whiteouts = Whiteouts::default();
         whiteouts.hide(&format!("data\\{prefix}"));
         let name: Vec<u16> = format!("{prefix}{}", "z".repeat(40))

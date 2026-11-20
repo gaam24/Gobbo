@@ -16,18 +16,19 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use minidumper::{LoopAction, MinidumpBinary, Server, ServerHandler, SocketName};
 
-// One owner for the session and environment names: the plain-std crate the app and the hook already share.
-pub use gobbo_overlay_decisions::{CRASH_DUMP_FILE, ENV_DUMPER, ENV_DUMPER32, LAST_DUMP_FILE};
+// The dump markers are owned by the decisions crate, the shared vocabulary of the session files. This crate writes
+// them; the app and the hook import them from there too.
+use gobbo_overlay_decisions::{CRASH_DUMP_FILE, LAST_DUMP_FILE};
 
 /// The file the 32-bit helper writes once its socket is bound. The app's spawner and the helper use this name instead
 /// of each spelling it.
 pub const READY_FILE: &str = "dump32.ready";
 
 /// The bytes the 32-bit helper writes to [`READY_FILE`] when its socket is listening.
-pub const READY_CONTENT: &str = "ready";
+const READY_CONTENT: &str = "ready";
 
 /// The protocol's fixed buffer for an `AF_UNIX` socket path. A path must be shorter so the terminator fits.
-pub const SOCKET_PATH_MAX: usize = 108;
+const SOCKET_PATH_MAX: usize = 108;
 
 /// The bound `socket_path` uses, below [`SOCKET_PATH_MAX`] so a generated path never reaches the terminator byte.
 const SOCKET_PATH_LIMIT: usize = SOCKET_PATH_MAX - 8;
@@ -111,7 +112,8 @@ pub fn start(state: &Path) -> Option<Monitor> {
     }
 }
 
-/// Runs a server in the current process until it is killed, then writes [`READY_CONTENT`] to `ready`.
+/// Writes [`READY_CONTENT`] to `ready` once the socket is bound, then runs a server in the current process until it
+/// is killed.
 ///
 /// The helper is called as `<state> <socket> <ready>`: the state folder owns the dumps, the socket carries the
 /// pointer-sized protocol, and the ready file exists only after the socket is bound, so the spawner can pass the socket

@@ -5,7 +5,7 @@ use std::ffi::c_void;
 
 use windows_sys::Win32::Foundation::STATUS_UNSUCCESSFUL;
 
-use super::names::{call_redirected, redirect_nt, refuse_device_write};
+use super::names::{call_redirected, redirect_nt};
 use super::trace_nt;
 use crate::guard::Guard;
 use crate::trace::trace_status;
@@ -65,12 +65,7 @@ unsafe fn query(
 ) -> i32 {
     unsafe { trace_nt(operation, attributes) };
     let guard = Guard::enter();
-    // An attribute query only reads, so a device namespace is never refused here; the check still runs so both NT
-    // entries apply the same rule before a name is classified.
-    if let Some(status) = unsafe { refuse_device_write(attributes, false, operation) } {
-        let _last_error = PreserveLastError::capture();
-        return status;
-    }
+    // An attribute query only reads, so a device name is never refused here, exactly as before the refactor.
     let redirected = match guard.as_ref() {
         Some(_guard) => unsafe { redirect_nt(attributes, false, true) },
         None => None,

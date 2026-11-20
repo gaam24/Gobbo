@@ -17,8 +17,9 @@ use super::names::{join_root, nt_name_units};
 use super::rename_info::{RenameInfo, build_rename, parse_rename};
 use crate::guard::enter_session;
 use crate::handles::{self, LayerKind};
-use crate::paths::{in_lower, make_write_target, name_taken, place_path, shown};
+use crate::paths::{in_lower, make_write_target, name_taken, place_path, shown, unsafe_units};
 use crate::search::has_visible_entries;
+use crate::trace::trace;
 use crate::whiteouts::hide;
 use crate::win32::PreserveLastError;
 
@@ -111,6 +112,14 @@ unsafe fn rename_in_game(
         root,
         name,
     } = parse_rename(bytes, class)?;
+
+    // A device namespace can alias a file in the game folder: a rename onto it fails closed instead of passing
+    // through as an unclassifiable name, the same way the open hooks refuse it. The name is unclassified, so this
+    // refusal is traced and builds no ring path.
+    if unsafe_units(&name.encode_utf16().collect::<Vec<u16>>()) {
+        trace(|| format!("NtSetInformationFile refused a device namespace: {name}"));
+        return Some(Err(STATUS_ACCESS_DENIED));
+    }
 
     let real = handles::layer_path(handle)?;
     let Some((mount, source_rel)) = handles::relative_in_upper(&real) else {

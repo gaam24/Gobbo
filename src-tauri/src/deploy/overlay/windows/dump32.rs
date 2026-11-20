@@ -8,7 +8,8 @@ use std::process::{Child, Command};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use gobbo_overlay_dump::{ENV_DUMPER32, READY_FILE, socket_path};
+use gobbo_overlay_decisions::ENV_DUMPER32;
+use gobbo_overlay_dump::{READY_FILE, socket_path};
 
 /// How long the helper may take to bind its socket.
 const READY_TIMEOUT: Duration = Duration::from_secs(3);

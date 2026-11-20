@@ -226,7 +226,7 @@ mod tests {
         MountConfig {
             version: MountConfig::VERSION,
             mounts: vec![gobbo_overlay_core::MountSpec {
-                id: "game".to_string(),
+                id: gobbo_overlay_core::MountSpec::GAME_ID.to_string(),
                 guest: std::path::PathBuf::from(r"C:\Game"),
                 root: std::path::PathBuf::from(r"C:\Game"),
                 staging: Some(std::path::PathBuf::from(r"C:\State\mods")),

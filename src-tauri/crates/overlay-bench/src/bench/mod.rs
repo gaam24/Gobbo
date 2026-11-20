@@ -23,8 +23,8 @@ const MAX_LIST: u64 = 200;
 const HOOK_BUILD_COMMAND: &str =
     "cargo build -p gobbo-overlay-hook --features \"bench-alloc bench-stats\"";
 
-/// The columns of one result row, in order. The header, the worker's row writer and the parser all derive from this
-/// list, so a column cannot be added in one place and lost in another.
+/// The columns of one result row, in order. The header is built from this list, and the worker's row writer and the
+/// parser both check their width against it, so a column cannot be added in one place and lost in another.
 const COLUMNS: &[&str] = &[
     "operation",
     "p50",

@@ -23,7 +23,7 @@ pub(crate) fn load() -> Option<MountConfig> {
     Some(long_names(MountConfig {
         version: MountConfig::VERSION,
         mounts: vec![MountSpec {
-            id: "game".to_string(),
+            id: MountSpec::GAME_ID.to_string(),
             guest: layers.root.clone(),
             root: layers.root.clone(),
             staging: layers.staging.clone(),

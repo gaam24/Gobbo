@@ -110,16 +110,16 @@ CreateProcessW (launcher, CREATE_SUSPENDED)
        - GobboOverlayInit (outside the loader lock)
             - remember this DLL's path for the children
             - read switches and layers
-            - load whiteouts and store the session layers (path caches build on first use)
             - install crash reporting
             - cache module ranges
+            - load whiteouts and store the session layers (path caches build on first use)
+            - hand the loader stubs back from stage 0 (`early.rs`) before the detours are created
             - create all detours
             - enable the detours in one transaction; with one thread in the process nothing is suspended (`detours::enable`)
+            - start the crash filter thread and, in a dev build, the trace thread (`diag::start_background_threads`)
             - record whether the internal process hook is active
             - write session.json
             - open the decision ring (so the report's own writes are not game decisions)
-            - hand the loader stubs back from stage 0 (`early.rs`) before the detours are created
-            - start the crash filter thread and, in a dev build, the trace thread (`diag::start_background_threads`)
             - signal Local\GobboOverlayReady_<pid>
        - restore registers and jump to the original RIP
   -> the loader resolves static imports through the patched descriptors, then the game code runs
