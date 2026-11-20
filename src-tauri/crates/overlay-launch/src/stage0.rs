@@ -19,11 +19,9 @@ use windows_sys::Win32::System::Diagnostics::Debug::{
 };
 use windows_sys::Win32::System::LibraryLoader::{GetModuleHandleW, GetProcAddress};
 use windows_sys::Win32::System::Memory::{
-    MEM_COMMIT, MEM_IMAGE, MEM_RESERVE, MEMORY_BASIC_INFORMATION, PAGE_EXECUTE_READWRITE,
-    VirtualAllocEx, VirtualProtectEx, VirtualQueryEx,
+    MEM_COMMIT, MEM_IMAGE, MEM_RELEASE, MEM_RESERVE, MEMORY_BASIC_INFORMATION,
+    PAGE_EXECUTE_READWRITE, VirtualAllocEx, VirtualFreeEx, VirtualProtectEx, VirtualQueryEx,
 };
-#[cfg(test)]
-use windows_sys::Win32::System::Memory::{MEM_RELEASE, VirtualFreeEx};
 use windows_sys::Win32::System::Threading::GetCurrentProcess;
 
 use gobbo_overlay_core::early::Line;
@@ -217,6 +215,43 @@ fn nt_prefix(folder: &Path) -> io::Result<Vec<u16>> {
     Ok(prefix)
 }
 
+/// Unmaps the child's mappings if `install` returns early. A successful install disowns this: the child still needs the
+/// mappings after the launcher returns, and the handover file owns their meaning from here.
+struct Mappings {
+    process: HANDLE,
+    image: Option<(usize, usize)>,
+    trampolines: Option<(usize, usize)>,
+}
+
+impl Mappings {
+    fn new(process: HANDLE) -> Self {
+        Self {
+            process,
+            image: None,
+            trampolines: None,
+        }
+    }
+
+    fn track_image(&mut self, address: usize, size: usize) {
+        self.image = Some((address, size));
+    }
+
+    fn track_trampolines(&mut self, address: usize, size: usize) {
+        self.trampolines = Some((address, size));
+    }
+}
+
+impl Drop for Mappings {
+    fn drop(&mut self) {
+        for region in [self.image, self.trampolines].into_iter().flatten() {
+            let (address, size) = region;
+            debug_assert!(size > 0, "a tracked mapping is empty");
+            // SAFETY: both regions were allocated in the child by `allocate` and are unused after this point.
+            unsafe { VirtualFreeEx(self.process, address as *mut c_void, 0, MEM_RELEASE) };
+        }
+    }
+}
+
 /// Maps the stage 0 DLL into the suspended child, writes `config` into it, and patches the four stubs. Refuses a child
 /// whose ntdll or stubs are not the ones this launcher knows, before any write to the child's code.
 pub(crate) fn install(
@@ -249,8 +284,11 @@ pub(crate) fn install(
         originals.push((address, original));
     }
 
-    let image = map_image(process, bits)?;
-    let trampolines = allocate(process, STUBS.len() * TRAMPOLINE_SLOT)?;
+    let mut mappings = Mappings::new(process);
+    let image = map_image(process, bits, &mut mappings)?;
+    let trampolines_size = STUBS.len() * TRAMPOLINE_SLOT;
+    let trampolines = allocate(process, trampolines_size)?;
+    mappings.track_trampolines(trampolines, trampolines_size);
 
     for (index, (_, original)) in originals.iter().enumerate() {
         let address = trampolines + index * TRAMPOLINE_SLOT;
@@ -276,6 +314,9 @@ pub(crate) fn install(
         write_code(process, *stub, &jump)?;
     }
 
+    // Both mappings outlive this function: the child still runs code in them, and the handover file tells the hook what
+    // they mean. Dropping the guard here would unmap them under a live child.
+    std::mem::forget(mappings);
     Ok(Patched {
         process,
         config_address,
@@ -518,7 +559,7 @@ impl Image {
 
 /// Maps the stage 0 DLL into the child: sections at their addresses, base relocations for the new base, and the export
 /// table. A DLL that imports something is refused: the child's loader has not started, so nothing could resolve it.
-fn map_image(process: HANDLE, bits: Bits) -> io::Result<Image> {
+fn map_image(process: HANDLE, bits: Bits, mappings: &mut Mappings) -> io::Result<Image> {
     let bytes = bits.dll();
 
     if bytes.is_empty() {
@@ -566,6 +607,7 @@ fn map_image(process: HANDLE, bits: Bits) -> io::Result<Image> {
     }
 
     let base = allocate(process, image_size)?;
+    mappings.track_image(base, image_size);
     let delta = (base as u64).wrapping_sub(preferred);
     let mut image = vec![0u8; image_size];
     image[..headers_size].copy_from_slice(&bytes[..headers_size]);
@@ -590,7 +632,15 @@ fn map_image(process: HANDLE, bits: Bits) -> io::Result<Image> {
         let page = u32le(&image, relocations + offset)? as usize;
         let block = u32le(&image, relocations + offset + 4)? as usize;
 
-        for entry in 0..(block.saturating_sub(8)) / 2 {
+        // A zero-size block would leave `offset` unchanged and hang the launcher. The DLL is embedded at build time,
+        // so a malformed block means a broken build: fail here instead of hanging a child.
+        if block < 8 {
+            return Err(io::Error::other(
+                "the stage 0 DLL has a malformed relocation block",
+            ));
+        }
+
+        for entry in 0..(block - 8) / 2 {
             let value = u16le(&image, relocations + offset + 8 + 2 * entry)?;
             let at = page + usize::from(value & 0xFFF);
 
@@ -598,12 +648,17 @@ fn map_image(process: HANDLE, bits: Bits) -> io::Result<Image> {
                 (0, _) => {}
                 (10, Bits::X64) => {
                     let old = u64le(&image, at)?;
-                    image[at..at + 8].copy_from_slice(&old.wrapping_add(delta).to_le_bytes());
+                    let slot = image.get_mut(at..at + 8).ok_or_else(|| {
+                        io::Error::other("the stage 0 DLL has a relocation outside the image")
+                    })?;
+                    slot.copy_from_slice(&old.wrapping_add(delta).to_le_bytes());
                 }
                 (3, Bits::X86) => {
                     let old = u32le(&image, at)?;
-                    image[at..at + 4]
-                        .copy_from_slice(&old.wrapping_add(delta as u32).to_le_bytes());
+                    let slot = image.get_mut(at..at + 4).ok_or_else(|| {
+                        io::Error::other("the stage 0 DLL has a relocation outside the image")
+                    })?;
+                    slot.copy_from_slice(&old.wrapping_add(delta as u32).to_le_bytes());
                 }
                 _ => {
                     return Err(io::Error::other(
@@ -638,11 +693,14 @@ fn read_exports(image: &[u8], directory: usize) -> io::Result<HashMap<String, us
         let name_rva = u32le(image, names + 4 * index)? as usize;
         let ordinal = usize::from(u16le(image, ordinals + 2 * index)?);
         let rva = u32le(image, functions + 4 * ordinal)? as usize;
-        let end = image[name_rva..]
+        let tail = image
+            .get(name_rva..)
+            .ok_or_else(|| io::Error::other("an export name is outside the image"))?;
+        let end = tail
             .iter()
             .position(|&byte| byte == 0)
             .ok_or_else(|| io::Error::other("an export name is not terminated"))?;
-        let raw = String::from_utf8_lossy(&image[name_rva..name_rva + end]).into_owned();
+        let raw = String::from_utf8_lossy(&tail[..end]).into_owned();
         exports.insert(undecorate(&raw), rva);
     }
 
@@ -668,8 +726,8 @@ read_le!(u32le, u32);
 read_le!(u64le, u64);
 
 fn field<const N: usize>(bytes: &[u8], at: usize) -> io::Result<[u8; N]> {
-    bytes
-        .get(at..at + N)
+    at.checked_add(N)
+        .and_then(|end| bytes.get(at..end))
         .and_then(|slice| slice.try_into().ok())
         .ok_or_else(|| io::Error::other("the stage 0 DLL is truncated"))
 }
@@ -855,6 +913,64 @@ mod tests {
             jump_through(0x1234_5678),
             vec![0xFF, 0x25, 0x78, 0x56, 0x34, 0x12]
         );
+    }
+
+    /// Lays the embedded DLL out by RVA, the way `map_image` does in the child, so its exports and code can be read.
+    fn mapped_dll(bits: Bits) -> Vec<u8> {
+        let bytes = bits.dll();
+        assert!(!bytes.is_empty(), "this build has no stage 0 DLL");
+        let nt = u32le(bytes, 0x3C).unwrap() as usize;
+        let section_count = usize::from(u16le(bytes, nt + 6).unwrap());
+        let optional_size = usize::from(u16le(bytes, nt + 20).unwrap());
+        let optional = nt + 24;
+        let image_size = u32le(bytes, optional + 56).unwrap() as usize;
+        let headers_size = u32le(bytes, optional + 60).unwrap() as usize;
+        let mut image = vec![0u8; image_size];
+        image[..headers_size].copy_from_slice(&bytes[..headers_size]);
+        let sections = nt + 24 + optional_size;
+
+        for index in 0..section_count {
+            let header = sections + 40 * index;
+            let size = u32le(bytes, header + 16).unwrap() as usize;
+            let raw = u32le(bytes, header + 20).unwrap() as usize;
+            let address = u32le(bytes, header + 12).unwrap() as usize;
+            let length = size.min(image_size.saturating_sub(address));
+
+            if length > 0 {
+                image[address..address + length].copy_from_slice(&bytes[raw..raw + length]);
+            }
+        }
+
+        image
+    }
+
+    #[test]
+    fn the_x86_shim_tails_remove_the_argument_bytes_the_launcher_checks() {
+        let bytes = DLL_X86;
+        let nt = u32le(bytes, 0x3C).unwrap() as usize;
+        let directories = nt + 24 + Bits::X86.directories();
+        let exports_rva = u32le(bytes, directories).unwrap() as usize;
+        let image = mapped_dll(Bits::X86);
+        let exports = read_exports(&image, exports_rva).unwrap();
+
+        for (index, name) in SHIMS.iter().enumerate() {
+            let rva = *exports
+                .get(*name)
+                .unwrap_or_else(|| panic!("{name} is not exported by the x86 stage 0 DLL"));
+            let ret = Decoder::with_ip(32, &image[rva..], 0, DecoderOptions::NONE)
+                .iter()
+                .take_while(|instruction| !instruction.is_invalid())
+                .find(|instruction| {
+                    instruction.mnemonic() == Mnemonic::Ret
+                        && instruction.op0_kind() == OpKind::Immediate16
+                })
+                .unwrap_or_else(|| panic!("{name} has no ret imm16"));
+            assert_eq!(
+                ret.immediate16(),
+                ARGUMENT_BYTES_32[index],
+                "{name} removes a different number of argument bytes"
+            );
+        }
     }
 
     #[test]

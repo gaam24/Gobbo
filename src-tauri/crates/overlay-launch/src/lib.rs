@@ -550,52 +550,59 @@ pub fn ready_event_name(pid: u32) -> Vec<u16> {
     wide(OsStr::new(&format!("Local\\GobboOverlayReady_{pid}")))
 }
 
-/// The command line: the program and each argument, quoted so that spaces and quotes survive.
+/// The command line: the program and each argument, quoted so that spaces and quotes survive. Everything stays in
+/// UTF-16 so a Windows path that is not valid UTF-8 reaches `CreateProcessW` unchanged.
 fn command_line(program: &Path, args: &[String]) -> Vec<u16> {
-    let mut line = quote(&program.display().to_string());
+    let mut line = quote(&program.as_os_str().encode_wide().collect::<Vec<_>>());
 
     for arg in args {
-        line.push(' ');
-        line.push_str(&quote_argument(arg));
+        line.push(u16::from(b' '));
+        line.extend(quote_argument(&arg.encode_utf16().collect::<Vec<_>>()));
     }
 
-    wide(OsStr::new(&line))
+    line.push(0);
+    line
 }
 
 /// One argument for the command line. A switch such as `/c` or `-windowed` stays unquoted: `cmd.exe` treats a quoted
 /// `/c` as a program name and fails. Everything else goes through `quote`, which keeps spaces and embedded quotes.
-fn quote_argument(arg: &str) -> String {
-    let switch = !arg.is_empty()
-        && (arg.starts_with('/') || arg.starts_with('-'))
-        && !arg
-            .chars()
-            .any(|character| character.is_whitespace() || character == '"');
-    if switch { arg.to_string() } else { quote(arg) }
+fn quote_argument(arg: &[u16]) -> Vec<u16> {
+    let is_switch = arg
+        .first()
+        .is_some_and(|unit| *unit == u16::from(b'/') || *unit == u16::from(b'-'))
+        && !char::decode_utf16(arg.iter().copied())
+            .any(|character| character.is_ok_and(|c| c.is_whitespace() || c == '"'));
+    if is_switch { arg.to_vec() } else { quote(arg) }
 }
 
-/// One argument, quoted by the rules the C runtime uses to split a command line.
-fn quote(arg: &str) -> String {
-    let mut out = String::from("\"");
+/// One argument, quoted by the rules the C runtime uses to split a command line. The rules only look at the ASCII
+/// backslash and quote, so operating on UTF-16 units gives the same bytes as operating on characters.
+fn quote(arg: &[u16]) -> Vec<u16> {
+    let backslash = u16::from(b'\\');
+    let quote_unit = u16::from(b'"');
+    let mut out = Vec::with_capacity(arg.len() + 2);
+    out.push(quote_unit);
     let mut backslashes = 0;
 
-    for character in arg.chars() {
-        match character {
-            '\\' => backslashes += 1,
-            '"' => {
-                out.extend(std::iter::repeat_n('\\', backslashes * 2 + 1));
-                out.push('"');
-                backslashes = 0;
-            }
-            _ => {
-                out.extend(std::iter::repeat_n('\\', backslashes));
-                out.push(character);
-                backslashes = 0;
-            }
+    for &unit in arg {
+        if unit == backslash {
+            backslashes += 1;
+            continue;
         }
+
+        if unit == quote_unit {
+            out.extend(std::iter::repeat_n(backslash, backslashes * 2 + 1));
+            out.push(quote_unit);
+        } else {
+            out.extend(std::iter::repeat_n(backslash, backslashes));
+            out.push(unit);
+        }
+
+        backslashes = 0;
     }
 
-    out.extend(std::iter::repeat_n('\\', backslashes * 2));
-    out.push('"');
+    out.extend(std::iter::repeat_n(backslash, backslashes * 2));
+    out.push(quote_unit);
     out
 }
 
@@ -635,20 +642,45 @@ mod tests {
 
     #[test]
     fn arguments_with_spaces_and_quotes_survive_the_command_line() {
-        assert_eq!(quote("plain"), r#""plain""#);
-        assert_eq!(quote(r#"say "hi""#), r#""say \"hi\"""#);
-        assert_eq!(quote(r"C:\Games\Dir\"), r#""C:\Games\Dir\\""#);
+        let units = |text: &str| text.encode_utf16().collect::<Vec<_>>();
+        assert_eq!(quote(&units("plain")), units(r#""plain""#));
+        assert_eq!(quote(&units(r#"say "hi""#)), units(r#""say \"hi\"""#));
+        assert_eq!(
+            quote(&units(r"C:\Games\Dir\")),
+            units(r#""C:\Games\Dir\\""#)
+        );
     }
 
     #[test]
     fn a_switch_is_not_quoted_for_cmd() {
-        assert_eq!(quote_argument("/c"), "/c");
-        assert_eq!(quote_argument("-windowed"), "-windowed");
+        let units = |text: &str| text.encode_utf16().collect::<Vec<_>>();
+        assert_eq!(quote_argument(&units("/c")), units("/c"));
+        assert_eq!(quote_argument(&units("-windowed")), units("-windowed"));
         assert_eq!(
-            quote_argument("/path with spaces"),
-            r#""/path with spaces""#
+            quote_argument(&units("/path with spaces")),
+            units(r#""/path with spaces""#)
         );
-        assert_eq!(quote_argument("echo hello"), r#""echo hello""#);
+        assert_eq!(
+            quote_argument(&units("echo hello")),
+            units(r#""echo hello""#)
+        );
+    }
+
+    #[test]
+    fn a_program_path_with_an_unpaired_surrogate_reaches_the_command_line_unchanged() {
+        use std::os::windows::ffi::OsStringExt;
+
+        let mut name = OsStr::new(r"C:\Games\").encode_wide().collect::<Vec<_>>();
+        name.push(0xD800);
+        name.extend(OsStr::new(r"\game.exe").encode_wide());
+        let program = PathBuf::from(OsString::from_wide(&name));
+
+        let mut expected = vec![u16::from(b'"')];
+        expected.extend_from_slice(&name);
+        expected.push(u16::from(b'"'));
+        expected.push(0);
+
+        assert_eq!(command_line(&program, &[]), expected);
     }
 
     #[test]

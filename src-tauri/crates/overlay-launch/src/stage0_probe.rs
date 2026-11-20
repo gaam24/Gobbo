@@ -1,188 +1,7 @@
-//! M0 probe for the early redirect: what the launcher can see and change in the ntdll of a suspended child before it
-//! runs. Nothing here is used by the product; it is a test that records the facts.
+//! Stage 0 regressions through the production installer: M2 serves a suspended child's loader calls from the layer,
+//! M3 binds a system DLL name from the layer, and X5 does the same for a 32-bit child.
 
-#[cfg(test)]
-mod tests {
-    use std::ffi::c_void;
-    use std::ptr::null;
-
-    use windows_sys::Win32::Foundation::{CloseHandle, FALSE, HANDLE};
-    use windows_sys::Win32::System::Diagnostics::Debug::{ReadProcessMemory, WriteProcessMemory};
-    use windows_sys::Win32::System::LibraryLoader::{GetModuleHandleW, GetProcAddress};
-    use windows_sys::Win32::System::Memory::{PAGE_EXECUTE_READWRITE, VirtualProtectEx};
-    use windows_sys::Win32::System::Threading::{
-        CREATE_SUSPENDED, CreateProcessW, PROCESS_INFORMATION, STARTUPINFOW, TerminateProcess,
-    };
-
-    use crate::wide;
-
-    /// The exports the redirect must patch, the file calls the loader makes.
-    const STUBS: [&str; 4] = [
-        "NtOpenFile",
-        "NtCreateFile",
-        "NtQueryAttributesFile",
-        "NtQueryFullAttributesFile",
-    ];
-
-    /// A suspended child that is terminated when the guard drops, also when an assertion fails.
-    pub(super) struct Child(pub(super) PROCESS_INFORMATION);
-
-    impl Drop for Child {
-        fn drop(&mut self) {
-            unsafe {
-                TerminateProcess(self.0.hProcess, 0);
-                CloseHandle(self.0.hThread);
-                CloseHandle(self.0.hProcess);
-            }
-        }
-    }
-
-    /// A suspended `cmd.exe` that exits at once if it ever runs.
-    fn suspended_child() -> Child {
-        let mut command = wide(std::ffi::OsStr::new(
-            r"C:\Windows\System32\cmd.exe /c exit 0",
-        ));
-        let startup: STARTUPINFOW = unsafe { std::mem::zeroed() };
-        let mut info: PROCESS_INFORMATION = unsafe { std::mem::zeroed() };
-        let mut startup = startup;
-        startup.cb = std::mem::size_of::<STARTUPINFOW>() as u32;
-        let created = unsafe {
-            CreateProcessW(
-                null(),
-                command.as_mut_ptr(),
-                null(),
-                null(),
-                FALSE,
-                CREATE_SUSPENDED,
-                null(),
-                null(),
-                &startup,
-                &mut info,
-            )
-        };
-        assert_ne!(created, FALSE, "the child did not start");
-        Child(info)
-    }
-
-    /// The base address of ntdll in this process, the image base that its header sits at.
-    fn ntdll_base() -> usize {
-        let module = unsafe { GetModuleHandleW(wide(std::ffi::OsStr::new("ntdll.dll")).as_ptr()) };
-        assert!(!module.is_null());
-        module as usize
-    }
-
-    /// The address of an export of ntdll in this process. The same address is used in the child (see the test).
-    fn local_export(name: &str) -> usize {
-        let module = unsafe { GetModuleHandleW(wide(std::ffi::OsStr::new("ntdll.dll")).as_ptr()) };
-        assert!(!module.is_null());
-        let name = std::ffi::CString::new(name).unwrap();
-        let procedure = unsafe { GetProcAddress(module, name.as_ptr().cast()) };
-        procedure.expect("ntdll exports the function") as usize
-    }
-
-    fn read(process: HANDLE, address: usize, length: usize) -> Vec<u8> {
-        let mut bytes = vec![0u8; length];
-        let mut done = 0;
-        let ok = unsafe {
-            ReadProcessMemory(
-                process,
-                address as *const c_void,
-                bytes.as_mut_ptr().cast(),
-                length,
-                &mut done,
-            )
-        };
-        assert_ne!(ok, FALSE, "reading the child at {address:#x} failed");
-        bytes.truncate(done);
-        bytes
-    }
-
-    fn hex(bytes: &[u8]) -> String {
-        bytes
-            .iter()
-            .map(|byte| format!("{byte:02X}"))
-            .collect::<Vec<_>>()
-            .join(" ")
-    }
-
-    #[test]
-    fn probe_ntdll_stubs_in_a_suspended_child() {
-        let child = suspended_child();
-        let process = child.0.hProcess;
-        let mut report = String::new();
-
-        // ntdll is mapped at the same address in every process of the boot. Check it: the child's PE header at our
-        // ntdll base must carry the same timestamp and image size as ours.
-        let base = ntdll_base();
-        let ours = read(current_process(), base, 0x400);
-        let theirs = read(process, base, 0x400);
-        report.push_str(&format!(
-            "ntdll base (ours) {base:#x}; child header magic {:02X}{:02X}\n",
-            theirs[0], theirs[1]
-        ));
-        assert_eq!(
-            &theirs[..2],
-            b"MZ",
-            "the child has no PE header at our ntdll base"
-        );
-        let stamp = |bytes: &[u8]| u32::from_le_bytes(bytes[0x108..0x10C].try_into().unwrap());
-        assert_eq!(
-            stamp(&ours),
-            stamp(&theirs),
-            "the child's ntdll is at another base"
-        );
-
-        for name in STUBS {
-            let address = local_export(name);
-            let bytes = read(process, address, 32);
-            report.push_str(&format!("{name} @ {address:#x}: {}\n", hex(&bytes)));
-        }
-
-        // Writable and restorable: change the protection of the first stub's page, write its bytes back unchanged,
-        // restore the protection. The bytes must read the same afterwards.
-        let first = local_export(STUBS[0]);
-        let before = read(process, first, 16);
-        let mut old = 0;
-        let protected = unsafe {
-            VirtualProtectEx(
-                process,
-                first as *const c_void,
-                16,
-                PAGE_EXECUTE_READWRITE,
-                &mut old,
-            )
-        };
-        assert_ne!(
-            protected, FALSE,
-            "the child's ntdll page cannot be made writable"
-        );
-        let mut written = 0;
-        let ok = unsafe {
-            WriteProcessMemory(
-                process,
-                first as *const c_void,
-                before.as_ptr().cast(),
-                16,
-                &mut written,
-            )
-        };
-        assert_ne!(ok, FALSE);
-        let mut restored = 0;
-
-        unsafe { VirtualProtectEx(process, first as *const c_void, 16, old, &mut restored) };
-        assert_eq!(read(process, first, 16), before);
-        report.push_str(&format!(
-            "writable and restorable: old protection {old:#x}\n"
-        ));
-
-        eprintln!("{report}");
-    }
-
-    /// The pseudo handle of this process, which reads this process's own memory through `ReadProcessMemory`.
-    fn current_process() -> HANDLE {
-        unsafe { windows_sys::Win32::System::Threading::GetCurrentProcess() }
-    }
-}
+use crate::stage0::{Bits, STUBS, install, ntdll_export, redirect_config};
 
 /// M2: the redirect serves the loader's file calls of a suspended child from the layer.
 #[cfg(test)]
@@ -198,7 +17,7 @@ pub(super) mod m2_redirect {
         STARTUPINFOW, TerminateProcess, WaitForSingleObject,
     };
 
-    use crate::stage0::{Bits, STUBS, install, ntdll_export, redirect_config};
+    use super::{Bits, STUBS, install, ntdll_export, redirect_config};
     use crate::wide;
 
     /// A suspended child, terminated when dropped.
@@ -370,7 +189,7 @@ mod m3_system_name {
     use std::path::{Path, PathBuf};
     use std::process::Command;
 
-    use crate::stage0::{Bits, install, redirect_config};
+    use super::{Bits, install, redirect_config};
 
     use super::m2_redirect::{resume_and_wait, spawn_suspended};
 
@@ -492,7 +311,7 @@ mod x5_system_name32 {
     use std::path::{Path, PathBuf};
     use std::process::Command;
 
-    use crate::stage0::{Bits, install, redirect_config};
+    use super::{Bits, install, redirect_config};
 
     use super::m2_redirect::{resume_and_wait, spawn_suspended};
 

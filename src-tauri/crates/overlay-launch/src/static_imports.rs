@@ -49,7 +49,7 @@ fn cache() -> &'static Mutex<Vec<CachedParse>> {
     PARSED.get_or_init(|| Mutex::new(Vec::new()))
 }
 
-/// The static imports of a program, cloned from the one-entry cache. The list is small; the executable is not held.
+/// The static imports of a program, cloned from the bounded cache. The list is small; the executable is not held.
 pub fn imports(program: &Path) -> io::Result<Vec<Import>> {
     Ok(parsed(program)?.imports.clone())
 }
@@ -98,18 +98,15 @@ pub unsafe fn rewrite(
     process: HANDLE,
     program: &Path,
     mapping: &[(String, PathBuf)],
-) -> io::Result<usize> {
+) -> io::Result<()> {
     if mapping.is_empty() {
-        return Ok(0);
+        return Ok(());
     }
 
     let parsed = parsed(program)?;
     let imports = &parsed.imports;
     let pe32 = parsed.pe32;
     let base = main_module(process, pe32)?;
-    // The image is smaller than 2 GiB; this start is inside the 32-bit RVA range and clear of the usual image.
-    let image_size = 0x1000_0000u32;
-    let mut patched = 0;
 
     for (name, path) in mapping {
         let Some(import) = imports
@@ -119,7 +116,7 @@ pub unsafe fn rewrite(
             continue;
         };
         let path = ansi(path)?;
-        let Some(remote) = allocate_near(process, base, image_size, path.len() + 1) else {
+        let Some(remote) = allocate_near(process, base, NEAR_IMAGE_SIZE, path.len() + 1) else {
             continue;
         };
         // SAFETY: `remote` is a fresh allocation of `path.len() + 1` bytes in the target.
@@ -182,11 +179,9 @@ pub unsafe fn rewrite(
             free_remote(process, remote);
             return Err(io::Error::last_os_error());
         }
-
-        patched += 1;
     }
 
-    Ok(patched)
+    Ok(())
 }
 
 /// Frees a remote allocation of the suspended process.
@@ -294,6 +289,14 @@ fn main_module(process: HANDLE, pe32: bool) -> io::Result<usize> {
     Ok(base)
 }
 
+/// How far above the image to start looking. The import descriptor's `Name` is a 32-bit RVA, so a span of 256 MiB
+/// from the image base keeps every address in it nameable while clearing the image's own addresses.
+const NEAR_IMAGE_SIZE: u32 = 0x1000_0000;
+
+/// How many 64 KiB steps `allocate_near` tries above `NEAR_IMAGE_SIZE`. A small bound covers the usual gap after an
+/// image; if it is taken, the import is skipped instead of looping over the address space forever.
+const NEAR_RETRIES: u32 = 32;
+
 /// Allocates `size` bytes in the target close enough to `base` that the offset fits in the 32-bit import name RVA.
 fn allocate_near(
     process: HANDLE,
@@ -303,7 +306,7 @@ fn allocate_near(
 ) -> Option<*mut c_void> {
     let mut preferred = base.checked_add(image_size as usize)?.checked_add(0xFFFF)? & !0xFFFF;
 
-    for _ in 0..32 {
+    for _ in 0..NEAR_RETRIES {
         // SAFETY: the address is a hint; Windows returns a new allocation or null.
         let remote = unsafe {
             VirtualAllocEx(
@@ -332,7 +335,6 @@ fn allocate_near(
     None
 }
 
-/// Whether the image is PE32 (x86) rather than PE32+ (x64). The launcher itself reads `Parsed::pe32`.
 /// The path in the system ANSI code page, with a NUL terminator.
 fn ansi(path: &Path) -> io::Result<Vec<u8>> {
     let wide = wide(path.as_os_str());
@@ -378,7 +380,6 @@ fn ansi(path: &Path) -> io::Result<Vec<u8>> {
     Ok(bytes)
 }
 
-/// A malformed PE image.
 /// The error of a malformed program image, for the callers that report `io::Error`.
 fn invalid() -> io::Error {
     io::Error::new(
@@ -387,9 +388,12 @@ fn invalid() -> io::Error {
     )
 }
 
-/// The error of a malformed image read by `gobbo_overlay_pe`.
-fn malformed(_: gobbo_overlay_pe::Malformed) -> io::Error {
-    invalid()
+/// The error of a malformed image read by `gobbo_overlay_pe`, with the parser's reason.
+fn malformed(detail: gobbo_overlay_pe::Malformed) -> io::Error {
+    io::Error::new(
+        io::ErrorKind::InvalidData,
+        format!("the program could not be parsed: {detail}"),
+    )
 }
 
 #[cfg(test)]
