@@ -167,13 +167,19 @@ impl Running {
         None
     }
 
-    /// Waits until the program exits, and returns its exit code.
+    /// Waits until the program exits, and returns its exit code. A program killed by a signal answers `128 + signal`,
+    /// as a shell reports it, so the launch report tells a crash from an ordinary exit code.
     pub fn wait(&mut self) -> Result<i32, DeployError> {
+        use std::os::unix::process::ExitStatusExt;
+
         let status = self
             .child
             .wait()
             .map_err(|e| FileError::new(Path::new("unshare"), e))?;
-        Ok(status.code().unwrap_or(1))
+        Ok(status
+            .code()
+            .or_else(|| status.signal().map(|signal| 128 + signal))
+            .unwrap_or(1))
     }
 }
 
