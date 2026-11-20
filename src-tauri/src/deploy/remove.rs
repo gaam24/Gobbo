@@ -9,12 +9,12 @@ use crate::deploy::target::journal_roots;
 use crate::deploy::undo;
 use crate::domain::profiles::Entry;
 use crate::domain::profiles::Profiles;
-use crate::error::AppError;
 use crate::error::game_running as game_is_running_error;
+use crate::error::{AppError, io_at};
 use crate::games;
+use crate::infra::fs::remove_dir_if_exists;
 use crate::library;
 use std::collections::HashSet;
-use std::fs;
 use std::path::PathBuf;
 
 /// Removes a whole mod family, see `library::delete_mod`. Prepared deployments that contain the mod are undone first; a
@@ -131,9 +131,12 @@ fn undo_prepared_holding(
         }
         let roots = journal_roots(&game, &settings, state.clone())?;
         undo(&roots).map_err(AppError::from)?;
+        // A layer that cannot be removed (a file still held open) keeps the profile deployed, so a later cleanup
+        // tries again instead of forgetting the files.
         if overlay {
-            let _ = fs::remove_dir_all(state.join("mods"));
-            let _ = fs::remove_dir_all(state.join(".work"));
+            for layer in [state.join("mods"), state.join(".work")] {
+                remove_dir_if_exists(&layer).map_err(io_at(&layer))?;
+            }
         }
         cleaned.push(profile_id.clone());
     }
