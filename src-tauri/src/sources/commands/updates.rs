@@ -44,13 +44,6 @@ pub async fn update_mod(
     .await
 }
 
-/// Stops one mod update at the next download chunk or import file. Nothing is selected when the work stops.
-#[tauri::command]
-#[specta::specta]
-pub fn cancel_update_mod(tasks: State<'_, TaskFlags>, game: String, id: String) {
-    tasks.cancel(TaskKey::update_mod(&game, &id).as_str());
-}
-
 /// Updates every mod with a saved newer version, or only the mods `ids` names, one after another. It ends with the fresh
 /// status and the failures.
 #[tauri::command]

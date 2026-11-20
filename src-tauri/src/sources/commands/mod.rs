@@ -58,20 +58,17 @@ pub use pages::{
     __tauri_command_name_open_update_page, open_source_page, open_update_page,
 };
 pub use requirements::{
-    __cmd__cancel_requirement, __cmd__install_requirement, __cmd__install_requirements,
-    __cmd__preview_requirements, __specta__fn__cancel_requirement,
+    __cmd__install_requirement, __cmd__install_requirements, __cmd__preview_requirements,
     __specta__fn__install_requirement, __specta__fn__install_requirements,
-    __specta__fn__preview_requirements, __tauri_command_name_cancel_requirement,
-    __tauri_command_name_install_requirement, __tauri_command_name_install_requirements,
-    __tauri_command_name_preview_requirements, cancel_requirement, install_requirement,
-    install_requirements, preview_requirements,
+    __specta__fn__preview_requirements, __tauri_command_name_install_requirement,
+    __tauri_command_name_install_requirements, __tauri_command_name_preview_requirements,
+    install_requirement, install_requirements, preview_requirements,
 };
 pub use updates::{
-    __cmd__cancel_update_all, __cmd__cancel_update_mod, __cmd__update_all, __cmd__update_mod,
-    __specta__fn__cancel_update_all, __specta__fn__cancel_update_mod, __specta__fn__update_all,
-    __specta__fn__update_mod, __tauri_command_name_cancel_update_all,
-    __tauri_command_name_cancel_update_mod, __tauri_command_name_update_all,
-    __tauri_command_name_update_mod, cancel_update_all, cancel_update_mod, update_all, update_mod,
+    __cmd__cancel_update_all, __cmd__update_all, __cmd__update_mod,
+    __specta__fn__cancel_update_all, __specta__fn__update_all, __specta__fn__update_mod,
+    __tauri_command_name_cancel_update_all, __tauri_command_name_update_all,
+    __tauri_command_name_update_mod, cancel_update_all, update_all, update_mod,
 };
 crate::commands::game_commands! {
     /// Checks every source of the game for updates through its provider. Requires the provider's saved key when it

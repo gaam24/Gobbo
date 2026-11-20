@@ -44,7 +44,6 @@ profiles::import_mo2_list
 profiles::inspect_community_profile
 profiles::import_community_profile
 deploy::apply
-deploy::cancel_apply
 deploy::preview_deployment
 deploy::conflict_explorer
 deploy::conflict_file_preview
@@ -125,12 +124,10 @@ sources::manual_update_finish
 sources::manual_update_cancel
 sources::manual_update_reopen
 sources::update_mod
-sources::cancel_update_mod
 sources::update_all
 sources::select_update_version
 sources::cancel_update_all
 sources::install_requirement
-sources::cancel_requirement
 sources::preview_requirements
 sources::install_requirements
 sources::fill_source_info
@@ -189,7 +186,6 @@ collections::check_collection_updates
 collections::finish_collection
 collections::skip_collection_item
 collections::install_collection
-collections::cancel_collection
 collections::prepare_collection_item
 collections::import_collection_file
 collections::open_collection_page

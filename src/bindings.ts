@@ -124,11 +124,6 @@ export const commands = {
 	 *  so the window can show the real percent.
 	 */
 	apply: (game: string, progress: Channel<DeployProgress>) => typedError<ApplyView, AppError_Serialize>(__TAURI_INVOKE("apply", { game, progress })),
-	/**
-	 *  Stops a deployment at the next safe boundary before the file writes. A deployment already in progress is not cut
-	 *  in half, so it either applies fully or stays untouched.
-	 */
-	cancelApply: (game: string) => __TAURI_INVOKE<void>("cancel_apply", { game }),
 	/**  What a deployment of the active profile would do, before it does anything. */
 	previewDeployment: (game: string) => typedError<DeployPreview, AppError_Serialize>(__TAURI_INVOKE("preview_deployment", { game })),
 	/**  Every shared file of the active profile, its winner, its losers and the size of the winning copy. */
@@ -352,8 +347,6 @@ export const commands = {
 	 *  download and import progress; the answer is the fresh status.
 	 */
 	updateMod: (game: string, id: string, provider: string, progress: Channel<UpdateProgress>) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("update_mod", { game, id, provider, progress })),
-	/**  Stops one mod update at the next download chunk or import file. Nothing is selected when the work stops. */
-	cancelUpdateMod: (game: string, id: string) => __TAURI_INVOKE<void>("cancel_update_mod", { game, id }),
 	/**
 	 *  Updates every mod with a saved newer version, or only the mods `ids` names, one after another. It ends with the fresh
 	 *  status and the failures.
@@ -368,8 +361,6 @@ export const commands = {
 	cancelUpdateAll: (game: string) => __TAURI_INVOKE<void>("cancel_update_all", { game }),
 	/**  Installs or enables a requirement of the selected mod, then answers with the fresh status. */
 	installRequirement: (game: string, source: SourceRef_Deserialize, progress: Channel<UpdateProgress>) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("install_requirement", { game, source, progress })),
-	/**  Stops a requirement install at the next download chunk or import file. Already enabled requirements stay enabled. */
-	cancelRequirement: (game: string) => __TAURI_INVOKE<void>("cancel_requirement", { game }),
 	/**
 	 *  The requirement closure of the selected mod version: direct requirements, transitive ones the library knows,
 	 *  alternatives, cycles and the reason a step is blocked. Nothing is downloaded.
@@ -531,8 +522,6 @@ export const commands = {
 	 *  window imports it with its wizard and calls the command again until the list is empty.
 	 */
 	installCollection: (game: string, profile: string, collection: string, progress: Channel<CollectionProgress_Deserialize>) => typedError<CollectionInstallView_Serialize, AppError_Serialize>(__TAURI_INVOKE("install_collection", { game, profile, collection, progress })),
-	/**  Stops an automatic install at the next member or at the next download chunk. */
-	cancelCollection: (game: string, profile: string, collection: string) => __TAURI_INVOKE<void>("cancel_collection", { game, profile, collection }),
 	/**  The guided flow's next member: a Nexus file page, an automatic bundle/direct install, or a manual instruction. */
 	prepareCollectionItem: (game: string, profile: string, collection: string, item: string) => typedError<CollectionItemAction_Serialize, AppError_Serialize>(__TAURI_INVOKE("prepare_collection_item", { game, profile, collection, item })),
 	/**  Imports a file the user picked for one member, with the wizard's choices when the archive is a FOMOD. */

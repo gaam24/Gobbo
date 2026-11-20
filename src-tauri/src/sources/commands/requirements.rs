@@ -44,13 +44,6 @@ pub async fn install_requirement(
     .await
 }
 
-/// Stops a requirement install at the next download chunk or import file. Already enabled requirements stay enabled.
-#[tauri::command]
-#[specta::specta]
-pub fn cancel_requirement(tasks: State<'_, TaskFlags>, game: String) {
-    tasks.cancel(TaskKey::requirement(&game).as_str());
-}
-
 /// The requirement closure of the selected mod version: direct requirements, transitive ones the library knows,
 /// alternatives, cycles and the reason a step is blocked. Nothing is downloaded.
 #[tauri::command]

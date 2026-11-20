@@ -41,15 +41,3 @@ pub async fn install_collection(
     )
     .await
 }
-
-/// Stops an automatic install at the next member or at the next download chunk.
-#[tauri::command]
-#[specta::specta]
-pub fn cancel_collection(
-    tasks: State<'_, TaskFlags>,
-    game: String,
-    profile: String,
-    collection: String,
-) {
-    tasks.cancel(TaskKey::collection_install(&game, &profile, &collection).as_str());
-}

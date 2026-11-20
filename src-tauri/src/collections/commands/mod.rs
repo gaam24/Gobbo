@@ -13,9 +13,8 @@ use super::model::{CollectionInstallRequest, CollectionPreview, CollectionSessio
 // Tauri's `#[command]` and Specta's `#[specta]` put hidden macros beside each command. `collect_commands!`
 // names the commands through this module, so the macros move with the single-name re-exports of the functions.
 pub use install::{
-    __cmd__cancel_collection, __cmd__install_collection, __specta__fn__cancel_collection,
-    __specta__fn__install_collection, __tauri_command_name_cancel_collection,
-    __tauri_command_name_install_collection, cancel_collection, install_collection,
+    __cmd__install_collection, __specta__fn__install_collection,
+    __tauri_command_name_install_collection, install_collection,
 };
 pub use page::{
     __cmd__open_collection_page, __specta__fn__open_collection_page,

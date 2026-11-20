@@ -38,14 +38,6 @@ pub async fn apply(
     .await
 }
 
-/// Stops a deployment at the next safe boundary before the file writes. A deployment already in progress is not cut
-/// in half, so it either applies fully or stays untouched.
-#[tauri::command]
-#[specta::specta]
-pub fn cancel_apply(tasks: State<'_, TaskFlags>, game: String) {
-    tasks.cancel(TaskKey::apply(&game).as_str());
-}
-
 crate::commands::game_commands! {
     /// What a deployment of the active profile would do, before it does anything.
     query preview_deployment() -> DeployPreview = super::preview::preview_deployment;
