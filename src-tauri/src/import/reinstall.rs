@@ -80,7 +80,12 @@ pub fn reinstall_mod_with(
         let library_dir = data.library();
         let target = library_dir.join(folder);
         let set_aside = library_dir.join(format!(".reinstall-{folder}"));
-        let _ = std::fs::remove_dir_all(&set_aside);
+        // A set-aside copy without the folder is what an interrupted reinstall left: it is the only copy, so it goes
+        // back first. With the folder in place it is a stale duplicate.
+        if set_aside.is_dir() && !target.is_dir() {
+            std::fs::rename(&set_aside, &target).map_err(io_at(&set_aside))?;
+        }
+        crate::infra::fs::remove_dir_if_exists(&set_aside).map_err(io_at(&set_aside))?;
         let had_folder = target.is_dir();
         if had_folder {
             std::fs::rename(&target, &set_aside).map_err(io_at(&target))?;
@@ -130,8 +135,16 @@ pub fn reinstall_mod_with(
             }
             let _ = std::fs::remove_dir_all(&set_aside);
         } else if had_folder {
-            let _ = std::fs::remove_dir_all(&target);
-            let _ = std::fs::rename(&set_aside, &target);
+            let restored = crate::infra::fs::remove_dir_if_exists(&target)
+                .and_then(|()| std::fs::rename(&set_aside, &target));
+            if let Err(error) = restored {
+                // The next reinstall puts the set-aside copy back; until then the log says where it is.
+                crate::infra::log::warn(format!(
+                    "could not restore {} after a failed reinstall; the previous copy is at {}: {error}",
+                    target.display(),
+                    set_aside.display()
+                ));
+            }
         }
         result
     })
