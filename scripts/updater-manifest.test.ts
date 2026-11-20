@@ -34,8 +34,8 @@ function bundleWith(root: string, folder: string, name: string, signature: strin
 
 function fragments(): Fragment[] {
 	return [
-		{ platform: "windows-x86_64", file: `Gobbo-${VERSION}-setup.nsis.zip`, signature: "SIG-WIN" },
-		{ platform: "linux-x86_64", file: `Gobbo_${VERSION}_amd64.AppImage.tar.gz`, signature: "SIG-LIN" },
+		{ platform: "windows-x86_64", file: `Gobbo-${VERSION}-setup.exe`, signature: "SIG-WIN" },
+		{ platform: "linux-x86_64", file: `Gobbo_${VERSION}_amd64.AppImage`, signature: "SIG-LIN" },
 		{ platform: "windows-x86_64-portable", file: `gobbo-${VERSION}-windows-x64-portable.zip`, signature: "SIG-WIN-P" },
 		{ platform: "linux-x86_64-portable", file: `gobbo-${VERSION}-linux-x64-portable.zip`, signature: "SIG-LIN-P" },
 	];
@@ -44,12 +44,12 @@ function fragments(): Fragment[] {
 test("stage copies the installer under a name without spaces and records its signature", () => {
 	const ws = workspace();
 	try {
-		const bundle = bundleWith(ws.root, "nsis", `Gobbo Mods Organizer_${VERSION}_x64-setup.nsis.zip`, "SIG-WIN");
+		const bundle = bundleWith(ws.root, "nsis", `Gobbo Mods Organizer_${VERSION}_x64-setup.exe`, "SIG-WIN");
 		const out = join(ws.root, "out");
 		const fragment = stage(bundle, out, "windows-x86_64");
 		expect(fragment).toEqual({
 			platform: "windows-x86_64",
-			file: `Gobbo-Mods-Organizer_${VERSION}_x64-setup.nsis.zip`,
+			file: `Gobbo-Mods-Organizer_${VERSION}_x64-setup.exe`,
 			signature: "SIG-WIN",
 		});
 		expect(existsSync(join(out, fragment.file))).toBe(true);
@@ -62,12 +62,12 @@ test("stage copies the installer under a name without spaces and records its sig
 test("a missing signature or an ambiguous installer is refused, not guessed", () => {
 	const ws = workspace();
 	try {
-		const unsigned = bundleWith(ws.root, "appimage", `Gobbo_${VERSION}_amd64.AppImage.tar.gz`, null);
+		const unsigned = bundleWith(ws.root, "appimage", `Gobbo_${VERSION}_amd64.AppImage`, null);
 		expect(() => findUpdaterArchive(unsigned, "linux-x86_64")).toThrow("was not signed");
 
-		const twice = bundleWith(ws.root, "nsis", "a.nsis.zip", "S1");
-		writeFileSync(join(twice, "nsis", "b.nsis.zip"), "archive");
-		writeFileSync(join(twice, "nsis", "b.nsis.zip.sig"), "S2");
+		const twice = bundleWith(ws.root, "nsis", "a-setup.exe", "S1");
+		writeFileSync(join(twice, "nsis", "b-setup.exe"), "archive");
+		writeFileSync(join(twice, "nsis", "b-setup.exe.sig"), "S2");
 		expect(() => findUpdaterArchive(twice, "windows-x86_64")).toThrow("found 2");
 	} finally {
 		ws.cleanup();
@@ -114,7 +114,7 @@ test("the manifest points each platform at its release asset and needs all four 
 	expect(manifest.pub_date).toBe("2026-11-16T00:00:00.000Z");
 	expect(manifest.platforms["windows-x86_64"]).toEqual({
 		signature: "SIG-WIN",
-		url: `https://github.com/gaam24/Gobbo/releases/download/v${VERSION}/Gobbo-${VERSION}-setup.nsis.zip`,
+		url: `https://github.com/gaam24/Gobbo/releases/download/v${VERSION}/Gobbo-${VERSION}-setup.exe`,
 	});
 	expect(manifest.platforms["linux-x86_64-portable"]).toEqual({
 		signature: "SIG-LIN-P",

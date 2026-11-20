@@ -76,8 +76,8 @@ _Screenshots use a demo library with example mod names._
 1. Download the archive for your system from [Releases](https://github.com/gaam24/Gobbo/releases/latest).
 2. Check it against `SHA256SUMS.txt`.
 3. Unpack it and start Gobbo:
-   - **Windows:** `gobbo-<version>-windows-<arch>-portable.zip` is ready to run; the other archive holds the NSIS installer.
-   - **Linux:** `gobbo-<version>-linux-<arch>-portable.zip` is ready to run.
+   - **Windows:** `gobbo-<version>-windows-<arch>-portable.zip` is ready to run, or install with `Gobbo-Mods-Organizer_<version>_x64-setup.exe`.
+   - **Linux:** `gobbo-<version>-linux-<arch>-portable.zip` is ready to run, or use the `.AppImage`.
 4. Add a game, import a mod archive, switch the mod on and press **Apply**.
 
 For a guided five-minute walkthrough, see [Quick start](docs/user/quickstart.md).
@@ -174,7 +174,7 @@ bun install
 bun run tauri dev
 ```
 
-The full setup and the checks are in [CONTRIBUTING.md](.github/CONTRIBUTING.md); the release build is in [docs/release.md](docs/release.md).
+The full setup and the checks are in [CONTRIBUTING.md](.github/CONTRIBUTING.md).
 
 ### Contributing
 

@@ -11,10 +11,12 @@ import process from "node:process";
 //   release assets. A manifest without all four platforms is refused: an update must not reach a copy that has no
 //   archive to install from.
 
-/// The installer platforms: the updater runs the installer (NSIS on Windows, AppImage on Linux).
+/// The installer platforms: the updater runs the installer (NSIS on Windows, AppImage on Linux). With
+/// `createUpdaterArtifacts: true`, Tauri v2 signs the installer itself (`<file>.sig`); there is no `.nsis.zip` or
+/// `.AppImage.tar.gz` (those are the v1-compatible names).
 export const INSTALLER_SUFFIX = {
-	"windows-x86_64": ".nsis.zip",
-	"linux-x86_64": ".AppImage.tar.gz",
+	"windows-x86_64": "-setup.exe",
+	"linux-x86_64": ".AppImage",
 } as const;
 
 /// The portable archive platforms: the updater replaces the program files of a portable copy.

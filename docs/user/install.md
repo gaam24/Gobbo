@@ -10,9 +10,10 @@ Take the archive for your system from the [latest release](https://github.com/ga
 | Asset                                         | What it is                                                  |
 | --------------------------------------------- | ----------------------------------------------------------- |
 | `gobbo-<version>-windows-<arch>-portable.zip` | The program, ready to run. Unpack it anywhere.              |
-| `gobbo-<version>-windows-<arch>.zip`          | The NSIS installer built by Tauri.                          |
+| `Gobbo-Mods-Organizer_<version>_x64-setup.exe` | The Windows installer (NSIS).                              |
 | `gobbo-<version>-linux-<arch>-portable.zip`   | The program, ready to run. Unpack it anywhere.              |
-| `SHA256SUMS.txt`                              | The SHA-256 of every archive in the release.                |
+| `Gobbo-Mods-Organizer_<version>_amd64.AppImage` | The Linux AppImage.                                       |
+| `SHA256SUMS.txt`                              | The SHA-256 of every download in the release.               |
 | `sbom-*.cdx.json`, `THIRD-PARTY-NOTICES-*.md` | The software bill of materials and the third-party notices. |
 
 The portable archive contains the program and the `games/` and `loaders/` data folders. On Windows it also contains the

@@ -3,10 +3,9 @@ import path from "node:path";
 import process from "node:process";
 import { type Zippable, zipSync } from "fflate";
 
-// Packs the release build of the current OS into two archives in `dist-release/`:
-// - `gobbo-<version>-<os>-<arch>-portable.zip` with the program, its hook DLLs (Windows), `games/` and `loaders/`;
-// - `gobbo-<version>-<os>-<arch>.zip` with what Tauri bundled (the installers).
-// Tauri cannot cross-compile, so each OS builds and packs its own archives; run `bun run build` on each one.
+// Packs the release build of the current OS into `dist-release/gobbo-<version>-<os>-<arch>-portable.zip`: the program,
+// its overlay binaries (Windows), `games/` and `loaders/`. The installers Tauri bundled are published as they are.
+// Tauri cannot cross-compile, so each OS builds and packs its own archive; run `bun run build` on each one.
 
 const root = path.resolve(import.meta.dirname, "..");
 const srcTauri = path.join(root, "src-tauri");
@@ -30,8 +29,7 @@ if (typeof config !== "object" || config === null || !("version" in config) || t
 	throw new Error("src-tauri/tauri.conf.json has no version.");
 }
 const version = config.version;
-const folder = `gobbo-${version}-${osName}-${process.arch}`;
-const portableFolder = `${folder}-portable`;
+const portableFolder = `gobbo-${version}-${osName}-${process.arch}-portable`;
 const exeName = process.platform === "win32" ? "gobbo.exe" : "gobbo";
 
 // Every file under `dir`, keyed by its path below `prefix` in the archive (always with forward slashes).
@@ -39,7 +37,7 @@ function filesUnder(dir: string, prefix: string, entries: Zippable) {
 	for (const entry of readdirSync(dir, { recursive: true })) {
 		const rel = entry.toString();
 		const abs = path.join(dir, rel);
-		if (!statSync(abs).isFile() || abs.includes(".AppDir")) {
+		if (!statSync(abs).isFile()) {
 			continue;
 		}
 		entries[`${prefix}/${rel.split(path.sep).join("/")}`] = readFileSync(abs);
@@ -82,16 +80,8 @@ if (process.platform === "win32") {
 filesUnder(path.join(root, "games"), `${portableFolder}/games`, portableEntries);
 filesUnder(path.join(root, "loaders"), `${portableFolder}/loaders`, portableEntries);
 
-const installerEntries: Zippable = {};
-filesUnder(required(path.join(release, "bundle")), folder, installerEntries);
-
 mkdirSync(distDir, { recursive: true });
-function writeArchive(name: string, entries: Zippable) {
-	const zipPath = path.join(distDir, name);
-	rmSync(zipPath, { force: true });
-	writeFileSync(zipPath, zipSync(entries, { level: 9 }));
-	process.stdout.write(`Wrote ${zipPath}\n`);
-}
-
-writeArchive(`${portableFolder}.zip`, portableEntries);
-writeArchive(`${folder}.zip`, installerEntries);
+const zipPath = path.join(distDir, `${portableFolder}.zip`);
+rmSync(zipPath, { force: true });
+writeFileSync(zipPath, zipSync(portableEntries, { level: 9 }));
+process.stdout.write(`Wrote ${zipPath}\n`);
