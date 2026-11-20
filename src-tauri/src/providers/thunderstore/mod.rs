@@ -118,9 +118,7 @@ impl SourceProvider for ThunderstoreProvider {
             .ok_or_else(|| api::bad_id(&request.source.mod_id))?;
         let version = match request.source.file_id.clone() {
             Some(version) => version,
-            None => api::latest(&api::read_package(owner, name)?)?
-                .version_number
-                .clone(),
+            None => read_newest(&request.source.mod_id)?.1.version_number,
         };
         if !link::is_version(&version) {
             return Err(api::bad_response("the version is not a version number"));
@@ -146,11 +144,9 @@ impl SourceProvider for ThunderstoreProvider {
         _game_key: &str,
         mod_id: &str,
     ) -> Result<SourceMeta, AppError> {
-        let (owner, name) = link::split_full_name(mod_id).ok_or_else(|| api::bad_id(mod_id))?;
-        let package = api::read_package(owner, name)?;
-        let version = api::latest(&package)?;
+        let (package, version) = read_newest(mod_id)?;
         // The picture is saved by a check, which knows the game's folder; a read here keeps none.
-        Ok(meta::meta_of(&package, version, None))
+        Ok(meta::meta_of(&package, &version, None))
     }
 }
 
