@@ -26,7 +26,8 @@ Switches are read once at install, never per call:
 - `GOBBO_OVERLAY_RING` - the base path of the decision ring. Every process writes `<base>.<pid>.ring`. Unset, a dev
   build uses the developer folder; a release build writes none.
 - `GOBBO_OVERLAY_DISABLE` - comma-separated hook field names.
-- `GOBBO_OVERLAY_TEST_PASSTHROUGH` - every call passes through, hooks still installed.
+- `GOBBO_OVERLAY_TEST_PASSTHROUGH` - any non-empty value except `off`: every call passes through, hooks still
+  installed.
 - `GOBBO_OVERLAY_ALLOW_UNHOOKED_CHILDREN` - a child that could not receive the hook may run anyway. Off by default: the
   child is terminated and the start fails with `ERROR_DLL_INIT_FAILED`.
 - `GOBBO_OVERLAY_SAFE_THREADS` - count the process's threads with a Toolhelp snapshot before enabling the detours and

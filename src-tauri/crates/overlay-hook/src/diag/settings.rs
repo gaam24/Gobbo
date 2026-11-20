@@ -70,18 +70,18 @@ pub(crate) fn settings() -> &'static Settings {
             .filter(|item| !item.is_empty())
             .map(str::to_string)
             .collect(),
-        crash_first: std::env::var_os("GOBBO_OVERLAY_CRASH_FIRST")
-            .is_some_and(|value| !value.is_empty() && value != "off"),
-        calls: std::env::var_os("GOBBO_OVERLAY_CALLS")
-            .is_some_and(|value| !value.is_empty() && value != "off"),
-        pass_writes: std::env::var_os("GOBBO_OVERLAY_PASS")
-            .is_some_and(|value| !value.is_empty() && value != "off"),
-        passthrough: std::env::var_os("GOBBO_OVERLAY_TEST_PASSTHROUGH").is_some(),
-        allow_unhooked_children: std::env::var_os("GOBBO_OVERLAY_ALLOW_UNHOOKED_CHILDREN")
-            .is_some_and(|value| !value.is_empty() && value != "off"),
-        safe_threads: std::env::var_os("GOBBO_OVERLAY_SAFE_THREADS")
-            .is_some_and(|value| !value.is_empty() && value != "off"),
+        crash_first: flag("GOBBO_OVERLAY_CRASH_FIRST"),
+        calls: flag("GOBBO_OVERLAY_CALLS"),
+        pass_writes: flag("GOBBO_OVERLAY_PASS"),
+        passthrough: flag("GOBBO_OVERLAY_TEST_PASSTHROUGH"),
+        allow_unhooked_children: flag("GOBBO_OVERLAY_ALLOW_UNHOOKED_CHILDREN"),
+        safe_threads: flag("GOBBO_OVERLAY_SAFE_THREADS"),
     })
+}
+
+/// An on/off switch: any non-empty value except `off` turns it on; unset, empty or `off` leaves it off.
+fn flag(name: &str) -> bool {
+    std::env::var_os(name).is_some_and(|value| !value.is_empty() && value != "off")
 }
 
 /// The minidump file: `1` or `on` selects the developer file, another non-empty value is a path, and unset/`off` means
