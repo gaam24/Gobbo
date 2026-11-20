@@ -2,8 +2,7 @@ import { Channel } from "@tauri-apps/api/core";
 import { Link as LinkIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import { useUiActions } from "@/app/contexts/ui-context";
-import { useWorkspace, useWorkspaceActions } from "@/app/contexts/workspace-context";
+import { useWorkspaceActions } from "@/app/contexts/workspace-context";
 import { commands, type PackLinkProgress } from "@/bindings";
 import { ModalDialog } from "@/components/modal-dialog";
 import { Button } from "@/components/ui/button";
@@ -13,16 +12,13 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { useTranslation } from "@/i18n";
 import { messageOf, unwrap } from "@/lib/ipc";
-import { needsGameSwitch } from "@/lib/task-open";
 import { registerTask, removeTask, updateTask } from "@/lib/tasks-store";
 
 /// Downloads a pack link into the pack preview. The hash and size are checked before the preview opens; a cancel
 /// leaves no file behind. The pack format itself is unchanged, so the existing preview and import do the rest.
 export function PackLinkDialog({ gameId, link: initial, onClose }: { gameId: string; link: string; onClose: () => void }) {
 	const { t } = useTranslation();
-	const { openDialog } = useUiActions();
-	const { gameId: activeGameId } = useWorkspace();
-	const { selectGame } = useWorkspaceActions();
+	const { openForGame } = useWorkspaceActions();
 	const [link, setLink] = useState(initial);
 	const [busy, setBusy] = useState(false);
 	const [percent, setPercent] = useState<number | null>(null);
@@ -36,24 +32,6 @@ export function PackLinkDialog({ gameId, link: initial, onClose }: { gameId: str
 			mounted.current = false;
 		};
 	}, []);
-
-	/// A Working task keeps its own game. Opening it must select that game first: the game switch closes every shell
-	/// dialog, so the target window is opened on the next macrotask, after the stack has been cleared.
-	const pendingOpen = useRef<(() => void) | null>(null);
-	useEffect(() => {
-		const next = pendingOpen.current;
-		if (!next || activeGameId !== gameId) return;
-		pendingOpen.current = null;
-		setTimeout(next, 0);
-	}, [activeGameId, gameId]);
-	const openForTask = (action: () => void) => {
-		if (!needsGameSwitch(gameId, activeGameId)) {
-			action();
-			return;
-		}
-		pendingOpen.current = action;
-		selectGame(gameId);
-	};
 
 	const download = async () => {
 		const wanted = link.trim();
@@ -70,7 +48,7 @@ export function PackLinkDialog({ gameId, link: initial, onClose }: { gameId: str
 			percent: 0,
 			state: "running",
 			cancel: { label: t("common.cancel"), run: () => void commands.cancelPackLink(gameId, wanted) },
-			open: { label: t("tasks.openWindow"), run: () => openForTask(() => openDialog({ kind: "pack-link", link: wanted })) },
+			open: { label: t("tasks.openWindow"), run: () => openForGame(gameId, { kind: "pack-link", link: wanted }) },
 			source: "local",
 		});
 		const progress = new Channel<PackLinkProgress>();
@@ -84,7 +62,7 @@ export function PackLinkDialog({ gameId, link: initial, onClose }: { gameId: str
 			const result = await unwrap(commands.downloadPackLink(gameId, wanted, progress));
 			if (mounted.current) {
 				removeTask(id);
-				openForTask(() => openDialog({ kind: "pack-import", path: result.path }));
+				openForGame(gameId, { kind: "pack-import", path: result.path });
 			} else {
 				// Backgrounded: leave a task that reopens the ready preview instead of silently finishing.
 				updateTask(id, {
@@ -95,7 +73,7 @@ export function PackLinkDialog({ gameId, link: initial, onClose }: { gameId: str
 						label: t("tasks.openWindow"),
 						run: () => {
 							removeTask(id);
-							openForTask(() => openDialog({ kind: "pack-import", path: result.path }));
+							openForGame(gameId, { kind: "pack-import", path: result.path });
 						},
 					},
 				});

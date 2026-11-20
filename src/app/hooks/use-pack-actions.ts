@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 
-import { useUiActions } from "@/app/contexts/ui-context";
+import { type AppDialog, useUiActions } from "@/app/contexts/ui-context";
 import { commands, type ImportProgress, type PackDownload, type PackImportView, type PackOptions } from "@/bindings";
 import { useTranslation } from "@/i18n";
 import { unwrap } from "@/lib/ipc";
@@ -40,28 +40,31 @@ export function usePackActions({
 	const { openDialog, closeDialog } = useUiActions();
 
 	/// A task's Open can be clicked while another game is shown. A switch closes every shell dialog, so remember the
-	/// preview to open and show it after the task's game becomes active. The ref keeps the registered callback fresh.
-	const { defer: deferOpen } = useDeferredOpen<{ gameId: string; path: string }>(
+	/// dialog and open it after the task's game becomes active. This hook stays mounted, unlike the dialog that started
+	/// the task. The ref keeps the registered callback fresh.
+	const { defer: deferOpen } = useDeferredOpen<{ gameId: string; dialog: AppDialog }>(
 		activeGameId,
 		(pending) => pending.gameId === activeGameId,
-		(pending) => openDialog({ kind: "pack-import", path: pending.path }),
+		(pending) => openDialog(pending.dialog),
 	);
-	const openPackPreview = useCallback(
-		(gameId: string, path: string) => {
+	const openDialogOf = useCallback(
+		(gameId: string, dialog: AppDialog) => {
 			if (selectGame && needsGameSwitch(gameId, activeGameId)) {
-				deferOpen({ gameId, path });
+				deferOpen({ gameId, dialog });
 				selectGame(gameId);
 				return;
 			}
-			openDialog({ kind: "pack-import", path });
+			openDialog(dialog);
 		},
 		[activeGameId, deferOpen, openDialog, selectGame],
 	);
-	const openPackPreviewRef = useRef(openPackPreview);
+	const openDialogOfRef = useRef(openDialogOf);
 	useEffect(() => {
-		openPackPreviewRef.current = openPackPreview;
-	}, [openPackPreview]);
-	const openFromTask = useCallback((gameId: string, path: string) => openPackPreviewRef.current(gameId, path), []);
+		openDialogOfRef.current = openDialogOf;
+	}, [openDialogOf]);
+	/// Opens a shell dialog for `gameId`, switching to that game first when another one is shown.
+	const openForGame = useCallback((gameId: string, dialog: AppDialog) => openDialogOfRef.current(gameId, dialog), []);
+	const openFromTask = (gameId: string, path: string) => openForGame(gameId, { kind: "pack-import", path });
 
 	const packImported = (result: PackImportView) => {
 		const done = t("notice.packImported", {
@@ -190,5 +193,5 @@ export function usePackActions({
 			void fillSourceInfo(gameId);
 		});
 
-	return { exportPack, pickPack, pickPackLink, importPack, downloadPack };
+	return { exportPack, pickPack, pickPackLink, importPack, downloadPack, openForGame };
 }

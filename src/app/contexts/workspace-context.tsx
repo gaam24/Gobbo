@@ -42,6 +42,8 @@ interface WorkspaceActions {
 	/// library must not run it beside a list edit.
 	reloadQueued: (gameId: string) => Promise<void>;
 	pickArchives: () => Promise<void>;
+	/// Opens a shell dialog for a game, switching to that game first when another one is shown.
+	openForGame: ReturnType<typeof usePackActions>["openForGame"];
 	selectGame: (gameId: string) => void;
 	showGames: () => void;
 	toMods: () => void;
@@ -351,7 +353,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 		scope.add(unlisten);
 	}, selectGame);
 
-	const { exportPack, pickPack, pickPackLink, importPack, downloadPack } = usePackActions({
+	const { exportPack, pickPack, pickPackLink, importPack, downloadPack, openForGame } = usePackActions({
 		forGame,
 		reload,
 		fillSourceInfo,
@@ -441,6 +443,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 			applyStatus: setStatusFor,
 			reloadQueued,
 			pickArchives,
+			openForGame,
 			selectGame,
 			showGames: openGames,
 			toMods: openMods,
@@ -462,6 +465,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 			acceptImported,
 			openFolderPath,
 			openPathFor,
+			openForGame,
 			openSource,
 			pickArchives,
 			revealFolderPath,
