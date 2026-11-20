@@ -1,6 +1,7 @@
 import { cn } from "cn";
 import { Copy, EllipsisVertical, FolderOpen, Pencil, Trash2 } from "lucide-react";
 import type { ReactNode } from "react";
+import { PathText } from "@/components/app/path-text";
 import { StatusBadge } from "@/components/app/status-badge";
 import { GameIcon } from "@/components/game-icon";
 import { Badge } from "@/components/ui/badge";
@@ -101,9 +102,13 @@ export function GameRow({
 				</span>
 				<span className="text-subtle-foreground block truncate font-mono text-xs">{game.id}</span>
 			</div>
-			<span className="text-muted-foreground truncate font-mono text-xs" title={root ?? undefined}>
-				{root ?? t(status === "added" ? "games.rootUnset" : "games.notInSteam")}
-			</span>
+			{root ? (
+				<PathText path={root} className="text-muted-foreground" />
+			) : (
+				<span className="text-muted-foreground truncate font-mono text-xs">
+					{t(status === "added" ? "games.rootUnset" : "games.notInSteam")}
+				</span>
+			)}
 			<div className="flex items-center justify-end gap-1">
 				{action}
 				{hasMenu && (

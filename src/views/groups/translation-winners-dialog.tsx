@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useWorkspace } from "@/app/contexts/workspace-context";
 import { commands } from "@/bindings";
 import { BoxList, BoxListRow } from "@/components/app/content-blocks";
+import { PathText } from "@/components/app/path-text";
 import { ModalDialog } from "@/components/modal-dialog";
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
@@ -61,7 +62,9 @@ export function TranslationWinnersDialog({ gameId, groupId, onClose }: { gameId:
 					{paths.map((path) => (
 						<BoxListRow key={path}>
 							<ItemContent>
-								<ItemTitle className="min-w-0 truncate font-mono text-xs font-normal">{path}</ItemTitle>
+								<ItemTitle className="min-w-0 font-normal">
+									<PathText path={path} />
+								</ItemTitle>
 							</ItemContent>
 						</BoxListRow>
 					))}

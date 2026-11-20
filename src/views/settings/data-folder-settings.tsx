@@ -1,3 +1,4 @@
+import { PathText } from "@/components/app/path-text";
 import { Item, ItemActions, ItemContent } from "@/components/ui/item";
 import { useTranslation } from "@/i18n";
 import { SettingRow } from "@/views/settings/controls";
@@ -10,9 +11,7 @@ export function DataFolderSettings({ path, onOpen, onCopy }: PathProps) {
 		<SettingRow title={t("settings.data.title")} help={t("settings.data.hint")}>
 			<Item variant="outline" size="sm" className="min-w-0">
 				<ItemContent className="min-w-0">
-					<span className="text-muted-foreground min-w-0 truncate font-mono text-xs" title={path || undefined}>
-						{path}
-					</span>
+					<PathText path={path} className="text-muted-foreground" />
 				</ItemContent>
 				<ItemActions>
 					<PathActions path={path} onOpen={onOpen} onCopy={onCopy} />

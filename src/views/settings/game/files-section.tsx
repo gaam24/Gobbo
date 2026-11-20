@@ -43,6 +43,7 @@ export function FilesSection({
 					<Input
 						id="game-root"
 						value={gameRoot}
+						title={gameRoot || undefined}
 						onChange={(event) => setGameRoot(event.currentTarget.value)}
 						onBlur={onCommit}
 						onKeyDown={commitOnEnter}
@@ -64,6 +65,7 @@ export function FilesSection({
 						<Input
 							id="settings-dir"
 							value={settingsDir}
+							title={settingsDir || undefined}
 							onChange={(event) => setSettingsDir(event.currentTarget.value)}
 							onBlur={onCommit}
 							onKeyDown={commitOnEnter}
@@ -86,6 +88,7 @@ export function FilesSection({
 						<Input
 							id="mods-root"
 							value={modsRoot}
+							title={modsRoot || undefined}
 							onChange={(event) => setModsRoot(event.currentTarget.value)}
 							onBlur={onCommit}
 							onKeyDown={commitOnEnter}

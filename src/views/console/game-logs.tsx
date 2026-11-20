@@ -1,6 +1,7 @@
 import { cn } from "cn";
 import { useState } from "react";
 import type { RunReport } from "@/bindings";
+import { PathText } from "@/components/app/path-text";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/i18n";
 import { formatTime } from "@/lib/mods";
@@ -172,7 +173,7 @@ export function GameLogs({ report }: { report: RunReport }) {
 							{copied ? t("console.logCopied") : t("console.logCopy")}
 						</Button>
 					</div>
-					<p className="text-muted-foreground shrink-0 truncate font-mono text-xs">{selected.path}</p>
+					<PathText path={selected.path} className="text-muted-foreground shrink-0" />
 					<pre className="bg-muted min-h-40 flex-1 overflow-auto rounded-lg border p-3 font-mono text-xs break-all whitespace-pre-wrap">
 						{selected.lines.length > 0 ? selected.lines.join("\n") : t("console.logEmptyFile")}
 					</pre>

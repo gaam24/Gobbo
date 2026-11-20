@@ -2,6 +2,7 @@ import { cn } from "cn";
 import { FileSearch, ShieldCheck } from "lucide-react";
 import type { IntegrityStatus, ModDetails as ModDetailsData } from "@/bindings";
 import { BoxList, BoxListRow } from "@/components/app/content-blocks";
+import { PathText } from "@/components/app/path-text";
 import { StatusBadge, type StatusTone } from "@/components/app/status-badge";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader } from "@/components/ui/empty";
@@ -81,7 +82,7 @@ export function FilesTab({
 				{files.map((file) => (
 					<BoxListRow key={file.path} className="py-2">
 						<ItemContent className="gap-0.5">
-							<span className="truncate font-mono text-xs">{file.path}</span>
+							<PathText path={file.path} />
 							<span className="flex min-w-0 items-center gap-2 text-xs">
 								<span aria-hidden className={cn("size-2 shrink-0 rounded-full", FILE_STATE[file.state].dot)} />
 								<span className={cn("min-w-0 truncate", FILE_STATE[file.state].text)}>{translate(file.result)}</span>

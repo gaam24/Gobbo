@@ -3,6 +3,7 @@ import { type ReactNode, useDeferredValue, useRef, useState } from "react";
 
 import { useWorkspace } from "@/app/contexts/workspace-context";
 import { commands } from "@/bindings";
+import { PathText } from "@/components/app/path-text";
 import { DialogCloseFooter, ModalDialog } from "@/components/modal-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -96,9 +97,7 @@ export function ConflictExplorerDialog({ gameId, onClose }: { gameId: string; on
 							>
 								<div className="flex items-center gap-3">
 									<div className="grid min-w-0 flex-1 gap-0.5">
-										<span className="truncate font-mono text-xs" title={entry.path}>
-											{entry.path}
-										</span>
+										<PathText path={entry.path} />
 										<span className="text-muted-foreground truncate text-xs">
 											{t("conflicts.overrides", {
 												winner: nameOf(entry.winner),

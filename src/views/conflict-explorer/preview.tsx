@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { useState } from "react";
 
 import { commands } from "@/bindings";
+import { PathText } from "@/components/app/path-text";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useTranslation } from "@/i18n";
@@ -55,9 +56,7 @@ export function ConflictPreviewPanel({
 				<Button variant="ghost" size="sm" onClick={onBack}>
 					<ArrowLeft /> {t("conflicts.back")}
 				</Button>
-				<span className="text-muted-foreground min-w-0 flex-1 truncate font-mono text-xs" title={path}>
-					{path}
-				</span>
+				<PathText path={path} className="text-muted-foreground flex-1" />
 				{families.length > 1 && (
 					<Select value={family} onValueChange={setFamily}>
 						<SelectTrigger className="h-8 w-48 text-xs" aria-label={t("conflicts.copy")}>

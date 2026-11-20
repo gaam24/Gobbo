@@ -1,6 +1,7 @@
 import { ArrowDown, ArrowDownRight, ArrowUp, ArrowUpRight } from "lucide-react";
 import type { ModDetails as ModDetailsData, Status } from "@/bindings";
 import { BoxList, BoxListRow, SectionHeading } from "@/components/app/content-blocks";
+import { PathText } from "@/components/app/path-text";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader } from "@/components/ui/empty";
 import { ItemContent } from "@/components/ui/item";
@@ -115,9 +116,7 @@ export function FileWinners({ modId, conflicts, status, canChoose, onSetWinner }
 					return (
 						<BoxListRow key={conflict.path}>
 							<ItemContent className="gap-1">
-								<span className="truncate font-mono text-xs" title={conflict.path}>
-									{conflict.path}
-								</span>
+								<PathText path={conflict.path} />
 								<span className="text-muted-foreground text-xs">
 									{wins ? t("mods.winners.wins") : t("mods.winners.loses", { name: nameOf(conflict.winner) })}
 								</span>

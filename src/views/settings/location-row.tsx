@@ -1,3 +1,4 @@
+import { PathText } from "@/components/app/path-text";
 import { Item, ItemActions, ItemContent } from "@/components/ui/item";
 import { PathActions } from "@/views/settings/path-actions";
 
@@ -20,9 +21,11 @@ export function LocationRow({
 			<li>
 				<ItemContent className="min-w-0 gap-0.5 md:flex-row md:items-center md:gap-4">
 					<span className="text-sm md:w-40 md:shrink-0">{label}</span>
-					<span className="text-muted-foreground min-w-0 flex-1 truncate font-mono text-xs" title={path || undefined}>
-						{path || emptyHint}
-					</span>
+					{path ? (
+						<PathText path={path} className="text-muted-foreground flex-1" />
+					) : (
+						<span className="text-muted-foreground min-w-0 flex-1 truncate font-mono text-xs">{emptyHint}</span>
+					)}
 				</ItemContent>
 				<ItemActions>
 					<PathActions path={path} onOpen={onOpen} onCopy={onCopy} />

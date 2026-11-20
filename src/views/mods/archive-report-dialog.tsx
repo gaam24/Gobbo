@@ -2,6 +2,7 @@ import { CircleAlert } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { commands, type SkipReason } from "@/bindings";
 import { BoxList, BoxListRow, SectionHeading } from "@/components/app/content-blocks";
+import { PathText } from "@/components/app/path-text";
 import { DialogCloseFooter, ModalDialog } from "@/components/modal-dialog";
 import { FieldError } from "@/components/ui/field";
 import { ItemContent, ItemTitle } from "@/components/ui/item";
@@ -87,8 +88,8 @@ function FileList({ title, files }: { title: string; files: string[] }) {
 				{files.map((path) => (
 					<BoxListRow key={path}>
 						<ItemContent className="min-w-0">
-							<ItemTitle className="w-full truncate font-mono text-xs font-normal" title={path}>
-								{path}
+							<ItemTitle className="w-full font-normal">
+								<PathText path={path} />
 							</ItemTitle>
 						</ItemContent>
 					</BoxListRow>

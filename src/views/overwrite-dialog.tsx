@@ -2,6 +2,7 @@ import { FolderOpen } from "lucide-react";
 import { useState } from "react";
 import { commands } from "@/bindings";
 import { BoxList, BoxListRow } from "@/components/app/content-blocks";
+import { PathText } from "@/components/app/path-text";
 import { ConfirmButton } from "@/components/confirm-button";
 import { closeThen, ModalDialog } from "@/components/modal-dialog";
 import { Button } from "@/components/ui/button";
@@ -57,7 +58,9 @@ export function OverwriteDialog({
 						{view.files.map((file) => (
 							<BoxListRow key={file.path}>
 								<ItemContent className="min-w-0 flex-row items-center gap-3">
-									<ItemTitle className="min-w-0 flex-1 truncate font-mono text-xs font-normal">{file.path}</ItemTitle>
+									<ItemTitle className="min-w-0 flex-1 font-normal">
+										<PathText path={file.path} />
+									</ItemTitle>
 									<ItemDescription className="shrink-0 font-mono text-xs tabular-nums">{formatSize(file.size_kb, locale)}</ItemDescription>
 								</ItemContent>
 							</BoxListRow>

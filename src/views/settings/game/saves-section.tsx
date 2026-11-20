@@ -2,6 +2,7 @@ import { FilePlus2, FolderOpen, FolderPlus, Trash2, Undo2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { Status } from "@/bindings";
 import { HelpHint } from "@/components/app/help-hint";
+import { PathText } from "@/components/app/path-text";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -144,9 +145,7 @@ export function SavesSection({
 								<Item asChild key={path} variant="outline" size="sm" className="min-w-0">
 									<li>
 										<ItemContent className="min-w-0">
-											<span className="min-w-0 truncate font-mono text-xs" title={path}>
-												{path}
-											</span>
+											<PathText path={path} />
 										</ItemContent>
 										<ItemActions>
 											<Button
@@ -172,9 +171,7 @@ export function SavesSection({
 									<Item asChild key={path} size="xs" variant="muted" className="py-1">
 										<li>
 											<ItemContent>
-												<span className="truncate font-mono text-xs" title={path}>
-													{path}
-												</span>
+												<PathText path={path} />
 											</ItemContent>
 										</li>
 									</Item>
