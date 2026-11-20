@@ -727,19 +727,22 @@ export function useGameActions({
 	const addProfileData = (path: string) => settingsChange((gameId) => commands.addProfileData(gameId, path));
 	const removeProfileData = (path: string) => settingsChange((gameId) => commands.removeProfileData(gameId, path));
 
-	/// The user-data choice belongs to the active profile, so it joins the profile queue. The answer is the fresh
-	/// status, which carries the new choice and the effective redirect/copy mode.
-	const setProfileUserData = (set: string, isolated: boolean) =>
+	/// A change to the active profile of the shown game. It joins the profile queue; the answer is the fresh status.
+	const profileChange = (call: (gameId: string, profile: string) => Promise<CommandResult<Status>>, notice: string) =>
 		queued(async (gameId) => {
 			const profile = activeProfileId(gameId);
 
 			if (!profile) return;
-			const fresh = await unwrap(commands.setProfileUserData(gameId, profile, set, isolated));
+			const fresh = await unwrap(call(gameId, profile));
 
 			if (!currentStatus(gameId)) return;
 			setStatusFor(gameId, fresh);
-			notify(t("notice.userDataSaved"));
+			notify(notice);
 		});
+
+	/// The user-data choice belongs to the active profile; the fresh status carries the effective redirect/copy mode.
+	const setProfileUserData = (set: string, isolated: boolean) =>
+		profileChange((gameId, profile) => commands.setProfileUserData(gameId, profile, set, isolated), t("notice.userDataSaved"));
 
 	/// The size of the profile's own data for one set, read on demand. A read does not join the queue.
 	const userDataSize = (set: string): Promise<number> => {
@@ -752,19 +755,9 @@ export function useGameActions({
 		return unwrap(commands.userDataSize(gameId, profile, set));
 	};
 
-	/// Moves the profile's layer back into the game folder and makes the set shared. A profile change, so it joins the
-	/// queue; the answer is the fresh status with the set shown as shared.
+	/// Moves the profile's layer back into the game folder and makes the set shared.
 	const moveProfileUserData = (set: string) =>
-		queued(async (gameId) => {
-			const profile = activeProfileId(gameId);
-
-			if (!profile) return;
-			const fresh = await unwrap(commands.moveProfileUserData(gameId, profile, set));
-
-			if (!currentStatus(gameId)) return;
-			setStatusFor(gameId, fresh);
-			notify(t("notice.userDataMoved"));
-		});
+		profileChange((gameId, profile) => commands.moveProfileUserData(gameId, profile, set), t("notice.userDataMoved"));
 
 	/// A new profile becomes the one shown, so the user can fill it at once. Creating it changes nothing on disk.
 	const createProfile = (name: string, copyFrom: string | null, copyData = false) =>
