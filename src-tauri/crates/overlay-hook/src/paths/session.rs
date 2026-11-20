@@ -113,9 +113,10 @@ fn long_name(path: &Path) -> Option<PathBuf> {
     }
 }
 
-/// The 8.3 form of a path, when it exists and differs from the long form. `None` when the volume has 8.3 names disabled
-/// (Windows returns the long form) or the path cannot be shortened.
-fn short_path_units(root: &Path) -> Option<Vec<u16>> {
+/// The 8.3 form of a path as plain UTF-16 units, when it exists and differs from the long form. `None` when the volume
+/// has 8.3 names disabled (Windows returns the long form) or the path cannot be shortened. Both this module's name
+/// classification and the handle mapping cache it at install so neither has to ask Windows during a call.
+pub(crate) fn short_path_units(root: &Path) -> Option<Vec<u16>> {
     let mut buffer = [0u16; 1024];
     let name = wide(root.as_os_str());
     // SAFETY: `name` is NUL-terminated, and the buffer holds 1024 writable units.

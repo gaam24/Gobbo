@@ -63,7 +63,7 @@ pub(crate) use prune::prune_old_files;
 pub(crate) use ring::{layer as decision_layer, open as open_ring, record as record_decision};
 pub(crate) use session::{HookStatus, Timeline, write as write_session};
 pub(crate) use settings::settings;
-pub(crate) use trace_buffer::{allow_flusher, flush_trace, trace_line};
+pub(crate) use trace_buffer::{allow_flusher, trace_line};
 
 /// Starts the threads that wait for the program: the crash filter thread and, in a dev build, the trace thread. They start
 /// after the detours are enabled, so that the install runs with one thread in the process and the enable needs no suspension.

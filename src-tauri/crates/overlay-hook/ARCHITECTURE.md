@@ -134,9 +134,9 @@ CreateProcessW (launcher, CREATE_SUSPENDED)
        - preserve LastError/status
        - final-path and module-path mapping comes from the real layer path; there is no handle table
   -> process exit
-       - flush the ring
-       - write the final status
-       - no locks on DLL_PROCESS_DETACH when lpvReserved != null
+       - no flush: every ring record is a complete append
+       - no final status: session.json was written once at install
+       - nothing on DLL_PROCESS_DETACH: no locks, no I/O; dynamic unload of the hook is not a supported operation
 ```
 
 `CreateProcessInternalW` repeats the load for each child: start suspended, rewrite the child's static imports whose DLL

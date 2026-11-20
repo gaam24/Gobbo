@@ -79,7 +79,7 @@ use std::sync::OnceLock;
 use gobbo_overlay_core::MountConfig;
 use windows_sys::Win32::Foundation::CloseHandle;
 use windows_sys::Win32::System::LibraryLoader::DisableThreadLibraryCalls;
-use windows_sys::Win32::System::SystemServices::{DLL_PROCESS_ATTACH, DLL_PROCESS_DETACH};
+use windows_sys::Win32::System::SystemServices::DLL_PROCESS_ATTACH;
 use windows_sys::Win32::System::Threading::{EVENT_MODIFY_STATE, OpenEventW, SetEvent};
 
 use crate::detours::{ESSENTIAL, PROCESS, PROCESS_INTERNAL};
@@ -90,7 +90,7 @@ use trace::log;
 static INIT: OnceLock<bool> = OnceLock::new();
 
 /// `DllMain`: only records the module and turns off thread notifications. The loader lock is held here, so no file I/O,
-/// allocation, logging or detour installation happens in this function.
+/// allocation, logging or detour installation happens in this function. Both detach paths do nothing.
 ///
 /// # Safety
 /// Called by the Windows loader with this DLL's module handle.
@@ -98,19 +98,16 @@ static INIT: OnceLock<bool> = OnceLock::new();
 pub unsafe extern "system" fn DllMain(
     module: *mut c_void,
     reason: u32,
-    reserved: *mut c_void,
+    _reserved: *mut c_void,
 ) -> i32 {
     if reason == DLL_PROCESS_ATTACH {
         diag::remember_own(module);
         // SAFETY: `module` is this DLL's module handle, and the call only turns off thread notifications.
         unsafe { DisableThreadLibraryCalls(module) };
-    } else if reason == DLL_PROCESS_DETACH {
-        // During process termination the loader has already torn down the other threads; taking the trace locks here
-        // can deadlock. The flusher thread and the operating system handle the lines that are still buffered.
-        if reserved.is_null() {
-            diag::flush_trace();
-        }
     }
+    // DLL_PROCESS_DETACH does nothing on either path: dynamic unload is not a supported operation. The installed
+    // hooks and the two background threads outlive it, the OS reclaims everything at process death, and the trace
+    // tail is a dev artifact lost by design. A lock or I/O here could deadlock under the loader lock.
 
     1
 }

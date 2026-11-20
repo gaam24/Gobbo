@@ -1,4 +1,4 @@
-﻿//! The paths a handle has: the path Windows gives it in a layer, the path the program sees (the guest path of the
+//! The paths a handle has: the path Windows gives it in a layer, the path the program sees (the guest path of the
 //! mount that serves it), and the game folder in the two forms a program can ask for.
 
 use std::ffi::c_void;
@@ -14,6 +14,7 @@ use windows_sys::Win32::Storage::FileSystem::{
 };
 
 use crate::guard::Guard;
+use crate::paths::short_path_units;
 use crate::state::{self, Mount};
 use crate::text::wide;
 use crate::win32::PreserveLastError;
@@ -28,6 +29,13 @@ pub(crate) enum LayerKind {
     InLayer,
     /// A path outside every mount; the call passes through.
     Outside,
+}
+
+/// The 8.3 spelling of a cached path in the three shapes the comparisons use. Built at install, never rebuilt.
+struct CachedShort {
+    plain: String,
+    verbatim: String,
+    units: Vec<u16>,
 }
 
 /// The cached text of one mount: its guest path and the layer folders in the forms the handle APIs return.
@@ -45,6 +53,12 @@ struct MountText {
     root_units: Vec<u16>,
     upper_units: Vec<u16>,
     staging_units: Option<Vec<u16>>,
+    /// The same prefixes under their 8.3 spelling. A short incoming path matches these; the answer is still built from
+    /// the long guest above, so the caller sees one canonical path.
+    guest_short: Option<CachedShort>,
+    root_short: Option<CachedShort>,
+    upper_short: Option<CachedShort>,
+    staging_short: Option<CachedShort>,
     guest_nt: OnceLock<Option<String>>,
 }
 
@@ -52,6 +66,16 @@ impl MountText {
     fn new(mount: &'static Mount) -> Self {
         let plain = |path: &Path| path.to_string_lossy().into_owned();
         let units = |text: &str| text.encode_utf16().collect();
+        let short = |path: &Path| {
+            let short_units = short_path_units(path)?;
+            let plain = String::from_utf16_lossy(&short_units);
+            let verbatim = verbatim(Path::new(&plain));
+            Some(CachedShort {
+                units: verbatim.encode_utf16().collect(),
+                verbatim,
+                plain,
+            })
+        };
         let guest_verbatim = verbatim(&mount.guest);
         let root_verbatim = verbatim(&mount.layers.root);
         let upper_verbatim = verbatim(&mount.layers.upper);
@@ -70,6 +94,10 @@ impl MountText {
             staging: mount.layers.staging.as_deref().map(plain),
             staging_units: staging_verbatim.as_deref().map(units),
             staging_verbatim,
+            guest_short: short(&mount.guest),
+            root_short: short(&mount.layers.root),
+            upper_short: short(&mount.layers.upper),
+            staging_short: mount.layers.staging.as_deref().and_then(short),
             guest_nt: OnceLock::new(),
         }
     }
@@ -122,16 +150,33 @@ pub(crate) fn layer_path_kind(handle: *mut c_void) -> Option<(LayerKind, String)
     Some((kind, String::from_utf16_lossy(&buffer[..length])))
 }
 
+/// Tries a cached long prefix first, then its 8.3 spelling. No allocation; the primitives only fold case, so the two
+/// spellings stay a call-site decision. `None` for a layer the mount does not have.
+fn strip_layer_units<'a>(
+    path: &'a [u16],
+    long: Option<&[u16]>,
+    short: Option<&[u16]>,
+) -> Option<&'a [u16]> {
+    long.and_then(|long| strip_prefix_ci_units(path, long))
+        .or_else(|| short.and_then(|short| strip_prefix_ci_units(path, short)))
+}
+
+/// The string form of `strip_layer_units`, for the answers the hook already holds as text.
+fn strip_layer_str<'a>(path: &'a str, long: Option<&str>, short: Option<&str>) -> Option<&'a str> {
+    long.and_then(|long| strip_prefix_ci(path, long))
+        .or_else(|| short.and_then(|short| strip_prefix_ci(path, short)))
+}
+
 /// Whether a final path is inside any mount's layers, given the cached mount text.
 fn classify_kind(path: &[u16], mounts: &[MountText]) -> LayerKind {
     for text in mounts {
-        if strip_prefix_ci_units(path, &text.upper_units).is_some()
-            || strip_prefix_ci_units(path, &text.root_units).is_some()
-            || text
-                .staging_units
-                .as_deref()
-                .is_some_and(|staging| strip_prefix_ci_units(path, staging).is_some())
-            || strip_prefix_ci_units(path, &text.guest_units).is_some()
+        let in_layer = |long: Option<&[u16]>, short: Option<&CachedShort>| {
+            strip_layer_units(path, long, short.map(|short| short.units.as_slice())).is_some()
+        };
+        if in_layer(Some(&text.upper_units), text.upper_short.as_ref())
+            || in_layer(Some(&text.root_units), text.root_short.as_ref())
+            || in_layer(text.staging_units.as_deref(), text.staging_short.as_ref())
+            || in_layer(Some(&text.guest_units), text.guest_short.as_ref())
         {
             return LayerKind::InLayer;
         }
@@ -175,12 +220,23 @@ pub(crate) fn program_path(handle: *mut c_void) -> Option<String> {
     Some(strip_verbatim_str(&path).to_string())
 }
 
+/// `relative_to` on the long layer path, then on its 8.3 spelling. Both produce the same relative tail.
+fn relative_to_either(base: &str, short: Option<&str>, path: &str) -> Option<String> {
+    relative_to(base, path).or_else(|| short.and_then(|short| relative_to(short, path)))
+}
+
 /// The mount and relative path when `path` is in the upper layer of a mount. `None` when it is elsewhere.
 pub(crate) fn relative_in_upper(path: &str) -> Option<(&'static Mount, String)> {
     let text = mount_text()?;
     let path = strip_verbatim_str(path);
-    text.iter()
-        .find_map(|mount| relative_to(&mount.upper, path).map(|rel| (mount.mount, rel)))
+    text.iter().find_map(|mount| {
+        relative_to_either(
+            &mount.upper,
+            mount.upper_short.as_ref().map(|short| short.plain.as_str()),
+            path,
+        )
+        .map(|rel| (mount.mount, rel))
+    })
 }
 
 /// The mount and relative path when `path` is in a lower layer. The upper layer is excluded because a handle there may
@@ -197,19 +253,34 @@ pub(crate) fn relative_in_layers(path: &str) -> Option<(&'static Mount, String)>
     let text = mount_text()?;
     let path = strip_verbatim_str(path);
     text.iter().find_map(|mount| {
-        relative_to(&mount.upper, path)
-            .or_else(|| relative_in_lower(mount, path))
-            .map(|rel| (mount.mount, rel))
+        relative_to_either(
+            &mount.upper,
+            mount.upper_short.as_ref().map(|short| short.plain.as_str()),
+            path,
+        )
+        .or_else(|| relative_in_lower(mount, path))
+        .map(|rel| (mount.mount, rel))
     })
 }
 
 /// The mount-relative path of `path` in the lower layers of `mount`: the root, then the staging layer.
 fn relative_in_lower(mount: &MountText, path: &str) -> Option<String> {
-    relative_to(&mount.root, path).or_else(|| {
-        mount
-            .staging
-            .as_deref()
-            .and_then(|staging| relative_to(staging, path))
+    relative_to_either(
+        &mount.root,
+        mount.root_short.as_ref().map(|short| short.plain.as_str()),
+        path,
+    )
+    .or_else(|| {
+        mount.staging.as_deref().and_then(|staging| {
+            relative_to_either(
+                staging,
+                mount
+                    .staging_short
+                    .as_ref()
+                    .map(|short| short.plain.as_str()),
+                path,
+            )
+        })
     })
 }
 
@@ -222,18 +293,42 @@ pub(crate) fn map_layer_path_cached(path: &str) -> Option<String> {
             return Some(path.to_string());
         }
 
-        for base in [&mount.upper_verbatim]
-            .into_iter()
-            .chain(mount.staging_verbatim.as_ref())
-            .chain(std::iter::once(&mount.root_verbatim))
+        if let Some(rest) = mount
+            .guest_short
+            .as_ref()
+            .and_then(|short| strip_prefix_ci(path, &short.verbatim))
         {
-            if let Some(rest) = strip_prefix_ci(path, base) {
+            return Some(format!("{}{rest}", mount.guest_verbatim));
+        }
+
+        for (long, short) in [
+            (
+                Some(mount.upper_verbatim.as_str()),
+                mount.upper_short.as_ref(),
+            ),
+            (
+                mount.staging_verbatim.as_deref(),
+                mount.staging_short.as_ref(),
+            ),
+            (
+                Some(mount.root_verbatim.as_str()),
+                mount.root_short.as_ref(),
+            ),
+        ] {
+            if let Some(rest) = strip_layer_str(path, long, short.map(|s| s.verbatim.as_str())) {
                 return Some(format!("{}{rest}", mount.guest_verbatim));
             }
         }
     }
 
     None
+}
+
+/// The `\\?\` form of a path's 8.3 spelling, for the explicit `Layers` form that has no session cache. Only the cold
+/// growing-buffer fallback calls this; the cached mapping uses the prefixes built at install.
+fn short_verbatim(path: &Path) -> Option<String> {
+    let units = short_path_units(path)?;
+    Some(verbatim(Path::new(&String::from_utf16_lossy(&units))))
 }
 
 /// The path in `path` with the spelling of a layer prefix replaced by the guest path. Both are the `\\?\` form. `None`
@@ -243,22 +338,41 @@ pub(crate) fn map_layer_path(path: &str, layers: &Layers) -> Option<String> {
     let root = verbatim(&layers.root);
     let upper = verbatim(&layers.upper);
     let staging = layers.staging.as_deref().map(verbatim);
-    map_layer_path_text(path, &root, &upper, staging.as_deref())
+    let root_short = short_verbatim(&layers.root);
+    let upper_short = short_verbatim(&layers.upper);
+    let staging_short = layers.staging.as_deref().and_then(short_verbatim);
+    map_layer_path_text(
+        path,
+        &root,
+        &upper,
+        staging.as_deref(),
+        root_short.as_deref(),
+        upper_short.as_deref(),
+        staging_short.as_deref(),
+    )
 }
 
-/// The body shared by the cached and explicit forms.
+/// The explicit form's body. Each base is tried long first, then under its 8.3 spelling; the answer always uses the
+/// long root, which is the path the game should see.
 fn map_layer_path_text(
     path: &str,
     root: &str,
     upper: &str,
     staging: Option<&str>,
+    root_short: Option<&str>,
+    upper_short: Option<&str>,
+    staging_short: Option<&str>,
 ) -> Option<String> {
     if strip_prefix_ci(path, root).is_some() {
         return Some(path.to_string());
     }
 
-    for base in [upper].into_iter().chain(staging) {
-        if let Some(rest) = strip_prefix_ci(path, base) {
+    if let Some(rest) = root_short.and_then(|short| strip_prefix_ci(path, short)) {
+        return Some(format!("{root}{rest}"));
+    }
+
+    for (long, short) in [(Some(upper), upper_short), (staging, staging_short)] {
+        if let Some(rest) = strip_layer_str(path, long, short) {
             return Some(format!("{root}{rest}"));
         }
     }
@@ -339,31 +453,52 @@ unsafe fn final_path_units_with(
     (length != 0 && length < buffer.len()).then_some(length)
 }
 
+/// Writes the long guest prefix and the tail of a matched layer path. A short layer spelling still answers long, so
+/// callers get one canonical guest path whatever spelling the process used. No allocation.
+fn write_guest_rest(guest: &[u16], rest: &[u16], out: &mut [u16]) -> Option<usize> {
+    let needed = guest.len() + rest.len();
+
+    if needed > out.len() {
+        return None;
+    }
+
+    out[..guest.len()].copy_from_slice(guest);
+    out[guest.len()..needed].copy_from_slice(rest);
+    Some(needed)
+}
+
 /// The guest path of the mount whose layers contain `path`, in the `\\?\` form, without building a `String`. `None` when
 /// the path is outside every layer or the guest path does not fit `out`.
 pub(crate) fn map_layer_path_units(path: &[u16], out: &mut [u16]) -> Option<usize> {
     let text = mount_text()?;
 
     for mount in text {
+        // A path already in the guest's own spelling is returned as it came. The 8.3 alias takes the branch below so the
+        // answer is always the long guest path, whatever the loader's spelling was.
         if strip_prefix_ci_units(path, &mount.guest_units).is_some() {
             return copy_units(path, out);
         }
 
-        for base in [mount.upper_units.as_slice()]
-            .into_iter()
-            .chain(mount.staging_units.as_deref())
-            .chain(std::iter::once(mount.root_units.as_slice()))
+        if let Some(rest) = mount
+            .guest_short
+            .as_ref()
+            .and_then(|short| strip_prefix_ci_units(path, &short.units))
         {
-            if let Some(rest) = strip_prefix_ci_units(path, base) {
-                let needed = mount.guest_units.len() + rest.len();
+            return write_guest_rest(&mount.guest_units, rest, out);
+        }
 
-                if needed > out.len() {
-                    return None;
-                }
-
-                out[..mount.guest_units.len()].copy_from_slice(&mount.guest_units);
-                out[mount.guest_units.len()..needed].copy_from_slice(rest);
-                return Some(needed);
+        for (long, short) in [
+            (
+                Some(mount.upper_units.as_slice()),
+                mount.upper_short.as_ref(),
+            ),
+            (mount.staging_units.as_deref(), mount.staging_short.as_ref()),
+            (Some(mount.root_units.as_slice()), mount.root_short.as_ref()),
+        ] {
+            if let Some(rest) =
+                strip_layer_units(path, long, short.map(|short| short.units.as_slice()))
+            {
+                return write_guest_rest(&mount.guest_units, rest, out);
             }
         }
     }
@@ -448,7 +583,14 @@ pub(crate) fn guest_nt_for_path_units(path: &[u16], out: &mut [u16]) -> Option<u
     let text = mount_text()?;
 
     for mount in text {
-        let Some(rest) = strip_prefix_ci_units(path, &mount.guest_units) else {
+        let Some(rest) = strip_layer_units(
+            path,
+            Some(&mount.guest_units),
+            mount
+                .guest_short
+                .as_ref()
+                .map(|short| short.units.as_slice()),
+        ) else {
             continue;
         };
         let nt = guest_nt(mount)?;
@@ -520,7 +662,14 @@ pub(crate) fn guest_nt_for_path(path: &str) -> Option<String> {
     let text = mount_text()?;
 
     for mount in text {
-        if let Some(rest) = strip_prefix_ci(path, &mount.guest_verbatim) {
+        if let Some(rest) = strip_layer_str(
+            path,
+            Some(&mount.guest_verbatim),
+            mount
+                .guest_short
+                .as_ref()
+                .map(|short| short.verbatim.as_str()),
+        ) {
             return Some(format!("{}{rest}", guest_nt(mount)?));
         }
     }
@@ -528,7 +677,8 @@ pub(crate) fn guest_nt_for_path(path: &str) -> Option<String> {
     None
 }
 
-/// The NT prefixes of one mount's layers, with the guest path they map to.
+/// The NT prefixes of one mount's layers, with the guest path they map to. A layer also has its 8.3 NT spelling, because
+/// a module the loader mapped by a short path can report a short NT name; the guest answer stays long in both cases.
 struct MountNt {
     guest: Vec<u16>,
     guest_rel: Option<Vec<u16>>,
@@ -537,6 +687,9 @@ struct MountNt {
     staging: Option<(Vec<u16>, Option<Vec<u16>>)>,
     root: Vec<u16>,
     root_rel: Option<Vec<u16>>,
+    upper_short: Option<(Vec<u16>, Option<Vec<u16>>)>,
+    staging_short: Option<(Vec<u16>, Option<Vec<u16>>)>,
+    root_short: Option<(Vec<u16>, Option<Vec<u16>>)>,
 }
 
 static LAYER_NT: OnceLock<Option<Vec<MountNt>>> = OnceLock::new();
@@ -566,6 +719,14 @@ fn layer_nt() -> Option<&'static [MountNt]> {
                     let rel = without_device(&units).map(<[u16]>::to_vec);
                     Some((units, rel))
                 });
+                // The short spellings are opened here, with the other layer folders, so no call pays for them. A volume
+                // without distinct 8.3 names simply has no short form to compare.
+                let short_nt =
+                    |short: Option<&CachedShort>| -> Option<(Vec<u16>, Option<Vec<u16>>)> {
+                        let units = nt_units(Path::new(&short?.plain))?;
+                        let rel = without_device(&units).map(<[u16]>::to_vec);
+                        Some((units, rel))
+                    };
                 mounts.push(MountNt {
                     guest_rel: without_device(&guest).map(<[u16]>::to_vec),
                     upper_rel: without_device(&upper).map(<[u16]>::to_vec),
@@ -574,6 +735,9 @@ fn layer_nt() -> Option<&'static [MountNt]> {
                     upper,
                     staging,
                     root,
+                    upper_short: short_nt(mount.upper_short.as_ref()),
+                    staging_short: short_nt(mount.staging_short.as_ref()),
+                    root_short: short_nt(mount.root_short.as_ref()),
                 });
             }
 
@@ -582,41 +746,65 @@ fn layer_nt() -> Option<&'static [MountNt]> {
         .as_deref()
 }
 
+/// Maps one layer's NT prefixes, long first then 8.3, to the guest NT form. No allocation for the comparison; only a
+/// match joins the cached guest prefix with the tail.
+fn map_nt_layer(
+    units: &[u16],
+    long: Option<(&[u16], Option<&[u16]>)>,
+    short: Option<(&[u16], Option<&[u16]>)>,
+    guest: &[u16],
+    guest_rel: Option<&[u16]>,
+) -> Option<Vec<u16>> {
+    for (base, rel) in [long, short].into_iter().flatten() {
+        if let Some(rest) = strip_prefix_ci_units(units, base) {
+            return Some(join_units(guest, rest));
+        }
+
+        if let (Some(rel), Some(guest_rel)) = (rel, guest_rel)
+            && let Some(rest) = strip_prefix_ci_units(units, rel)
+        {
+            return Some(join_units(guest_rel, rest));
+        }
+    }
+
+    None
+}
+
 /// Maps an NT layer path to the NT path of the guest folder. `None` when the path is not in a layer.
 pub(crate) fn map_layer_path_nt(units: &[u16]) -> Option<Vec<u16>> {
     let mounts = layer_nt()?;
 
     for mount in mounts {
-        for (base, rel, guest, guest_rel) in [
+        for (long, short) in [
             (
-                Some(mount.upper.as_slice()),
-                mount.upper_rel.as_deref(),
-                mount.guest.as_slice(),
-                mount.guest_rel.as_deref(),
+                Some((mount.upper.as_slice(), mount.upper_rel.as_deref())),
+                mount
+                    .upper_short
+                    .as_ref()
+                    .map(|(units, rel)| (units.as_slice(), rel.as_deref())),
             ),
             (
-                mount.staging.as_ref().map(|(units, _)| units.as_slice()),
-                mount.staging.as_ref().and_then(|(_, rel)| rel.as_deref()),
-                mount.guest.as_slice(),
-                mount.guest_rel.as_deref(),
+                mount
+                    .staging
+                    .as_ref()
+                    .map(|(units, rel)| (units.as_slice(), rel.as_deref())),
+                mount
+                    .staging_short
+                    .as_ref()
+                    .map(|(units, rel)| (units.as_slice(), rel.as_deref())),
             ),
             (
-                Some(mount.root.as_slice()),
-                mount.root_rel.as_deref(),
-                mount.guest.as_slice(),
-                mount.guest_rel.as_deref(),
+                Some((mount.root.as_slice(), mount.root_rel.as_deref())),
+                mount
+                    .root_short
+                    .as_ref()
+                    .map(|(units, rel)| (units.as_slice(), rel.as_deref())),
             ),
         ] {
-            if let Some(base) = base
-                && let Some(rest) = strip_prefix_ci_units(units, base)
+            if let Some(mapped) =
+                map_nt_layer(units, long, short, &mount.guest, mount.guest_rel.as_deref())
             {
-                return Some(join_units(guest, rest));
-            }
-
-            if let (Some(base), Some(rel)) = (rel, guest_rel)
-                && let Some(rest) = strip_prefix_ci_units(units, base)
-            {
-                return Some(join_units(rel, rest));
+                return Some(mapped);
             }
         }
     }

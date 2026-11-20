@@ -32,9 +32,9 @@ pub(crate) fn load() -> Option<MountConfig> {
     }))
 }
 
-/// Stores mount paths in the form Windows reports for handles and modules. A program may spell a folder with 8.3 names,
-/// but `GetFinalPathNameByHandleW` and `GetModuleFileNameW` answer with the long form; comparing a short prefix against
-/// a long answer would make every layer handle look external and leave the game folder untouched by the overlay.
+/// Stores mount paths in their long form, the form the handle APIs answer. A program may spell a folder with 8.3 names:
+/// handle APIs answer long, while the loader reports a module path in the spelling the process used. The hook compares
+/// both spellings against these prefixes and always answers with the long guest path.
 fn long_names(config: MountConfig) -> MountConfig {
     MountConfig {
         version: config.version,

@@ -17,7 +17,7 @@ mod target;
 pub(crate) use names::{
     Place, absolute, place, place_path, place_units, shown_name, unsafe_name, unsafe_units,
 };
-pub(crate) use session::{long_path, paths};
+pub(crate) use session::{long_path, paths, short_path_units};
 pub(crate) use spelling::{find_exact, with_pattern};
 pub(crate) use target::{
     Failure, Redirected, Target, copy_up, in_lower, is_visible_dir, make_write_target, missing,
