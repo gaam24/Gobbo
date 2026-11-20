@@ -9,6 +9,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use gobbo_overlay_core::Layers;
+use gobbo_overlay_decisions::ENV_IN_PROCESS_DUMP;
 use gobbo_overlay_launch::{Launch, spawn_hooked};
 
 /// The number of copy-up operations. Each one needs a file in the lower layer.
@@ -18,18 +19,70 @@ const MAX_WHITEOUT: u64 = 300;
 /// The number of directory listings. A listing walks every entry, so it runs fewer times.
 const MAX_LIST: u64 = 200;
 
+/// The command that builds a hook with every counter the benchmark reads.
+const HOOK_BUILD_COMMAND: &str =
+    "cargo build -p gobbo-overlay-hook --features \"bench-alloc bench-stats\"";
+
+/// The columns of one result row, in order. The header, the worker's row writer and the parser all derive from this
+/// list, so a column cannot be added in one place and lost in another.
+const COLUMNS: &[&str] = &[
+    "operation",
+    "p50",
+    "p95",
+    "p99",
+    "mean",
+    "worker_allocs",
+    "hook_allocs",
+    "hook_bytes",
+    "spelling",
+    "probes",
+    "locks",
+    "io",
+];
+
+/// The folder names of one mode's fixture. The fixture builder and the worker share them so a path is built from the
+/// layout instead of being inferred from another folder's name.
+mod layout {
+    /// The game folder, which is the worker's input in the baseline and active modes.
+    pub const GAME: &str = "game";
+    /// The mod layer, read above the game folder in the active mode.
+    pub const MODS: &str = "mods";
+    /// The writable upper layer.
+    pub const UPPER: &str = "upper";
+    /// The folder outside every mount, which is the worker's input in the pass-through mode.
+    pub const OUTSIDE: &str = "outside";
+    /// The folder with the small read fixture.
+    pub const READ: &str = "read";
+    /// The folder with the write fixture.
+    pub const WRITE: &str = "write";
+    /// The folder with the small listing fixture.
+    pub const LIST: &str = "list";
+    /// The folder with a thousand unmodified names.
+    pub const BIG: &str = "big";
+    /// The folder with a thousand names and two hundred overrides.
+    pub const BIG_MODDED: &str = "big_modded";
+    /// The folder with a thousand names and ten overrides.
+    pub const BIG_MODDED_FEW: &str = "big_modded_few";
+    /// The folder with non-ASCII names.
+    pub const NONASCII: &str = "zażółć";
+    /// The folder with the copy-up fixture.
+    pub const LOWER: &str = "lower";
+    /// The folder with the whiteout fixture.
+    pub const DELETE: &str = "delete";
+}
+
 /// The switches that must stay off in the benchmark: they add file I/O or allocations unrelated to the hook path.
 const OFF_SWITCHES: [&str; 7] = [
     "GOBBO_OVERLAY_LOG",
     "GOBBO_OVERLAY_DIAG",
     "GOBBO_OVERLAY_CRASH",
-    "GOBBO_OVERLAY_DUMP",
+    ENV_IN_PROCESS_DUMP,
     "GOBBO_OVERLAY_RING",
     "GOBBO_OVERLAY_SESSION",
     "GOBBO_OVERLAY_CALLS",
 ];
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Mode {
     Baseline,
     PassThrough,
@@ -44,6 +97,16 @@ impl Mode {
             Self::Baseline => "baseline",
             Self::PassThrough => "pass-through",
             Self::Active => "active",
+        }
+    }
+
+    /// Parses the mode name a worker receives, so the worker never infers its behavior from a folder name.
+    fn parse(name: &str) -> Result<Self, Box<dyn Error>> {
+        match name {
+            "baseline" => Ok(Self::Baseline),
+            "pass-through" => Ok(Self::PassThrough),
+            "active" => Ok(Self::Active),
+            other => Err(format!("unknown worker mode: {other}").into()),
         }
     }
 }
@@ -61,10 +124,10 @@ impl Fixture {
     /// baseline and the pass-through mode run the same operations.
     fn prepare(base: &Path, iterations: u64) -> Result<Self, Box<dyn Error>> {
         let fixture = Self {
-            game: base.join("game"),
-            mods: base.join("mods"),
-            upper: base.join("upper"),
-            outside: base.join("outside"),
+            game: base.join(layout::GAME),
+            mods: base.join(layout::MODS),
+            upper: base.join(layout::UPPER),
+            outside: base.join(layout::OUTSIDE),
         };
 
         for dir in [
@@ -77,46 +140,55 @@ impl Fixture {
         }
 
         for root in [&fixture.game, &fixture.outside] {
-            write(root.join("read").join("a.bin"), b"read-root")?;
-            write(root.join("write").join("w.bin"), &[b'w'; 4096])?;
+            write(root.join(layout::READ).join("a.bin"), b"read-root")?;
+            write(root.join(layout::WRITE).join("w.bin"), &[b'w'; 4096])?;
         }
         // The active read sees the mod layer above the game's own file.
-        write(fixture.mods.join("read").join("a.bin"), b"read-mod")?;
+        write(fixture.mods.join(layout::READ).join("a.bin"), b"read-mod")?;
 
         for number in 0..64 {
             write(
-                fixture.game.join("list").join(format!("g{number}.txt")),
+                fixture
+                    .game
+                    .join(layout::LIST)
+                    .join(format!("g{number}.txt")),
                 b"x",
             )?;
             write(
-                fixture.outside.join("list").join(format!("o{number}.txt")),
+                fixture
+                    .outside
+                    .join(layout::LIST)
+                    .join(format!("o{number}.txt")),
                 b"x",
             )?;
         }
 
         for number in 0..1000 {
             write(
-                fixture.game.join("big").join(format!("b{number:04}.bin")),
+                fixture
+                    .game
+                    .join(layout::BIG)
+                    .join(format!("b{number:04}.bin")),
                 b"x",
             )?;
             write(
                 fixture
                     .outside
-                    .join("big")
+                    .join(layout::BIG)
                     .join(format!("b{number:04}.bin")),
                 b"x",
             )?;
             write(
                 fixture
                     .game
-                    .join("big_modded")
+                    .join(layout::BIG_MODDED)
                     .join(format!("b{number:04}.bin")),
                 b"x",
             )?;
             write(
                 fixture
                     .outside
-                    .join("big_modded")
+                    .join(layout::BIG_MODDED)
                     .join(format!("b{number:04}.bin")),
                 b"x",
             )?;
@@ -125,14 +197,14 @@ impl Fixture {
             write(
                 fixture
                     .game
-                    .join("big_modded_few")
+                    .join(layout::BIG_MODDED_FEW)
                     .join(format!("b{number:04}.bin")),
                 b"x",
             )?;
             write(
                 fixture
                     .outside
-                    .join("big_modded_few")
+                    .join(layout::BIG_MODDED_FEW)
                     .join(format!("b{number:04}.bin")),
                 b"x",
             )?;
@@ -142,7 +214,7 @@ impl Fixture {
             write(
                 fixture
                     .mods
-                    .join("big_modded")
+                    .join(layout::BIG_MODDED)
                     .join(format!("b{number:04}.bin")),
                 b"mod",
             )?;
@@ -152,7 +224,7 @@ impl Fixture {
             write(
                 fixture
                     .mods
-                    .join("big_modded_few")
+                    .join(layout::BIG_MODDED_FEW)
                     .join(format!("b{number:04}.bin")),
                 b"mod",
             )?;
@@ -160,16 +232,23 @@ impl Fixture {
 
         for number in 0..16 {
             write(
-                fixture.mods.join("list").join(format!("m{number}.txt")),
+                fixture
+                    .mods
+                    .join(layout::LIST)
+                    .join(format!("m{number}.txt")),
                 b"x",
             )?;
         }
         // Names outside ASCII: the fold rule must not build a `String` per entry on the common path.
         for root in [&fixture.game, &fixture.outside] {
-            write(root.join("zażółć").join("ąć.bin"), b"non-ascii")?;
+            write(root.join(layout::NONASCII).join("ąć.bin"), b"non-ascii")?;
 
             for number in 0..64 {
-                write(root.join("zażółć").join(format!("ąć{number:02}.bin")), b"x")?;
+                write(
+                    root.join(layout::NONASCII)
+                        .join(format!("ąć{number:02}.bin")),
+                    b"x",
+                )?;
             }
         }
 
@@ -177,7 +256,7 @@ impl Fixture {
             write(
                 fixture
                     .mods
-                    .join("zażółć")
+                    .join(layout::NONASCII)
                     .join(format!("ąć{number:02}.bin")),
                 b"mod",
             )?;
@@ -185,14 +264,17 @@ impl Fixture {
 
         for number in 0..iterations.min(MAX_COPY_UP) {
             for root in [&fixture.game, &fixture.outside] {
-                write(root.join("lower").join(format!("l{number}.bin")), b"lower")?;
+                write(
+                    root.join(layout::LOWER).join(format!("l{number}.bin")),
+                    b"lower",
+                )?;
             }
         }
 
         for number in 0..iterations.min(MAX_WHITEOUT) {
             for root in [&fixture.game, &fixture.outside] {
                 write(
-                    root.join("delete").join(format!("d{number}.bin")),
+                    root.join(layout::DELETE).join(format!("d{number}.bin")),
                     b"delete",
                 )?;
             }
@@ -221,6 +303,7 @@ fn write(path: PathBuf, contents: &[u8]) -> Result<(), Box<dyn Error>> {
 }
 
 /// One row of the worker's CSV result.
+#[derive(Debug, PartialEq)]
 struct Row {
     operation: String,
     p50: u64,
@@ -236,32 +319,45 @@ struct Row {
     io: f64,
 }
 
-/// Parses the worker's result file.
+/// Parses one data line. A line with the wrong field count is an error, not a missing measurement to skip.
+fn parse_row(line: &str) -> Result<Row, Box<dyn Error>> {
+    let fields: Vec<&str> = line.split(',').collect();
+
+    if fields.len() != COLUMNS.len() {
+        return Err(format!(
+            "expected {} fields ({}) but got {}: {line}",
+            COLUMNS.len(),
+            COLUMNS.join(","),
+            fields.len()
+        )
+        .into());
+    }
+
+    Ok(Row {
+        operation: fields[0].to_string(),
+        p50: fields[1].parse()?,
+        p95: fields[2].parse()?,
+        p99: fields[3].parse()?,
+        mean: fields[4].parse()?,
+        worker_allocs: fields[5].parse()?,
+        hook_allocs: fields[6].parse()?,
+        hook_bytes: fields[7].parse()?,
+        spelling: fields[8].parse()?,
+        probes: fields[9].parse()?,
+        locks: fields[10].parse()?,
+        io: fields[11].parse()?,
+    })
+}
+
+/// Parses the worker's result file and reports the position of any bad line.
 fn read_rows(path: &Path) -> Result<Vec<Row>, Box<dyn Error>> {
     let text = fs::read_to_string(path)?;
     let mut rows = Vec::new();
 
-    for line in text.lines().skip(1) {
-        let fields: Vec<&str> = line.split(',').collect();
-
-        if fields.len() != 12 {
-            continue;
-        }
-
-        rows.push(Row {
-            operation: fields[0].to_string(),
-            p50: fields[1].parse()?,
-            p95: fields[2].parse()?,
-            p99: fields[3].parse()?,
-            mean: fields[4].parse()?,
-            worker_allocs: fields[5].parse()?,
-            hook_allocs: fields[6].parse()?,
-            hook_bytes: fields[7].parse()?,
-            spelling: fields[8].parse()?,
-            probes: fields[9].parse()?,
-            locks: fields[10].parse()?,
-            io: fields[11].parse()?,
-        });
+    for (line_number, line) in text.lines().enumerate().skip(1) {
+        let row = parse_row(line)
+            .map_err(|error| format!("result line {} ({error})", line_number + 1))?;
+        rows.push(row);
     }
 
     Ok(rows)
@@ -351,14 +447,9 @@ fn run(
         for mode in Mode::ALL {
             let dir = base.join(format!("{round}-{}", mode.name()));
             let fixture = Fixture::prepare(&dir, iterations)?;
-            let input = if mode == Mode::PassThrough {
-                fixture.outside.clone()
-            } else {
-                fixture.game.clone()
-            };
             let result = dir.join("result.csv");
             let run = WorkerRun {
-                input: &input,
+                root: &dir,
                 iterations,
                 warmup,
                 result: &result,
@@ -385,7 +476,7 @@ fn run(
         measured.push(results);
     }
 
-    let results = aggregate(measured);
+    let results = aggregate(measured)?;
 
     if check_budgets {
         check(&results)?;
@@ -400,18 +491,38 @@ fn run(
     Ok(())
 }
 
-/// The median of the per-round rows. Every round has the same modes and operations in the same order.
-fn aggregate(rounds: Vec<Vec<(Mode, Vec<Row>)>>) -> Vec<(Mode, Vec<Row>)> {
+/// The rows of every mode in every measurement round.
+type Measured = Vec<Vec<(Mode, Vec<Row>)>>;
+/// The rows of every mode after taking the median across rounds.
+type Aggregated = Vec<(Mode, Vec<Row>)>;
+
+/// The median of the per-round rows. A missing mode or operation is a diagnosis, not an out-of-bounds panic.
+fn aggregate(rounds: Measured) -> Result<Aggregated, Box<dyn Error>> {
+    let first = rounds.first().ok_or("no rounds were measured")?;
     let mut merged = Vec::new();
 
-    for (mode_index, (mode, rows)) in rounds[0].iter().enumerate() {
+    for (mode_index, (mode, rows)) in first.iter().enumerate() {
         let mut merged_rows = Vec::new();
 
         for (operation_index, row) in rows.iter().enumerate() {
-            let values: Vec<&Row> = rounds
-                .iter()
-                .map(|round| &round[mode_index].1[operation_index])
-                .collect();
+            let mut values = Vec::with_capacity(rounds.len());
+
+            for (round_index, round) in rounds.iter().enumerate() {
+                let mode_rows = round.get(mode_index).ok_or_else(|| {
+                    format!("round {} has no {} mode", round_index + 1, mode.name())
+                })?;
+                let value = mode_rows.1.get(operation_index).ok_or_else(|| {
+                    format!(
+                        "round {} has no `{}` row for mode {} (row {})",
+                        round_index + 1,
+                        row.operation,
+                        mode.name(),
+                        operation_index + 1
+                    )
+                })?;
+                values.push(value);
+            }
+
             merged_rows.push(Row {
                 operation: row.operation.clone(),
                 p50: median_u64(values.iter().map(|row| row.p50)),
@@ -431,7 +542,7 @@ fn aggregate(rounds: Vec<Vec<(Mode, Vec<Row>)>>) -> Vec<(Mode, Vec<Row>)> {
         merged.push((*mode, merged_rows));
     }
 
-    merged
+    Ok(merged)
 }
 
 fn median_u64(values: impl Iterator<Item = u64>) -> u64 {
@@ -446,9 +557,9 @@ fn median_f64(values: impl Iterator<Item = f64>) -> f64 {
     values.get(values.len() / 2).copied().unwrap_or(0.0)
 }
 
-/// The arguments one worker run shares: where to work, how many times, and where to write the result.
+/// The arguments one worker run shares: the fixture root, how many times to run, and where to write the result.
 struct WorkerRun<'a> {
-    input: &'a Path,
+    root: &'a Path,
     iterations: u64,
     warmup: u64,
     result: &'a Path,
@@ -464,12 +575,11 @@ fn spawn_worker(
 ) -> Result<(), Box<dyn Error>> {
     let args = vec![
         "--worker".to_string(),
-        run.input.display().to_string(),
+        run.root.display().to_string(),
         run.iterations.to_string(),
         run.warmup.to_string(),
         run.result.display().to_string(),
-        // The baseline has no hook, so a missing counter is expected there and not a build mistake.
-        u8::from(mode != Mode::Baseline).to_string(),
+        mode.name().to_string(),
     ];
 
     match mode {
@@ -482,6 +592,9 @@ fn spawn_worker(
         }
         Mode::PassThrough | Mode::Active => {
             let layers = fixture.layers();
+            // The bench uses the legacy `Layers::to_env()` variables on purpose: it isolates the hook's own call
+            // behavior. The file-based session the app writes is covered by the integration suite, and nothing measured
+            // here happens before the hooks are installed.
             let mut env: Vec<(String, String)> = layers
                 .to_env()
                 .into_iter()
@@ -491,6 +604,8 @@ fn spawn_worker(
                 env.push((name.to_string(), "off".to_string()));
             }
 
+            // No early redirect, static imports, cwd or output pipe: the bench measures hooked file calls, not the
+            // app's launch orchestration (the integration suite owns that path).
             let launch = Launch {
                 program: exe,
                 args: &args,
@@ -526,8 +641,7 @@ fn hook_dll(exe: &Path) -> Result<PathBuf, Box<dyn Error>> {
         .flatten()
         .find(|path| path.is_file())
         .ok_or_else(|| {
-            "gobbo_overlay_hook.dll not found; run `cargo build -p gobbo-overlay-hook --features bench-alloc` first"
-                .into()
+            format!("gobbo_overlay_hook.dll not found; run `{HOOK_BUILD_COMMAND}` first").into()
         })
 }
 
@@ -659,23 +773,17 @@ fn run_main() -> Result<(), Box<dyn Error>> {
     }
 
     if first.as_deref() == Some("--worker") {
-        let dir = args.next().ok_or("--worker needs a directory")?;
+        let root = args.next().ok_or("--worker needs a fixture root")?;
         let iterations = args.next().ok_or("--worker needs iterations")?.parse()?;
         let warmup = args.next().ok_or("--worker needs warmup")?.parse()?;
         let result = args.next().ok_or("--worker needs a result file")?;
-        let hooked = match args.next().as_deref() {
-            Some("1") => true,
-            Some("0") | None => false,
-            Some(other) => {
-                return Err(format!("--worker hooked flag must be 0 or 1, not {other}").into());
-            }
-        };
+        let mode = Mode::parse(&args.next().ok_or("--worker needs a mode")?)?;
         return worker::run(
-            Path::new(&dir),
+            Path::new(&root),
             iterations,
             warmup,
             Path::new(&result),
-            hooked,
+            mode,
         );
     }
 
@@ -705,7 +813,7 @@ fn run_main() -> Result<(), Box<dyn Error>> {
             }
             "--help" | "-h" => {
                 println!(
-                    "overlay-bench [--iterations N] [--warmup N] [--rounds N] [--json] [--check]\noverlay-bench --ring\n\nBuild the hook with `cargo build -p gobbo-overlay-hook --features \"bench-alloc bench-stats\"` first."
+                    "overlay-bench [--iterations N] [--warmup N] [--rounds N] [--json] [--check]\noverlay-bench --ring\n\nBuild the hook with `{HOOK_BUILD_COMMAND}` first."
                 );
                 return Ok(());
             }

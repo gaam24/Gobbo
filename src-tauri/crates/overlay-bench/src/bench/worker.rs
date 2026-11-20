@@ -22,7 +22,7 @@ use windows_sys::Win32::System::LibraryLoader::{
     GetModuleFileNameW, GetModuleHandleW, GetProcAddress,
 };
 
-use super::{MAX_COPY_UP, MAX_LIST, MAX_WHITEOUT};
+use super::{COLUMNS, HOOK_BUILD_COMMAND, MAX_COPY_UP, MAX_LIST, MAX_WHITEOUT, Mode, layout};
 
 /// Every allocation of the worker process since the last reset.
 static WORKER_ALLOCATIONS: AtomicU64 = AtomicU64::new(0);
@@ -53,45 +53,61 @@ unsafe impl GlobalAlloc for CountingAllocator {
 #[global_allocator]
 static ALLOCATOR: CountingAllocator = CountingAllocator;
 
-/// The counters exported by a hook built with the `bench-alloc` feature.
+/// The counters exported by a hook built with the `bench-alloc` and `bench-stats` features.
 #[derive(Clone, Copy)]
 struct HookCounters {
     allocations: unsafe extern "C" fn() -> u64,
     bytes: Option<unsafe extern "C" fn() -> u64>,
     reset: unsafe extern "C" fn(),
-    spelling: Option<unsafe extern "C" fn() -> u64>,
-    probes: Option<unsafe extern "C" fn() -> u64>,
-    locks: Option<unsafe extern "C" fn() -> u64>,
-    io: Option<unsafe extern "C" fn() -> u64>,
-    reset_stats: Option<unsafe extern "C" fn()>,
+    spelling: unsafe extern "C" fn() -> u64,
+    probes: unsafe extern "C" fn() -> u64,
+    locks: unsafe extern "C" fn() -> u64,
+    io: unsafe extern "C" fn() -> u64,
+    reset_stats: unsafe extern "C" fn(),
+}
+
+/// The error for a hook that is loaded but cannot report the counters the budget checks read.
+fn missing_counter(name: &str) -> Box<dyn Error> {
+    format!("the loaded hook is missing {name}; build it with `{HOOK_BUILD_COMMAND}`").into()
 }
 
 impl HookCounters {
-    /// Finds the counters in the loaded hook DLL. `None` for the baseline and for a hook built without the feature.
-    fn find() -> Option<Self> {
+    /// Finds the counters in the loaded hook DLL. `None` when no hook is loaded (the baseline); fails hard when a hook
+    /// is loaded without the benchmark features, so a zeroed counter cannot pass a budget check.
+    fn find() -> Result<Option<Self>, Box<dyn Error>> {
         let name: Vec<u16> = "gobbo_overlay_hook.dll\0".encode_utf16().collect();
         // SAFETY: `name` is a NUL-terminated wide string.
         let module = unsafe { GetModuleHandleW(name.as_ptr()) };
 
         if module.is_null() {
-            return None;
+            return Ok(None);
         }
+
         // SAFETY: the addresses are looked up by their stable exported names in the loaded DLL.
-        let allocations = unsafe { export(module, b"gobbo_overlay_bench_allocations\0") }?;
+        let allocations = unsafe { export(module, b"gobbo_overlay_bench_allocations\0") }
+            .ok_or_else(|| missing_counter("gobbo_overlay_bench_allocations"))?;
         // SAFETY: the byte counter is optional; an older hook leaves it as `None`.
         let bytes = unsafe { export(module, b"gobbo_overlay_bench_alloc_bytes\0") };
-        // SAFETY: the same as `allocations`.
-        let reset = unsafe { export(module, b"gobbo_overlay_bench_reset\0") }?;
-        // SAFETY: the stats exports are optional; a hook without `bench-stats` simply leaves them as `None`.
-        let spelling = unsafe { export(module, b"gobbo_overlay_bench_spelling\0") };
-        let probes = unsafe { export(module, b"gobbo_overlay_bench_probes\0") };
-        // SAFETY: as `probes`.
-        let locks = unsafe { export(module, b"gobbo_overlay_bench_locks\0") };
-        // SAFETY: as `probes`.
-        let io = unsafe { export(module, b"gobbo_overlay_bench_io\0") };
-        // SAFETY: as `probes`.
-        let reset_stats = unsafe { export(module, b"gobbo_overlay_bench_reset_stats\0") };
-        Some(Self {
+        // SAFETY: as `allocations`.
+        let reset = unsafe { export(module, b"gobbo_overlay_bench_reset\0") }
+            .ok_or_else(|| missing_counter("gobbo_overlay_bench_reset"))?;
+        // SAFETY: as `allocations`.
+        let spelling = unsafe { export(module, b"gobbo_overlay_bench_spelling\0") }
+            .ok_or_else(|| missing_counter("gobbo_overlay_bench_spelling"))?;
+        // SAFETY: as `allocations`.
+        let probes = unsafe { export(module, b"gobbo_overlay_bench_probes\0") }
+            .ok_or_else(|| missing_counter("gobbo_overlay_bench_probes"))?;
+        // SAFETY: as `allocations`.
+        let locks = unsafe { export(module, b"gobbo_overlay_bench_locks\0") }
+            .ok_or_else(|| missing_counter("gobbo_overlay_bench_locks"))?;
+        // SAFETY: as `allocations`.
+        let io = unsafe { export(module, b"gobbo_overlay_bench_io\0") }
+            .ok_or_else(|| missing_counter("gobbo_overlay_bench_io"))?;
+        // SAFETY: as `allocations`.
+        let reset_stats = unsafe { export(module, b"gobbo_overlay_bench_reset_stats\0") }
+            .ok_or_else(|| missing_counter("gobbo_overlay_bench_reset_stats"))?;
+
+        Ok(Some(Self {
             allocations,
             bytes,
             reset,
@@ -100,7 +116,7 @@ impl HookCounters {
             locks,
             io,
             reset_stats,
-        })
+        }))
     }
 }
 
@@ -133,42 +149,66 @@ struct Stats {
 
 /// Runs every operation and writes the result file.
 pub(super) fn run(
-    input: &Path,
+    root: &Path,
     iterations: u64,
     warmup: u64,
     result: &Path,
-    hooked: bool,
+    mode: Mode,
 ) -> Result<(), Box<dyn Error>> {
-    let hook = HookCounters::find();
+    /// Closes a raw directory handle when it goes out of scope, including on an early error.
+    struct HandleGuard(*mut std::ffi::c_void);
 
-    if hooked && hook.is_none() {
-        eprintln!(
-            "overlay-bench: the hook has no allocation counters; build it with `--features \"bench-alloc bench-stats\"`"
-        );
+    impl Drop for HandleGuard {
+        fn drop(&mut self) {
+            if !self.0.is_null() && self.0 != INVALID_HANDLE_VALUE {
+                // SAFETY: the handle is owned by this guard and no other owner closes it.
+                unsafe { CloseHandle(self.0) };
+            }
+        }
     }
+
+    let hook = if mode == Mode::Baseline {
+        None
+    } else {
+        match HookCounters::find()? {
+            Some(hook) => Some(hook),
+            None => {
+                return Err(
+                    "the hook DLL is not loaded in a hooked worker; check the launch report".into(),
+                );
+            }
+        }
+    };
+
+    let game_folder = root.join(layout::GAME);
+    let outside_folder = root.join(layout::OUTSIDE);
+    let (input, expected_list, game_nt_row) = match mode {
+        Mode::Baseline => (game_folder.clone(), 64, true),
+        Mode::PassThrough => (outside_folder.clone(), 64, false),
+        Mode::Active => (game_folder.clone(), 80, true),
+    };
+
     // Make the relative-path operation resolve against the mode's input folder, not the benchmark's own folder.
-    let _ = std::env::set_current_dir(input);
-    let read = input.join("read").join("a.bin");
-    let write_path = input.join("write").join("w.bin");
-    // The game folder and the folder outside it are the two folders of the mode's fixture (see `Fixture`).
-    let base = input.parent().unwrap_or(input);
-    let game_folder = base.join("game");
-    let outside_folder = base.join("outside");
+    std::env::set_current_dir(&input).map_err(|error| {
+        format!(
+            "the benchmark could not change to {}: {error}",
+            input.display()
+        )
+    })?;
+    let read = input.join(layout::READ).join("a.bin");
+    let write_path = input.join(layout::WRITE).join("w.bin");
     let missing = input.join("missing").join("a.bin");
-    let list = input.join("list");
+    let list = input.join(layout::LIST);
     let lower: Vec<PathBuf> = (0..iterations.min(MAX_COPY_UP))
-        .map(|number| input.join("lower").join(format!("l{number}.bin")))
+        .map(|number| input.join(layout::LOWER).join(format!("l{number}.bin")))
         .collect();
     let deletes: Vec<PathBuf> = (0..iterations.min(MAX_WHITEOUT))
-        .map(|number| input.join("delete").join(format!("d{number}.bin")))
+        .map(|number| input.join(layout::DELETE).join(format!("d{number}.bin")))
         .collect();
     let buffer = [b'x'; 4096];
 
     let mut out = BufWriter::new(File::create(result)?);
-    writeln!(
-        out,
-        "operation,p50,p95,p99,mean,worker_allocs,hook_allocs,hook_bytes,spelling,probes,locks,io"
-    )?;
+    write_header(&mut out)?;
 
     let stats = measure(iterations, warmup, hook, |_| {
         let _ = File::open(&read);
@@ -181,7 +221,7 @@ pub(super) fn run(
     write_stats(&mut out, "open_read_relative", &stats)?;
 
     // A file that only the game folder has: the overlay read stays in the root layer and must not re-encode its name.
-    let root_read = input.join("write").join("w.bin");
+    let root_read = input.join(layout::WRITE).join("w.bin");
     let stats = measure(iterations, warmup, hook, |_| {
         let _ = File::open(&root_read);
     })?;
@@ -203,7 +243,7 @@ pub(super) fn run(
 
     // A handle outside every mount: the hook must write the program's path back without a `String`, a second system
     // call, or an allocation (the pass-through budget).
-    if let Ok(file) = File::open(outside_folder.join("read").join("a.bin")) {
+    if let Ok(file) = File::open(outside_folder.join(layout::READ).join("a.bin")) {
         let handle = file.as_raw_handle();
         let mut path = [0u16; 520];
         let stats = measure(iterations, warmup, hook, |_| {
@@ -232,28 +272,25 @@ pub(super) fn run(
     // NtCreateFile with a directory handle as the root: the name is joined onto the handle's path. The handle to a folder
     // outside every mount must not allocate in the hook; the handle to the game folder is redirected (active).
     if let Some(create) = nt_create_file() {
-        // The pass-through mode runs in the folder outside the game, so the row for the game folder is an active row only.
-        let active = input.file_name().is_some_and(|name| name == "game");
         let mut rows = vec![("open_nt_relative_outside", &outside_folder)];
 
-        if active {
+        if game_nt_row {
             rows.push(("open_nt_relative_game", &game_folder));
         }
 
         for (operation, folder) in rows {
             let root = open_folder(folder);
 
-            if root.is_null() {
+            if root.is_null() || root == INVALID_HANDLE_VALUE {
                 return Err(format!("the benchmark could not open {}", folder.display()).into());
             }
+            let _root = HandleGuard(root);
 
             let name: Vec<u16> = r"read\a.bin".encode_utf16().collect();
             let stats = measure(iterations, warmup, hook, |_| {
                 let _ = nt_open_relative(create, root, &name);
             })?;
             write_stats(&mut out, operation, &stats)?;
-            // SAFETY: the handle was opened by `open_folder` and is closed once.
-            unsafe { CloseHandle(root) };
         }
     }
 
@@ -300,11 +337,6 @@ pub(super) fn run(
 
     // The active game folder merges 64 game files and 16 mod files; the baseline process and the pass-through folder
     // see only the 64 game files.
-    let expected_list = if hooked && input.file_name().is_some_and(|name| name == "game") {
-        80
-    } else {
-        64
-    };
     let stats = measure(iterations.min(MAX_LIST), warmup, hook, |_| {
         if let Ok(entries) = fs::read_dir(&list) {
             let count = entries.count();
@@ -315,7 +347,7 @@ pub(super) fn run(
 
     // A folder of 1000 files that only the game folder has (or only the folder outside it): the listing is merged
     // from the layers, and the root layer is read entry by entry.
-    let big = input.join("big");
+    let big = input.join(layout::BIG);
     let stats = measure(iterations.min(MAX_LIST), warmup, hook, |_| {
         if let Ok(entries) = fs::read_dir(&big) {
             let count = entries.count();
@@ -326,7 +358,7 @@ pub(super) fn run(
 
     // The same 1000 game names, with 200 of them overridden by the mod layer. Every override asks the lower layers for
     // the spelling the game keeps, which is the cost the spelling rule adds to a modded listing.
-    let modded = input.join("big_modded");
+    let modded = input.join(layout::BIG_MODDED);
     let stats = measure(iterations.min(MAX_LIST), warmup, hook, |_| {
         if let Ok(entries) = fs::read_dir(&modded) {
             let count = entries.count();
@@ -337,7 +369,7 @@ pub(super) fn run(
 
     // The same 1000 game names with only ten overrides: exact lower-layer searches are cheaper than one root pass
     // when the root folder is much larger than the number of modded entries.
-    let modded_few = input.join("big_modded_few");
+    let modded_few = input.join(layout::BIG_MODDED_FEW);
     let stats = measure(iterations.min(MAX_LIST), warmup, hook, |_| {
         if let Ok(entries) = fs::read_dir(&modded_few) {
             let count = entries.count();
@@ -348,7 +380,7 @@ pub(super) fn run(
 
     // Polish names exercise the fold rule without a `String` on the common path: a prefix classification, a whiteout
     // check, and a duplicate check in the listing.
-    let nonascii = input.join("zażółć");
+    let nonascii = input.join(layout::NONASCII);
     let stats = measure(iterations, warmup, hook, |_| {
         let _ = fs::metadata(nonascii.join("ąć.bin"));
     })?;
@@ -365,6 +397,7 @@ pub(super) fn run(
     // streams in batches instead of materializing the whole folder.
     if let Some(query) = nt_query_directory_file() {
         let folder = open_directory(&big)?;
+        let _folder = HandleGuard(folder);
         let mut status_block = [0usize; 2];
         let mut entries = vec![0u8; 4096];
         let stats = measure(iterations.min(MAX_LIST), warmup, hook, |_| {
@@ -376,20 +409,16 @@ pub(super) fn run(
         })?;
         write_stats(&mut out, "list_nt_1000", &stats)?;
         // The same folder with 200 overrides: the merged snapshot, not the plain handle.
-        let modded = open_directory(&modded)?;
+        let modded_handle = open_directory(&modded)?;
+        let _modded = HandleGuard(modded_handle);
         let stats = measure(iterations.min(MAX_LIST), warmup, hook, |_| {
             assert_eq!(
-                nt_count(query, modded, &mut entries, &mut status_block),
+                nt_count(query, modded_handle, &mut entries, &mut status_block),
                 1000,
                 "the modded NT listing fixture changed"
             );
         })?;
         write_stats(&mut out, "list_nt_modded", &stats)?;
-        // SAFETY: the handles were opened by `open_directory` and are closed once.
-        unsafe {
-            CloseHandle(folder);
-            CloseHandle(modded);
-        }
     }
 
     out.flush()?;
@@ -420,12 +449,10 @@ fn measure(
         WORKER_ALLOCATIONS.store(0, Ordering::Relaxed);
 
         if let Some(hook) = hook {
-            // SAFETY: the exported reset takes no arguments.
-            unsafe { (hook.reset)() };
-
-            if let Some(reset) = hook.reset_stats {
-                // SAFETY: the exported stats reset takes no arguments.
-                unsafe { reset() };
+            // SAFETY: the exported resets take no arguments.
+            unsafe {
+                (hook.reset)();
+                (hook.reset_stats)();
             }
         }
 
@@ -443,25 +470,14 @@ fn measure(
                 bytes_total = bytes_total.saturating_add(unsafe { read() });
             }
 
-            if let Some(read) = hook.spelling {
-                // SAFETY: the exported counter takes no arguments.
-                spelling_total = spelling_total.saturating_add(unsafe { read() });
-            }
-
-            if let Some(read) = hook.probes {
-                // SAFETY: the exported counter takes no arguments.
-                probes_total = probes_total.saturating_add(unsafe { read() });
-            }
-
-            if let Some(read) = hook.locks {
-                // SAFETY: the exported counter takes no arguments.
-                locks_total = locks_total.saturating_add(unsafe { read() });
-            }
-
-            if let Some(read) = hook.io {
-                // SAFETY: the exported counter takes no arguments.
-                io_total = io_total.saturating_add(unsafe { read() });
-            }
+            // SAFETY: the exported counters take no arguments.
+            spelling_total = spelling_total.saturating_add(unsafe { (hook.spelling)() });
+            // SAFETY: as `spelling`.
+            probes_total = probes_total.saturating_add(unsafe { (hook.probes)() });
+            // SAFETY: as `spelling`.
+            locks_total = locks_total.saturating_add(unsafe { (hook.locks)() });
+            // SAFETY: as `spelling`.
+            io_total = io_total.saturating_add(unsafe { (hook.io)() });
         }
 
         histogram
@@ -485,23 +501,35 @@ fn measure(
     })
 }
 
-/// Writes one CSV row.
+/// Writes the CSV header from the shared column list.
+fn write_header(out: &mut impl Write) -> std::io::Result<()> {
+    writeln!(out, "{}", COLUMNS.join(","))
+}
+
+/// Writes one CSV row. The values line up with `COLUMNS`, which owns the schema and its width.
 fn write_stats(out: &mut impl Write, operation: &str, stats: &Stats) -> std::io::Result<()> {
-    writeln!(
-        out,
-        "{operation},{},{},{},{},{:.2},{:.2},{:.2},{:.2},{:.2},{:.2},{:.2}",
-        stats.p50,
-        stats.p95,
-        stats.p99,
-        stats.mean,
-        stats.worker_allocs,
-        stats.hook_allocs,
-        stats.hook_bytes,
-        stats.spelling,
-        stats.probes,
-        stats.locks,
-        stats.io
-    )
+    let values = [
+        operation.to_string(),
+        stats.p50.to_string(),
+        stats.p95.to_string(),
+        stats.p99.to_string(),
+        stats.mean.to_string(),
+        format!("{:.2}", stats.worker_allocs),
+        format!("{:.2}", stats.hook_allocs),
+        format!("{:.2}", stats.hook_bytes),
+        format!("{:.2}", stats.spelling),
+        format!("{:.2}", stats.probes),
+        format!("{:.2}", stats.locks),
+        format!("{:.2}", stats.io),
+    ];
+
+    if values.len() != COLUMNS.len() {
+        return Err(std::io::Error::other(
+            "the result row does not match the column schema",
+        ));
+    }
+
+    writeln!(out, "{}", values.join(","))
 }
 
 /// The `UNICODE_STRING` and `OBJECT_ATTRIBUTES` of an NT open. The pointers are plain pointers, so both bitnesses lay the
@@ -754,3 +782,72 @@ const NT_FILE_OPEN: u32 = 1;
 const NT_FILE_NON_DIRECTORY_FILE: u32 = 0x40;
 /// `FILE_SYNCHRONOUS_IO_NONALERT`: the I/O is synchronous (the NT create options).
 const NT_FILE_SYNCHRONOUS_IO_NONALERT: u32 = 0x20;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::bench::Row;
+
+    fn sample_stats() -> Stats {
+        Stats {
+            p50: 1_250,
+            p95: 2_500,
+            p99: 3_750,
+            mean: 2_000,
+            worker_allocs: 1.25,
+            hook_allocs: 2.5,
+            hook_bytes: 4.75,
+            spelling: 1.0,
+            probes: 3.25,
+            locks: 2.0,
+            io: 0.5,
+        }
+    }
+
+    #[test]
+    fn a_written_row_parses_back_to_the_same_stats() {
+        let mut out = Vec::new();
+        let stats = sample_stats();
+        write_stats(&mut out, "open_read", &stats).unwrap();
+        let line = String::from_utf8(out).unwrap();
+
+        let row = super::super::parse_row(line.trim_end()).unwrap();
+        assert_eq!(
+            row,
+            Row {
+                operation: "open_read".to_string(),
+                p50: stats.p50,
+                p95: stats.p95,
+                p99: stats.p99,
+                mean: stats.mean,
+                worker_allocs: stats.worker_allocs,
+                hook_allocs: stats.hook_allocs,
+                hook_bytes: stats.hook_bytes,
+                spelling: stats.spelling,
+                probes: stats.probes,
+                locks: stats.locks,
+                io: stats.io,
+            }
+        );
+    }
+
+    #[test]
+    fn a_row_with_the_wrong_field_count_is_refused() {
+        let mut out = Vec::new();
+        write_stats(&mut out, "open_read", &sample_stats()).unwrap();
+        let line = String::from_utf8(out).unwrap();
+        let short = line.trim_end().rsplit_once(',').unwrap().0;
+
+        let error = super::super::parse_row(short).unwrap_err();
+        assert!(error.to_string().contains(&COLUMNS.len().to_string()));
+        assert!(error.to_string().contains(short));
+    }
+
+    #[test]
+    fn mode_names_parse_into_the_worker_modes() {
+        assert_eq!(Mode::parse("baseline").unwrap(), Mode::Baseline);
+        assert_eq!(Mode::parse("pass-through").unwrap(), Mode::PassThrough);
+        assert_eq!(Mode::parse("active").unwrap(), Mode::Active);
+        assert!(Mode::parse("other").is_err());
+    }
+}
