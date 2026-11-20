@@ -51,7 +51,7 @@ pub(super) fn watch_game_folder(data: &Data) -> Option<(PathBuf, watch::Snapshot
 /// An overlay run writes no file into the game folder, so every change is a leak.
 pub(super) fn record_game_changes(data: &Data, root: &Path, before: &watch::Snapshot) {
     let after = watch::take(root);
-    let found = watch::changes(before, &after, &[]);
+    let found = watch::changes(before, &after);
     report::update(data, |r| {
         r.game_changes_total = u32::try_from(found.len()).unwrap_or(u32::MAX);
         r.game_changes = found.into_iter().take(MAX_GAME_CHANGES).collect();

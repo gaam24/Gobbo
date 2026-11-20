@@ -26,7 +26,7 @@ fn a_run_through_the_overlay_leaves_the_game_folder_unchanged() {
         )],
     );
     let after = watch::take(&root);
-    let changes = watch::changes(&before, &after, &[]);
+    let changes = watch::changes(&before, &after);
     assert!(changes.is_empty(), "{changes:?}");
     assert!(
         session
@@ -314,7 +314,7 @@ fn a_rebuilt_layer_starts_without_the_whiteouts_of_the_old_one() {
     undo(&target.journal_roots()).unwrap();
 
     // Other mods build the layer again, so the old whiteouts go.
-    let other = overlay_plan(&library, &[]);
+    let other = overlay_plan(&library);
     apply(&other, &library, &target).unwrap();
     assert!(!layers.whiteouts_file().exists());
     assert!(!layers.whiteouts_journal_file().exists());
@@ -548,7 +548,7 @@ fn writes_through_the_layer_when_spelled_in_another_case(name: &str, powershell:
     .unwrap();
     let after = watch::take(&root);
 
-    let changes = watch::changes(&before, &after, &[]);
+    let changes = watch::changes(&before, &after);
     assert!(changes.is_empty(), "{changes:?}");
     assert!(
         session

@@ -831,7 +831,6 @@ pub struct WatchFixture {
     dir: PathBuf,
     before: watch::Snapshot,
     after: watch::Snapshot,
-    expected: Vec<String>,
 }
 
 impl WatchFixture {
@@ -851,12 +850,7 @@ impl WatchFixture {
         std::fs::write(dir.join("d0/f0.bin"), b"changed").expect("a changed benchmark file");
         std::fs::write(dir.join("new.bin"), b"new").expect("a new benchmark file");
         let after = watch::take(&dir);
-        Self {
-            dir,
-            before,
-            after,
-            expected: Vec::new(),
-        }
+        Self { dir, before, after }
     }
 
     /// Records the folder again.
@@ -866,7 +860,7 @@ impl WatchFixture {
 
     /// Compares the two snapshots.
     pub fn changes(&self) -> usize {
-        watch::changes(&self.before, &self.after, &self.expected).len()
+        watch::changes(&self.before, &self.after).len()
     }
 }
 

@@ -208,7 +208,7 @@ fn sessions(seed: u64) -> (Vec<String>, Vec<String>) {
     )
     .unwrap();
     let after = watch::take(&root);
-    let changes = watch::changes(&before, &after, &[]);
+    let changes = watch::changes(&before, &after);
     assert!(
         changes.is_empty(),
         "seed {seed}: the game folder changed: {changes:?}"

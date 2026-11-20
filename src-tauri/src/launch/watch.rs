@@ -5,7 +5,6 @@
 
 use std::collections::BTreeMap;
 
-use rustc_hash::FxHashSet;
 use std::path::Path;
 use std::time::SystemTime;
 
@@ -65,19 +64,11 @@ pub fn take(root: &Path) -> Snapshot {
 }
 
 /// The changes from `before` to `after`, in path order. A folder counts as changed only when it appears or disappears:
-/// its own time moves whenever something inside it changes, and that would repeat every change below it. Paths in
-/// `expected` are left out, because Gobbo itself put them there.
-pub fn changes(before: &Snapshot, after: &Snapshot, expected: &[String]) -> Vec<GameChange> {
-    // The expected paths are a few thousand entries of a game folder; a list lookup inside the loops below was
-    // quadratic. Build the set once.
-    let expected: FxHashSet<&str> = expected.iter().map(String::as_str).collect();
+/// its own time moves whenever something inside it changes, and that would repeat every change below it.
+pub fn changes(before: &Snapshot, after: &Snapshot) -> Vec<GameChange> {
     let mut found = Vec::new();
 
     for (path, entry) in &after.entries {
-        if expected.contains(path.as_str()) {
-            continue;
-        }
-
         match before.entries.get(path) {
             None => found.push(GameChange {
                 path: path.clone(),
@@ -92,7 +83,7 @@ pub fn changes(before: &Snapshot, after: &Snapshot, expected: &[String]) -> Vec<
     }
 
     for path in before.entries.keys() {
-        if !after.entries.contains_key(path) && !expected.contains(path.as_str()) {
+        if !after.entries.contains_key(path) {
             found.push(GameChange {
                 path: path.clone(),
                 kind: ChangeKind::Removed,
@@ -128,7 +119,7 @@ mod tests {
         fs::create_dir_all(root.join("bin")).unwrap();
         fs::write(root.join("bin/game.exe"), "game").unwrap();
         let before = take(&root);
-        assert!(changes(&before, &take(&root), &[]).is_empty());
+        assert!(changes(&before, &take(&root)).is_empty());
     }
 
     #[test]
@@ -145,7 +136,7 @@ mod tests {
         fs::write(root.join("r6/added.txt"), "hi").unwrap();
         let after = take(&root);
 
-        let found = changes(&before, &after, &[]);
+        let found = changes(&before, &after);
         assert_eq!(
             kinds(&found),
             vec![
@@ -162,21 +153,7 @@ mod tests {
         fs::create_dir_all(root.join("a")).unwrap();
         let before = take(&root);
         fs::create_dir_all(root.join("a/b")).unwrap();
-        let found = changes(&before, &take(&root), &[]);
+        let found = changes(&before, &take(&root));
         assert_eq!(kinds(&found), vec![(sub("a", "b"), ChangeKind::Created)]);
-    }
-
-    #[test]
-    fn paths_gobbo_placed_itself_are_left_out() {
-        let root = scratch!("expected");
-        let before = take(&root);
-        fs::write(root.join("version.dll"), "placed").unwrap();
-        fs::write(root.join("stray.txt"), "game").unwrap();
-        let after = take(&root);
-        let found = changes(&before, &after, &["version.dll".to_string()]);
-        assert_eq!(
-            kinds(&found),
-            vec![("stray.txt".to_string(), ChangeKind::Created)]
-        );
     }
 }

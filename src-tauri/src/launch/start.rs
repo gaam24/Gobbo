@@ -286,7 +286,7 @@ pub(super) fn program_launch(
 
     // Windows has no Proton, so every game runs its own file there. On Linux a game with Steam app ids starts through Proton.
     #[cfg(not(windows))]
-    if !game.detect.steam_app_ids.is_empty() {
+    if runs_through_proton(game) {
         return proton_command(game, data, settings, &game_root, exe, home, with_mods);
     }
 
