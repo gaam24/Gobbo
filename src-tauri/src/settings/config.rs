@@ -23,11 +23,11 @@ pub struct AppSettings {
     #[specta(type = Vec<String>)]
     pub source_links: Vec<String>,
     /// The main window opens with the size and place it had when it was closed. Off, it opens at the default size.
-    #[serde(default = "remembered_by_default")]
+    #[serde(default = "on_by_default")]
     pub remember_window: bool,
     /// Closing the window hides it in the system tray instead of ending the app. Background work keeps running and the
     /// tray stays available as the only way back in. On from the start.
-    #[serde(default = "remembered_by_default")]
+    #[serde(default = "on_by_default")]
     pub minimize_to_tray: bool,
     /// Windows 11 Efficiency mode: off, only while the window is in the background, or always. Other systems keep it
     /// off because they have no equivalent.
@@ -35,7 +35,7 @@ pub struct AppSettings {
     pub efficiency_mode: EfficiencyMode,
     /// Asks the saved providers for newer revisions of the active profile's collections when a game opens. One read
     /// per collection, on the same budget as every other provider read. On from the start.
-    #[serde(default = "checks_on_by_default")]
+    #[serde(default = "on_by_default")]
     pub check_collections_on_launch: bool,
 }
 
@@ -74,13 +74,8 @@ pub fn apply_efficiency(mode: EfficiencyMode, focused: bool, minimized: bool) {
     let _ = crate::platform::set_efficiency_mode(mode.active(focused, minimized));
 }
 
-/// Settings saved before the window option existed have no value for it: the window is remembered from the start.
-pub(super) const fn remembered_by_default() -> bool {
-    true
-}
-
-/// Settings saved before collection checks existed have no value for them: the checks run from the start.
-pub(super) const fn checks_on_by_default() -> bool {
+/// A switch that settings saved before it existed have no value for: it starts on.
+pub(super) const fn on_by_default() -> bool {
     true
 }
 
