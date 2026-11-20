@@ -5,13 +5,13 @@ import { useGames } from "@/app/contexts/games-context";
 import { useStorage } from "@/app/contexts/storage-context";
 import { useWorkspace, useWorkspaceActions } from "@/app/contexts/workspace-context";
 import type { GameRuntime } from "@/app/selectors/game-presentation";
-import type { DeployProgress, UpdateAllProgress, UpdateAllStage, UpdateProgress, UpdateStage } from "@/bindings";
+import type { DeployProgress, UpdateAllProgress, UpdateAllStage, UpdateProgress } from "@/bindings";
 import { type TranslationKey, useTranslation } from "@/i18n";
 import { clearFailedTask, type FailedTask, useFailedTasks } from "@/lib/failed-tasks-store";
 import { errorText } from "@/lib/ipc";
 import { formatSize } from "@/lib/mods";
 import { type ImportState, useProgress } from "@/lib/progress-store";
-import { dedupeKey, type Task, taskDedupeOf } from "@/lib/tasks";
+import { dedupeKey, type Task, type TaskStages, taskDedupeOf } from "@/lib/tasks";
 import {
 	type RegisteredTask,
 	registerBackendActions,
@@ -21,31 +21,38 @@ import {
 } from "@/lib/tasks-store";
 import type { Download } from "@/nexus/use-downloads";
 
-/// The import stages, as the one set of translation keys an activity row uses.
-const STAGE_LABEL = {
-	downloading: "import.stage.downloading",
-	hashing: "import.stage.hashing",
-	extracting: "import.stage.extracting",
-	copying: "import.stage.copying",
+/// The steps each kind of work goes through, in order, as the stage codes the backend reports.
+const IMPORT_STAGES = ["downloading", "hashing", "extracting", "copying"] as const;
+const IMPORT_STAGE_NAME = {
+	downloading: "tasks.stage.download",
+	hashing: "tasks.stage.check",
+	extracting: "tasks.stage.unpack",
+	copying: "tasks.stage.copy",
 } as const satisfies Record<ImportState["stage"], TranslationKey>;
-
-/// The update stages, shared by one update, "update all" and the final switch to an installed version.
-const UPDATE_STAGE_LABEL = {
-	downloading: "tasks.updateDownloading",
-	importing: "tasks.updateImporting",
-	selecting: "tasks.updateSelecting",
-	switching: "tasks.updateSwitching",
+const UPDATE_STAGES = ["downloading", "importing", "selecting", "switching"] as const;
+const UPDATE_STAGE_NAME = {
+	downloading: "tasks.stage.download",
+	importing: "tasks.stage.install",
+	selecting: "tasks.stage.select",
+	switching: "tasks.stage.switch",
 } as const satisfies Record<UpdateAllStage, TranslationKey>;
+const DEPLOY_STAGES = ["preparing", "writing", "settings", "done"] as const;
+const DEPLOY_STAGE_NAME = {
+	preparing: "tasks.stage.prepare",
+	writing: "tasks.stage.write",
+	settings: "tasks.stage.settings",
+} as const satisfies Record<Exclude<DeployProgress["stage"], "done">, TranslationKey>;
 
-/// The same stages when the work installs a requirement, where "update" would name the wrong action.
-const REQUIREMENT_STAGE_LABEL = {
-	downloading: "tasks.requirementDownloading",
-	importing: "tasks.requirementImporting",
-	selecting: "tasks.requirementSelecting",
-} as const satisfies Record<UpdateStage, TranslationKey>;
-
-function stageDetail<S extends string>(stage: S, labels: Record<S, TranslationKey>, t: Translate): string {
-	return t(labels[stage]);
+/// The track of one task: the names of its steps and the current one. `steps` lists the steps the track draws; a stage
+/// after them (such as `done`) marks every step complete.
+function stagesOf<S extends string>(steps: readonly S[], names: Partial<Record<S, TranslationKey>>, current: S, t: Translate): TaskStages {
+	return {
+		names: steps.flatMap((step) => {
+			const name = names[step];
+			return name ? [t(name)] : [];
+		}),
+		current: steps.indexOf(current),
+	};
 }
 
 type Translate = ReturnType<typeof useTranslation>["t"];
@@ -93,7 +100,7 @@ export function useActivity(): Task[] {
 			),
 			...localFailedTasks(failed, games),
 			...updateTasks(modUpdates.checkingGames, games, t),
-			...importTasks(progress.importing, gameId, t),
+			...importTasks(progress.importing, gameId, gameName, t),
 			...downloadTasks(downloads, i18n.language, { installDownload, removeDownload, retryDownload }, t),
 			...storageTasks(storageScanning, t),
 		];
@@ -160,9 +167,12 @@ function busyTasks(
 					id: "apply",
 					kind: "apply",
 					title: t("tasks.kind.apply"),
-					detail: deployDetail(deployProgress, t) ?? gameName,
+					detail: deployDetail(deployProgress, t),
 					percent: deployProgress?.percent,
+					stages: deployProgress ? stagesOf(DEPLOY_STAGES, DEPLOY_STAGE_NAME, deployProgress.stage, t) : undefined,
 					state: "running",
+					game: gameId,
+					gameName,
 					dedupeKey: dedupeKey({ Apply: { game: gameId ?? "" } }),
 				},
 			];
@@ -172,8 +182,9 @@ function busyTasks(
 					id: "launch",
 					kind: "launch",
 					title: t("tasks.kind.launch"),
-					detail: gameName,
 					state: "running",
+					game: gameId,
+					gameName,
 					dedupeKey: `launch:${gameId ?? ""}`,
 				},
 			];
@@ -183,8 +194,9 @@ function busyTasks(
 					id: "stop",
 					kind: "stop",
 					title: t("tasks.kind.stop"),
-					detail: gameName,
 					state: "running",
+					game: gameId,
+					gameName,
 					dedupeKey: `stop:${gameId ?? ""}`,
 				},
 			];
@@ -198,9 +210,12 @@ function busyTasks(
 							done: Math.min(updateAllProgress.done + 1, updateAllProgress.total),
 							total: updateAllProgress.total,
 						}),
-						detail: [updateAllProgress.name, updateAllDetail(updateAllProgress, t)].filter(Boolean).join(" · "),
+						detail: updateAllProgress.name,
 						percent: updateAllProgress.percent,
+						stages: stagesOf(UPDATE_STAGES, UPDATE_STAGE_NAME, updateAllProgress.stage, t),
 						state: "running",
+						game: gameId,
+						gameName,
 						onCancel: updateAllCancel ?? undefined,
 						dedupeKey: dedupeKey({ UpdateAll: { game: gameId ?? "" } }),
 					},
@@ -214,9 +229,11 @@ function busyTasks(
 					title: t(updateKind === "requirement" ? "tasks.installingRequirement" : "tasks.updating", {
 						name: updateModName ?? gameName,
 					}),
-					detail: updateKind === "requirement" ? requirementDetail(updateProgress, t) : updateDetail(updateProgress, t),
 					percent: updateProgress?.percent,
+					stages: updateProgress ? stagesOf(UPDATE_STAGES.slice(0, 3), UPDATE_STAGE_NAME, updateProgress.stage, t) : undefined,
 					state: "running",
+					game: gameId,
+					gameName,
 					dedupeKey:
 						updateKind === "requirement"
 							? dedupeKey({ Requirement: { game: gameId ?? "" } })
@@ -247,18 +264,6 @@ function deployDetail(progress: DeployProgress | null, t: Translate): string | u
 		default:
 			return undefined;
 	}
-}
-
-function updateDetail(progress: UpdateProgress | null, t: Translate): string | undefined {
-	return progress ? stageDetail(progress.stage, UPDATE_STAGE_LABEL, t) : undefined;
-}
-
-function updateAllDetail(progress: UpdateAllProgress, t: Translate): string {
-	return stageDetail(progress.stage, UPDATE_STAGE_LABEL, t);
-}
-
-function requirementDetail(progress: UpdateProgress | null, t: Translate): string | undefined {
-	return progress ? stageDetail(progress.stage, REQUIREMENT_STAGE_LABEL, t) : undefined;
 }
 
 /// The name of a game id from the catalogue, falling back to the id for a game just removed from it.
@@ -339,18 +344,17 @@ function storageTasks(scanning: boolean, t: Translate): Task[] {
 	return scanning ? [{ id: "storage", kind: "scan", title: t("tasks.scanningStorage"), state: "running" }] : [];
 }
 
-function importTasks(importing: ReadonlyMap<string, ImportState>, gameId: string | undefined, t: Translate): Task[] {
+function importTasks(importing: ReadonlyMap<string, ImportState>, gameId: string | undefined, gameName: string, t: Translate): Task[] {
 	return [...importing].map(([path, item]) => ({
 		id: `import:${path}`,
 		kind: "import" as const,
 		title: t("tasks.importTitle", { name: item.name }),
-		detail: t("tasks.importDetail", {
-			index: item.index,
-			total: item.total,
-			stage: t(STAGE_LABEL[item.stage]),
-		}),
+		detail: item.total > 1 ? t("tasks.importCount", { index: item.index, total: item.total }) : undefined,
 		percent: item.percent,
+		stages: stagesOf(IMPORT_STAGES, IMPORT_STAGE_NAME, item.stage, t),
 		state: "running" as const,
+		game: gameId,
+		gameName,
 		onCancel: item.onCancel,
 		dedupeKey: dedupeKey({ Import: { game: gameId ?? "", path } }),
 	}));

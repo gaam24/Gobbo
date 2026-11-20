@@ -51,16 +51,13 @@ function grouped(): Task[] {
 	];
 }
 
-test("the card groups by state, then by game, and sorts the rows inside each game", () => {
-	const groups = groupedTasks(grouped());
+test("the card groups by game and orders each game's rows by state, then title", () => {
+	const games = groupedTasks(grouped());
 
-	expect(groups.map((group) => group.state)).toEqual(["failed", "waiting", "running"]);
-	expect(groups.map((group) => group.count)).toEqual([2, 1, 3]);
-	expect(groups[0]?.games[0]?.tasks.map((row) => row.id)).toEqual(["a", "e"]);
-	expect(groups[1]?.games[0]?.tasks.map((row) => row.id)).toEqual(["d"]);
 	// Global work comes before named games, then games by name.
-	expect(groups[2]?.games.map((group) => group.game)).toEqual([null, "game-a", "game-b"]);
-	expect(groups[2]?.games.map((group) => group.tasks.map((row) => row.id))).toEqual([["f"], ["c"], ["b"]]);
+	expect(games.map((group) => group.game)).toEqual([null, "game-a", "game-b"]);
+	expect(games.map((group) => group.tasks.map((row) => row.id))).toEqual([["f", "d"], ["c", "a", "e"], ["b"]]);
+	expect(games.map((group) => group.count)).toEqual([2, 3, 1]);
 });
 
 test("the grouping does not depend on registration order", () => {
@@ -73,13 +70,13 @@ test("equal titles fall back to the id so two rows never swap", () => {
 		{ ...task("b", "running"), title: "Same" },
 		{ ...task("a", "running"), title: "Same" },
 	];
-	expect(groupedTasks(tasks)[0]?.games[0]?.tasks.map((row) => row.id)).toEqual(["a", "b"]);
+	expect(groupedTasks(tasks)[0]?.tasks.map((row) => row.id)).toEqual(["a", "b"]);
 });
 
 test("an empty list has no groups and a game without a catalogue entry keeps its id", () => {
 	expect(groupedTasks([])).toEqual([]);
 	const groups = groupedTasks([{ ...task("a", "running"), game: "game-missing" }]);
-	expect(groups[0]?.games[0]).toMatchObject({ game: "game-missing", gameName: undefined, count: 1 });
+	expect(groups[0]).toMatchObject({ game: "game-missing", gameName: undefined, count: 1 });
 });
 
 test("the counts stay in step with the groups", () => {

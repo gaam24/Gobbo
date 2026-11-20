@@ -7,6 +7,11 @@ export type TaskKind = "apply" | "launch" | "stop" | "import" | "download" | "in
 
 export type TaskState = "running" | "waiting" | "failed";
 
+export interface TaskStages {
+	names: string[];
+	current: number;
+}
+
 export interface Task {
 	id: string;
 	kind: TaskKind;
@@ -16,6 +21,8 @@ export interface Task {
 	detail?: string;
 	/// Why a failed task failed, already translated. Shown in full under the title.
 	error?: string;
+	/// The steps of the work, already translated, and the index of the current one. Past the last index means done.
+	stages?: TaskStages;
 	/// 0–100 when the operation can measure itself.
 	percent?: number;
 	state: TaskState;
@@ -169,12 +176,6 @@ export interface TaskGameGroup {
 	tasks: Task[];
 }
 
-export interface TaskGroup {
-	state: TaskState;
-	count: number;
-	games: TaskGameGroup[];
-}
-
 /// Code-point order, not `localeCompare`: the card must sort the same way on every machine and in every locale.
 function compareText(a: string, b: string): -1 | 0 | 1 {
 	if (a < b) return -1;
@@ -194,20 +195,20 @@ function compareGames(a: TaskGameGroup, b: TaskGameGroup): -1 | 0 | 1 {
 	return compareText(a.gameName ?? "", b.gameName ?? "") || compareText(a.game, b.game);
 }
 
-/// The activity card's view model. Rows are grouped by state and then by game; inside a game they are ordered by title
-/// and then id. The registry keeps insertion order so a progress update does not jump a row, so the ordering here is
-/// explicit and deterministic instead of relying on when a task happened to be registered.
-export function groupedTasks(tasks: readonly Task[]): TaskGroup[] {
-	const byState = new Map<TaskState, Map<string | null, Task[]>>();
+/// The order of rows inside one game: work in progress first, then work that waits for the user, then failures.
+const ROW_STATE_ORDER: Record<TaskState, number> = { running: 0, waiting: 1, failed: 2 };
+
+function compareRows(a: Task, b: Task): number {
+	return ROW_STATE_ORDER[a.state] - ROW_STATE_ORDER[b.state] || compareTasks(a, b);
+}
+
+/// The activity card's view model: one group per game, so every game's work is visible from any screen. Global work
+/// comes first, then games by name; inside a game the rows go by state, then title, then id. The registry keeps
+/// insertion order so a progress update does not jump a row, so the ordering here is explicit and deterministic.
+export function groupedTasks(tasks: readonly Task[]): TaskGameGroup[] {
+	const byGame = new Map<string | null, Task[]>();
 
 	for (const task of tasks) {
-		let byGame = byState.get(task.state);
-
-		if (!byGame) {
-			byGame = new Map<string | null, Task[]>();
-			byState.set(task.state, byGame);
-		}
-
 		const game = task.game ?? null;
 		const rows = byGame.get(game);
 
@@ -215,30 +216,14 @@ export function groupedTasks(tasks: readonly Task[]): TaskGroup[] {
 		else byGame.set(game, [task]);
 	}
 
-	const groups: TaskGroup[] = [];
+	const games: TaskGameGroup[] = [];
 
-	for (const state of TASK_STATE_ORDER) {
-		const byGame = byState.get(state);
-
-		if (!byGame) continue;
-		const games: TaskGameGroup[] = [];
-		let count = 0;
-
-		for (const [game, rows] of byGame) {
-			const sorted = rows.toSorted(compareTasks);
-			count += sorted.length;
-			games.push({
-				game,
-				gameName: sorted.find((row) => Boolean(row.gameName))?.gameName,
-				count: sorted.length,
-				tasks: sorted,
-			});
-		}
-
-		groups.push({ state, count, games: games.toSorted(compareGames) });
+	for (const [game, rows] of byGame) {
+		const sorted = rows.toSorted(compareRows);
+		games.push({ game, gameName: sorted.find((row) => Boolean(row.gameName))?.gameName, count: sorted.length, tasks: sorted });
 	}
 
-	return groups;
+	return games.toSorted(compareGames);
 }
 
 /// A short status for the live region. It names only the state whose count changed, so a percent tick does not make a
