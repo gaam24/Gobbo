@@ -18,7 +18,10 @@ dist-ssr
 coverage/
 # Archives made by `bun run build` (see scripts/package-release.ts).
 dist-release
-target*
+# Cargo build output and tooling scratch space (e2e data, `jscpd`, `sbom`, screenshots).
+# Anchored so a Rust module file or folder named `target` is never ignored again.
+/target/
+/src-tauri/target/
 # Staged by `bun run build:overlay-hook` (Windows only).
 src-tauri/overlay-hook
 *.local
