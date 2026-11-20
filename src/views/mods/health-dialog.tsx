@@ -29,13 +29,17 @@ export function HealthDialog({ gameId, onClose }: { gameId: string; onClose: () 
 	const { gameActions } = useWorkspace();
 	const report = useLoad(`health:${gameId}`, () => unwrap(commands.healthCheck(gameId)));
 
+	/// One handler per action kind, so a new kind fails to compile here instead of falling back to an apply.
+	const actions: Record<HealthActionKind, () => void> = {
+		open_settings: openGameSettings,
+		show_mods: openMods,
+		open_overwrite: () => openDialog({ kind: "overwrite" }),
+		apply: () => void gameActions.runDeploy(),
+	};
+
 	const run = (kind: HealthActionKind) => {
 		onClose();
-
-		if (kind === "open_settings") openGameSettings();
-		else if (kind === "show_mods") openMods();
-		else if (kind === "open_overwrite") openDialog({ kind: "overwrite" });
-		else void gameActions.runDeploy();
+		actions[kind]();
 	};
 
 	let body: ReactNode;
