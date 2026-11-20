@@ -28,8 +28,10 @@ pub fn save(account: &str, key: &str) -> Result<(), AppError> {
     let entry = keyring::Entry::new(SERVICE, account)
         .map_err(|error| key_error(error, "source.key_save_failed"))?;
     if key.is_empty() {
-        let _ = entry.delete_credential();
-        return Ok(());
+        return match entry.delete_credential() {
+            Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+            Err(error) => Err(key_error(error, "source.key_save_failed")),
+        };
     }
     entry
         .set_password(key)
