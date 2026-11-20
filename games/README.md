@@ -23,7 +23,7 @@ against a real mod archive without importing it. The rest of this section is the
    launch checks on every shipped definition that has that slot. Tests never name a game.
 4. Test on a real installation: detection, import, apply, undo, launch.
 5. The two supported-games tables (this file and the root `README.md`) are checked against the `games/*` folders by
-   `bun run generated:check`: the folder name and the top-level `name` in `game.toml` are the source, and adding a game
+   `bun run guard`: the folder name and the top-level `name` in `game.toml` are the source, and adding a game
    cannot update one list without the other. The README summary is checked against the tested counts here too.
 6. If the game needs a rule the schema cannot express, add a reusable primitive with tests. Never a branch for one game.
 
