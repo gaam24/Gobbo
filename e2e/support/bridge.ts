@@ -31,33 +31,34 @@ type Result<T> = { ok: true; value: T } | { ok: false; error: string };
 /// this is the same path the window takes, including the capability check and the Specta serialization. A failure is
 /// carried as JSON text: WebDriver does not always serialize the backend's plain error object.
 export async function invokeResult<T>(command: string, args: Record<string, unknown> = {}): Promise<Result<T>> {
-	const raw = await browser.executeAsync(
-		(cmd: string, callArgs: Record<string, unknown>, done: (result: unknown) => void) => {
-			const failed = (error: unknown) => {
-				const record = error && typeof error === "object" ? (error as Record<string, unknown>) : {};
-				const payload = {
-					code: typeof record.code === "string" ? record.code : "e2e.invoke_failed",
-					params: record.params && typeof record.params === "object" ? record.params : {},
-					kind: typeof record.kind === "string" ? record.kind : undefined,
-					recovery: record.recovery,
-					message: error instanceof Error ? error.message : String(error),
+	const raw = await browser.execute(
+		(cmd: string, callArgs: Record<string, unknown>) =>
+			new Promise<unknown>((resolve) => {
+				const failed = (error: unknown) => {
+					const record = error && typeof error === "object" ? (error as Record<string, unknown>) : {};
+					const payload = {
+						code: typeof record.code === "string" ? record.code : "e2e.invoke_failed",
+						params: record.params && typeof record.params === "object" ? record.params : {},
+						kind: typeof record.kind === "string" ? record.kind : undefined,
+						recovery: record.recovery,
+						message: error instanceof Error ? error.message : String(error),
+					};
+					// The embedded driver treats a top-level `ok: false` as a failed executeAsync call. Keep the envelope
+					// under a neutral key, so a rejected command is a value the spec can inspect.
+					resolve({ e2e: { ok: false, error: JSON.stringify(payload) } });
 				};
-				// The embedded driver treats a top-level `ok: false` as a failed executeAsync call. Keep the envelope
-				// under a neutral key, so a rejected command is a value the spec can inspect.
-				done({ e2e: { ok: false, error: JSON.stringify(payload) } });
-			};
-			void (async () => {
-				try {
-					const bridge = window.__TAURI__;
+				void (async () => {
+					try {
+						const bridge = window.__TAURI__;
 
-					if (!bridge) throw new Error("the Tauri bridge is not available");
-					const value = await bridge.core.invoke(cmd, callArgs);
-					done({ e2e: { ok: true, value } });
-				} catch (error) {
-					failed(error);
-				}
-			})();
-		},
+						if (!bridge) throw new Error("the Tauri bridge is not available");
+						const value = await bridge.core.invoke(cmd, callArgs);
+						resolve({ e2e: { ok: true, value } });
+					} catch (error) {
+						failed(error);
+					}
+				})();
+			}),
 		command,
 		args,
 	);
@@ -78,34 +79,35 @@ export async function invoke<T>(command: string, args: Record<string, unknown> =
 
 /// Invokes a command that takes a progress `Channel`, and returns the answer together with every event the channel sent.
 export async function invokeWithChannel<T>(command: string, args: Record<string, unknown> = {}): Promise<{ value: T; events: unknown[] }> {
-	const raw = await browser.executeAsync(
-		(cmd: string, callArgs: Record<string, unknown>, done: (result: unknown) => void) => {
-			const events: unknown[] = [];
-			const failed = (error: unknown) => {
-				const record = error && typeof error === "object" ? (error as Record<string, unknown>) : {};
-				const payload = {
-					code: typeof record.code === "string" ? record.code : "e2e.invoke_failed",
-					params: record.params && typeof record.params === "object" ? record.params : {},
-					kind: typeof record.kind === "string" ? record.kind : undefined,
-					recovery: record.recovery,
-					message: error instanceof Error ? error.message : String(error),
+	const raw = await browser.execute(
+		(cmd: string, callArgs: Record<string, unknown>) =>
+			new Promise<unknown>((resolve) => {
+				const events: unknown[] = [];
+				const failed = (error: unknown) => {
+					const record = error && typeof error === "object" ? (error as Record<string, unknown>) : {};
+					const payload = {
+						code: typeof record.code === "string" ? record.code : "e2e.invoke_failed",
+						params: record.params && typeof record.params === "object" ? record.params : {},
+						kind: typeof record.kind === "string" ? record.kind : undefined,
+						recovery: record.recovery,
+						message: error instanceof Error ? error.message : String(error),
+					};
+					resolve({ e2e: { ok: false, error: JSON.stringify(payload), events } });
 				};
-				done({ e2e: { ok: false, error: JSON.stringify(payload), events } });
-			};
-			void (async () => {
-				try {
-					const bridge = window.__TAURI__;
+				void (async () => {
+					try {
+						const bridge = window.__TAURI__;
 
-					if (!bridge) throw new Error("the Tauri bridge is not available");
-					const progress = new bridge.core.Channel();
-					progress.onmessage = (message: unknown) => events.push(message);
-					const value = await bridge.core.invoke(cmd, { ...callArgs, progress });
-					done({ e2e: { ok: true, value, events } });
-				} catch (error) {
-					failed(error);
-				}
-			})();
-		},
+						if (!bridge) throw new Error("the Tauri bridge is not available");
+						const progress = new bridge.core.Channel();
+						progress.onmessage = (message: unknown) => events.push(message);
+						const value = await bridge.core.invoke(cmd, { ...callArgs, progress });
+						resolve({ e2e: { ok: true, value, events } });
+					} catch (error) {
+						failed(error);
+					}
+				})();
+			}),
 		command,
 		args,
 	);

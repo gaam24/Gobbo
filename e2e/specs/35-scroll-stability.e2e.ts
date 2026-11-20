@@ -16,30 +16,34 @@ const STEP = 40;
 /// window changes while scrolling, and scroll anchoring used to cancel most of each step. With the virtualizer and
 /// `overflow-anchor: none` every frame must advance by the full step.
 async function scrollSteps(): Promise<{ steps: number[]; scrollTop: number }> {
-	return (await browser.executeAsync(
-		(frames: number, step: number, done: (value: { steps: number[]; scrollTop: number }) => void) => {
-			const row = document.querySelector<HTMLElement>("[data-mod]");
-			let container: HTMLElement | null = row;
+	return (await browser.execute(
+		(frames: number, step: number) =>
+			new Promise<{ steps: number[]; scrollTop: number }>((resolve) => {
+				const row = document.querySelector<HTMLElement>("[data-mod]");
+				let container: HTMLElement | null = row;
 
-			while (container && !["auto", "scroll", "overlay"].includes(getComputedStyle(container).overflowY)) {
-				container = container.parentElement;
-			}
+				while (container && !["auto", "scroll", "overlay"].includes(getComputedStyle(container).overflowY)) {
+					container = container.parentElement;
+				}
 
-			if (!container) return done({ steps: [], scrollTop: -1 });
-			const steps: number[] = [];
-			let count = 0;
-			const tick = () => {
-				const before = container ? container.scrollTop : 0;
+				if (!container) {
+					resolve({ steps: [], scrollTop: -1 });
+					return;
+				}
+				const steps: number[] = [];
+				let count = 0;
+				const tick = () => {
+					const before = container ? container.scrollTop : 0;
 
-				if (container) container.scrollTop += step;
-				steps.push((container ? container.scrollTop : 0) - before);
-				count += 1;
+					if (container) container.scrollTop += step;
+					steps.push((container ? container.scrollTop : 0) - before);
+					count += 1;
 
-				if (count < frames) requestAnimationFrame(tick);
-				else done({ steps, scrollTop: container ? container.scrollTop : -1 });
-			};
-			requestAnimationFrame(tick);
-		},
+					if (count < frames) requestAnimationFrame(tick);
+					else resolve({ steps, scrollTop: container ? container.scrollTop : -1 });
+				};
+				requestAnimationFrame(tick);
+			}),
 		FRAMES,
 		STEP,
 	)) as { steps: number[]; scrollTop: number };
