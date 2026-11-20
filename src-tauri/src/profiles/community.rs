@@ -119,7 +119,11 @@ pub fn import(
     })?;
     if let Err(error) = actions::save_profile(root, game_id, &rows) {
         // The profile was created but has no list; remove it rather than leave an empty one behind.
-        let _ = actions::delete_profile(root, game_id, &profile);
+        if let Err(cleanup) = actions::delete_profile(root, game_id, &profile) {
+            crate::infra::log::warn(format!(
+                "could not remove the empty profile {profile} after a failed save: {cleanup}"
+            ));
+        }
         return Err(error);
     }
     let missing = preview
