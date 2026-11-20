@@ -172,13 +172,19 @@ pub(super) fn import_member(
     {
         progress(CollectionItemState::Patching, 0, None);
         let mut issues = Vec::new();
-        let _ = patch::apply(
+        // A patch is an improvement on top of an installed mod: the member stays installed, and the failure is logged.
+        if let Err(error) = patch::apply(
             archive,
             &item.name,
             &loaded.data.library().join(folder),
             &item.patches,
             &mut issues,
-        );
+        ) {
+            crate::infra::log::warn(format!(
+                "collection patches of {} were not applied: {error}",
+                item.name
+            ));
+        }
         for issue in issues {
             crate::infra::log::warn(format!(
                 "collection patch {}: {}",
