@@ -108,7 +108,7 @@ pub fn mounts_path(state: &Path) -> PathBuf {
 #[cfg(windows)]
 pub fn mount_config(session: &Session) -> MountConfig {
     let mut mounts = vec![MountSpec {
-        id: "game".to_string(),
+        id: MountSpec::GAME_ID.to_string(),
         guest: session.root.clone(),
         root: session.root.clone(),
         staging: Some(session.mods.clone()),

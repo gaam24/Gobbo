@@ -11,6 +11,7 @@ use problems::{Problems, is_provider_key, is_variant};
 
 use crate::domain::pathkey;
 use crate::games::definition::GameDef;
+use gobbo_overlay_core::MountSpec;
 
 pub(in crate::games) use loader::duplicate_problems;
 
@@ -129,8 +130,11 @@ impl GameDef {
                 ));
             }
 
-            if set.id == "game" {
-                problems.push("user_data id \"game\" is reserved for the game mount".to_string());
+            if set.id == MountSpec::GAME_ID {
+                problems.push(format!(
+                    "user_data id {:?} is reserved for the game mount",
+                    MountSpec::GAME_ID
+                ));
             }
 
             if !ids.insert(set.id.as_str()) {

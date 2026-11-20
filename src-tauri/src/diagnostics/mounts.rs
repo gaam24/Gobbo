@@ -14,6 +14,7 @@ use crate::deploy::overlay;
 use crate::error::{AppError, Message, io_at};
 use crate::games::GameDef;
 use crate::infra::fs as files;
+use gobbo_overlay_core::MountSpec;
 
 /// One prefix the game reads through a layer of the active deployment.
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
@@ -67,7 +68,7 @@ pub fn diagnose(root: &Data, game_id: &str) -> Result<MountDiagnostics, AppError
             continue;
         };
         mounts.push(MountView {
-            id: "game".to_string(),
+            id: MountSpec::GAME_ID.to_string(),
             guest: settings.game_root.clone(),
             upper: state.join("overwrite").display().to_string(),
             active,
