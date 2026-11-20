@@ -243,6 +243,8 @@ fn game_processes(game_root: &Path) -> Vec<u32> {
     };
     let mut parents = HashMap::new();
     let mut roots = Vec::new();
+    // Gobbo and its parents may name the game folder too; they launch the game and are never stopped with it.
+    let chain = launch_chain();
 
     for entry in processes.filter_map(std::result::Result::ok) {
         let Some(pid) = entry
@@ -258,7 +260,9 @@ fn game_processes(game_root: &Path) -> Vec<u32> {
             parents.insert(pid, parent);
         }
 
-        if fs::read(path.join("cmdline")).is_ok_and(|raw| runs_game(&raw, root.as_bytes())) {
+        if !chain.contains(&entry.file_name())
+            && fs::read(path.join("cmdline")).is_ok_and(|raw| runs_game(&raw, root.as_bytes()))
+        {
             roots.push(pid);
         }
     }
