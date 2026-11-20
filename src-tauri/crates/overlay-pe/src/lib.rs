@@ -40,19 +40,12 @@ const MAX_IMPORTS: u32 = 4096;
 const MAGIC_PE32: u16 = 0x10B;
 const MAGIC_PE32_PLUS: u16 = 0x20B;
 
-/// The imports of a PE image, in import-table order.
+/// The bitness and the imports, from one pass over the headers. One pass answers both questions, so the launcher
+/// reads the file once.
 ///
 /// # Errors
-/// [`Malformed`] when a header or the import table is missing, truncated, or points outside the image.
-pub fn imports(bytes: &[u8]) -> Result<Vec<Import>, Malformed> {
-    parse(bytes).map(|(_, imports)| imports)
-}
-
-/// The bitness and the imports, from one pass over the headers. The launcher needs both; calling `imports` and
-/// `is_pe32` read the optional header twice.
-///
-/// # Errors
-/// [`Malformed`] when a header or the import table is missing, truncated, or points outside the image.
+/// [`Malformed`] when a header or the import table is missing or truncated, a field points outside the image, or an
+/// import name is not NUL-terminated.
 pub fn parse(bytes: &[u8]) -> Result<(bool, Vec<Import>), Malformed> {
     let optional = optional_header(bytes)?;
     let magic = u16_at(bytes, optional)?;
@@ -89,7 +82,7 @@ fn imports_from(bytes: &[u8], import_rva: u32, import_size: u32) -> Result<Vec<I
             break;
         }
 
-        let name = read_name(bytes, name_rva).unwrap_or_default();
+        let name = read_name(bytes, name_rva).ok_or(Malformed)?;
         result.push(Import {
             name,
             descriptor_rva,
@@ -101,14 +94,6 @@ fn imports_from(bytes: &[u8], import_rva: u32, import_size: u32) -> Result<Vec<I
     }
 
     Ok(result)
-}
-
-/// Whether the image is PE32 (x86) rather than PE32+ (x64).
-///
-/// # Errors
-/// [`Malformed`] when the optional header's magic is missing.
-pub fn is_pe32(bytes: &[u8]) -> Result<bool, Malformed> {
-    Ok(u16_at(bytes, optional_header(bytes)?)? == MAGIC_PE32)
 }
 
 /// The offset of the optional header: `e_lfanew` plus the PE signature and the file header.
@@ -290,17 +275,17 @@ mod tests {
         let (rva_at, size_at) = import_directory(&bytes);
         let mut zero_rva = bytes.clone();
         zero_rva[rva_at..rva_at + 4].fill(0);
-        assert_eq!(imports(&zero_rva).unwrap(), []);
+        assert_eq!(parse(&zero_rva).unwrap().1, []);
         let mut zero_size = bytes;
         zero_size[size_at..size_at + 4].fill(0);
-        assert_eq!(imports(&zero_size).unwrap(), []);
+        assert_eq!(parse(&zero_size).unwrap().1, []);
     }
 
     #[test]
     fn a_null_descriptor_ends_the_table() {
         let mut bytes = image(false, &["kernel32.dll", "version.dll"]);
         bytes[SECTION_RAW..SECTION_RAW + DESCRIPTOR_SIZE].fill(0);
-        assert_eq!(imports(&bytes).unwrap(), []);
+        assert_eq!(parse(&bytes).unwrap().1, []);
     }
 
     #[test]
@@ -309,7 +294,19 @@ mod tests {
         // Keep another field non-zero so only the name RVA marks the terminator.
         bytes[SECTION_RAW] = 1;
         bytes[SECTION_RAW + 12..SECTION_RAW + 16].fill(0);
-        assert_eq!(imports(&bytes).unwrap(), []);
+        assert_eq!(parse(&bytes).unwrap().1, []);
+    }
+
+    #[test]
+    fn a_broken_name_rva_is_malformed_not_an_empty_import() {
+        let mut outside = image(false, &["kernel32.dll"]);
+        let name_at = SECTION_RAW + 12;
+        outside[name_at..name_at + 4].copy_from_slice(&0x7FFF_FFFFu32.to_le_bytes());
+        assert_eq!(parse(&outside), Err(Malformed));
+
+        let mut unterminated = image(false, &["kernel32.dll"]);
+        unterminated.truncate(SECTION_RAW + DESCRIPTOR_SIZE * 2 + "kernel32.dll".len());
+        assert_eq!(parse(&unterminated), Err(Malformed));
     }
 
     #[test]
@@ -328,20 +325,23 @@ mod tests {
     #[test]
     fn exactly_the_limit_of_imports_is_allowed() {
         let names = vec!["a"; MAX_IMPORTS as usize];
-        let found = imports(&image(false, &names)).unwrap();
+        let found = parse(&image(false, &names)).unwrap().1;
         assert_eq!(found.len(), MAX_IMPORTS as usize);
     }
 
     #[test]
     fn more_imports_than_the_limit_are_malformed() {
         let names = vec!["a"; MAX_IMPORTS as usize + 1];
-        assert_eq!(imports(&image(false, &names)), Err(Malformed));
+        assert_eq!(
+            parse(&image(false, &names)).map(|(_, imports)| imports),
+            Err(Malformed)
+        );
     }
 
     #[test]
     fn the_imports_come_in_table_order_with_their_descriptors() {
         let bytes = image(false, &["kernel32.dll", "version.dll"]);
-        let found = imports(&bytes).unwrap();
+        let found = parse(&bytes).unwrap().1;
         assert_eq!(
             found,
             [
@@ -369,24 +369,20 @@ mod tests {
     }
 
     #[test]
-    fn the_bitness_is_read_from_the_optional_header() {
-        assert_eq!(is_pe32(&image(true, &[])), Ok(true));
-        assert_eq!(is_pe32(&image(false, &[])), Ok(false));
-    }
-
-    #[test]
     fn an_image_without_imports_has_none() {
-        assert_eq!(imports(&image(false, &[])).unwrap(), []);
+        assert_eq!(parse(&image(false, &[])).unwrap().1, []);
     }
 
     #[test]
     fn a_truncated_or_unknown_image_is_malformed_not_a_panic() {
         let bytes = image(false, &["kernel32.dll"]);
-        assert_eq!(imports(&bytes[..0x90]), Err(Malformed));
-        assert_eq!(is_pe32(&[]), Err(Malformed));
+        assert_eq!(
+            parse(&bytes[..0x90]).map(|(_, imports)| imports),
+            Err(Malformed)
+        );
         let mut unknown = bytes;
         unknown[0x98..0x9A].copy_from_slice(&0x1234u16.to_le_bytes());
-        assert_eq!(imports(&unknown), Err(Malformed));
+        assert_eq!(parse(&unknown).map(|(_, imports)| imports), Err(Malformed));
     }
 
     mod properties {
@@ -395,25 +391,24 @@ mod tests {
 
         proptest! {
             #[test]
-            fn arbitrary_bytes_never_panic(bytes in proptest::collection::vec(any::<u8>(), 0..4096)) {
-                let _ = imports(&bytes);
-                let _ = is_pe32(&bytes);
-            }
+            fn parsing_arbitrary_or_damaged_bytes_never_panics(
+                bytes in prop_oneof![
+                    proptest::collection::vec(any::<u8>(), 0..4096),
+                    (any::<bool>(), proptest::collection::vec((any::<usize>(), any::<u8>()), 1..16)).prop_map(
+                        |(pe32, damage)| {
+                            let mut bytes = image(pe32, &["kernel32.dll", "ntdll.dll"]);
+                            let length = bytes.len();
 
-            #[test]
-            fn a_damaged_image_never_panics(
-                pe32 in any::<bool>(),
-                damage in proptest::collection::vec((any::<usize>(), any::<u8>()), 1..16),
+                            for (at, value) in damage {
+                                bytes[at % length] = value;
+                            }
+
+                            bytes
+                        },
+                    ),
+                ],
             ) {
-                let mut bytes = image(pe32, &["kernel32.dll", "ntdll.dll"]);
-                let length = bytes.len();
-
-                for (at, value) in damage {
-                    bytes[at % length] = value;
-                }
-
-                let _ = imports(&bytes);
-                let _ = is_pe32(&bytes);
+                let _ = parse(&bytes);
             }
         }
     }

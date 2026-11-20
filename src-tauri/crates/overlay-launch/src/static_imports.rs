@@ -26,7 +26,7 @@ use windows_sys::Win32::System::Threading::PROCESS_BASIC_INFORMATION;
 
 use crate::wide;
 
-pub use gobbo_overlay_pe::Import;
+use gobbo_overlay_pe::Import;
 
 /// The parsed parts of one executable: its static imports and its bitness, both taken from the same read. A launch
 /// asks for them twice (the report and the import patch); the executable may be hundreds of megabytes, so one cache
