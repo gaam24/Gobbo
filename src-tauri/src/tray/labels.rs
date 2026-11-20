@@ -134,6 +134,8 @@ fn kind_label(code: &str) -> &'static str {
         "pack" => "Importing a mod pack…",
         "pack-link" => "Downloading a mod pack…",
         "collection" => "Installing collection…",
+        "launch" => "Running a tool…",
+        "install" => "Installing tool prerequisites…",
         _ => "Working…",
     }
 }

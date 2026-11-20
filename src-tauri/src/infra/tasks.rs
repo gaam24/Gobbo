@@ -35,7 +35,31 @@ pub struct TaskView {
     #[serde(default)]
     #[specta(optional)]
     pub dedupe: TaskDedupe,
+    /// Why a failed task failed, as the error code and values the window translates. Additive like `dedupe`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[specta(optional)]
+    pub error: Option<TaskError>,
 }
+
+/// The part of an [`AppError`] a task record keeps: enough to translate the reason, also after a restart.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
+pub struct TaskError {
+    pub code: String,
+    #[serde(default)]
+    pub params: std::collections::BTreeMap<String, String>,
+}
+
+impl From<&AppError> for TaskError {
+    fn from(error: &AppError) -> Self {
+        Self {
+            code: error.code.clone(),
+            params: error.params.clone(),
+        }
+    }
+}
+
+/// The reason of a task that was still running when Gobbo stopped. The work cannot continue after a restart.
+const INTERRUPTED: &str = "tasks.interrupted";
 
 /// The typed identity of one long task, carried beside its string id. Each workflow has one variant, with the fields
 /// that decide which rows describe the same operation. The window groups a backend lifecycle row with the matching
@@ -382,6 +406,10 @@ impl TaskJournal {
         for row in &mut rows {
             if row.state == state::RUNNING {
                 row.state = state::FAILED.to_string();
+                row.error = Some(TaskError {
+                    code: INTERRUPTED.to_string(),
+                    params: std::collections::BTreeMap::new(),
+                });
             }
         }
 
@@ -530,6 +558,7 @@ impl TaskFlags {
             state: state::RUNNING.to_string(),
             percent: None,
             dedupe: key.dedupe().clone(),
+            error: None,
         };
         {
             let mut inner = self.lock();
@@ -561,6 +590,7 @@ impl TaskFlags {
             state: state::WAITING.to_string(),
             percent: None,
             dedupe: key.dedupe().clone(),
+            error: None,
         };
         {
             let mut inner = self.lock();
@@ -605,6 +635,11 @@ impl TaskFlags {
     /// state and does not get a second event; the window has heard the cancellation already. Terminal rows are removed
     /// from the journal, so a restart does not resurrect them.
     pub fn finish(&self, key: &str, state: &str) {
+        self.finish_with(key, state, None);
+    }
+
+    /// [`Self::finish`] that keeps the reason of a failure on the record, so the window can say why.
+    pub fn finish_with(&self, key: &str, state: &str, error: Option<&AppError>) {
         let finished = {
             let mut inner = self.lock();
             inner.flags.remove(key);
@@ -614,6 +649,9 @@ impl TaskFlags {
                 }
 
                 task.state = state.to_string();
+                task.error = (state == state::FAILED)
+                    .then_some(error.map(TaskError::from))
+                    .flatten();
                 Some(task.clone())
             });
             self.persist(&inner);
@@ -624,6 +662,23 @@ impl TaskFlags {
         if let Some(view) = finished {
             self.emit(TASK_FINISHED_EVENT, &view);
         }
+    }
+
+    /// Forgets a failed or waiting task the user has read, also in the journal, so a restart does not show it again. A
+    /// running task is left alone: it is stopped with [`Self::cancel`].
+    pub fn dismiss(&self, key: &str) {
+        let mut inner = self.lock();
+        let finished = inner
+            .tasks
+            .get(key)
+            .is_some_and(|task| task.state != state::RUNNING);
+
+        if finished {
+            inner.tasks.remove(key);
+            self.persist(&inner);
+        }
+
+        drop(inner);
     }
 
     /// The tasks the window still needs to show, in a stable order: running work, waiting work and failures. Successful
@@ -742,6 +797,13 @@ pub fn list_tasks(tasks: State<'_, TaskFlags>) -> Result<Vec<TaskView>, AppError
 #[specta::specta]
 pub fn cancel_task(tasks: State<'_, TaskFlags>, id: String) {
     tasks.cancel(&id);
+}
+
+/// Forgets a failed or waiting task the user dismissed in the Working panel.
+#[tauri::command]
+#[specta::specta]
+pub fn dismiss_task(tasks: State<'_, TaskFlags>, id: String) {
+    tasks.dismiss(&id);
 }
 
 #[cfg(test)]
@@ -969,6 +1031,7 @@ mod tests {
                 dedupe: TaskDedupe::Apply {
                     game: "game".to_string(),
                 },
+                error: None,
             }]
         );
 
@@ -1148,6 +1211,14 @@ mod tests {
         );
         assert_eq!(
             by_id
+                .get("apply:game")
+                .and_then(|row| row.error.as_ref())
+                .map(|error| error.code.as_str()),
+            Some(INTERRUPTED),
+            "interrupted work says why it failed"
+        );
+        assert_eq!(
+            by_id
                 .get("collection:game:p1:c")
                 .map(|row| row.state.as_str()),
             Some(state::WAITING),
@@ -1161,6 +1232,40 @@ mod tests {
             restarted.flags_are_empty(),
             "no cancellation flag is restored for work of an earlier process"
         );
+    }
+
+    #[test]
+    fn a_failure_keeps_its_reason_until_the_user_dismisses_it() {
+        let (dir, tasks) = with_journal("tasks-journal-dismiss");
+        tasks.start(
+            "import:game:a.zip".to_string(),
+            Some("game".to_string()),
+            kind::IMPORT,
+        );
+        tasks.finish_with(
+            "import:game:a.zip",
+            state::FAILED,
+            Some(&AppError::user("import.archive_damaged").with("file", "a.zip")),
+        );
+        let error = tasks.list()[0].error.clone().unwrap();
+        assert_eq!(error.code, "import.archive_damaged");
+        assert_eq!(error.params.get("file").map(String::as_str), Some("a.zip"));
+
+        tasks.dismiss("import:game:a.zip");
+        assert!(tasks.list().is_empty());
+        drop(tasks);
+        assert!(
+            TaskFlags::with_journal(dir).list().is_empty(),
+            "a dismissed failure does not come back after a restart"
+        );
+    }
+
+    #[test]
+    fn a_running_task_cannot_be_dismissed() {
+        let tasks = TaskFlags::default();
+        tasks.start("apply:game".to_string(), None, kind::APPLY);
+        tasks.dismiss("apply:game");
+        assert_eq!(tasks.list().len(), 1);
     }
 
     #[test]

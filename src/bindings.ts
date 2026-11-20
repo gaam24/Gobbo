@@ -14,6 +14,8 @@ export const commands = {
 	 *  cancel commands and this generic one share the same mechanism.
 	 */
 	cancelTask: (id: string) => __TAURI_INVOKE<void>("cancel_task", { id }),
+	/**  Forgets a failed or waiting task the user dismissed in the Working panel. */
+	dismissTask: (id: string) => __TAURI_INVOKE<void>("dismiss_task", { id }),
 	/**
 	 *  Every game from the bundled and user definition folders, with invalid user files reported. The frontend gets only
 	 *  what the UI shows.
@@ -5063,6 +5065,21 @@ export type TaskDedupe =
 /**  Work without a typed identity yet, such as a row restored from a journal written before this field existed. */
 "Other";
 
+/**  The part of an [`AppError`] a task record keeps: enough to translate the reason, also after a restart. */
+export type TaskError = TaskError_Serialize | TaskError_Deserialize;
+
+/**  The part of an [`AppError`] a task record keeps: enough to translate the reason, also after a restart. */
+export type TaskError_Deserialize = {
+	code: string,
+	params?: { [key in string]: string },
+};
+
+/**  The part of an [`AppError`] a task record keeps: enough to translate the reason, also after a restart. */
+export type TaskError_Serialize = {
+	code: string,
+	params: { [key in string]: string },
+};
+
 /**
  *  One task as the window reads it. `id` is the stable key that also cancels the task; `kind` and `state` are stable
  *  codes that the frontend translates, never display text. `dedupe` is the typed identity of the operation, so the
@@ -5091,6 +5108,8 @@ export type TaskView_Deserialize = {
 	 *  gets [`TaskDedupe::Other`], so this is not an on-disk format migration.
 	 */
 	dedupe?: TaskDedupe,
+	/**  Why a failed task failed, as the error code and values the window translates. Additive like `dedupe`. */
+	error?: TaskError_Deserialize | null,
 };
 
 /**
@@ -5114,6 +5133,8 @@ export type TaskView_Serialize = {
 	 *  gets [`TaskDedupe::Other`], so this is not an on-disk format migration.
 	 */
 	dedupe?: TaskDedupe,
+	/**  Why a failed task failed, as the error code and values the window translates. Additive like `dedupe`. */
+	error?: TaskError_Serialize,
 };
 
 /**  A tool of the game in the view. `folder` is `None` when its program is not in the game folder. */

@@ -6,6 +6,7 @@
 
 task_commands::list_tasks
 task_commands::cancel_task
+task_commands::dismiss_task
 games::list_games
 games::game_icon
 games::export_definition

@@ -12,8 +12,10 @@ export interface Task {
 	kind: TaskKind;
 	/// The line the user reads first, already translated.
 	title: string;
-	/// A second line with the file, the stage or the failure.
+	/// A second line with the file, the stage or the item the work is about.
 	detail?: string;
+	/// Why a failed task failed, already translated. Shown in full under the title.
+	error?: string;
 	/// 0–100 when the operation can measure itself.
 	percent?: number;
 	state: TaskState;

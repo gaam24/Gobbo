@@ -301,6 +301,7 @@ function registryTasks(tasks: readonly RegisteredTask[], games: Array<{ id: stri
 		kind: task.kind,
 		title: task.title,
 		detail: task.detail,
+		error: task.error,
 		percent: task.percent,
 		state: task.state,
 		game: task.game,

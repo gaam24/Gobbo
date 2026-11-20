@@ -1,7 +1,8 @@
-import { commands, type TASK_KINDS, type TaskDedupe, type TaskView_Serialize } from "@/bindings";
+import { commands, type TASK_KINDS, type TaskDedupe, type TaskError, type TaskView_Serialize } from "@/bindings";
 import { type TranslationKey, useTranslation } from "@/i18n";
 import { createStore, useStore } from "@/lib/external-store";
-import { unwrap } from "@/lib/ipc";
+import { errorText, unwrap } from "@/lib/ipc";
+import { fileName } from "@/lib/paths";
 import type { TaskKind } from "@/lib/tasks";
 import { useTauriListener } from "@/lib/use-tauri-listener";
 
@@ -23,6 +24,8 @@ export interface RegisteredTask {
 	/// Already translated by the feature that registered the task.
 	title: string;
 	detail?: string;
+	/// Why the work failed, already translated.
+	error?: string;
 	percent?: number;
 	state: RegisteredTaskState;
 	cancel?: TaskAction;
@@ -94,6 +97,8 @@ export interface BackendTaskPayload {
 	percent?: number;
 	/// Optional because a journal row written before the typed identity existed has no discriminator.
 	dedupe?: TaskDedupe;
+	/// Why a failed task failed. Absent on rows of other states and on journals written before the field existed.
+	error?: TaskError | null;
 }
 
 /// The codes the backend can emit, from the generated binding. The Rust `TASK_KINDS` list is the single source, so a
@@ -115,8 +120,8 @@ const REQUIRED_BACKEND_KINDS: Record<BackendTaskCode, KindEntry> = {
 	pack: { kind: "import", label: "tasks.kind.pack" },
 	"pack-link": { kind: "download", label: "tasks.kind.pack-link" },
 	collection: { kind: "collection", label: "tasks.kind.collection" },
-	launch: { kind: "launch", label: "tasks.kind.launch" },
-	install: { kind: "install", label: "tasks.kind.install" },
+	launch: { kind: "launch", label: "tasks.kind.tool" },
+	install: { kind: "install", label: "tasks.kind.toolInstall" },
 };
 
 /// The lookup also keeps a few frontend-only codes that older callers pass in; every backend code comes from the typed
@@ -164,8 +169,49 @@ export function backendActionsOf(kind: string): BackendTaskActions {
 
 type Translate = ReturnType<typeof useTranslation>["t"];
 
-export function backendTaskTitle(code: string, t: Translate): string {
+/// The title of a failed row says what failed ("Import failed"), not what was running ("Importing files…").
+const FAILED_TITLE: Record<BackendTaskCode, TranslationKey> = {
+	import: "tasks.failedKind.import",
+	update: "tasks.failedKind.update",
+	"update-all": "tasks.failedKind.update-all",
+	requirement: "tasks.failedKind.requirement",
+	apply: "tasks.failedKind.apply",
+	pack: "tasks.failedKind.pack",
+	"pack-link": "tasks.failedKind.pack-link",
+	collection: "tasks.failedKind.collection",
+	launch: "tasks.failedKind.launch",
+	install: "tasks.failedKind.install",
+};
+
+function isBackendCode(code: string): code is BackendTaskCode {
+	return code in FAILED_TITLE;
+}
+
+export function backendTaskTitle(code: string, state: string, t: Translate): string {
+	if (state === "failed") return t(isBackendCode(code) ? FAILED_TITLE[code] : "tasks.failedKind.generic");
 	return t(BACKEND_KINDS[code]?.label ?? "tasks.kind.generic");
+}
+
+/// The item a backend row is about, read from its typed identity: the archive, the pack, the link, the collection or the
+/// tool. The game is not repeated here; the Working panel already groups the rows by game.
+export function backendTaskDetail(dedupe: TaskDedupe | undefined): string | undefined {
+	if (dedupe === undefined || dedupe === "Other") return undefined;
+
+	if ("Import" in dedupe && dedupe.Import) return fileName(dedupe.Import.path);
+
+	if ("Pack" in dedupe && dedupe.Pack) return fileName(dedupe.Pack.path);
+
+	if ("PackLink" in dedupe && dedupe.PackLink) return dedupe.PackLink.link;
+
+	if ("Collection" in dedupe && dedupe.Collection) return dedupe.Collection.collection;
+
+	if ("Tool" in dedupe && dedupe.Tool) return dedupe.Tool.tool;
+	return undefined;
+}
+
+/// The translated reason of a failed backend row.
+export function backendTaskError(error: TaskError | null | undefined): string | undefined {
+	return error ? errorText({ code: error.code, params: error.params ?? {}, kind: "user_action" }) : undefined;
 }
 
 function backendState(state: string): RegisteredTaskState {
@@ -184,6 +230,8 @@ export function backendTaskFromPayload(payload: BackendTaskPayload, title: strin
 		game: payload.game,
 		kind: backendTaskKind(payload.kind),
 		title,
+		detail: backendTaskDetail(payload.dedupe),
+		error: backendTaskError(payload.error),
 		state: backendState(payload.state),
 		percent: payload.percent ?? undefined,
 		source: "backend",
@@ -213,6 +261,7 @@ export function normalizeBackendTask(task: TaskView_Serialize): BackendTaskPaylo
 		state: task.state,
 		percent: task.percent ?? undefined,
 		dedupe: task.dedupe,
+		error: task.error,
 	};
 }
 
@@ -237,10 +286,18 @@ export function useBackendTasks(): void {
 		/// or waiting row has no flag: it offers the Retry/Open actions a feature registered for its kind. Rows hydrated
 		/// from the `listTasks` snapshot go through the same mapping as live events, so a restart keeps their actions.
 		const fromBackend = (payload: BackendTaskPayload): RegisteredTask => {
-			const task = backendTaskFromPayload(payload, backendTaskTitle(payload.kind, t), backendActionsOf(payload.kind));
+			const task = backendTaskFromPayload(payload, backendTaskTitle(payload.kind, payload.state, t), backendActionsOf(payload.kind));
 
 			if (task.state === "running") {
 				task.cancel = { label: t("common.cancel"), run: () => void commands.cancelTask(payload.id) };
+			}
+
+			// A failure stays in the backend journal until the user has read it; dismissing forgets it there too.
+			if (task.state === "failed") {
+				task.dismiss = () => {
+					removeTask(payload.id);
+					void commands.dismissTask(payload.id);
+				};
 			}
 
 			return task;

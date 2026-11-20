@@ -385,7 +385,22 @@ const pl = {
 			collection: "Instalowanie kolekcji…",
 			pack: "Importowanie paczki modów…",
 			"pack-link": "Pobieranie paczki modów…",
+			tool: "Uruchamianie narzędzia…",
+			toolInstall: "Instalowanie wymagań narzędzia…",
 			generic: "W toku…",
+		},
+		failedKind: {
+			import: "Import się nie udał",
+			update: "Aktualizacja się nie udała",
+			"update-all": "Aktualizacja modów się nie udała",
+			requirement: "Instalacja wymagania się nie udała",
+			apply: "Stosowanie modów się nie udało",
+			pack: "Import paczki modów się nie udał",
+			"pack-link": "Pobieranie paczki modów się nie udało",
+			collection: "Instalacja kolekcji się nie udała",
+			launch: "Uruchomienie narzędzia się nie udało",
+			install: "Instalacja wymagań narzędzia się nie udała",
+			generic: "Zadanie się nie udało",
 		},
 	},
 	/** Natywne menu w zasobniku. Jest budowane w Rust, więc te teksty są wysyłane do backendu przy zmianie języka. */
@@ -2588,6 +2603,9 @@ const pl = {
 		},
 	},
 	errors: {
+		tasks: {
+			interrupted: "Gobbo został zamknięty w trakcie tej operacji. Uruchom ją jeszcze raz.",
+		},
 		diagnostics: {
 			orphan_invalid: "Ten folder nie jest już osierocony, więc Gobbo go nie usunął: {{path}}",
 		},

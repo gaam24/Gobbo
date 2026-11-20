@@ -549,6 +549,7 @@ mod tests {
             state: "waiting".to_owned(),
             percent: None,
             dedupe: TaskDedupe::Other,
+            error: None,
         });
         let rendered = render(&current, &TrayLabels::default());
         assert_eq!(rendered.icon, IconState::Attention);

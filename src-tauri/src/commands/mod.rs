@@ -74,11 +74,10 @@ pub async fn run_task<T: Send + 'static>(
         work(root, game, flag.as_ref(), handle)
     })
     .await;
-    let state = match &result {
-        Ok(_) => task_commands::state::DONE,
-        Err(error) => task_state_for_failure(error),
-    };
-    tasks.finish(&key, state);
+    match &result {
+        Ok(_) => tasks.finish(&key, task_commands::state::DONE),
+        Err(error) => tasks.finish_with(&key, task_state_for_failure(error), Some(error)),
+    }
     result
 }
 
@@ -103,7 +102,7 @@ pub async fn start_detached_task<T: Send + 'static>(
     .await;
 
     if let Err(ref error) = result {
-        tasks.finish(&key, task_state_for_failure(error));
+        tasks.finish_with(&key, task_state_for_failure(error), Some(error));
     }
 
     result

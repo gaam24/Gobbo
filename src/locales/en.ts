@@ -377,7 +377,23 @@ const en = {
 			collection: "Installing collection…",
 			pack: "Importing a mod pack…",
 			"pack-link": "Downloading a mod pack…",
+			tool: "Running a tool…",
+			toolInstall: "Installing tool prerequisites…",
 			generic: "Working…",
+		},
+		/// The title of a failed row, by the backend's task kind.
+		failedKind: {
+			import: "Import failed",
+			update: "Update failed",
+			"update-all": "Updating mods failed",
+			requirement: "Requirement install failed",
+			apply: "Applying mods failed",
+			pack: "Mod pack import failed",
+			"pack-link": "Mod pack download failed",
+			collection: "Collection install failed",
+			launch: "Tool run failed",
+			install: "Tool prerequisites failed",
+			generic: "Task failed",
 		},
 	},
 	/** The native tray menu. It is built in Rust, so these strings are sent to the backend when the language changes. */
@@ -2480,6 +2496,9 @@ const en = {
 		},
 	},
 	errors: {
+		tasks: {
+			interrupted: "Gobbo was closed while this was running. Start it again when you are ready.",
+		},
 		diagnostics: {
 			orphan_invalid: "This folder isn't an orphan anymore, so it wasn't removed: {{path}}",
 		},
