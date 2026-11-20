@@ -82,6 +82,7 @@ use windows_sys::Win32::System::LibraryLoader::DisableThreadLibraryCalls;
 use windows_sys::Win32::System::SystemServices::{DLL_PROCESS_ATTACH, DLL_PROCESS_DETACH};
 use windows_sys::Win32::System::Threading::{EVENT_MODIFY_STATE, OpenEventW, SetEvent};
 
+use crate::detours::{ESSENTIAL, PROCESS, PROCESS_INTERNAL};
 use crate::state::{Mount, Mounts};
 use trace::log;
 
@@ -232,24 +233,8 @@ fn install() -> bool {
     let enabled = statuses.iter().filter(|status| status.is_enabled()).count();
     let failed = statuses.iter().filter(|status| status.is_failed()).count();
     // The launcher may resume the game only when every hook the overlay needs is active. Optional hooks (links,
-    // replace, tracing) may be missing without letting the game run against the real folder.
-    const ESSENTIAL: [&str; 9] = [
-        "create_file",
-        "nt_create_file",
-        "nt_open_file",
-        "nt_query_attributes_file",
-        "nt_query_full_attributes_file",
-        "nt_set_information_file",
-        "find_first",
-        "find_first_ex",
-        "get_final_path",
-    ];
-    // Child injection has one of three hooks: the undocumented export, and the documented fallbacks.
-    const PROCESS: [&str; 3] = [
-        "create_process",
-        "create_process_w",
-        "create_process_as_user",
-    ];
+    // replace, tracing) may be missing without letting the game run against the real folder. The two lists live next
+    // to the detour table so a renamed field has one place to be fixed.
     let is_enabled = |name: &str| {
         statuses
             .iter()
@@ -257,7 +242,7 @@ fn install() -> bool {
     };
     let ready = ESSENTIAL.iter().all(|name| is_enabled(name))
         && PROCESS.iter().any(|name| is_enabled(name));
-    crate::process::set_internal_hook(is_enabled("create_process"));
+    crate::process::set_internal_hook(is_enabled(PROCESS_INTERNAL));
     diag::write_session(
         &config,
         &statuses,

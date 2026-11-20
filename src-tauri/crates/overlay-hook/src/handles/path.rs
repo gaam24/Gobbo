@@ -21,13 +21,11 @@ use crate::win32::PreserveLastError;
 /// The volume name form is the low bits of the flags of `GetFinalPathNameByHandleW`.
 pub(super) const VOLUME_NAME_MASK: u32 = 0x7;
 
-/// The layer a handle names, when it can be told without building the path as a `String`.
+/// Whether a path lies inside a mount's layers or outside every mount, the only distinction callers ask for.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum LayerKind {
-    /// A file of the upper layer: a write or a delete acts there.
-    Upper,
-    /// A file of a lower layer: a write or a delete would reach it.
-    Lower,
+    /// A path inside at least one mount's layers; the layers decide the answer.
+    InLayer,
     /// A path outside every mount; the call passes through.
     Outside,
 }
@@ -88,18 +86,18 @@ fn mount_text() -> Option<&'static [MountText]> {
         .as_deref()
 }
 
-/// The layer a handle names, without allocating the path. `None` when the path is unavailable, too long for the stack
-/// buffer, or the mounts are not stored; the caller then uses the allocating path.
+/// Whether a handle's path is inside a mount, without allocating the path. `None` when the path is unavailable, too long
+/// for the stack buffer, or the mounts are not stored; the caller then uses the allocating path.
 pub(crate) fn layer_kind(handle: *mut c_void) -> Option<LayerKind> {
     let text = mount_text()?;
     let mut buffer = [0u16; 512];
     let length = final_path_units(handle, &mut buffer)?;
-    Some(classify_units(&buffer[..length], text))
+    Some(classify_kind(&buffer[..length], text))
 }
 
-/// The layer a final path names, given the cached mount text, without building a `String`.
+/// Whether a final path is inside a mount, given the cached mount text, without building a `String`.
 pub(crate) fn layer_kind_units(path: &[u16]) -> Option<LayerKind> {
-    Some(classify_units(path, mount_text()?))
+    Some(classify_kind(path, mount_text()?))
 }
 
 /// The final DOS path of a handle in `buffer`, or `None` when Windows gives none or it does not fit.
@@ -108,14 +106,14 @@ pub(crate) fn final_path_units(handle: *mut c_void, buffer: &mut [u16; 512]) -> 
     unsafe { final_path_units_with(handle, VOLUME_NAME_DOS, buffer) }
 }
 
-/// The layer and the real DOS path of a handle, from one `GetFinalPathNameByHandleW`. A directory query needs both;
-/// asking `layer_kind` and then `layer_path` called the same API twice. The path of an outside handle is empty: the
-/// caller passes through and never uses it, so the pass-through path does not allocate.
+/// Whether a handle is inside a mount and its real DOS path, from one `GetFinalPathNameByHandleW`. A directory query
+/// needs both; asking `layer_kind` and then `layer_path` called the same API twice. The path of an outside handle is
+/// empty: the caller passes through and never uses it, so the pass-through path does not allocate.
 pub(crate) fn layer_path_kind(handle: *mut c_void) -> Option<(LayerKind, String)> {
     let text = mount_text()?;
     let mut buffer = [0u16; 512];
     let length = final_path_units(handle, &mut buffer)?;
-    let kind = classify_units(&buffer[..length], text);
+    let kind = classify_kind(&buffer[..length], text);
 
     if kind == LayerKind::Outside {
         return Some((kind, String::new()));
@@ -124,21 +122,18 @@ pub(crate) fn layer_path_kind(handle: *mut c_void) -> Option<(LayerKind, String)
     Some((kind, String::from_utf16_lossy(&buffer[..length])))
 }
 
-/// The layer a final path names, given the cached mount text, without building a `String`.
-fn classify_units(path: &[u16], mounts: &[MountText]) -> LayerKind {
+/// Whether a final path is inside any mount's layers, given the cached mount text.
+fn classify_kind(path: &[u16], mounts: &[MountText]) -> LayerKind {
     for text in mounts {
-        if strip_prefix_ci_units(path, &text.upper_units).is_some() {
-            return LayerKind::Upper;
-        }
-
-        if strip_prefix_ci_units(path, &text.root_units).is_some()
+        if strip_prefix_ci_units(path, &text.upper_units).is_some()
+            || strip_prefix_ci_units(path, &text.root_units).is_some()
             || text
                 .staging_units
                 .as_deref()
                 .is_some_and(|staging| strip_prefix_ci_units(path, staging).is_some())
             || strip_prefix_ci_units(path, &text.guest_units).is_some()
         {
-            return LayerKind::Lower;
+            return LayerKind::InLayer;
         }
     }
 
@@ -158,7 +153,7 @@ pub(crate) fn outside_path_units(handle: *mut c_void, buffer: &mut [u16; 512]) -
     let mounts = mount_text()?;
     let length = final_path_units(handle, buffer)?;
 
-    if classify_units(&buffer[..length], mounts) != LayerKind::Outside {
+    if classify_kind(&buffer[..length], mounts) != LayerKind::Outside {
         return None;
     }
 
@@ -177,13 +172,13 @@ pub(crate) fn outside_path_units(handle: *mut c_void, buffer: &mut [u16; 512]) -
 pub(crate) fn program_path(handle: *mut c_void) -> Option<String> {
     let path = layer_path(handle)?;
     let path = map_layer_path_cached(&path).unwrap_or(path);
-    Some(path.strip_prefix(r"\\?\").unwrap_or(&path).to_string())
+    Some(strip_verbatim_str(&path).to_string())
 }
 
 /// The mount and relative path when `path` is in the upper layer of a mount. `None` when it is elsewhere.
 pub(crate) fn relative_in_upper(path: &str) -> Option<(&'static Mount, String)> {
     let text = mount_text()?;
-    let path = path.strip_prefix(r"\\?\").unwrap_or(path);
+    let path = strip_verbatim_str(path);
     text.iter()
         .find_map(|mount| relative_to(&mount.upper, path).map(|rel| (mount.mount, rel)))
 }
@@ -192,7 +187,7 @@ pub(crate) fn relative_in_upper(path: &str) -> Option<(&'static Mount, String)> 
 /// be changed in place.
 pub(crate) fn relative_in_lower_layers(path: &str) -> Option<(&'static Mount, String)> {
     let text = mount_text()?;
-    let path = path.strip_prefix(r"\\?\").unwrap_or(path);
+    let path = strip_verbatim_str(path);
     text.iter()
         .find_map(|mount| relative_in_lower(mount, path).map(|rel| (mount.mount, rel)))
 }
@@ -200,7 +195,7 @@ pub(crate) fn relative_in_lower_layers(path: &str) -> Option<(&'static Mount, St
 /// The mount and relative path when `path` is in any layer.
 pub(crate) fn relative_in_layers(path: &str) -> Option<(&'static Mount, String)> {
     let text = mount_text()?;
-    let path = path.strip_prefix(r"\\?\").unwrap_or(path);
+    let path = strip_verbatim_str(path);
     text.iter().find_map(|mount| {
         relative_to(&mount.upper, path)
             .or_else(|| relative_in_lower(mount, path))
@@ -306,8 +301,9 @@ pub(super) fn original_path(handle: *mut c_void, flags: u32) -> Option<String> {
             buffer.truncate(length as usize);
             return Some(String::from_utf16_lossy(&buffer));
         }
-        // The call returns the size needed, including the terminator, when the buffer is too small.
-        size = length as usize;
+        // The call returns the size needed, including the terminator, when the buffer is too small. Doubling makes every
+        // retry grow, even when that size equals the buffer just tried.
+        size = size.saturating_mul(2);
 
         if size > 32_768 {
             return None;
@@ -427,6 +423,12 @@ fn strip_verbatim_units(path: &[u16], out: &mut [u16]) -> Option<usize> {
     }
 
     copy_units(text, out)
+}
+
+/// The string form of `strip_verbatim_units`: a path without the `\\?\` prefix. A UNC volume keeps its `UNC\` marker
+/// for the caller that needs the `\\` spelling.
+fn strip_verbatim_str(path: &str) -> &str {
+    path.strip_prefix(r"\\?\").unwrap_or(path)
 }
 
 /// `without_volume` for a UTF-16 path, in a caller's stack buffer. No allocation.
@@ -689,7 +691,7 @@ fn join_units(base: &[u16], rest: &[u16]) -> Vec<u16> {
 
 /// A path without its volume, as `VOLUME_NAME_NONE` asks: `\...`; for a server, `\\server\share\...`.
 pub(crate) fn without_volume(path: &str) -> String {
-    let text = path.strip_prefix(r"\\?\").unwrap_or(path);
+    let text = strip_verbatim_str(path);
 
     if let Some(server) = text.strip_prefix(r"UNC\") {
         return format!(r"\\{server}");

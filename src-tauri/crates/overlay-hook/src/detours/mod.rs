@@ -197,7 +197,7 @@ fn skipped(name: &str) -> bool {
         return true;
     }
 
-    !diag::settings().calls && matches!(name, "get_file_information")
+    !diag::settings().calls && TRACE_ONLY.contains(&name)
 }
 
 /// Marks the status with `name` as enabled in the list `create` built.
@@ -254,6 +254,39 @@ detours! {
     nt_query_information_file: crate::types::NtQueryInformationFileFn = Nt "NtQueryInformationFile" => crate::file_info::nt_query_information_file;
 }
 
+/// The field name of the trace-only information hook, shared by the auto-disable rule and the warning rule.
+pub(crate) const TRACE_ONLY_HOOK: &str = "get_file_information";
+
+/// Hooks left off automatically when per-call tracing is off: they only feed `GOBBO_OVERLAY_CALLS`.
+pub(crate) const TRACE_ONLY: [&str; 1] = [TRACE_ONLY_HOOK];
+
+/// Hooks exempt from the "you disabled a hook" warning: information hooks whose absence is not a loss of redirection.
+/// This is a reporting rule, separate from the auto-disable rule above.
+pub(crate) const NO_DISABLE_WARNING: [&str; 2] = [TRACE_ONLY_HOOK, "nt_query_information_file"];
+
+/// The hooks the overlay needs active before the game may run: without one of them a path to the real folder stays open.
+pub(crate) const ESSENTIAL: [&str; 9] = [
+    "create_file",
+    "nt_create_file",
+    "nt_open_file",
+    "nt_query_attributes_file",
+    "nt_query_full_attributes_file",
+    "nt_set_information_file",
+    "find_first",
+    "find_first_ex",
+    "get_final_path",
+];
+
+/// The field name of the undocumented internal process hook, shared by the fallback path and the readiness gate.
+pub(crate) const PROCESS_INTERNAL: &str = "create_process";
+
+/// Child-start hooks: one of these must be active for a child to be hooked.
+pub(crate) const PROCESS: [&str; 3] = [
+    PROCESS_INTERNAL,
+    "create_process_w",
+    "create_process_as_user",
+];
+
 /// The detours of the file API, in `module`, and of the NT layer in `ntdll`. `KernelBase` exports the file API from
 /// Windows 8 on, and `kernel32` only forwards to it. A program that imports from `KernelBase` skips `kernel32`, so the
 /// hooks go where every call ends up.
@@ -270,4 +303,25 @@ pub(crate) unsafe fn create_hooks() -> (Hooks, Vec<HookStatus>) {
     log(&format!("the file API is in {file}"));
 
     unsafe { Hooks::create(file) }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Creating a detour leaves it disabled, so the table can be asked for its names without hooking this process.
+    #[test]
+    fn every_named_hook_is_a_field_of_the_table() {
+        let (_hooks, statuses) = unsafe { create_hooks() };
+        let names: Vec<&str> = statuses.iter().map(|status| status.name).collect();
+
+        for name in ESSENTIAL
+            .iter()
+            .chain(PROCESS.iter())
+            .chain(TRACE_ONLY.iter())
+            .chain(NO_DISABLE_WARNING.iter())
+        {
+            assert!(names.contains(name), "the hook table has no '{name}'");
+        }
+    }
 }

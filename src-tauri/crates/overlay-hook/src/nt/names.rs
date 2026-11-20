@@ -5,7 +5,7 @@ use std::ffi::c_void;
 use std::os::windows::ffi::OsStrExt;
 use std::path::Path;
 
-use windows_sys::Win32::Foundation::ERROR_ACCESS_DENIED;
+use windows_sys::Win32::Foundation::STATUS_ACCESS_DENIED;
 
 use crate::handles;
 use crate::paths::{
@@ -188,10 +188,6 @@ pub(super) unsafe fn redirect_nt(
     writing: bool,
     keeps_contents: bool,
 ) -> Option<Result<Redirected, Failure>> {
-    if writing && unsafe { object_unsafe(attributes) } {
-        return Some(Err(Failure::Denied(ERROR_ACCESS_DENIED)));
-    }
-
     let place = unsafe { place_name(attributes) }?;
     let target = redirect_relative_on(place.mount, &place.rel, writing, keeps_contents);
     Some(target.map(|target| match target {
@@ -215,6 +211,28 @@ unsafe fn object_unsafe(attributes: *const ObjectAttributes) -> bool {
         return false;
     };
     unsafe_units(unsafe { name_units(name) })
+}
+
+/// Refuses a write through a device namespace before the object name is classified: trace the refusal, then return
+/// `STATUS_ACCESS_DENIED` without a decision record. A read is never refused here, so it still passes through.
+///
+/// # Safety
+/// `attributes` must be null or point to a valid `OBJECT_ATTRIBUTES`, with a valid name string.
+pub(super) unsafe fn refuse_device_write(
+    attributes: *const ObjectAttributes,
+    writing: bool,
+    operation: &str,
+) -> Option<i32> {
+    if !writing || !unsafe { object_unsafe(attributes) } {
+        return None;
+    }
+
+    crate::trace::trace(|| {
+        format!("{operation} refused a device namespace: {}", unsafe {
+            object_name(attributes)
+        })
+    });
+    Some(STATUS_ACCESS_DENIED)
 }
 
 /// Makes an NT call with the name the layers pick. `redirected` is that name when a layer has it, or the `Missing` error

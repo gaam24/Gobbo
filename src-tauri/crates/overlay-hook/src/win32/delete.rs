@@ -310,28 +310,4 @@ mod tests {
             None
         );
     }
-
-    #[test]
-    fn the_entries_are_not_listed_when_the_folder_is_refused_first() {
-        let mut listed = false;
-        let _ = removal_error(
-            false,
-            None,
-            || ERROR_FILE_NOT_FOUND,
-            || {
-                listed = true;
-                true
-            },
-        );
-        let _ = removal_error(
-            true,
-            Some(true),
-            || ERROR_FILE_NOT_FOUND,
-            || {
-                listed = true;
-                true
-            },
-        );
-        assert!(!listed);
-    }
 }

@@ -9,7 +9,9 @@ use windows_sys::Win32::Foundation::{STATUS_OBJECT_NAME_COLLISION, STATUS_UNSUCC
 use super::layout::{
     FILE_CREATE, FILE_DELETE_ON_CLOSE, FILE_OPEN, FILE_OVERWRITE, FILE_OVERWRITE_IF, FILE_SUPERSEDE,
 };
-use super::names::{call_redirected, object_name, place_name, redirect_nt, shown_object};
+use super::names::{
+    call_redirected, object_name, place_name, redirect_nt, refuse_device_write, shown_object,
+};
 use super::trace_nt;
 use crate::diag::record_decision;
 use crate::guard::{Guard, enter_session};
@@ -40,6 +42,11 @@ pub(crate) unsafe extern "system" fn nt_create_file(
     unsafe { trace_nt("NtCreateFile", attributes) };
     // As `CreateFileW`: keep the guard for the whole call, so the hook does not see its own redirected name again.
     let guard = Guard::enter();
+    let writing = writes_requested(access) || (disposition != FILE_OPEN);
+    // The device check stays ahead of classification: the name here is still the one the program passed.
+    if let Some(status) = unsafe { refuse_device_write(attributes, writing, "NtCreateFile") } {
+        return status;
+    }
     // A new file over a name the layers show fails before anything is copied.
     let taken =
         guard.is_some() && disposition == FILE_CREATE && unsafe { shown_object(attributes) };
@@ -53,7 +60,6 @@ pub(crate) unsafe extern "system" fn nt_create_file(
         return STATUS_OBJECT_NAME_COLLISION;
     }
 
-    let writing = writes_requested(access) || (disposition != FILE_OPEN);
     let keeps_contents = !matches!(
         disposition,
         FILE_SUPERSEDE | FILE_OVERWRITE | FILE_OVERWRITE_IF
@@ -110,6 +116,9 @@ pub(crate) unsafe extern "system" fn nt_open_file(
     unsafe { trace_nt("NtOpenFile", attributes) };
     let guard = Guard::enter();
     let writing = writes_requested(access);
+    if let Some(status) = unsafe { refuse_device_write(attributes, writing, "NtOpenFile") } {
+        return status;
+    }
     let redirected = unsafe {
         redirect_open(
             "NtOpenFile",
@@ -135,7 +144,8 @@ pub(crate) unsafe extern "system" fn nt_open_file(
     result
 }
 
-/// Redirects an open or create, records the decision, and logs a pass-through write.
+/// Redirects an open or create, records a decision for refusals after classification, and logs a pass-through write. A
+/// device-namespace write is refused by the caller before this runs, so every error recorded here was classified.
 ///
 /// # Safety
 /// `attributes` must be the `OBJECT_ATTRIBUTES` the program passed, and `guard` the guard the caller entered.

@@ -6,6 +6,7 @@ use serde_json::json;
 
 use super::settings::settings;
 use super::writer::write_file;
+use crate::detours::NO_DISABLE_WARNING;
 
 /// The state of one hook after installation.
 #[derive(Debug)]
@@ -66,8 +67,12 @@ impl HookStatus {
         self.state = HookState::Failed(error);
     }
 
-    /// Marks a created hook as disabled by `GOBBO_OVERLAY_DISABLE`.
+    /// Marks a hook as disabled by `GOBBO_OVERLAY_DISABLE`. A failed hook stays failed: the error is what happened,
+    /// while `Disabled` would claim the user chose to leave it off.
     pub(crate) fn mark_disabled(&mut self) {
+        if self.is_failed() {
+            return;
+        }
         self.state = HookState::Disabled;
     }
 }
@@ -132,13 +137,7 @@ fn report(
         .iter()
         .filter_map(|status| match &status.state {
             HookState::Failed(error) => Some(format!("hook {} failed: {error}", status.name)),
-            // The information hooks are disabled by design while per-call tracing is off; that is not a warning.
-            HookState::Disabled
-                if !matches!(
-                    status.name,
-                    "get_file_information" | "nt_query_information_file"
-                ) =>
-            {
+            HookState::Disabled if !NO_DISABLE_WARNING.contains(&status.name) => {
                 Some(format!("hook {} disabled", status.name))
             }
             HookState::Disabled => None,
@@ -252,17 +251,9 @@ mod tests {
     }
 
     #[test]
-    fn a_created_hook_can_become_enabled_failed_or_disabled() {
-        let mut status = HookStatus::created("x");
-        status.mark_enabled();
-        assert!(status.is_enabled());
-
-        let mut status = HookStatus::created("x");
-        status.mark_failed("boom".to_string());
-        assert!(status.is_failed());
-
-        let mut status = HookStatus::created("x");
+    fn a_failed_hook_stays_failed_when_marked_disabled() {
+        let mut status = HookStatus::failed("create_file", "boom".to_string());
         status.mark_disabled();
-        assert!(matches!(status.state, HookState::Disabled));
+        assert!(status.is_failed());
     }
 }

@@ -81,7 +81,8 @@ struct ProcessInformation {
 /// Whether `CreateProcessInternalW` is hooked and enabled. When it is, the documented `CreateProcessW` and
 /// `CreateProcessAsUserW` hooks leave the start to it, so a process is suspended and injected once.
 fn internal_present() -> bool {
-    !crate::diag::settings().disabled("create_process") && INTERNAL_HOOK.load(Ordering::Acquire)
+    !crate::diag::settings().disabled(crate::detours::PROCESS_INTERNAL)
+        && INTERNAL_HOOK.load(Ordering::Acquire)
 }
 
 /// `CreateProcessInternalW`: the child starts suspended, the hook is loaded into it, and then it runs, unless the caller

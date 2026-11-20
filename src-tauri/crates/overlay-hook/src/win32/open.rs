@@ -47,10 +47,13 @@ pub(crate) unsafe extern "system" fn create_file(
     }
 
     let writing = writes_requested(access) || disposition != OPEN_EXISTING;
-    // A device namespace can alias a file in the game folder; a write through it must not pass through unchanged.
+    // A device namespace can alias a file in the game folder; a write through it must not pass through unchanged. The
+    // name is still unclassified here, so this refusal is traced but builds no ring path.
     if writing && unsafe { unsafe_name(name) } {
-        record_decision(Kind::Refuse, Layer::None, ERROR_ACCESS_DENIED, || unsafe {
-            crate::text::display_name(name)
+        crate::trace::trace(|| {
+            format!("CreateFileW refused a device namespace: {}", unsafe {
+                crate::text::display_name(name)
+            })
         });
         fail(ERROR_ACCESS_DENIED);
         return INVALID_HANDLE_VALUE;
