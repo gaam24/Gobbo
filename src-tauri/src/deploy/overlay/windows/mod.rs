@@ -10,7 +10,8 @@ use std::os::windows::io::AsRawHandle;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-use gobbo_overlay_core::{ENV_EARLY, ENV_MOUNTS, Layer, Layers, join_rel, relative_to};
+use gobbo_overlay_core::early::{ENV, FILE_NAME};
+use gobbo_overlay_core::{ENV_MOUNTS, Layer, Layers, join_rel, relative_to};
 use gobbo_overlay_decisions::ENV_RING;
 use gobbo_overlay_launch::{Hooked, stage0};
 
@@ -68,12 +69,13 @@ pub fn start(
     // Start the 32-bit helper now, so its process start and socket bind overlap the program read and the sweep.
     let pending32 = dump32::spawn(&session.state);
     // The early redirect of this launch: its handover file is written by the launcher before the game runs. A file left
-    // by an earlier launch must not be read, because its addresses belong to another process.
-    let handover = session.state.join(EARLY_FILE);
+    // by an earlier launch must not be read, because its addresses belong to another process. The file name and the
+    // variable that names it are shared with the hook through `gobbo_overlay_core::early`.
+    let handover = session.state.join(FILE_NAME);
     let _ = std::fs::remove_file(&handover);
     let early = early_config(&layers)?;
     let mut mount_env = vec![(ENV_MOUNTS.to_string(), mounts_path.display().to_string())];
-    mount_env.push((ENV_EARLY.to_string(), handover.display().to_string()));
+    mount_env.push((ENV.to_string(), handover.display().to_string()));
     // A DLL the executable imports statically is loaded before any program code. The launcher points those imports at
     // the mod layer, because the hook is not installed early enough for the loader's own import lookup.
     let imports = static_imports_for(&layers, Path::new(program));
@@ -280,9 +282,6 @@ fn resolved_imports(layers: &Layers, program: &Path) -> (Vec<ResolvedImport>, Ve
 
     (imports, reserved)
 }
-
-/// The file the launcher writes with the early redirect's handover. The variable that names it is shared with the hook.
-const EARLY_FILE: &str = "early-redirect.txt";
 
 /// The early redirect of a session: the game folder served from the mod layer. `None` when the session has no layer.
 fn early_config(layers: &Layers) -> Result<Option<stage0::logic::Config>, DeployError> {

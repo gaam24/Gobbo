@@ -2211,6 +2211,7 @@ dependencies = [
 name = "gobbo-overlay-launch"
 version = "0.1.0"
 dependencies = [
+ "gobbo-overlay-core",
  "gobbo-overlay-pe",
  "iced-x86",
  "windows-sys 0.61.2",

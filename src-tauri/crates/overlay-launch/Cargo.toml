@@ -12,6 +12,8 @@ name = "gobbo_overlay_inject32"
 path = "src/bin/inject32.rs"
 
 [target.'cfg(windows)'.dependencies]
+# The handover grammar is shared with the hook.
+gobbo-overlay-core.workspace = true
 # Used only by the Windows-gated `static_imports` module, which parses the program's PE imports.
 gobbo-overlay-pe.workspace = true
 # Decodes the first instructions of a loader stub. The same crate is already in the lock file through `detour`.

@@ -12,12 +12,12 @@ use windows_sys::Win32::System::Memory::{PAGE_EXECUTE_READWRITE, VirtualProtect}
 use windows_sys::Win32::System::Threading::GetCurrentProcess;
 
 use crate::trace::log;
-use gobbo_overlay_core::ENV_EARLY;
+use gobbo_overlay_core::early::{ENV, Line, parse_line};
 
 /// Restores the stubs and switches the stage 0 redirect off, then removes the handover file. Called before the hook
 /// creates its own detours.
 pub(crate) fn restore() {
-    let Some(path) = std::env::var_os(ENV_EARLY) else {
+    let Some(path) = std::env::var_os(ENV) else {
         return;
     };
     let Ok(text) = std::fs::read_to_string(&path) else {
@@ -26,23 +26,14 @@ pub(crate) fn restore() {
     let mut stubs = 0;
 
     for line in text.lines() {
-        let mut parts = line.split_whitespace();
-
-        match (parts.next(), parts.next(), parts.next()) {
-            (Some("config"), Some(address), None) => match parse_address(address) {
-                Some(address) => write(address, &0u32.to_le_bytes()),
-                None => log("early redirect: the configuration address is not a number"),
-            },
-            (Some("stub"), Some(address), Some(hex)) => {
-                match (parse_address(address), parse_hex(hex)) {
-                    (Some(address), Some(original)) => {
-                        write(address, &original);
-                        stubs += 1;
-                    }
-                    _ => log("early redirect: a stub line is not valid"),
-                }
+        match parse_line(line) {
+            Some(Line::Config(address)) => write(address, &0u32.to_le_bytes()),
+            Some(Line::Stub { address, original }) => {
+                write(address, &original);
+                stubs += 1;
             }
-            _ => {}
+            None if line.trim().is_empty() => {}
+            None => log("early redirect: a line is not valid"),
         }
     }
 
@@ -50,21 +41,6 @@ pub(crate) fn restore() {
         "early redirect: {stubs} stubs handed back to the hook"
     ));
     let _ = std::fs::remove_file(&path);
-}
-
-fn parse_address(text: &str) -> Option<usize> {
-    text.parse().ok()
-}
-
-fn parse_hex(text: &str) -> Option<Vec<u8>> {
-    if !text.len().is_multiple_of(2) {
-        return None;
-    }
-
-    (0..text.len())
-        .step_by(2)
-        .map(|at| u8::from_str_radix(text.get(at..at + 2)?, 16).ok())
-        .collect()
 }
 
 /// Writes bytes into this process's memory at `address`, making the page writable for the write and restoring its
@@ -90,9 +66,18 @@ fn write(address: usize, bytes: &[u8]) {
     unsafe { std::ptr::copy_nonoverlapping(bytes.as_ptr(), address as *mut u8, bytes.len()) };
     let mut restored = 0;
     // SAFETY: restores the protection `VirtualProtect` returned above.
-    unsafe { VirtualProtect(address as *const c_void, bytes.len(), old, &mut restored) };
+    let restored_ok =
+        unsafe { VirtualProtect(address as *const c_void, bytes.len(), old, &mut restored) };
+    if restored_ok == FALSE {
+        log("early redirect: a page's protection could not be restored");
+    }
     // SAFETY: flushes the instruction cache of this process for the range just written.
-    unsafe { FlushInstructionCache(GetCurrentProcess(), address as *const c_void, bytes.len()) };
+    let flushed = unsafe {
+        FlushInstructionCache(GetCurrentProcess(), address as *const c_void, bytes.len())
+    };
+    if flushed == FALSE {
+        log("early redirect: the instruction cache could not be flushed");
+    }
 }
 
 #[cfg(test)]
@@ -118,10 +103,10 @@ mod tests {
         std::fs::write(&path, text).unwrap();
         // SAFETY: the variable is set for this test only; the test binary runs its tests on their own threads, and no
         // other test reads this variable.
-        unsafe { std::env::set_var(ENV_EARLY, &path) };
+        unsafe { std::env::set_var(ENV, &path) };
         restore();
 
-        unsafe { std::env::remove_var(ENV_EARLY) };
+        unsafe { std::env::remove_var(ENV) };
         assert_eq!(&stub[..4], &[0x4C, 0x8B, 0xD1, 0xB8]);
         assert_eq!(config, [0, 0, 0, 0]);
         assert!(!path.exists(), "the handover file was not removed");

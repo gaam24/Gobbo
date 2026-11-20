@@ -8,6 +8,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod early;
 pub mod nt_listing;
 
 use std::collections::BTreeSet;
@@ -24,8 +25,6 @@ const ENV_UPPER: &str = "GOBBO_OVERLAY_UPPER";
 /// The JSON file that names every mount of the session, including the game folder and the profile's user-data roots.
 /// A hook that finds it uses it instead of the three single-layer variables above.
 pub const ENV_MOUNTS: &str = "GOBBO_OVERLAY_MOUNTS";
-/// The handover file that carries the original bytes of the patched loader stubs from the launcher to the hook.
-pub const ENV_EARLY: &str = "GOBBO_OVERLAY_EARLY";
 
 /// The three folders of one overlay session.
 #[derive(Debug, Clone, PartialEq, Eq)]

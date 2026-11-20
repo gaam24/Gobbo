@@ -26,6 +26,8 @@ use windows_sys::Win32::System::Memory::{
 use windows_sys::Win32::System::Memory::{MEM_RELEASE, VirtualFreeEx};
 use windows_sys::Win32::System::Threading::GetCurrentProcess;
 
+use gobbo_overlay_core::early::Line;
+
 use crate::wide;
 
 /// The path logic of the stage 0 DLL, compiled here too so its rules have tests on this side.
@@ -129,11 +131,16 @@ pub(crate) struct Patched {
 impl Patched {
     /// The text the hook reads: the configuration's address, then each stub with the bytes it had before the patch.
     pub(crate) fn handover(&self) -> String {
-        let mut text = format!("config {}\n", self.config_address);
+        let mut text = Line::Config(self.config_address).to_text();
 
         for (address, original) in &self.stubs {
-            let hex: String = original.iter().map(|byte| format!("{byte:02x}")).collect();
-            text.push_str(&format!("stub {address} {hex}\n"));
+            text.push_str(
+                &Line::Stub {
+                    address: *address,
+                    original: original.clone(),
+                }
+                .to_text(),
+            );
         }
 
         text
