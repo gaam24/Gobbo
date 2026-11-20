@@ -20,9 +20,9 @@ use crate::context::profile::history::{self, forget_profile};
 use crate::context::profile::lock_profiles;
 use crate::context::profile::state as profile_state;
 use crate::context::running::game_running;
-use crate::deploy::state_is_overlay;
 use crate::deploy::target::journal_roots;
 use crate::deploy::undo;
+use crate::deploy::undo_blocked_while_running;
 use crate::domain::profiles::Row;
 use crate::domain::profiles::{Entry as ProfileEntry, Separator, normalize_groups};
 use crate::error::game_running as game_is_running_error;
@@ -383,10 +383,9 @@ pub fn delete_profile(root: &Data, game_id: &str, id: &str) -> Result<(), AppErr
     let state = data.profile_state(id);
 
     if state.join(JOURNAL_FILE).is_file() {
-        let running = game_running(root, game_id)?;
-        let overlay = state_is_overlay(&state);
-
-        if running && (!overlay || profiles.last_launched.as_deref() == Some(id)) {
+        if game_running(root, game_id)?
+            && undo_blocked_while_running(&state, id, profiles.last_launched.as_deref())
+        {
             return Err(game_is_running_error());
         }
 

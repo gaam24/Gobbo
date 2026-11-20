@@ -55,6 +55,17 @@ pub fn state_is_overlay(state: &Path) -> bool {
         .unwrap_or(false)
 }
 
+/// Whether the running game keeps `profile`'s deployment in `state` from being undone. Only an overlay layer that the
+/// game was not started from can go while it runs; files placed in the game folder, or the layer of the last launch,
+/// stay until it exits.
+pub fn undo_blocked_while_running(
+    state: &Path,
+    profile: &str,
+    last_launched: Option<&str>,
+) -> bool {
+    !state_is_overlay(state) || last_launched == Some(profile)
+}
+
 /// Places in the game and in the state folder that Gobbo writes to.
 pub struct Target {
     /// The deployment root. The destinations in the plan are relative to it.

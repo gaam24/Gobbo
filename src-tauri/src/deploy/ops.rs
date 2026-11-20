@@ -21,6 +21,7 @@ use crate::deploy::state_is_overlay;
 use crate::deploy::target::journal_roots;
 use crate::deploy::target::target_for;
 use crate::deploy::undo;
+use crate::deploy::undo_blocked_while_running;
 use crate::domain::profiles::Entry as ProfileEntry;
 use crate::domain::resolver::PlanMode;
 use crate::error::AppError;
@@ -225,12 +226,10 @@ pub fn undo_deployment(root: &Data, game_id: &str) -> Result<Vec<Message>, AppEr
         .ok_or(DeployError::NothingToUndo)?;
     let running = game_running_at(game_id, &settings.game_root);
 
-    if running {
-        let overlay = state_is_overlay(&state);
-
-        if !overlay || profiles.last_launched.as_deref() == Some(profiles.active.as_str()) {
-            return Err(game_is_running_error());
-        }
+    if running
+        && undo_blocked_while_running(&state, &profiles.active, profiles.last_launched.as_deref())
+    {
+        return Err(game_is_running_error());
     }
 
     if !running {

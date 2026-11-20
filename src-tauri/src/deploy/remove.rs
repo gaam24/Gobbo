@@ -7,6 +7,7 @@ use crate::context::running::game_running_at;
 use crate::deploy::state_is_overlay;
 use crate::deploy::target::journal_roots;
 use crate::deploy::undo;
+use crate::deploy::undo_blocked_while_running;
 use crate::domain::profiles::Entry;
 use crate::domain::profiles::Profiles;
 use crate::error::game_running as game_is_running_error;
@@ -125,14 +126,8 @@ fn undo_prepared_holding(
 
         let overlay = state_is_overlay(state);
 
-        if running {
-            if last_launched.as_deref() == Some(profile_id) {
-                return Err(game_is_running_error());
-            }
-
-            if !overlay {
-                return Err(game_is_running_error());
-            }
+        if running && undo_blocked_while_running(state, profile_id, last_launched.as_deref()) {
+            return Err(game_is_running_error());
         }
 
         let roots = journal_roots(&game, &settings, state.clone())?;
