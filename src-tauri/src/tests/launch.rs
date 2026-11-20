@@ -144,11 +144,10 @@ fn launch_does_not_need_the_settings_folder() {
 
     let data = Data::new(base.join("data"));
     save_folders(&data, SLOT_GAME, &game_root, "");
-    let (launch, with_mods, spawn_error) =
+    let (_, with_mods, spawn_error) =
         launch_command(&test_games::slot(), &data, SLOT_GAME, None, &base).unwrap();
     assert!(!with_mods);
     assert_eq!(spawn_error, "launch.proton_failed");
-    let _ = launch;
 }
 
 #[test]

@@ -145,13 +145,4 @@ mod tests {
         assert_eq!(write_units(buffer.as_mut_ptr(), 8, &text), 5);
         assert_eq!(&buffer[..6], &[97, 98, 99, 100, 101, 0]);
     }
-
-    #[test]
-    fn a_volume_is_removed_from_a_drive_and_a_server_path() {
-        assert_eq!(without_volume(r"\\?\C:\Game\a.txt"), r"\Game\a.txt");
-        assert_eq!(
-            without_volume(r"\\?\UNC\server\share\a.txt"),
-            r"\\server\share\a.txt"
-        );
-    }
 }

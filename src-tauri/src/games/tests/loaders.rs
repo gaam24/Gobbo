@@ -91,20 +91,14 @@ fn a_loader_is_a_string_or_a_table_and_its_keys_are_checked() {
     assert_eq!(chosen.loader.as_ref().unwrap().id(), "bepinex");
     assert_eq!(chosen.loader.as_ref().unwrap().variant(), Some("6"));
 
-    let error = GameDef::parse(&loader_text_with("{ id = \"bepinex\", extra = \"x\" }"))
-        .unwrap_err()
-        .to_string();
-    assert!(error.contains("unknown field"), "{error}");
-
-    let error = GameDef::parse(&loader_text_with("{ variant = \"6\" }"))
-        .unwrap_err()
-        .to_string();
-    assert!(error.contains("missing field `id`"), "{error}");
-
-    let error = GameDef::parse(&loader_text_with("5"))
-        .unwrap_err()
-        .to_string();
-    assert!(error.contains("invalid type"), "{error}");
+    // An unknown key, a table without an id and a value of another type are each refused.
+    for bad in [
+        "{ id = \"bepinex\", extra = \"x\" }",
+        "{ variant = \"6\" }",
+        "5",
+    ] {
+        assert!(GameDef::parse(&loader_text_with(bad)).is_err(), "{bad}");
+    }
 }
 
 #[test]

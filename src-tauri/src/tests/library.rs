@@ -375,7 +375,6 @@ fn deleting_a_used_version_switches_every_profile_to_the_replacement() {
     status(&f.data, MIRROR_GAME).unwrap();
     import(&f.data, MIRROR_GAME, &new, None, &mut |_, _| {}).unwrap();
     let view = status(&f.data, MIRROR_GAME).unwrap();
-    let family = view.mods[0].id.clone();
     let versions = mod_versions(&f.data, MIRROR_GAME, &view.mods[0].folder).unwrap();
     let old_folder = versions
         .iter()
@@ -408,7 +407,6 @@ fn deleting_a_used_version_switches_every_profile_to_the_replacement() {
     assert_eq!(view.mods[0].folder, new_folder);
     assert_eq!(view.mods[0].version_count, 1);
     assert!(!f.data.game(MIRROR_GAME).library().join(old_folder).exists());
-    let _ = family;
 }
 
 #[test]
