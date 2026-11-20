@@ -30,8 +30,7 @@ pub fn download(
     md5: Option<&str>,
     progress: &mut dyn FnMut(u64, u64) -> bool,
 ) -> Result<Downloaded, AppError> {
-    let parsed = validate_url(url)?;
-    let _ = parsed;
+    validate_url(url)?;
     fs::create_dir_all(directory).map_err(io_at(directory))?;
     let part = http::temporary_download(directory);
     // A direct file has no provider account to pace: the server's own 429 is the only limit that applies here, and

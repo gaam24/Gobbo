@@ -112,7 +112,8 @@ impl Client {
         let mut attempt = 0_u32;
         loop {
             let started = Instant::now();
-            match self.send_once(url, query, body) {
+            // Each outcome says whether a retry may help and how long the server asked to wait.
+            let (outcome, retryable, wait) = match self.send_once(url, query, body) {
                 Ok(response) => {
                     let status = response.status().as_u16();
                     let retry_after = retry_after(response.headers());
@@ -127,16 +128,12 @@ impl Client {
                                 Some(text.len() as u64),
                                 started,
                             );
-                            if retry && transient(status) && attempt + 1 < self.attempts {
-                                std::thread::sleep(backoff(attempt, retry_after));
-                                attempt += 1;
-                                continue;
-                            }
-                            return Ok(Response {
+                            let response = Response {
                                 status,
                                 body: text,
                                 rate_limit: budget,
-                            });
+                            };
+                            (Ok(response), transient(status), retry_after)
                         }
                         Err(error) => {
                             trace(Trace {
@@ -148,25 +145,21 @@ impl Client {
                                 elapsed: started.elapsed(),
                                 error: Some(format!("the body did not read: {error}")),
                             });
-                            if retry && attempt + 1 < self.attempts {
-                                std::thread::sleep(backoff(attempt, retry_after));
-                                attempt += 1;
-                                continue;
-                            }
-                            return Err(ClientError::Body(error));
+                            (Err(ClientError::Body(error)), true, retry_after)
                         }
                     }
                 }
                 Err(error) => {
                     trace_failure(&self.service, method, url, started, &error);
-                    if retry && attempt + 1 < self.attempts {
-                        std::thread::sleep(backoff(attempt, None));
-                        attempt += 1;
-                        continue;
-                    }
-                    return Err(ClientError::Transport(error));
+                    (Err(ClientError::Transport(error)), true, None)
                 }
+            };
+            if retry && retryable && attempt + 1 < self.attempts {
+                std::thread::sleep(backoff(attempt, wait));
+                attempt += 1;
+                continue;
             }
+            return outcome;
         }
     }
 
