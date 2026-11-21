@@ -18,7 +18,14 @@ import { EfficiencySetting } from "@/views/settings/efficiency-setting";
 import { LanguageSettings } from "@/views/settings/language-settings";
 import { StorageSettings } from "@/views/settings/storage-settings";
 import { SupportSection } from "@/views/settings/support-section";
-import { CheckCatalogSetting, CheckCollectionsSetting, ProviderLinkSetting, RememberWindowSetting } from "@/views/settings/toggle-settings";
+import {
+	CheckCatalogSetting,
+	CheckCollectionsSetting,
+	HideWhenGameLaunchesSetting,
+	ProviderLinkSetting,
+	RememberWindowSetting,
+	SystemNotificationsSetting,
+} from "@/views/settings/toggle-settings";
 import { UpdatesSection } from "@/views/settings/updates-section";
 
 /// The providers as the settings show them: the list, whether each key is saved, and the providers whose download links
@@ -62,6 +69,12 @@ export function AppSettings({
 	onCheckCollectionsOnLaunch,
 	checkCatalogOnLaunch,
 	onCheckCatalogOnLaunch,
+	hideWhenGameLaunches,
+	onHideWhenGameLaunches,
+	systemNotifications,
+	onSystemNotifications,
+	mutedNotifications,
+	onNotification,
 	dataFolder,
 	storage,
 	onOpenFolder,
@@ -87,6 +100,14 @@ export function AppSettings({
 	/// The official catalog is read when the Games page opens.
 	checkCatalogOnLaunch: boolean;
 	onCheckCatalogOnLaunch: (on: boolean) => void | Promise<void>;
+	/// The window moves to the tray once a game starts.
+	hideWhenGameLaunches: boolean;
+	onHideWhenGameLaunches: (on: boolean) => void | Promise<void>;
+	/// System notifications and the individual events that produce them.
+	systemNotifications: boolean;
+	onSystemNotifications: (on: boolean) => void | Promise<void>;
+	mutedNotifications: string[];
+	onNotification: (code: string, on: boolean) => void | Promise<void>;
 	/// The data folder, and the actions for it.
 	dataFolder: string;
 	/// The storage mode and the file that records it.
@@ -114,6 +135,13 @@ export function AppSettings({
 					<LanguageSettings language={language} onLanguage={onLanguage} />
 					<RememberWindowSetting on={rememberWindow} onChange={onRememberWindow} />
 					<CloseActionSetting action={closeAction} tray={tray} onAction={onCloseAction} />
+					{tray && <HideWhenGameLaunchesSetting on={hideWhenGameLaunches} onChange={onHideWhenGameLaunches} />}
+					<SystemNotificationsSetting
+						on={systemNotifications}
+						muted={mutedNotifications}
+						onChange={onSystemNotifications}
+						onNotification={onNotification}
+					/>
 					<CheckCollectionsSetting on={checkCollectionsOnLaunch} onChange={onCheckCollectionsOnLaunch} />
 					<CheckCatalogSetting on={checkCatalogOnLaunch} onChange={onCheckCatalogOnLaunch} />
 					{platform === "windows" && <EfficiencySetting mode={efficiencyMode} onMode={onEfficiencyMode} />}

@@ -1,7 +1,8 @@
 import { type ReactNode, useEffect } from "react";
 import { useNavigation } from "@/app/contexts/navigation-context";
-import { commands, type TrayLabels } from "@/bindings";
+import { commands, NOTIFICATION_OUTCOMES, TASK_KINDS, type TrayLabels } from "@/bindings";
 import { useTranslation } from "@/i18n";
+import { taskNotification } from "@/lib/notifications";
 import { useTauriListener } from "@/lib/use-tauri-listener";
 
 /// The native menu lives outside the webview, so `t()` cannot reach it. The translated strings are sent to Rust once
@@ -51,6 +52,8 @@ export function trayLabels(t: ReturnType<typeof useTranslation>["t"]): TrayLabel
 			pack: t("tasks.kind.pack"),
 			"pack-link": t("tasks.kind.pack-link"),
 			collection: t("tasks.kind.collection"),
+			launch: t("tasks.kind.tool"),
+			install: t("tasks.kind.toolInstall"),
 		},
 		states: {
 			running: t("tasks.group.running"),
@@ -65,7 +68,12 @@ export function trayLabels(t: ReturnType<typeof useTranslation>["t"]): TrayLabel
 		quit_leave: t("tray.quitLeave"),
 		notice_title: t("app.shortName"),
 		notice_waiting: t("tray.noticeWaiting"),
-		notice_failed: t("tray.noticeFailed"),
+		notices: Object.fromEntries(
+			TASK_KINDS.flatMap((kind) =>
+				NOTIFICATION_OUTCOMES.map((outcome) => [taskNotification(kind, outcome), t(`tray.notices.${kind}.${outcome}`)]),
+			),
+		),
+		notice_hidden: t("tray.noticeHidden"),
 	};
 }
 

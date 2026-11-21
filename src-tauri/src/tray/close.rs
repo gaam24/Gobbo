@@ -80,6 +80,7 @@ pub fn apply(app: &AppHandle, action: CloseAction) {
         CloseAction::HideToTray => {
             if let Some(window) = window {
                 let _ = window.hide();
+                super::hidden_to_tray(app);
             }
         }
     }

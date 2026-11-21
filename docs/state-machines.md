@@ -101,7 +101,11 @@ The card groups rows by state (failed, waiting for you, running) and then by gam
 waiting on the user has its own icon and label, so it does not look like one that is still running. The live region speaks
 only a state change — a failed or waiting count moving — never each percent tick, so a screen reader hears the stage once.
 Tool runs and prerequisite installs also appear as rows for their whole duration; toasts carry only completed results,
-and a result whose recovery must outlive the toast (Undo) keeps its action in **Notifications**.
+and a result whose recovery must outlive the toast (Undo) keeps its action in **Notifications**. When the window is
+hidden or minimized, the same task events also become system notifications: `waiting`, `failed` and `done` (`cancelled`
+never speaks). Each `<task kind>.<outcome>` code (`import.failed`, `import.done`, ...) has its own switch in the
+settings; `waiting` follows only the main switch. The tray owns the message; clicking one restores the window and opens
+**Working**.
 
 ## Updates and the provider account
 

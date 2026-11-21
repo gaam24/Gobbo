@@ -22,6 +22,7 @@ Here's what each platform supports today.
 | Deep links (`nxm://`, future schemes) | Yes, registered by the app          | Yes, registered by the app                                    |
 | OS keyring                            | Yes                                 | Yes, the desktop keyring must be running                      |
 | System tray                           | Icon, menu and left-click window    | Icon and menu; click events aren't delivered, so use the menu |
+| System notifications                  | Yes; click opens Working            | Yes; click support depends on the desktop's notification server |
 | First-start storage dialog            | `rfd`                               | GTK on the main thread                                        |
 | Mod picture cache                     | Yes                                 | Yes                                                           |
 | Overlay probe                         | x64 built in, x86 helper            | Not applicable: no hook DLL                                   |

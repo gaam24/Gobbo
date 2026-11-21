@@ -29,6 +29,12 @@ interface SettingsData {
 	checkCollectionsOnLaunch: boolean;
 	/// Whether the official catalog is read when the Games page opens.
 	checkCatalogOnLaunch: boolean;
+	/// Whether the window moves to the tray once a game starts.
+	hideWhenGameLaunches: boolean;
+	/// Whether notifications may be shown while the window is hidden.
+	systemNotifications: boolean;
+	/// The notification kinds the user turned off.
+	mutedNotifications: string[];
 	inspectorCollapsed: boolean;
 }
 
@@ -56,6 +62,9 @@ interface SettingsActions {
 	saveEfficiencyMode: (mode: AppSettings_Serialize["efficiency_mode"]) => void | Promise<void>;
 	saveCheckCollectionsOnLaunch: (on: boolean) => void | Promise<void>;
 	saveCheckCatalogOnLaunch: (on: boolean) => void | Promise<void>;
+	saveHideWhenGameLaunches: (on: boolean) => void | Promise<void>;
+	saveSystemNotifications: (on: boolean) => void | Promise<void>;
+	saveNotification: (code: string, on: boolean) => void | Promise<void>;
 	saveSourceLinks: (providers: string[]) => void | Promise<void>;
 	refreshSourceLinks: () => void | Promise<void>;
 	ensureSourceLinks: () => void | Promise<void>;
@@ -101,6 +110,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 		efficiencyMode,
 		checkCollectionsOnLaunch,
 		checkCatalogOnLaunch,
+		hideWhenGameLaunches,
+		systemNotifications,
+		mutedNotifications,
 		inspectorCollapsed,
 		loadAppSettings,
 		saveInspectorCollapsed,
@@ -112,6 +124,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 		saveEfficiencyMode,
 		saveCheckCollectionsOnLaunch,
 		saveCheckCatalogOnLaunch,
+		saveHideWhenGameLaunches,
+		saveSystemNotifications,
+		saveNotification,
 		saveSourceLinks,
 		refreshSourceLinks,
 		ensureSourceLinks,
@@ -134,6 +149,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 			efficiencyMode,
 			checkCollectionsOnLaunch,
 			checkCatalogOnLaunch,
+			hideWhenGameLaunches,
+			systemNotifications,
+			mutedNotifications,
 			inspectorCollapsed,
 		}),
 		[
@@ -142,7 +160,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 			checkCatalogOnLaunch,
 			checkCollectionsOnLaunch,
 			dataFolder,
+			mutedNotifications,
 			efficiencyMode,
+			hideWhenGameLaunches,
 			inspectorCollapsed,
 			keysSaved,
 			language,
@@ -153,6 +173,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 			sourceLinks,
 			rememberWindow,
 			storage,
+			systemNotifications,
 		],
 	);
 	const actions = useMemo(
@@ -167,6 +188,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 			saveEfficiencyMode,
 			saveCheckCollectionsOnLaunch,
 			saveCheckCatalogOnLaunch,
+			saveHideWhenGameLaunches,
+			saveSystemNotifications,
+			saveNotification,
 			saveSourceLinks,
 			refreshSourceLinks,
 			ensureSourceLinks,
@@ -185,7 +209,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 			saveCheckCatalogOnLaunch,
 			saveCheckCollectionsOnLaunch,
 			saveEfficiencyMode,
+			saveHideWhenGameLaunches,
 			saveInspectorCollapsed,
+			saveNotification,
+			saveSystemNotifications,
 			saveLanguage,
 			saveRememberWindow,
 			saveCloseAction,

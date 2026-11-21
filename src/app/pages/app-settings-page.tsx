@@ -20,6 +20,9 @@ export function AppSettingsPage() {
 		efficiencyMode,
 		checkCollectionsOnLaunch,
 		checkCatalogOnLaunch,
+		hideWhenGameLaunches,
+		systemNotifications,
+		mutedNotifications,
 	} = useSettingsData();
 	const {
 		saveLanguage,
@@ -31,6 +34,9 @@ export function AppSettingsPage() {
 		saveEfficiencyMode,
 		saveCheckCollectionsOnLaunch,
 		saveCheckCatalogOnLaunch,
+		saveHideWhenGameLaunches,
+		saveSystemNotifications,
+		saveNotification,
 		refreshSourceLinks,
 		ensureSourceLinks,
 	} = useSettingsActions();
@@ -71,6 +77,12 @@ export function AppSettingsPage() {
 				onCheckCollectionsOnLaunch={saveCheckCollectionsOnLaunch}
 				checkCatalogOnLaunch={checkCatalogOnLaunch}
 				onCheckCatalogOnLaunch={saveCheckCatalogOnLaunch}
+				hideWhenGameLaunches={hideWhenGameLaunches}
+				onHideWhenGameLaunches={saveHideWhenGameLaunches}
+				systemNotifications={systemNotifications}
+				onSystemNotifications={saveSystemNotifications}
+				mutedNotifications={mutedNotifications}
+				onNotification={saveNotification}
 				dataFolder={dataFolder}
 				storage={storage}
 				onOpenFolder={openFolderPath}

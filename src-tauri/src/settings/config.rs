@@ -7,6 +7,22 @@ use serde::{Deserialize, Deserializer, Serialize};
 
 pub use crate::context::{Settings, save_settings};
 
+/// The task outcomes that can become a system notification. Each task kind gets one switch per outcome, so the code of
+/// one notification is `<task kind>.<outcome>` (see [`task_notification`]). The values are the task state codes.
+pub const NOTIFICATION_OUTCOMES: &[&str] = &[
+    crate::infra::tasks::state::FAILED,
+    crate::infra::tasks::state::DONE,
+];
+
+/// Notifications that do not come from a task. Their codes are used as they are.
+pub const APP_NOTIFICATIONS: &[&str] = &["hidden_to_tray"];
+
+/// The stable code of one task notification, as the settings store it and the window builds it from `TASK_KINDS` and
+/// `NOTIFICATION_OUTCOMES`.
+pub fn task_notification(kind: &str, outcome: &str) -> String {
+    format!("{kind}.{outcome}")
+}
+
 /// App settings shared by all games, e.g. the interface language. Provider keys live in the OS credential store, not
 /// here, so they are never written to disk in plaintext.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
@@ -46,6 +62,17 @@ pub struct AppSettings {
     /// Asks the official catalog for new or changed game definitions when the app starts. On from the start.
     #[serde(default = "on_by_default")]
     pub check_catalog_on_launch: bool,
+    /// Hides the main window in the tray once a game starts. Off from the start, so starting a game never takes the
+    /// window away unexpectedly.
+    #[serde(default)]
+    pub hide_when_game_launches: bool,
+    /// Sends system notifications while the window is hidden. On from the start.
+    #[serde(default = "on_by_default")]
+    pub system_notifications: bool,
+    /// The notification codes the user turned off: a [`task_notification`] code or one of [`APP_NOTIFICATIONS`]. Empty
+    /// from the start, so every notification is on. A code from a newer version is kept and ignored.
+    #[serde(default)]
+    pub muted_notifications: Vec<String>,
 }
 
 /// What closing the main window does. `Ask` shows the dialog with the three concrete choices; the others perform one
@@ -115,7 +142,17 @@ impl Default for AppSettings {
             efficiency_mode: EfficiencyMode::Auto,
             check_collections_on_launch: true,
             check_catalog_on_launch: true,
+            hide_when_game_launches: false,
+            system_notifications: true,
+            muted_notifications: Vec::new(),
         }
+    }
+}
+
+impl AppSettings {
+    /// Whether the notification with this code may be shown: the main switch is on and the user did not mute the code.
+    pub fn notifies(&self, code: &str) -> bool {
+        self.system_notifications && !self.muted_notifications.iter().any(|muted| muted == code)
     }
 }
 
@@ -162,7 +199,10 @@ fn saved_close_action<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Clos
 
 #[cfg(test)]
 mod tests {
-    use super::{AppSettings, CloseAction, EfficiencyMode};
+    use super::{
+        APP_NOTIFICATIONS, AppSettings, CloseAction, EfficiencyMode, NOTIFICATION_OUTCOMES,
+        task_notification,
+    };
 
     fn read(json: &str) -> AppSettings {
         serde_json::from_str(json).expect("the settings must parse")
@@ -256,6 +296,67 @@ mod tests {
         assert!(EfficiencyMode::Auto.active(false, false));
         assert!(!EfficiencyMode::Auto.active(true, false));
         assert!(EfficiencyMode::Always.active(true, false));
+    }
+
+    #[test]
+    fn an_old_settings_file_keeps_the_window_and_shows_every_notification() {
+        let settings = read("{}");
+        assert!(!settings.hide_when_game_launches);
+        assert!(settings.system_notifications);
+        assert!(settings.muted_notifications.is_empty());
+        assert_eq!(settings, AppSettings::default());
+    }
+
+    #[test]
+    fn notification_settings_survive_a_round_trip() {
+        let json = r#"{
+            "hide_when_game_launches": true,
+            "system_notifications": true,
+            "muted_notifications": ["import.done", "hidden_to_tray"]
+        }"#;
+        let settings = read(json);
+        assert!(settings.hide_when_game_launches);
+        assert_eq!(
+            settings.muted_notifications,
+            ["import.done", "hidden_to_tray"]
+        );
+        let saved = serde_json::to_string(&settings).expect("the settings must serialize");
+        assert_eq!(read(&saved), settings);
+    }
+
+    #[test]
+    fn each_task_kind_and_outcome_has_its_own_switch() {
+        let settings = AppSettings {
+            muted_notifications: vec![task_notification("import", "done")],
+            ..AppSettings::default()
+        };
+        assert!(!settings.notifies("import.done"));
+        assert!(settings.notifies("import.failed"));
+        assert!(settings.notifies("update.done"));
+        assert!(settings.notifies("hidden_to_tray"));
+    }
+
+    #[test]
+    fn the_main_switch_silences_every_notification_and_an_unknown_code_silences_none() {
+        let off = AppSettings {
+            system_notifications: false,
+            ..AppSettings::default()
+        };
+        assert!(!off.notifies("import.failed"));
+        assert!(!off.notifies("hidden_to_tray"));
+
+        let newer = AppSettings {
+            muted_notifications: vec!["from_a_newer_version".to_owned()],
+            ..AppSettings::default()
+        };
+        assert!(newer.notifies("import.failed"));
+    }
+
+    #[test]
+    fn notification_outcomes_are_terminal_task_states() {
+        assert_eq!(NOTIFICATION_OUTCOMES, ["failed", "done"]);
+        assert_eq!(APP_NOTIFICATIONS, ["hidden_to_tray"]);
+        assert_eq!(task_notification("pack-link", "failed"), "pack-link.failed");
     }
 }
 

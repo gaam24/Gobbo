@@ -7,17 +7,21 @@ pub mod commands;
 mod icons;
 mod labels;
 mod menu;
+mod notifications;
 mod state;
 mod view;
 
 pub use actions::quit_app;
+pub use notifications::hidden_to_tray;
 use state::TrayState;
 
 use tauri::tray::{MouseButton, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Listener, Manager};
 
+use crate::context::Data;
 use crate::error::AppError;
 use crate::infra::tasks::TaskView;
+use crate::settings::config::load_app_settings;
 
 const TRAY_ID: &str = "gobbo-main";
 
@@ -27,6 +31,7 @@ pub fn init(app: &AppHandle) -> Result<(), AppError> {
     // The state is managed before the icon is built: closing and quitting read the game state through it, so a desktop
     // without a tray still asks before stopping a running game. Only the icon is missing then.
     app.manage(TrayState::new());
+    notifications::init_action_handler(app);
     let state = app.state::<TrayState>();
     let labels = state.labels();
     let tooltip = icons::load(view::IconState::Idle)
@@ -77,9 +82,27 @@ fn watch(app: &AppHandle, name: &str) {
         let Ok(task) = serde_json::from_str::<TaskView>(event.payload()) else {
             return;
         };
-        actions::task_event(&handle, &task);
+        notifications::task_event(&handle, &task);
         let _ = refresh(&handle);
     });
+}
+
+/// Hides the main window after a game starts when the user asked for it. Both launch paths call this only after the game
+/// started, so a failed launch leaves the window where it is; the tray owns the behaviour and announces the move.
+pub fn after_game_launch(app: &AppHandle) {
+    // Hiding without an icon would leave no way back. The settings page hides the switch on such a desktop too.
+    if !close::available(app) {
+        return;
+    }
+    let Some(data) = app.try_state::<Data>() else {
+        return;
+    };
+    if load_app_settings(&data).hide_when_game_launches
+        && let Some(window) = app.get_webview_window("main")
+    {
+        let _ = window.hide();
+        hidden_to_tray(app);
+    }
 }
 
 /// Rebuilds the icon, tooltip and menu from one fresh snapshot.

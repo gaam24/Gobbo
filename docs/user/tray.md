@@ -30,11 +30,20 @@ and can stop the game before it exits.
 
 ## Closing the window
 
-By default the window's **X** hides Gobbo in the tray instead of ending it. The setting
-**Settings → Interface → Close to the system tray** turns that off; with it off, **X** ends the app as before. On Windows
-a left click on the icon opens the window and a right click opens the menu. On Linux click events are not delivered to
-the app, so use the menu's **Open Gobbo** item.
+By default the window's **X** asks what to do. You can quit, minimize to the taskbar or hide Gobbo in the tray, and save
+the choice in **Settings → Interface → When closing the window**. On Windows a left click on the icon opens the window
+and a right click opens the menu. On Linux click events are not delivered to the app, so use the menu's **Open Gobbo**
+item. **Settings → Interface → Hide Gobbo in the tray when a game starts** does the same move once a game is running;
+it is off by default.
 
-A task that needs an installer choice or a browser step stays in **Working** while the window is hidden. Gobbo sends one
-notification when such a task appears or fails, and only while the window is hidden or minimized. Progress updates never
-notify.
+## Notifications
+
+While the window is hidden or minimized, Gobbo sends a system notification when a task fails or finishes, when a task
+waits for your input, and when the window is hidden in the tray. The title names the game the task worked on. Progress
+updates never notify, and neither does a task you cancelled. Clicking a notification restores the window and opens
+**Working**.
+
+**Settings → Interface → System notifications** turns them all off. Below it, a table has one row per kind of task
+(import, mod update, applying mods, tool run, ...) with a switch for **Failed** and one for **Finished**, so you can keep
+the failures of an import and silence its successes. A task waiting for your input has no switch of its own: the work
+cannot go on until you answer, so only the main switch silences it.

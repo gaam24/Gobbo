@@ -58,6 +58,12 @@ function settings(registered: boolean) {
 						onCheckCollectionsOnLaunch={nothing}
 						checkCatalogOnLaunch
 						onCheckCatalogOnLaunch={nothing}
+						hideWhenGameLaunches={false}
+						onHideWhenGameLaunches={nothing}
+						systemNotifications
+						onSystemNotifications={nothing}
+						mutedNotifications={[]}
+						onNotification={nothing}
 						dataFolder="/tmp/gobbo"
 						storage={null}
 						onOpenFolder={nothing}
@@ -100,4 +106,14 @@ test("the catalog check toggle renders next to the collection check", () => {
 	expect(html).toContain("Check for new game definitions when the app starts");
 	expect(html).toContain('id="check-catalog-on-launch"');
 	expect(html).toContain("Check when a game opens");
+});
+
+test("each task kind has its own switch per outcome", () => {
+	const html = renderToString(settings(true));
+	expect(html).toContain("System notifications");
+	expect(html).toContain("Mod pack download");
+	expect(html).toContain('id="notification-import.done"');
+	expect(html).toContain('id="notification-pack-link.failed"');
+	expect(html).toContain('id="notification-hidden_to_tray"');
+	expect(html).toContain('aria-label="Import: Finished"');
 });

@@ -177,8 +177,9 @@ pub async fn launch_game(
     apply_draft: bool,
 ) -> Result<bool, crate::error::AppError> {
     let event_game = game.clone();
-    crate::commands::for_game(data, game, move |root, game| {
-        let app = app.clone();
+    let launch_app = app.clone();
+    let launched = crate::commands::for_game(data, game, move |root, game| {
+        let app = launch_app;
         crate::launch::start::launch_game(
             root,
             game,
@@ -190,7 +191,9 @@ pub async fn launch_game(
             })),
         )
     })
-    .await
+    .await?;
+    crate::tray::after_game_launch(&app);
+    Ok(launched)
 }
 
 /// Stops the game and records that the user asked for it, so the last run is not treated as a crash.

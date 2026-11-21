@@ -13,6 +13,7 @@ import {
 } from "@/bindings";
 import { applyLanguage, useTranslation } from "@/i18n";
 import { unwrap } from "@/lib/ipc";
+import { withMuted } from "@/lib/notifications";
 import { withoutKey } from "@/lib/records";
 import { createQueue } from "@/lib/serial-queue";
 import type { useNotices } from "@/lib/use-notices";
@@ -67,6 +68,11 @@ export function useAppSettings({
 	const [efficiencyMode, setEfficiencyMode] = useState<AppSettings_Serialize["efficiency_mode"]>("auto");
 	const [checkCollectionsOnLaunch, setCheckCollectionsOnLaunch] = useState(true);
 	const [checkCatalogOnLaunch, setCheckCatalogOnLaunch] = useState(true);
+	const [hideWhenGameLaunches, setHideWhenGameLaunches] = useState(false);
+	const [systemNotifications, setSystemNotifications] = useState(true);
+	const [mutedNotifications, setMutedNotifications] = useState<string[]>([]);
+	/// The list the last switch sent. Two quick clicks both build on it instead of on a render that has not happened yet.
+	const mutedSent = useRef<string[]>([]);
 	const [inspectorCollapsed, setInspectorCollapsed] = useState(false);
 	const [dataFolder, setDataFolder] = useState("");
 	const [storage, setStorage] = useState<StorageInfo | null>(null);
@@ -265,6 +271,10 @@ export function useAppSettings({
 		setEfficiencyMode(settings.efficiency_mode);
 		setCheckCollectionsOnLaunch(settings.check_collections_on_launch);
 		setCheckCatalogOnLaunch(settings.check_catalog_on_launch);
+		setHideWhenGameLaunches(settings.hide_when_game_launches);
+		setSystemNotifications(settings.system_notifications);
+		setMutedNotifications(settings.muted_notifications);
+		mutedSent.current = settings.muted_notifications;
 		setInspectorCollapsed(settings.inspector_collapsed);
 	}, []);
 
@@ -333,6 +343,22 @@ export function useAppSettings({
 		saveSetting({ check_catalog_on_launch: on }, () => setCheckCatalogOnLaunch(on));
 	};
 
+	/// The next game launch reads this choice. Setting it takes effect only after a game actually starts.
+	const saveHideWhenGameLaunches = (on: boolean) => {
+		saveSetting({ hide_when_game_launches: on }, () => setHideWhenGameLaunches(on));
+	};
+
+	const saveSystemNotifications = (on: boolean) => {
+		saveSetting({ system_notifications: on }, () => setSystemNotifications(on));
+	};
+
+	/// One switch of one notification, by its code (see `@/lib/notifications`).
+	const saveNotification = (code: string, on: boolean) => {
+		const next = withMuted(mutedSent.current, code, on);
+		mutedSent.current = next;
+		saveSetting({ muted_notifications: next }, () => setMutedNotifications(next));
+	};
+
 	/// Takes the download links of the given providers. A provider added registers its links with the system; one left
 	/// out gives them up.
 	const saveSourceLinks = (taken: string[]) => {
@@ -373,6 +399,9 @@ export function useAppSettings({
 		efficiencyMode,
 		checkCollectionsOnLaunch,
 		checkCatalogOnLaunch,
+		hideWhenGameLaunches,
+		systemNotifications,
+		mutedNotifications,
 		inspectorCollapsed,
 		loadAppSettings,
 		saveInspectorCollapsed,
@@ -384,6 +413,9 @@ export function useAppSettings({
 		saveEfficiencyMode,
 		saveCheckCollectionsOnLaunch,
 		saveCheckCatalogOnLaunch,
+		saveHideWhenGameLaunches,
+		saveSystemNotifications,
+		saveNotification,
 		saveSourceLinks,
 		refreshSourceLinks,
 		ensureSourceLinks,

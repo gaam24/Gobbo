@@ -581,6 +581,10 @@ export const commands = {
 };
 
 /* Constants */
+export const APP_NOTIFICATIONS = ["hidden_to_tray"] as const;
+
+export const NOTIFICATION_OUTCOMES = ["failed","done"] as const;
+
 export const TASK_KINDS = ["import","update","update-all","requirement","apply","pack","pack-link","collection","launch","install"] as const;
 
 /* Types */
@@ -639,6 +643,18 @@ export type AppSettings_Deserialize = {
 	check_collections_on_launch?: boolean,
 	/**  Asks the official catalog for new or changed game definitions when the app starts. On from the start. */
 	check_catalog_on_launch?: boolean,
+	/**
+	 *  Hides the main window in the tray once a game starts. Off from the start, so starting a game never takes the
+	 *  window away unexpectedly.
+	 */
+	hide_when_game_launches?: boolean,
+	/**  Sends system notifications while the window is hidden. On from the start. */
+	system_notifications?: boolean,
+	/**
+	 *  The notification codes the user turned off: a [`task_notification`] code or one of [`APP_NOTIFICATIONS`]. Empty
+	 *  from the start, so every notification is on. A code from a newer version is kept and ignored.
+	 */
+	muted_notifications?: string[],
 } & ({
 	/**
 	 *  What closing the main window does. `Ask` opens the closing dialog; a concrete action runs without asking and is
@@ -689,6 +705,18 @@ export type AppSettings_Serialize = {
 	check_collections_on_launch: boolean,
 	/**  Asks the official catalog for new or changed game definitions when the app starts. On from the start. */
 	check_catalog_on_launch: boolean,
+	/**
+	 *  Hides the main window in the tray once a game starts. Off from the start, so starting a game never takes the
+	 *  window away unexpectedly.
+	 */
+	hide_when_game_launches: boolean,
+	/**  Sends system notifications while the window is hidden. On from the start. */
+	system_notifications: boolean,
+	/**
+	 *  The notification codes the user turned off: a [`task_notification`] code or one of [`APP_NOTIFICATIONS`]. Empty
+	 *  from the start, so every notification is on. A code from a newer version is kept and ignored.
+	 */
+	muted_notifications: string[],
 };
 
 export type ApplyView = {
@@ -5388,10 +5416,17 @@ export type TrayLabels = {
 	quit_stop: string,
 	quit_cancel: string,
 	quit_leave: string,
+	/**  The title of a notification that is not about one game; a task notification takes the game's name instead. */
 	notice_title: string,
-	/**  `{kind}` and `{game}` for a task that needs the user. */
+	/**  The body for a task that waits for the user. */
 	notice_waiting: string,
-	notice_failed: string,
+	/**
+	 *  The body of each task notification, keyed by its `<task kind>.<outcome>` code. A full sentence per code, so every
+	 *  language can agree the verb with its own noun.
+	 */
+	notices: { [key in string]: string },
+	/**  Shown when the main window was hidden in the tray. */
+	notice_hidden: string,
 };
 
 /**  One step of a bulk update: the mod, its place in the run, and the overall percentage. */

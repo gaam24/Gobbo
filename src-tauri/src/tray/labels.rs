@@ -6,6 +6,7 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 use crate::infra::tasks::TASK_KINDS;
+use crate::settings::config::{NOTIFICATION_OUTCOMES, task_notification};
 
 /// Every string the tray menu and its notices show. The maps are keyed by the stable codes the backend already emits:
 /// `NextAction`, task kinds and task states.
@@ -43,10 +44,15 @@ pub struct TrayLabels {
     pub quit_stop: String,
     pub quit_cancel: String,
     pub quit_leave: String,
+    /// The title of a notification that is not about one game; a task notification takes the game's name instead.
     pub notice_title: String,
-    /// `{kind}` and `{game}` for a task that needs the user.
+    /// The body for a task that waits for the user.
     pub notice_waiting: String,
-    pub notice_failed: String,
+    /// The body of each task notification, keyed by its `<task kind>.<outcome>` code. A full sentence per code, so every
+    /// language can agree the verb with its own noun.
+    pub notices: BTreeMap<String, String>,
+    /// Shown when the main window was hidden in the tray.
+    pub notice_hidden: String,
 }
 
 impl Default for TrayLabels {
@@ -112,8 +118,19 @@ impl Default for TrayLabels {
             quit_cancel: "Cancel".to_owned(),
             quit_leave: "Quit anyway".to_owned(),
             notice_title: "Gobbo".to_owned(),
-            notice_waiting: "{{kind}} needs you in {{game}}".to_owned(),
-            notice_failed: "{{kind}} failed in {{game}}".to_owned(),
+            notice_waiting: "A task is waiting for your input.".to_owned(),
+            notices: TASK_KINDS
+                .iter()
+                .flat_map(|&code| {
+                    NOTIFICATION_OUTCOMES.iter().map(move |&outcome| {
+                        (
+                            task_notification(code, outcome),
+                            bootstrap_notice(code, outcome),
+                        )
+                    })
+                })
+                .collect(),
+            notice_hidden: "Gobbo keeps working in the tray. Click to open it.".to_owned(),
         }
     }
 }
@@ -140,6 +157,29 @@ fn kind_label(code: &str) -> &'static str {
     }
 }
 
+/// The bootstrap English body of one task notification. The window replaces it with its translation.
+fn bootstrap_notice(code: &str, outcome: &str) -> String {
+    let what = match code {
+        "apply" => "Applying mods",
+        "import" => "Import",
+        "update" => "Mod update",
+        "update-all" => "Updating mods",
+        "requirement" => "Requirement install",
+        "pack" => "Mod pack import",
+        "pack-link" => "Mod pack download",
+        "collection" => "Collection install",
+        "launch" => "Tool run",
+        "install" => "Tool prerequisites",
+        _ => "Task",
+    };
+    let verb = if outcome == crate::infra::tasks::state::FAILED {
+        "failed"
+    } else {
+        "finished"
+    };
+    format!("{what} {verb}")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -162,6 +202,26 @@ mod tests {
         }
 
         assert_eq!(labels.kinds.len(), TASK_KINDS.len());
+    }
+
+    #[test]
+    fn every_task_kind_has_a_bootstrap_notice_for_each_outcome() {
+        let labels = TrayLabels::default();
+
+        for code in TASK_KINDS {
+            for outcome in NOTIFICATION_OUTCOMES {
+                let notice = labels.notices.get(&task_notification(code, outcome));
+                assert!(
+                    notice.is_some_and(|text| !text.starts_with("Task ")),
+                    "{code}.{outcome} needs a bootstrap notice"
+                );
+            }
+        }
+
+        assert_eq!(
+            labels.notices.len(),
+            TASK_KINDS.len() * NOTIFICATION_OUTCOMES.len()
+        );
     }
 
     #[test]

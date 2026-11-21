@@ -3,7 +3,6 @@
 
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
-use tauri_plugin_notification::NotificationExt;
 
 use crate::context::Data;
 use crate::error::AppError;
@@ -47,6 +46,7 @@ fn blocking(app: AppHandle, work: impl FnOnce(&Data) -> Result<(), AppError> + S
 /// launched again; the menu already shows Stop in that state.
 fn play(app: &AppHandle, game: String, apply_draft: bool) {
     let handle = app.clone();
+    let launch_handle = app.clone();
     let exit_game = game.clone();
     blocking(app.clone(), move |data| {
         let home = home_dir()?;
@@ -60,6 +60,7 @@ fn play(app: &AppHandle, game: String, apply_draft: bool) {
                 let _ = handle.emit("game-exited", exit_game.clone());
             })),
         )?;
+        super::after_game_launch(&launch_handle);
         Ok(())
     });
 }
@@ -175,52 +176,6 @@ pub fn quit_app(app: &AppHandle) {
             app.dialog().message(error.to_string()).show(|_| {});
         }
     }
-}
-
-fn notify_if_hidden(app: &AppHandle, task_state: &str, kind: &str, game: Option<&str>) {
-    if task_state != "waiting" && task_state != "failed" {
-        return;
-    }
-
-    let hidden = app.get_webview_window("main").is_none_or(|window| {
-        !window.is_visible().unwrap_or(true) || window.is_minimized().unwrap_or(false)
-    });
-
-    if !hidden {
-        return;
-    }
-
-    let labels = app.state::<TrayState>().labels();
-    let template = if task_state == "waiting" {
-        &labels.notice_waiting
-    } else {
-        &labels.notice_failed
-    };
-    let body = crate::tray::labels::fill(
-        &crate::tray::labels::fill(
-            template,
-            "kind",
-            &labels
-                .kinds
-                .get(kind)
-                .cloned()
-                .unwrap_or_else(|| kind.to_owned()),
-        ),
-        "game",
-        game.unwrap_or(&labels.name),
-    );
-    let _ = app
-        .notification()
-        .builder()
-        .title(labels.notice_title.clone())
-        .body(body)
-        .show();
-}
-
-/// The notification hook for one task event. Only a state change that needs the user produces a notice, and only when
-/// the window is hidden or minimized.
-pub fn task_event(app: &AppHandle, task: &crate::infra::tasks::TaskView) {
-    notify_if_hidden(app, &task.state, &task.kind, task.game.as_deref());
 }
 
 /// Dispatches one native menu id.
