@@ -2,6 +2,7 @@
 //! from the same status, task registry and game runtime the window reads, so it never becomes a second source of truth.
 
 mod actions;
+pub mod close;
 pub mod commands;
 mod icons;
 mod labels;
@@ -9,6 +10,7 @@ mod menu;
 mod state;
 mod view;
 
+pub use actions::quit_app;
 use state::TrayState;
 
 use tauri::tray::{MouseButton, TrayIconBuilder, TrayIconEvent};
@@ -22,7 +24,10 @@ const TRAY_ID: &str = "gobbo-main";
 /// Creates the icon, installs its handlers and subscribes to the events that change what it shows. A failure is logged
 /// by the caller: a tray is useful, but a missing one never stops the app.
 pub fn init(app: &AppHandle) -> Result<(), AppError> {
-    let state = TrayState::new();
+    // The state is managed before the icon is built: closing and quitting read the game state through it, so a desktop
+    // without a tray still asks before stopping a running game. Only the icon is missing then.
+    app.manage(TrayState::new());
+    let state = app.state::<TrayState>();
     let labels = state.labels();
     let tooltip = icons::load(view::IconState::Idle)
         .map_err(AppError::unexpected)
@@ -53,7 +58,6 @@ pub fn init(app: &AppHandle) -> Result<(), AppError> {
                 .map_err(AppError::unexpected)
         })?;
     state.set_tray(tooltip);
-    app.manage(state);
     refresh(app)?;
     watch(app, "task-started");
     watch(app, "task-finished");

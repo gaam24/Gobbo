@@ -292,6 +292,18 @@ const en = {
 		help: "More information",
 		back: "Back",
 	},
+	closeDialog: {
+		title: "Close Gobbo?",
+		hideToTray: "Hide in the tray",
+		hideDetail: "Gobbo keeps working; open it again from the tray icon.",
+		minimize: "Minimize",
+		minimizeDetail: "Gobbo keeps working; the window stays on the taskbar.",
+		exit: "Exit Gobbo",
+		exitDetail: "Gobbo stops, along with any work in progress.",
+		exitGameDetail: "The running game is stopped first. You will be asked to confirm.",
+		remember: "Remember my choice",
+		rememberHint: "You can change it in Settings, under Interface.",
+	},
 	errorBoundary: {
 		title: "Something went wrong",
 		body: "Gobbo ran into an unexpected error. Your mods and profiles are safe. Reload the window or try that screen again.",
@@ -1514,10 +1526,13 @@ const en = {
 			hint: "The window opens at the same size and spot it had when you closed it. Takes effect the next time you start Gobbo.",
 			toggle: "Remember the window size and position",
 		},
-		tray: {
-			title: "Close to the system tray",
-			toggle: "Hide the window in the tray instead of quitting",
-			hint: "The tray still shows the game, the mod list and anything in progress. Use Quit Gobbo in the tray to close the app.",
+		closeAction: {
+			label: "When closing the window",
+			hint: "Gobbo can ask each time or do one thing without asking. This is also where you bring the closing dialog back.",
+			ask: "Ask every time",
+			exit: "Exit Gobbo",
+			minimize: "Minimize to the taskbar",
+			hideToTray: "Hide in the system tray",
 		},
 		collections: {
 			title: "Check collection versions",

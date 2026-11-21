@@ -13,6 +13,7 @@ use crate::context::managed::{GameDataUsage, ManagedGame};
 use crate::domain::source::{SourceLinkStatus, SourceLinksReport};
 use crate::error::AppError;
 use crate::settings::config::AppSettings;
+use crate::settings::config::CloseAction;
 use crate::settings::config::Settings;
 
 crate::commands::game_commands! {
@@ -80,6 +81,16 @@ pub async fn save_app_settings(
         saved
     })
     .await
+}
+
+/// Performs the choice made in the closing dialog; `Ask` is its Cancel. "Don't show this again" is saved by the window
+/// like every other app setting, before this runs. Exiting goes through the tray's safe quit, which still asks before
+/// stopping a running game.
+#[tauri::command]
+#[specta::specta]
+pub async fn choose_close_action(app: AppHandle, action: CloseAction) -> Result<(), AppError> {
+    crate::tray::close::apply(&app, action);
+    Ok(())
 }
 
 /// The system's handler for each download-link scheme the settings take, and whether it is this Gobbo. Nothing is

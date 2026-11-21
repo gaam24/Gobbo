@@ -1,7 +1,7 @@
 import { createContext, type ReactNode, useContext, useMemo } from "react";
 import { useNoticeActions } from "@/app/contexts/notices-context";
 import { useAppSettings } from "@/app/use-app-settings";
-import type { AppSettings_Serialize, SourceAccount, SourceLinkStatus, SourceProviderInfo, StorageInfo } from "@/bindings";
+import type { AppSettings_Serialize, CloseAction, SourceAccount, SourceLinkStatus, SourceProviderInfo, StorageInfo } from "@/bindings";
 import type { LanguageSetting } from "@/locales/locale";
 
 /// The app settings the interface reads. They change when the user edits them, not while a game is being modded.
@@ -23,7 +23,7 @@ interface SettingsData {
 	/// What the system does for each download-link scheme the settings take.
 	linkStatus: SourceLinkStatus[];
 	rememberWindow: boolean;
-	minimizeToTray: boolean;
+	closeAction: CloseAction;
 	efficiencyMode: AppSettings_Serialize["efficiency_mode"];
 	/// Whether the active profile's collection revisions are read again when a game opens.
 	checkCollectionsOnLaunch: boolean;
@@ -52,7 +52,7 @@ interface SettingsActions {
 	openSourceKeyPage: (provider: string) => void;
 	saveLanguage: (language: LanguageSetting) => void | Promise<void>;
 	saveRememberWindow: (on: boolean) => void | Promise<void>;
-	saveMinimizeToTray: (on: boolean) => void | Promise<void>;
+	saveCloseAction: (action: CloseAction) => Promise<void>;
 	saveEfficiencyMode: (mode: AppSettings_Serialize["efficiency_mode"]) => void | Promise<void>;
 	saveCheckCollectionsOnLaunch: (on: boolean) => void | Promise<void>;
 	saveCheckCatalogOnLaunch: (on: boolean) => void | Promise<void>;
@@ -97,7 +97,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 		sourceLinks,
 		linkStatus,
 		rememberWindow,
-		minimizeToTray,
+		closeAction,
 		efficiencyMode,
 		checkCollectionsOnLaunch,
 		checkCatalogOnLaunch,
@@ -108,7 +108,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 		openSourceKeyPage,
 		saveLanguage,
 		saveRememberWindow,
-		saveMinimizeToTray,
+		saveCloseAction,
 		saveEfficiencyMode,
 		saveCheckCollectionsOnLaunch,
 		saveCheckCatalogOnLaunch,
@@ -130,7 +130,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 			sourceLinks,
 			linkStatus,
 			rememberWindow,
-			minimizeToTray,
+			closeAction,
 			efficiencyMode,
 			checkCollectionsOnLaunch,
 			checkCatalogOnLaunch,
@@ -147,7 +147,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 			keysSaved,
 			language,
 			linkStatus,
-			minimizeToTray,
+			closeAction,
 			providers,
 			readyProviders,
 			sourceLinks,
@@ -163,7 +163,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 			openSourceKeyPage,
 			saveLanguage,
 			saveRememberWindow,
-			saveMinimizeToTray,
+			saveCloseAction,
 			saveEfficiencyMode,
 			saveCheckCollectionsOnLaunch,
 			saveCheckCatalogOnLaunch,
@@ -188,7 +188,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 			saveInspectorCollapsed,
 			saveLanguage,
 			saveRememberWindow,
-			saveMinimizeToTray,
+			saveCloseAction,
 			saveSourceKey,
 			saveSourceLinks,
 		],

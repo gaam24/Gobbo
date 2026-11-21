@@ -50,7 +50,10 @@ export function ModalDialog({
 					<DialogTitle>{title}</DialogTitle>
 					{description && <DialogDescription>{description}</DialogDescription>}
 				</DialogHeader>
-				<div className="grid min-h-0 min-w-0 flex-1 content-start gap-4 overflow-auto text-sm">{body}</div>
+				{/* The 4 px padding, taken back by the negative margin, keeps focus rings inside the scrolling body, which would
+				clip them. Only the body scrolls up and down: a control's wider hit area, such as a checkbox's, never makes it
+				scroll sideways. */}
+				<div className="-m-1 grid min-h-0 min-w-0 flex-1 content-start gap-4 overflow-x-hidden overflow-y-auto p-1 text-sm">{body}</div>
 				{footer}
 			</DialogContent>
 		</Dialog>

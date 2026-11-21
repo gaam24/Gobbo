@@ -16,7 +16,7 @@ export function AppSettingsPage() {
 		linkStatus,
 		language,
 		rememberWindow,
-		minimizeToTray,
+		closeAction,
 		efficiencyMode,
 		checkCollectionsOnLaunch,
 		checkCatalogOnLaunch,
@@ -27,7 +27,7 @@ export function AppSettingsPage() {
 		openSourceKeyPage,
 		saveSourceLinks,
 		saveRememberWindow,
-		saveMinimizeToTray,
+		saveCloseAction,
 		saveEfficiencyMode,
 		saveCheckCollectionsOnLaunch,
 		saveCheckCatalogOnLaunch,
@@ -63,8 +63,8 @@ export function AppSettingsPage() {
 				}}
 				rememberWindow={rememberWindow}
 				onRememberWindow={saveRememberWindow}
-				minimizeToTray={minimizeToTray}
-				onMinimizeToTray={saveMinimizeToTray}
+				closeAction={closeAction}
+				onCloseAction={saveCloseAction}
 				efficiencyMode={efficiencyMode}
 				onEfficiencyMode={saveEfficiencyMode}
 				checkCollectionsOnLaunch={checkCollectionsOnLaunch}

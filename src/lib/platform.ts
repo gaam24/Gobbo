@@ -35,3 +35,27 @@ export function usePlatform(): string | null {
 
 	return value;
 }
+
+/// Whether the system shows Gobbo's tray icon. It is `true` until the backend answers, and without a backend, so the
+/// option is not hidden by mistake; the backend still minimizes when a saved tray choice has no icon to go to.
+export function useTrayAvailable(): boolean {
+	const [value, setValue] = useState(true);
+
+	useEffect(() => {
+		let active = true;
+		void (async () => {
+			try {
+				const available = await commands.trayAvailable();
+				// oxlint-disable-next-line typescript/no-unnecessary-condition -- the cleanup flips `active`, which flow analysis cannot see.
+				if (active) setValue(available);
+			} catch {
+				// No backend: keep the option visible.
+			}
+		})();
+		return () => {
+			active = false;
+		};
+	}, []);
+
+	return value;
+}

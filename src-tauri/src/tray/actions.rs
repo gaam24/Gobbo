@@ -155,6 +155,28 @@ fn quit(app: &AppHandle, snapshot: &Snapshot, labels: &TrayLabels) {
         });
 }
 
+/// Ends the app the same way the tray's Quit item does. Closing the window reuses it, so a running game or a task in
+/// progress keeps the existing confirmation and is stopped before the app exits.
+pub fn quit_app(app: &AppHandle) {
+    if app.try_state::<TrayState>().is_none() {
+        app.exit(0);
+        return;
+    }
+
+    // Without the game state Gobbo cannot tell whether a game would be left running with its overlay mounted, so it
+    // stays open and says why instead of exiting blind.
+    match snapshot(app) {
+        Ok(current) => {
+            let labels = app.state::<TrayState>().labels();
+            quit(app, &current, &labels);
+        }
+        Err(error) => {
+            crate::infra::log::warn(format!("quit: the game state could not be read: {error}"));
+            app.dialog().message(error.to_string()).show(|_| {});
+        }
+    }
+}
+
 fn notify_if_hidden(app: &AppHandle, task_state: &str, kind: &str, game: Option<&str>) {
     if task_state != "waiting" && task_state != "failed" {
         return;
@@ -255,12 +277,7 @@ pub fn handle(app: &AppHandle, id: &str) {
                 }
             }
         }
-        "tray.quit" => {
-            if let Ok(current) = snapshot(app) {
-                let labels = app.state::<TrayState>().labels();
-                quit(app, &current, &labels);
-            }
-        }
+        "tray.quit" => quit_app(app),
         _ => {}
     }
 }

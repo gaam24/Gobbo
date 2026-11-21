@@ -50,8 +50,8 @@ function settings(registered: boolean) {
 						}}
 						rememberWindow
 						onRememberWindow={nothing}
-						minimizeToTray
-						onMinimizeToTray={nothing}
+						closeAction="ask"
+						onCloseAction={nothing}
 						efficiencyMode="auto"
 						onEfficiencyMode={nothing}
 						checkCollectionsOnLaunch
@@ -87,6 +87,12 @@ test("only the selected settings tab is visible", () => {
 	const html = renderToString(settings(true));
 	expect(html).toContain("Remember the window");
 	expect(html).not.toContain("Create support bundle");
+});
+
+test("the closing choice is editable in the interface settings", () => {
+	const html = renderToString(settings(true));
+	expect(html).toContain("When closing the window");
+	expect(html).toContain('id="app-close-action"');
 });
 
 test("the catalog check toggle renders next to the collection check", () => {

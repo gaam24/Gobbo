@@ -2,6 +2,7 @@
 //! This is not game state — it is the last thing the window told the tray, so the menu still makes sense with no window.
 
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use tauri::{Wry, tray::TrayIcon};
 
@@ -19,6 +20,8 @@ struct Inner {
 pub struct TrayState {
     inner: Mutex<Inner>,
     tray: Mutex<Option<TrayIcon<Wry>>>,
+    /// The window was asked to show the closing dialog and has not answered yet.
+    close_pending: AtomicBool,
 }
 
 impl TrayState {
@@ -31,6 +34,7 @@ impl TrayState {
                 labels: TrayLabels::default(),
             }),
             tray: Mutex::new(None),
+            close_pending: AtomicBool::new(false),
         }
     }
 
@@ -77,6 +81,16 @@ impl TrayState {
             .tray
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(icon);
+    }
+
+    /// Marks that the closing dialog was asked for. Returns whether an earlier request is still unanswered.
+    pub fn begin_close(&self) -> bool {
+        self.close_pending.swap(true, Ordering::AcqRel)
+    }
+
+    /// The closing dialog answered, or the close was handled another way.
+    pub fn end_close(&self) {
+        self.close_pending.store(false, Ordering::Release);
     }
 
     /// The icon handle, cloned because `TrayIcon` is reference-counted.

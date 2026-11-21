@@ -3,6 +3,7 @@ import { useLinkFocus } from "@/app/hooks/use-link-focus";
 import {
 	type AppSettings_Serialize,
 	type AppSettings as AppSettingsData,
+	type CloseAction,
 	commands,
 	type SourceAccount,
 	type SourceLinkStatus,
@@ -62,7 +63,7 @@ export function useAppSettings({
 	const [linkStatus, setLinkStatus] = useState<SourceLinkStatus[]>([]);
 	const [language, setLanguage] = useState<LanguageSetting>("system");
 	const [rememberWindow, setRememberWindow] = useState(true);
-	const [minimizeToTray, setMinimizeToTray] = useState(true);
+	const [closeAction, setCloseAction] = useState<CloseAction>("ask");
 	const [efficiencyMode, setEfficiencyMode] = useState<AppSettings_Serialize["efficiency_mode"]>("auto");
 	const [checkCollectionsOnLaunch, setCheckCollectionsOnLaunch] = useState(true);
 	const [checkCatalogOnLaunch, setCheckCatalogOnLaunch] = useState(true);
@@ -260,7 +261,7 @@ export function useAppSettings({
 		setSourceLinks(settings.source_links);
 		setLanguage(settings.language);
 		setRememberWindow(settings.remember_window);
-		setMinimizeToTray(settings.minimize_to_tray);
+		setCloseAction(settings.close_action);
 		setEfficiencyMode(settings.efficiency_mode);
 		setCheckCollectionsOnLaunch(settings.check_collections_on_launch);
 		setCheckCatalogOnLaunch(settings.check_catalog_on_launch);
@@ -308,9 +309,13 @@ export function useAppSettings({
 		saveSetting({ remember_window: on }, () => setRememberWindow(on));
 	};
 
-	/// The tray keeps background work reachable. The backend reads the saved value on the next window close.
-	const saveMinimizeToTray = (on: boolean) => {
-		saveSetting({ minimize_to_tray: on }, () => setMinimizeToTray(on));
+	/// What closing the window does. The backend reads the saved choice on the next window close. It resolves once the
+	/// file is written, so the closing dialog can save a remembered "exit" before the app ends.
+	const saveCloseAction = async (action: CloseAction) => {
+		await attempt(async () => {
+			await update({ close_action: action });
+			setCloseAction(action);
+		});
 	};
 
 	/// Windows 11 Efficiency mode is an app setting: the backend applies it at once.
@@ -364,7 +369,7 @@ export function useAppSettings({
 		sourceLinks,
 		linkStatus,
 		rememberWindow,
-		minimizeToTray,
+		closeAction,
 		efficiencyMode,
 		checkCollectionsOnLaunch,
 		checkCatalogOnLaunch,
@@ -375,7 +380,7 @@ export function useAppSettings({
 		openSourceKeyPage,
 		saveLanguage,
 		saveRememberWindow,
-		saveMinimizeToTray,
+		saveCloseAction,
 		saveEfficiencyMode,
 		saveCheckCollectionsOnLaunch,
 		saveCheckCatalogOnLaunch,

@@ -1,29 +1,24 @@
 import { FolderOpen, KeyRound, LifeBuoy, Link2Off, RefreshCw, Settings2 } from "lucide-react";
 import { useState } from "react";
-import type { AppSettings_Serialize, SourceAccount, SourceLinkStatus, SourceProviderInfo, StorageInfo } from "@/bindings";
+import type { AppSettings_Serialize, CloseAction, SourceAccount, SourceLinkStatus, SourceProviderInfo, StorageInfo } from "@/bindings";
 import { SettingsLayout, type SettingsSection } from "@/components/app/page-layout";
 import { PageFrame } from "@/components/page-frame";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/i18n";
-import { usePlatform } from "@/lib/platform";
+import { usePlatform, useTrayAvailable } from "@/lib/platform";
 import type { LanguageSetting } from "@/locales/locale";
 import type { KeyCheck } from "@/sources/key-check";
 import { lostLinkSchemes } from "@/sources/links";
 import { ProviderKeySection } from "@/sources/provider-key-section";
+import { CloseActionSetting } from "@/views/settings/close-action-setting";
 import { Section, SettingRow, SettingsGroup } from "@/views/settings/controls";
 import { DataFolderSettings } from "@/views/settings/data-folder-settings";
 import { EfficiencySetting } from "@/views/settings/efficiency-setting";
 import { LanguageSettings } from "@/views/settings/language-settings";
 import { StorageSettings } from "@/views/settings/storage-settings";
 import { SupportSection } from "@/views/settings/support-section";
-import {
-	CheckCatalogSetting,
-	CheckCollectionsSetting,
-	MinimizeToTraySetting,
-	ProviderLinkSetting,
-	RememberWindowSetting,
-} from "@/views/settings/toggle-settings";
+import { CheckCatalogSetting, CheckCollectionsSetting, ProviderLinkSetting, RememberWindowSetting } from "@/views/settings/toggle-settings";
 import { UpdatesSection } from "@/views/settings/updates-section";
 
 /// The providers as the settings show them: the list, whether each key is saved, and the providers whose download links
@@ -59,8 +54,8 @@ export function AppSettings({
 	providerActions,
 	rememberWindow,
 	onRememberWindow,
-	minimizeToTray,
-	onMinimizeToTray,
+	closeAction,
+	onCloseAction,
 	efficiencyMode,
 	onEfficiencyMode,
 	checkCollectionsOnLaunch,
@@ -80,9 +75,9 @@ export function AppSettings({
 	/// The main window's size and place, restored at the start when this is on.
 	rememberWindow: boolean;
 	onRememberWindow: (on: boolean) => void | Promise<void>;
-	/// Closing the window hides it in the tray instead of ending the app.
-	minimizeToTray: boolean;
-	onMinimizeToTray: (on: boolean) => void | Promise<void>;
+	/// What closing the main window does, including "ask every time".
+	closeAction: CloseAction;
+	onCloseAction: (action: CloseAction) => void | Promise<void>;
 	/// Windows 11 Efficiency mode. Other systems do not show the row.
 	efficiencyMode: AppSettings_Serialize["efficiency_mode"];
 	onEfficiencyMode: (mode: AppSettings_Serialize["efficiency_mode"]) => void | Promise<void>;
@@ -104,6 +99,7 @@ export function AppSettings({
 	const { t } = useTranslation();
 	/// The link handler is registered on Windows and Linux; macOS takes its links from the app bundle.
 	const platform = usePlatform();
+	const tray = useTrayAvailable();
 	const linkProviders = providers.list.filter((provider) => provider.schemes.length > 0);
 	const lostSchemes = lostLinkSchemes(providers.status);
 	const [tab, setTab] = useState<AppSettingsTab>("interface");
@@ -117,7 +113,7 @@ export function AppSettings({
 				<Section id="settings-app-interface" title={t("settings.groups.interface")}>
 					<LanguageSettings language={language} onLanguage={onLanguage} />
 					<RememberWindowSetting on={rememberWindow} onChange={onRememberWindow} />
-					<MinimizeToTraySetting on={minimizeToTray} onChange={onMinimizeToTray} />
+					<CloseActionSetting action={closeAction} tray={tray} onAction={onCloseAction} />
 					<CheckCollectionsSetting on={checkCollectionsOnLaunch} onChange={onCheckCollectionsOnLaunch} />
 					<CheckCatalogSetting on={checkCatalogOnLaunch} onChange={onCheckCatalogOnLaunch} />
 					{platform === "windows" && <EfficiencySetting mode={efficiencyMode} onMode={onEfficiencyMode} />}

@@ -14,9 +14,8 @@ pub const BINDINGS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../src/bindings
 
 use std::path::{Path, PathBuf};
 
-use tauri::Manager;
-use tauri::WindowEvent;
 use tauri::utils::config::AppDirectoriesOverride;
+use tauri::{Manager, WindowEvent};
 use tauri_plugin_window_state::{StateFlags, WindowExt};
 
 use crate::commands;
@@ -95,14 +94,14 @@ pub fn run() {
         )
         .on_window_event(|window, event| {
             // The tray owns the app's lifetime while background work continues. E2E builds keep the ordinary close so
-            // WebdriverIO can end a session; the tray itself is still created for a visual check.
+            // WebdriverIO can end a session. Everywhere else Rust blocks the close and the tray decides: the saved choice, or
+            // the closing dialog.
             if let WindowEvent::CloseRequested { api, .. } = event
                 && !cfg!(feature = "e2e")
                 && let Some(data) = window.app_handle().try_state::<Data>()
-                && crate::settings::config::load_app_settings(&data).minimize_to_tray
             {
                 api.prevent_close();
-                let _ = window.hide();
+                crate::tray::close::request(window.app_handle(), &data);
             }
             // Efficiency mode follows focus and minimize. The settings file is small and this runs on window events,
             // not on every status, so it is read again rather than kept in a second global.

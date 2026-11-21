@@ -44,17 +44,6 @@ export function RememberWindowSetting({ on, onChange }: { on: boolean; onChange:
 	);
 }
 
-/// Whether closing the window hides it in the tray. The tray is the way back in while work continues in the background.
-export function MinimizeToTraySetting({ on, onChange }: { on: boolean; onChange: (on: boolean) => void | Promise<void> }) {
-	const { t } = useTranslation();
-	const toggle = t("settings.tray.toggle");
-	return (
-		<SettingRow title={t("settings.tray.title")} htmlFor="minimize-to-tray" hint={toggle} help={t("settings.tray.hint")}>
-			<Switch id="minimize-to-tray" aria-label={toggle} checked={on} onCheckedChange={(checked) => void onChange(checked)} />
-		</SettingRow>
-	);
-}
-
 /// Whether a game open reads the current revision of the active profile's collections. One read per collection, through
 /// the provider that owns it; the manual check in the collection menu works either way.
 export function CheckCollectionsSetting({ on, onChange }: { on: boolean; onChange: (on: boolean) => void | Promise<void> }) {

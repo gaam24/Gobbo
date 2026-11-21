@@ -1,5 +1,5 @@
-//! The two commands the window uses to keep the native menu in step with the interface: its translated labels and the
-//! game and busy state only the window knows.
+//! The commands the window uses to keep the native menu in step with the interface (its translated labels and the game
+//! and busy state only the window knows), and to learn whether the system shows a tray icon at all.
 
 use tauri::{AppHandle, State};
 
@@ -32,4 +32,11 @@ pub async fn set_tray_context(
 ) -> Result<(), AppError> {
     tray.set_context(game, busy);
     super::refresh(&app)
+}
+
+/// Whether the system shows Gobbo's tray icon. Without one the interface does not offer hiding the window in the tray.
+#[tauri::command]
+#[specta::specta]
+pub async fn tray_available(app: AppHandle) -> bool {
+    super::close::available(&app)
 }

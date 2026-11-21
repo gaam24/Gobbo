@@ -275,6 +275,8 @@ export const commands = {
 	 *  closes, so its status remains meaningful while work continues in the background.
 	 */
 	setTrayContext: (game: string | null, busy: string | null) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("set_tray_context", { game, busy })),
+	/**  Whether the system shows Gobbo's tray icon. Without one the interface does not offer hiding the window in the tray. */
+	trayAvailable: () => __TAURI_INVOKE<boolean>("tray_available"),
 	/**  The update path of this copy. */
 	updateChannel: () => typedError<UpdateChannel, AppError_Serialize>(__TAURI_INVOKE("update_channel")),
 	/**  Looks for a newer portable version. The manifest is read through the updater plugin, with its own key. */
@@ -307,6 +309,12 @@ export const commands = {
 	 *  left out gives its links up, when Gobbo has them.
 	 */
 	saveAppSettings: (settings: AppSettings_Deserialize) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("save_app_settings", { settings })),
+	/**
+	 *  Performs the choice made in the closing dialog; `Ask` is its Cancel. "Don't show this again" is saved by the window
+	 *  like every other app setting, before this runs. Exiting goes through the tray's safe quit, which still asks before
+	 *  stopping a running game.
+	 */
+	chooseCloseAction: (action: CloseAction) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("choose_close_action", { action })),
 	/**
 	 *  The system's handler for each download-link scheme the settings take, and whether it is this Gobbo. Nothing is
 	 *  changed.
@@ -620,11 +628,6 @@ export type AppSettings_Deserialize = {
 	/**  The main window opens with the size and place it had when it was closed. Off, it opens at the default size. */
 	remember_window?: boolean,
 	/**
-	 *  Closing the window hides it in the system tray instead of ending the app. Background work keeps running and the
-	 *  tray stays available as the only way back in. On from the start.
-	 */
-	minimize_to_tray?: boolean,
-	/**
 	 *  Windows 11 Efficiency mode: off, only while the window is in the background, or always. Other systems keep it
 	 *  off because they have no equivalent.
 	 */
@@ -636,7 +639,21 @@ export type AppSettings_Deserialize = {
 	check_collections_on_launch?: boolean,
 	/**  Asks the official catalog for new or changed game definitions when the app starts. On from the start. */
 	check_catalog_on_launch?: boolean,
-};
+} & ({
+	/**
+	 *  What closing the main window does. `Ask` opens the closing dialog; a concrete action runs without asking and is
+	 *  what the dialog remembers when "don't show again" is checked. `Ask` from the start. A file from before the dialog
+	 *  has the old tray switch instead; see `saved_close_action`.
+	 */
+	close_action?: CloseAction,
+} & {
+	/**
+	 *  What closing the main window does. `Ask` opens the closing dialog; a concrete action runs without asking and is
+	 *  what the dialog remembers when "don't show again" is checked. `Ask` from the start. A file from before the dialog
+	 *  has the old tray switch instead; see `saved_close_action`.
+	 */
+	minimize_to_tray?: CloseAction,
+});
 
 /**
  *  App settings shared by all games, e.g. the interface language. Provider keys live in the OS credential store, not
@@ -655,10 +672,11 @@ export type AppSettings_Serialize = {
 	/**  The main window opens with the size and place it had when it was closed. Off, it opens at the default size. */
 	remember_window: boolean,
 	/**
-	 *  Closing the window hides it in the system tray instead of ending the app. Background work keeps running and the
-	 *  tray stays available as the only way back in. On from the start.
+	 *  What closing the main window does. `Ask` opens the closing dialog; a concrete action runs without asking and is
+	 *  what the dialog remembers when "don't show again" is checked. `Ask` from the start. A file from before the dialog
+	 *  has the old tray switch instead; see `saved_close_action`.
 	 */
-	minimize_to_tray: boolean,
+	close_action: CloseAction,
 	/**
 	 *  Windows 11 Efficiency mode: off, only while the window is in the background, or always. Other systems keep it
 	 *  off because they have no equivalent.
@@ -915,6 +933,20 @@ export type Choice_Serialize = {
 	/**  The chosen option's name. */
 	option: string,
 };
+
+/**
+ *  What closing the main window does. `Ask` shows the dialog with the three concrete choices; the others perform one
+ *  of them directly. A concrete action is what "don't show this again" writes to the settings.
+ */
+export type CloseAction = 
+/**  Show the closing dialog every time. The default for both new and old settings files. */
+"ask" | 
+/**  Stop a running game with the usual confirmation and end the app. */
+"exit" | 
+/**  Minimize the window to the taskbar; background work keeps running. */
+"minimize" | 
+/**  Hide the window in the system tray; the tray is the way back in. */
+"hide_to_tray";
 
 /**  The small collection marker a profile view carries. The full origin stays in the profile. */
 export type CollectionBadge = {

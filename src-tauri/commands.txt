@@ -102,6 +102,7 @@ settings::data_folder
 settings::storage_info
 tray::set_tray_labels
 tray::set_tray_context
+tray::tray_available
 updates::update_channel
 updates::portable_update_check
 updates::portable_update_install
@@ -110,6 +111,7 @@ sources::open_source_page
 sources::open_update_page
 sources::refresh_source_meta
 settings::save_app_settings
+settings::choose_close_action
 settings::source_link_status
 settings::ensure_source_links
 sources::source_providers

@@ -300,6 +300,18 @@ const pl = {
 		help: "Więcej informacji",
 		back: "Wstecz",
 	},
+	closeDialog: {
+		title: "Zamknąć Gobbo?",
+		hideToTray: "Ukryj w zasobniku",
+		hideDetail: "Gobbo pracuje dalej; otworzysz je z ikony w zasobniku.",
+		minimize: "Minimalizuj",
+		minimizeDetail: "Gobbo pracuje dalej; okno zostaje na pasku zadań.",
+		exit: "Zakończ Gobbo",
+		exitDetail: "Gobbo się wyłączy razem z trwającą pracą.",
+		exitGameDetail: "Najpierw zostanie zatrzymana uruchomiona gra. Gobbo poprosi o potwierdzenie.",
+		remember: "Zapamiętaj wybór",
+		rememberHint: "Zmienisz to w Ustawieniach, w sekcji Interfejs.",
+	},
 	errorBoundary: {
 		title: "Coś poszło nie tak",
 		body: "Gobbo trafił na nieoczekiwany błąd. Twoje mody i profile są bezpieczne. Odśwież okno albo spróbuj jeszcze raz na tym ekranie.",
@@ -1602,10 +1614,13 @@ const pl = {
 			hint: "Okno otworzy się w tym samym rozmiarze i miejscu, w którym było przy zamknięciu. Zmiana zadziała od następnego uruchomienia.",
 			toggle: "Pamiętaj rozmiar i miejsce okna",
 		},
-		tray: {
-			title: "Zamykaj do zasobnika",
-			toggle: "Chowaj okno do zasobnika zamiast kończyć pracę",
-			hint: "W zasobniku widać grę, listę modów i trwającą pracę. Żeby zamknąć Gobbo, wybierz „Zakończ Gobbo” w zasobniku.",
+		closeAction: {
+			label: "Przy zamykaniu okna",
+			hint: "Gobbo może pytać za każdym razem albo od razu wykonać jedną akcję. Tu możesz też przywrócić okno zamykania.",
+			ask: "Pytaj za każdym razem",
+			exit: "Zakończ Gobbo",
+			minimize: "Minimalizuj do paska zadań",
+			hideToTray: "Ukryj w zasobniku systemowym",
 		},
 		collections: {
 			title: "Sprawdzanie wersji kolekcji",
