@@ -21,6 +21,7 @@ use crate::error::AppError;
 use crate::error::Message;
 use crate::error::io_at;
 use crate::games::GameDef;
+use crate::games::prefix::effective_source;
 use crate::library::active_mods;
 use crate::library::relations::{SourceLookup, UnmetRequirements, relation_warnings_with};
 use crate::library::sync::sync_profiles as sync_profile_lists;
@@ -57,6 +58,26 @@ fn row_revision(view: &super::views::ModView) -> String {
     format!("{:016x}", hasher.finish())
 }
 
+/// The line under the game name: the Steam app id for Steam installs, the store name for the other stores. An empty
+/// or unknown source keeps the old behaviour of naming the first Steam app id.
+fn subtitle_for(source: &str, steam_app_ids: &[u32]) -> String {
+    let steam = || {
+        steam_app_ids
+            .first()
+            .map(|id| format!("Steam {id}"))
+            .unwrap_or_default()
+    };
+    match effective_source(source, steam_app_ids) {
+        "gog" => "GOG".to_string(),
+        "epic" => "Epic".to_string(),
+        "heroic" => "Heroic".to_string(),
+        "legendary" => "Legendary".to_string(),
+        "lutris" => "Lutris".to_string(),
+        "manual" => "Manual".to_string(),
+        _ => steam(),
+    }
+}
+
 pub(super) fn status_inner(
     root: &Data,
     game_id: &str,
@@ -66,7 +87,7 @@ pub(super) fn status_inner(
     let game = root.definition_shared(game_id)?;
     let data = root.game(game_id);
     let settings = load_settings(&data);
-    let tools = tool_views(&game, &settings.game_root);
+    let tools = tool_views(&game, &data, &settings);
     let library = load_library_shared(&data, &game)?;
     let view = LibraryView::new(&library);
     // The lock covers the read, the sync and the save of `synced_profiles`. The rest of the status is read-only: it
@@ -129,20 +150,20 @@ pub(super) fn status_inner(
         })
         .collect();
 
-    let game_subtitle = game
-        .detect
-        .steam_app_ids
-        .first()
-        .map(|id| format!("Steam {id}"))
-        .unwrap_or_default();
-    let game_profile_data = profile_data::game_paths(&game, &settings);
+    let game_subtitle = subtitle_for(&settings.source, &game.detect.steam_app_ids);
+    let runtime = crate::context::target::runtime(&game, &settings);
+    let launch_hint = super::launch_hint(
+        game_id,
+        effective_source(&settings.source, &game.detect.steam_app_ids),
+    );
+    let game_profile_data = profile_data::game_paths(&data, &game, &settings);
     // One path for the view and for the user-data sets: the active profile's state folder is the same throughout.
     let active_state = data.profile_state(&profiles.active);
-    let user_sets =
-        user_data::sets(&game, &settings, profiles.active(), &active_state).unwrap_or_default();
+    let user_sets = user_data::sets(&data, &game, &settings, profiles.active(), &active_state)
+        .unwrap_or_default();
     let settings_redirected =
         crate::deploy::target::settings_redirected(&game, &settings, &user_sets);
-    let ready = readiness(&game, &settings, settings_redirected);
+    let ready = readiness(&data, &game, &settings, settings_redirected);
     let user_data_views = user_sets
         .into_iter()
         .map(|set| UserDataView {
@@ -185,6 +206,7 @@ pub(super) fn status_inner(
     Ok(Status {
         game_name: game.name.clone(),
         game_subtitle,
+        runtime,
         stage,
         next_action,
         blocker,
@@ -233,7 +255,7 @@ pub(super) fn status_inner(
         overwrite_dir: active_state.join("overwrite").display().to_string(),
         game_profile_data,
         user_data: user_data_views,
-        launch_hint: super::launch_hint(game_id),
+        launch_hint,
         executables: game
             .executables
             .iter()
@@ -290,8 +312,13 @@ struct Readiness {
     mods_root: String,
 }
 
-fn readiness(game: &GameDef, settings: &Settings, settings_redirected: bool) -> Readiness {
-    let ready = folder_readiness(game, settings, settings_redirected);
+fn readiness(
+    data: &Data,
+    game: &GameDef,
+    settings: &Settings,
+    settings_redirected: bool,
+) -> Readiness {
+    let ready = folder_readiness(data, game, settings, settings_redirected);
     Readiness {
         game_ready: ready.game,
         settings_ready: ready.settings,
@@ -345,6 +372,7 @@ fn plan_outcome(
     let mut outcome = PlanOutcome::default();
 
     if !is_ready(
+        data,
         game,
         settings,
         profiles.active(),

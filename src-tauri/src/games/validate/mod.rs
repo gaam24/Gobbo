@@ -91,6 +91,7 @@ impl GameDef {
 
     fn check_detect(&self, problems: &mut Problems) {
         problems.relative("detect marker", &self.detect.markers);
+        problems.relative("detect linux marker", &self.detect.linux_markers);
         problems.relative("required file", &self.requires);
         problems.requirements("game", &self.requirements);
         problems.relative("executable", self.executables.iter().map(|exe| &exe.path));

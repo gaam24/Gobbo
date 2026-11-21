@@ -13,12 +13,12 @@ use crate::games;
 use crate::games::Executable;
 use crate::games::GameDef;
 use crate::games::Tool;
+use crate::games::runtime::Runtime;
 use crate::launch::executable::check_start;
 use crate::launch::start::game_env;
 use crate::launch::start::native_dlls_for_launch;
 use crate::launch::start::overlay_session_state;
 use crate::launch::start::program_launch;
-use crate::launch::start::runs_through_proton;
 use crate::launch::tools::prerequisites::missing_prerequisites;
 use crate::platform::Process;
 use std::path::Path;
@@ -52,10 +52,11 @@ pub fn run_game(
     // Steam passed in are inherited; the game's program is its default executable.
     let program_file = game.executables.first().map_or("", |exe| exe.path.as_str());
     let native = native_dlls_for_launch(&game, game_root, program_file, Some(&session));
+    let runtime = crate::context::target::runtime(&game, &settings);
     let inherited = std::env::var("WINEDLLOVERRIDES").ok();
     let env = game_env(
         &settings,
-        runs_through_proton(&game),
+        runtime != Runtime::Native,
         &native,
         inherited.as_deref(),
     )?;
@@ -105,7 +106,7 @@ pub fn run_tool(
     let (game, data, settings) = load_stopped(root, game_id)?;
     check_start(&settings)?;
     let tool = tool_of(&game, tool_id)?;
-    let missing = missing_prerequisites(&game, tool, &settings.game_root);
+    let missing = missing_prerequisites(&game, &data, tool, &settings);
 
     if !missing.is_empty() {
         return Err(AppError::user("tools.prerequisites_missing").with("names", missing.join(", ")));

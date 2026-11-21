@@ -118,6 +118,7 @@ pub fn mod_details(root: &Data, game_id: &str, folder: &str) -> Result<ModDetail
     let mod_steps = crate::launch::steps::load_mod_steps(&data)?;
 
     let deploy_plan = if is_ready(
+        &data,
         &game,
         &settings,
         profiles.active(),

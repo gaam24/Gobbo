@@ -16,11 +16,14 @@ pub fn prefix_missing() -> AppError {
     AppError::user("settings.prefix_missing")
 }
 
-/// The values a template may use. `prefix` is the Proton prefix of a Steam game, when it exists;
-/// `settings` is the folder of the game's order file, as entered in the game settings.
+/// The values a template may use. `prefix` is the Proton prefix of the install, when it exists; `under_proton` says the
+/// install runs under Proton, so its Windows user folders exist only inside that prefix and a missing prefix is an
+/// error, never the Linux home folders. `settings` is the folder of the game's order file, as entered in the game
+/// settings.
 pub struct Context {
     pub game_root: PathBuf,
     pub prefix: Option<PathBuf>,
+    pub under_proton: bool,
     pub home: PathBuf,
     pub settings: Option<PathBuf>,
 }
@@ -88,6 +91,16 @@ impl Context {
         Ok(path)
     }
 
+    /// The prefix the Windows user folders live in. An install under Proton without its prefix yet is an error, so a
+    /// path never resolves to the Linux home folder first and into the prefix after the first run.
+    fn windows_prefix(&self) -> Result<Option<&Path>, AppError> {
+        match &self.prefix {
+            Some(prefix) => Ok(Some(prefix)),
+            None if self.under_proton => Err(prefix_missing()),
+            None => Ok(None),
+        }
+    }
+
     fn appdata(&self) -> Result<PathBuf, AppError> {
         self.known_folder("AppData/Roaming", "APPDATA", "XDG_CONFIG_HOME", ".config")
     }
@@ -104,7 +117,7 @@ impl Context {
     /// Windows `LocalLow`, the folder Unity games use for saves and settings. Proton has the same folder under its
     /// prefix user; native Linux has no `LocalLow`, so a definition uses `path_linux` for a native build.
     fn local_low(&self) -> Result<PathBuf, AppError> {
-        if let Some(prefix) = &self.prefix {
+        if let Some(prefix) = self.windows_prefix()? {
             return Ok(proton_user(prefix).join("AppData/LocalLow"));
         }
 
@@ -123,7 +136,7 @@ impl Context {
         xdg_env: &str,
         xdg_fallback: &str,
     ) -> Result<PathBuf, AppError> {
-        if let Some(prefix) = &self.prefix {
+        if let Some(prefix) = self.windows_prefix()? {
             return Ok(proton_user(prefix).join(proton));
         }
 
@@ -136,7 +149,7 @@ impl Context {
     }
 
     fn documents(&self) -> Result<PathBuf, AppError> {
-        if let Some(prefix) = &self.prefix {
+        if let Some(prefix) = self.windows_prefix()? {
             return Ok(proton_user(prefix).join("Documents"));
         }
         // The OS known folder follows a Documents folder redirected to OneDrive. The environment fallback keeps
@@ -235,9 +248,45 @@ mod tests {
         Context {
             game_root: PathBuf::from("/games/Test"),
             prefix: prefix.map(Path::to_path_buf),
+            under_proton: false,
             home: home.to_path_buf(),
             settings: None,
         }
+    }
+
+    #[test]
+    fn under_proton_a_missing_prefix_never_falls_back_to_the_home_folders() {
+        let home = Path::new("/home/user");
+        let ctx = Context {
+            under_proton: true,
+            ..context(None, home)
+        };
+        for template in [
+            "{appdata}/Game",
+            "{local_appdata}/Game",
+            "{documents}/Game",
+            "{local_low}/Game",
+        ] {
+            assert_eq!(
+                ctx.resolve(template).unwrap_err().code,
+                "settings.prefix_missing",
+                "{template}"
+            );
+        }
+        assert_eq!(
+            ctx.resolve("{game}/Mods").unwrap(),
+            Path::new("/games/Test/Mods")
+        );
+
+        let prefix = Path::new("/prefix/pfx");
+        let ctx = Context {
+            under_proton: true,
+            ..context(Some(prefix), home)
+        };
+        assert_eq!(
+            ctx.resolve("{appdata}/Game").unwrap(),
+            prefix.join("drive_c/users/steamuser/AppData/Roaming/Game")
+        );
     }
 
     #[test]
@@ -321,6 +370,7 @@ mod tests {
         let ctx = Context {
             game_root: PathBuf::from(r"C:\Games\Test"),
             prefix: None,
+            under_proton: false,
             home: PathBuf::from(r"C:\Users\Player"),
             settings: None,
         };
@@ -357,6 +407,7 @@ mod prefix_user_tests {
         fs::create_dir_all(prefix.join("drive_c/users/alice/AppData/LocalLow")).unwrap();
         let ctx = Context {
             prefix: Some(prefix.clone()),
+            under_proton: false,
             home: "/home/user".into(),
             game_root: "/games/Test".into(),
             settings: None,
@@ -380,6 +431,7 @@ mod prefix_user_tests {
     fn local_low_without_a_prefix_is_an_error_on_native_linux() {
         let err = Context {
             prefix: None,
+            under_proton: false,
             home: "/home/user".into(),
             game_root: "/games/Test".into(),
             settings: None,

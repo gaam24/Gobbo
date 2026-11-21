@@ -2,8 +2,8 @@
 #
 # BepInEx comes from an enabled mod. The shared layout is the `bepinex` loader preset in loaders/bepinex.toml: the
 # proxy and settings at the root, the plugin slot, the core/config/patchers/monomod mirrors and the archive aliases.
-# The game also has a native Linux build; Gobbo starts Steam games through Proton, so this definition covers the Windows
-# build under Proton. The Linux executable is a marker so detection works on both installs.
+# The game also has a native Linux build. Gobbo finds that install through its Linux marker and starts it directly;
+# the Windows program stays for installs that run under Proton.
 
 schema = 1
 id = "valheim"
@@ -14,13 +14,15 @@ loader = "bepinex"
 [detect]
 steam_app_ids = [892970]
 steam_install_dirs = ["Valheim"]
-# The native Linux program is not chosen by the launcher yet, so detection covers the Proton install only.
+# The Windows build and the native Linux build are both found; each install starts the program it has.
 markers = ["valheim.exe"]
+linux_markers = ["valheim.x86_64"]
 any_marker = true
 
 [[executables]]
 name = "Valheim"
 path = "valheim.exe"
+path_linux = "valheim.x86_64"
 
 [[user_data]]
 # Not yet verified on a real installation. Unity keeps the saves here on Windows, under Proton and on native Linux.

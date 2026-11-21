@@ -257,6 +257,9 @@ pub struct Status {
     pub game_name: String,
     /// A short description of the game under its name, for example `Steam 292030`.
     pub game_subtitle: String,
+    /// How this install starts on this computer, from the files in its folder. The Proton settings apply only when it
+    /// is not `native`, which it always is on Windows.
+    pub runtime: crate::games::runtime::Runtime,
     /// The one derived state of the game. Every screen reads this instead of deriving the state from booleans.
     pub stage: GameStage,
     /// The one thing to do next, derived from `stage`.

@@ -26,8 +26,8 @@ pub(super) fn copy_profile_data(
 ) -> Result<(), AppError> {
     let source_state = data.profile_state(&source.id);
     let target_state = data.profile_state(&target.id);
-    let source_sets = user_data::sets(game, settings, source, &source_state)?;
-    let target_sets = user_data::sets(game, settings, target, &target_state)?;
+    let source_sets = user_data::sets(data, game, settings, source, &source_state)?;
+    let target_sets = user_data::sets(data, game, settings, target, &target_state)?;
 
     // The target is replaced whole, so a set it no longer isolates cannot leave old files behind.
     remove_dir_if_exists(&target_state.join("userdata"))

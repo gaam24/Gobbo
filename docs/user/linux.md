@@ -69,11 +69,26 @@ outside the deployment root is copied around a launch on Linux; the game folder 
 The overlay is per profile. Switching a profile changes the layer; the game folder on disk stays as it was. Writes the
 game or a tool makes go to the profile's layer and can be captured as a mod of their own or cleared.
 
+## Games from other stores
+
+A Windows game from GOG, Epic or a plain folder starts through Proton just like a Steam game. Gobbo keeps its prefix in
+the game's data folder, so the game's own saves and settings work. The Proton build is picked in the game settings; the
+newest installed build is used by default.
+
+A game from Heroic or Lutris uses the prefix that launcher already runs it in, so mods and saves land where you play.
+The game's Proton tab shows that prefix and lets you pick another folder or go back to Gobbo's own. Gobbo can start the
+game itself only in a Proton prefix (a folder named `pfx`); a prefix made by plain Wine still works for mods and saves,
+and the game starts from its launcher.
+
+Until a Windows game outside Steam has started once, its prefix does not exist, so a mod folder inside it (for example
+in `AppData`) cannot be resolved yet. Start the game once, then deploy.
+
 ## Native Linux builds
 
-Valheim ships a native Linux build. The current launcher starts Steam games through Proton, so its definition covers
-the Windows build under Proton. An executable can name a Linux path; a non-Steam game uses it on
-Linux. Until the launcher chooses the native program of a Steam game, Gobbo does not offer an install it cannot start.
+Valheim ships a native Linux build, and its definition names both the Linux program and the files that identify that
+install. The Games page finds a native-only install and starts it directly, without Proton. What is in the game folder
+decides: a Windows copy of the same game, for example one Steam installed with Proton forced, still runs through Proton. Other games offer the same
+support as soon as their definitions name the native build.
 
 ## If something does not work
 

@@ -40,7 +40,7 @@ pub fn report(root: &Data, game_id: &str, folder: &str) -> Result<ArchiveReport,
         None => None,
     };
     let settings = load_settings(&data);
-    let roots = crate::context::target::deployment_root(&game, &settings)
+    let roots = crate::context::target::deployment_root(&data, &game, &settings)
         .ok()
         .map(|root| install::top_level_folders(&root))
         .unwrap_or_default();

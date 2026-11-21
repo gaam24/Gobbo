@@ -12,7 +12,8 @@ interface Games {
 	managed: ManagedGame[] | null;
 	/// The added games, ready for the rail and the palette.
 	managedGames: GameView[];
-	/// The scan results, or `null` until the Games page asks for them.
+	/// The scan results, or `null` until the Games page asks for them. Other installs of a game are carried in each
+	/// result but the list keeps showing only the preferred one.
 	scans: GameScan[] | null;
 	/// The failure of the last scan, so the Games page can offer a retry instead of a permanent "Searching…".
 	scanError: string | null;

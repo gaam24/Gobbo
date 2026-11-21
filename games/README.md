@@ -185,17 +185,32 @@ Rules:
 | -------------------- | --------------------------------------------------------------------------------- |
 | `steam_app_ids`      | Steam app ids. The first one also finds the Proton prefix.                        |
 | `steam_install_dirs` | Folder names under `steamapps/common`, tried when no app manifest names one.      |
-| `gog_ids`            | GOG product ids, matched by `goggame-<id>.info` and Heroic's GOG store.           |
-| `epic_ids`           | Epic AppNames, matched by `LauncherInstalled.dat` and Heroic's legendary store.   |
-| `heroic_slugs`       | Extra Heroic app names, when the store does not use the Epic AppName.             |
-| `lutris_slugs`       | Lutris `game_slug` values.                                                        |
+| `gog_ids`            | GOG product ids (the base game, not a DLC). Matched by every way a GOG game is installed. |
+| `epic_ids`           | Epic `AppName`s. Matched by every way an Epic game is installed.                  |
+| `heroic_slugs`       | Extra Heroic app names, only for a Heroic app that has no GOG or Epic id.         |
+| `lutris_slugs`       | Lutris game slugs, for a game Lutris installed from neither GOG nor Epic.         |
 | `markers`            | Files that identify the game folder.                                              |
+| `linux_markers`     | Files that identify the folder of the native Linux build. Used only on Linux.    |
 | `any_marker`         | `true`: one marker is enough (builds with different file names). Default `false`. |
+
+Where each id is read. A GOG or Epic id matches its game however it was installed, so a definition rarely needs
+`heroic_slugs` or `lutris_slugs`.
+
+| Store     | Read from                                                                                                               |
+| --------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Steam     | `libraryfolders.vdf` and `appmanifest_<id>.acf` in every library                                                       |
+| GOG       | the `goggame-<id>.info` files in each game folder (the game and each DLC), GOG's registry entries on Windows, and the folders of Galaxy, GOG's installers and minigalaxy |
+| Epic      | the launcher's `.item` manifests (its data folder from the registry) and `LauncherInstalled.dat`; unfinished downloads and DLC are skipped |
+| Heroic    | its Epic and GOG install lists, native and Flatpak, with the Wine prefix from `GamesConfig`                             |
+| Legendary | its own `installed.json`, in `LEGENDARY_CONFIG_PATH`, `$XDG_CONFIG_HOME/legendary` or `~/.config/legendary`          |
+| Lutris    | its database `pga.db`, native and Flatpak, with the Wine prefix from the game's file; a game Lutris installed from GOG or Epic also carries that id |
 
 ### `[[executables]]`
 
 The programs the game starts with; the first one is the default. `name`, `path`, and `args` (always passed, before
-the user's own arguments). There is no automatic anti-cheat detection: if a game needs a launch flag, put it in `args`.
+the user's own arguments). `path_linux` names the program of a native Linux build; on Linux Gobbo starts it directly,
+without Proton, and falls back to `path` when it is empty. There is no automatic anti-cheat detection: if a game needs
+a launch flag, put it in `args`.
 
 ### `[deploy]`
 
@@ -297,7 +312,11 @@ start while one is missing, and the settings offer to install it after a confirm
 
 `{game}`, `{prefix}` (the Proton prefix), `{appdata}`, `{local_appdata}`, `{documents}`, `{home}`, and in
 `profile_data` also `{settings}` (the folder of the order file). For a Steam game with a Proton prefix the user
-folders are the ones Windows programs see inside the prefix. `..` is refused.
+folders are the ones Windows programs see inside the prefix. For an install that is not from Steam, the prefix is the
+one Heroic or Lutris names, the one the user picks, or else the one Gobbo owns in the game's data folder; it exists once
+the game has been started. Under Proton the user folders always resolve inside the prefix, never to the Linux home
+folders, so a template waits for the first start instead of moving. A native install (its folder has the
+`linux_markers` or the `path_linux` program) resolves them in the Linux home folders. `..` is refused.
 
 ## Patterns
 
@@ -324,7 +343,7 @@ folders are the ones Windows programs see inside the prefix. `..` is refused.
 | TCG Card Shop Simulator           | `loader = "bepinex"`; Nexus and Thunderstore                                                                                                                                                                              | yes    |
 | Lethal Company                    | `loader = "bepinex"`; Nexus and Thunderstore                                                                                                                                                                              | yes    |
 | Tainted Grail: The Fall of Avalon | `loader = { id = "bepinex", variant = "6" }`; Nexus                                                                                                                                                                       | yes    |
-| Valheim                           | `loader = "bepinex"`; Nexus and Thunderstore                                                                                                                                                                              | no     |
+| Valheim                           | `loader = "bepinex"`; Nexus and Thunderstore; native Linux build found and started directly                                                                                                                             | no     |
 | R.E.P.O.                          | `loader = "bepinex"`; Nexus and Thunderstore                                                                                                                                                                              | no     |
 | Content Warning                   | `loader = "bepinex"`; BepInEx mods only; Nexus and Thunderstore                                                                                                                                                           | no     |
 
@@ -334,10 +353,8 @@ campaign modules (`.mod`/`.mmd` in `Data/modules`), language packs (`.tlk`/`.key
 `Data/Scripts`, `Data/Templates`, `Data/Meshes`, `Data/Dialogues` and `Data/voices` keep their paths; `resource_names`
 makes equal names conflict across those mirrors and the flat `Data/Override` slot.
 
-Valheim also ships a native Linux build. The current launcher starts Steam games through Proton, so its definition
-covers the Windows build under Proton. An executable can name a `path_linux`; a non-Steam game uses it
-on Linux. Until the launcher chooses the native program of a Steam game, the native Linux marker is not used for
-detection, so Gobbo does not offer an install it cannot start.
+Valheim also ships a native Linux build. Its definition names that program and its marker, so the Games page finds the
+native install and starts it directly, without Proton. The Windows program stays for installs that run under Proton.
 
 Tainted Grail has two builds. The default Steam build is IL2CPP and takes BepInEx 6; the `mono` beta branch is Mono and
 takes BepInEx 5. Both loaders use the layout described by the `bepinex` preset. The definition takes variant `6`: it

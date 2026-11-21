@@ -337,11 +337,46 @@ fn steam_fixture(name: &str) -> (Fixture, PathBuf) {
     (mirror_layout_fixture(base, game_root), out)
 }
 
-/// The mirror fixture without Steam app ids, so the launch goes the native way.
+/// The mirror fixture with a Linux program: it starts natively, whatever store the install came from.
 fn native_game() -> GameDef {
     let mut game = test_games::mirror();
     game.detect.steam_app_ids.clear();
+    let program = game.executables[0].path.clone();
+    game.executables[0].path_linux = Some(program);
     game
+}
+
+/// A GOG-shaped install with a fake Proton the settings pick. Proton records the two folders it is given, the Steam app
+/// id (empty for an owned prefix) and its arguments, then whether a mod file is visible in the game folder.
+#[cfg(target_os = "linux")]
+fn owned_fixture(name: &str) -> (Fixture, PathBuf) {
+    let base = scratch!(name);
+    let game_root = base.join("GOG Games/Owned Game");
+    fs::create_dir_all(game_root.join("bin/x64")).unwrap();
+    fs::write(game_root.join("goggame-2002.info"), "{}").unwrap();
+    let proton_dir = base.join("Proton Owned");
+    fs::create_dir_all(&proton_dir).unwrap();
+    let out = base.join("out.txt");
+    let probe = game_root.join("r6/scripts/Mod/a.reds");
+    let script = format!(
+        "#!/bin/sh\n{{ printf '%s\\n' \"$STEAM_COMPAT_DATA_PATH\" \"$STEAM_COMPAT_INSTALL_PATH\" \"$SteamAppId\"; \
+             printf '%s\\n' \"$@\"; \
+             if [ -f '{}' ]; then echo visible; else echo hidden; fi; }} > '{}'\n",
+        probe.display(),
+        out.display()
+    );
+    write_script(&proton_dir.join("proton"), &script);
+    let f = mirror_layout_fixture(base, game_root);
+    f.save_settings(
+        MIRROR_GAME,
+        Settings {
+            proton_dir: proton_dir.display().to_string(),
+            source: "gog".to_string(),
+            ..f.settings()
+        },
+    )
+    .unwrap();
+    (f, out)
 }
 
 /// A game folder outside any Steam library, with the exe on disk: a native game (GOG, from disk).

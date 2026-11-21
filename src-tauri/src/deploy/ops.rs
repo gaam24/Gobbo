@@ -78,7 +78,7 @@ pub fn apply_deployment_cancellable(
 
     let active = profiles.active.clone();
     let state = data.profile_state(&active);
-    let roots = journal_roots(&game, &settings, state.clone())?;
+    let roots = journal_roots(&data, &game, &settings, state.clone())?;
     let prepared = data.prepared_states();
     let active_prepared = prepared.contains_key(&active);
     let active_overlay = state_is_overlay(&state);
@@ -105,7 +105,7 @@ pub fn apply_deployment_cancellable(
         undo(&roots).map_err(AppError::from)?;
     }
 
-    let target = target_for(&game, &settings, state, profiles.active())?;
+    let target = target_for(&data, &game, &settings, state, profiles.active())?;
     // The index is read, refreshed and saved under its lock. The deployment below only reads it.
     let (library, mods) = {
         let _index = crate::library::lock_index();
@@ -236,7 +236,7 @@ pub fn undo_deployment(root: &Data, game_id: &str) -> Result<Vec<Message>, AppEr
         profile_state::capture_current(&data, &game, &settings)?;
     }
 
-    let roots = journal_roots(&game, &settings, state)?;
+    let roots = journal_roots(&data, &game, &settings, state)?;
     let warnings = undo(&roots).map_err(AppError::from)?;
 
     if !running {

@@ -182,7 +182,7 @@ pub fn preflight(root: &Data, game_id: &str) -> Result<PreflightReport, AppError
         .map(|profile| profile.id.clone())
         .unwrap_or_default();
     let state = data.profile_state(&active);
-    let root = deployment_root(&game, &settings)
+    let root = deployment_root(&data, &game, &settings)
         .unwrap_or_else(|_| std::path::PathBuf::from(settings.game_root.trim()));
     match overlay::check_support(&state, &root) {
         Ok(()) => checks.push(check(

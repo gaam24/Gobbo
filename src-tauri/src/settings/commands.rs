@@ -150,8 +150,8 @@ pub const fn platform() -> &'static str {
 pub async fn proton_builds() -> Result<Vec<crate::platform::ProtonBuild>, AppError> {
     blocking(|| {
         let home = crate::games::paths::home_dir()?;
-        let installs = crate::games::detect::steam_installs(&home);
-        let libraries = crate::games::detect::libraries_in(&installs);
+        let installs = crate::games::stores::steam::steam_installs(&home);
+        let libraries = crate::games::stores::steam::libraries_in(&installs);
         Ok(crate::platform::installed_protons(&installs, &libraries))
     })
     .await

@@ -387,7 +387,7 @@ fn targets(
     profile: &Profile,
 ) -> Result<Vec<(ManifestSet, PathBuf)>, AppError> {
     let state = scope.game.profile_state(&profile.id);
-    let sets = user_data::sets(game, settings, profile, &state)?;
+    let sets = user_data::sets(&scope.game, game, settings, profile, &state)?;
     let mut targets = Vec::with_capacity(manifest.sets.len() + 1);
 
     for set in &manifest.sets {

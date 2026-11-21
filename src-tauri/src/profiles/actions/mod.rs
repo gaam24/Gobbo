@@ -389,7 +389,7 @@ pub fn delete_profile(root: &Data, game_id: &str, id: &str) -> Result<(), AppErr
             return Err(game_is_running_error());
         }
 
-        let roots = journal_roots(&game, &settings, state)?;
+        let roots = journal_roots(&data, &game, &settings, state)?;
         undo(&roots).map_err(AppError::from)?;
     }
 

@@ -19,6 +19,7 @@ gobbo-overlay-launch = { path = "crates/overlay-launch" }
 gobbo-overlay-pe = { path = "crates/overlay-pe" }
 gobbo-overlay-probe = { path = "crates/overlay-probe" }
 rustc-hash = "2"
+windows-registry = "0.6.1"
 windows-sys = "0.61"
 
 # The lints stay at `warn` so they inform without blocking everyday work; CI and `bun run check:rust` treat them as gates.
@@ -297,9 +298,17 @@ ureq = { version = "3", default-features = false, features = [
 # Windows 11 Efficiency mode (EcoQoS): a safe wrapper for SetProcessInformation, so the app keeps
 # `#![forbid(unsafe_code)]`. It uses the `windows`/`windows-result` versions already in the tree.
 win32-ecoqos = { version = "0.6", default-features = false }
+# GOG's per-game install folders in the registry (MIT OR Apache-2.0). Microsoft's safe API keeps the app
+# `#![forbid(unsafe_code)]`.
+windows-registry.workspace = true
 
 [target.'cfg(any(target_os = "linux", windows))'.dependencies]
 tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
+
+[target."cfg(not(windows))".dependencies]
+# Lutris keeps a game's install folder only in its SQLite database (`pga.db`), read-only (MIT). `bundled` compiles
+# SQLite in, so detection does not depend on the system library's version.
+rusqlite = { version = "0.43.0", features = ["bundled"] }
 
 [target.'cfg(target_os = "linux")'.dev-dependencies]
 iai-callgrind = "0.16"

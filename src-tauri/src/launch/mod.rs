@@ -1,5 +1,5 @@
-//! Starting the game: through Proton from Steam (Linux), natively, or in the overlay layer, plus the
-//! running-check the poller uses.
+//! Starting the game: through Proton from Steam or in a prefix Gobbo owns (Linux), natively, or in the overlay layer,
+//! plus the running-check the poller uses.
 
 pub mod changes;
 pub mod commands;
@@ -39,12 +39,13 @@ pub fn overlay_session(
 ) -> Result<Session, AppError> {
     let profiles = load_profiles(data)?;
     let sets = user_data::sets(
+        data,
         game,
         settings,
         profiles.active(),
         &data.profile_state(&profiles.active),
     )?;
-    let root = deployment_root(game, settings).unwrap_or_else(|_| game_root.to_path_buf());
+    let root = deployment_root(data, game, settings).unwrap_or_else(|_| game_root.to_path_buf());
     Ok(Session::with_roots(state, &root, game_root, sets))
 }
 

@@ -30,7 +30,7 @@ pub use commit::{already_in_library, remove_folders};
 /// list; the version and same-name rules still recognise the common archive wrappers.
 fn base_roots(data: &Data, game: &GameDef) -> Vec<String> {
     let settings = load_settings(data);
-    crate::context::target::deployment_root(game, &settings)
+    crate::context::target::deployment_root(data, game, &settings)
         .ok()
         .map(|root| install::top_level_folders(&root))
         .unwrap_or_default()

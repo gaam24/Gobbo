@@ -1,4 +1,4 @@
-//! The game catalog: the games in `games/`, their icons, and the scan of the Steam libraries for them.
+//! The game catalog: the games in `games/`, their icons, and the scan of Steam and the other stores for them.
 
 use tauri::ipc::Channel;
 
@@ -108,7 +108,7 @@ pub async fn import_definition_package(
     blocking(move || editor::import_package(std::path::Path::new(&path), overwrite)).await
 }
 
-/// Looks for supported games in the Steam libraries on this computer. Read-only; nothing changes.
+/// Looks for supported games in the Steam libraries and the other stores on this computer. Read-only; nothing changes.
 #[tauri::command]
 #[specta::specta]
 pub async fn scan_games() -> Result<Vec<detect::GameScan>, AppError> {

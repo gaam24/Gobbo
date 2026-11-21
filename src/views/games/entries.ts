@@ -1,4 +1,4 @@
-import type { GameScan, GameView, ManagedGame } from "@/bindings";
+import type { Found, GameScan, GameView, ManagedGame } from "@/bindings";
 import { foldText } from "@/lib/fold-text";
 
 /// Where a supported game stands. `searching` lasts only while the libraries are being scanned; a failed scan leaves
@@ -18,6 +18,10 @@ export interface GameEntry {
 	root: string | null;
 	/// Whether an added game still has its folder. Always `false` for games that are not added.
 	ready: boolean;
+	/// The store of the added or found install. `null` when nothing knows it.
+	store: string | null;
+	/// The other installs of a found game, in scan order. Empty for every other status.
+	others: Found[];
 }
 
 /// Columns of a game row: icon, name, status, folder, action. The header row uses the same grid.
@@ -34,6 +38,8 @@ export function buildGameEntries(games: GameView[], managed: ManagedGame[], scan
 				status: "added",
 				root: added.game_root || null,
 				ready: added.ready,
+				store: added.source || null,
+				others: [],
 			};
 
 		if (scans === null)
@@ -42,6 +48,8 @@ export function buildGameEntries(games: GameView[], managed: ManagedGame[], scan
 				status: scanFailed ? "unsearched" : "searching",
 				root: null,
 				ready: false,
+				store: null,
+				others: [],
 			};
 		const scan = scans.find((item) => item.id === game.id);
 
@@ -51,8 +59,10 @@ export function buildGameEntries(games: GameView[], managed: ManagedGame[], scan
 				status: "found",
 				root: scan.found.game_root,
 				ready: false,
+				store: scan.found.store || null,
+				others: scan.others,
 			};
-		return { game, status: "missing", root: null, ready: false };
+		return { game, status: "missing", root: null, ready: false, store: null, others: [] };
 	});
 }
 

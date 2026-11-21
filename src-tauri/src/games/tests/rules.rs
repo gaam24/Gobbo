@@ -126,6 +126,18 @@ fn paths_must_stay_inside_the_game() {
 }
 
 #[test]
+fn a_linux_marker_must_be_a_relative_path_inside_the_game() {
+    has_problem(
+        &lf(SLOT).replacen(
+            "markers = [\"bin/game.exe\", \"content/base\"]",
+            "markers = [\"bin/game.exe\", \"content/base\"]\nlinux_markers = [\"/Game.x86_64\"]",
+            1,
+        ),
+        "detect linux marker is not a relative path",
+    );
+}
+
+#[test]
 fn extensions_are_lowercase_with_a_dot() {
     has_problem(
         &lf(SLOT).replacen("\".ws\", \".xml\"", "\"ws\"", 1),

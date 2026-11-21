@@ -11,6 +11,8 @@ use std::fs;
 pub struct ManagedGame {
     pub id: String,
     pub game_root: String,
+    /// Where this install came from: `steam`, `gog`, `epic`, `heroic`, `legendary`, `lutris` or `manual`.
+    pub source: String,
     pub ready: bool,
 }
 
@@ -46,11 +48,12 @@ pub fn managed_games(root: &Data) -> Result<Vec<ManagedGame>, AppError> {
     Ok(managed_ids(root)?
         .into_iter()
         .map(|id| {
-            let game_root = load_settings(&root.game(&id)).game_root;
-            let ready = crate::context::is_dir(&game_root);
+            let settings = load_settings(&root.game(&id));
+            let ready = crate::context::is_dir(&settings.game_root);
             ManagedGame {
                 id,
-                game_root,
+                game_root: settings.game_root,
+                source: settings.source,
                 ready,
             }
         })

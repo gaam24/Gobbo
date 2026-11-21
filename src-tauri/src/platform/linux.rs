@@ -23,6 +23,55 @@ pub const fn supports_user_data_redirect() -> bool {
     false
 }
 
+/// Where the other stores keep their data on Linux: Heroic and Lutris, native and Flatpak, Legendary, minigalaxy and
+/// the GOG folders in the home folder. Linux has no Epic launcher and no registry.
+pub fn store_folders(home: &Path) -> super::StoreFolders {
+    store_folders_from(
+        home,
+        std::env::var_os("XDG_CONFIG_HOME"),
+        std::env::var_os("XDG_DATA_HOME"),
+        std::env::var_os("LEGENDARY_CONFIG_PATH"),
+    )
+}
+
+/// `store_folders` with the environment given, so a test can check the rule without changing the process's variables.
+fn store_folders_from(
+    home: &Path,
+    config: Option<std::ffi::OsString>,
+    data: Option<std::ffi::OsString>,
+    legendary: Option<std::ffi::OsString>,
+) -> super::StoreFolders {
+    let config_home = config
+        .clone()
+        .map_or_else(|| home.join(".config"), PathBuf::from);
+    let data_home = data.map_or_else(|| home.join(".local/share"), PathBuf::from);
+    let flatpak =
+        |app: &str, kind: &str, store: &str| home.join(".var/app").join(app).join(kind).join(store);
+
+    super::StoreFolders {
+        epic_data: None,
+        epic_list: None,
+        gog_libraries: vec![home.join("GOG Games"), home.join("Games")],
+        gog_registry: Vec::new(),
+        minigalaxy: Some(config_home.join("minigalaxy/config.json")),
+        heroic: vec![
+            config_home.join("heroic"),
+            flatpak("com.heroicgameslauncher.hgl", "config", "heroic"),
+        ],
+        legendary: Some(super::legendary_dir(home, legendary, config)),
+        lutris: vec![
+            super::LutrisFolders {
+                config: config_home.join("lutris"),
+                data: data_home.join("lutris"),
+            },
+            super::LutrisFolders {
+                config: flatpak("net.lutris.Lutris", "config", "lutris"),
+                data: flatpak("net.lutris.Lutris", "data", "lutris"),
+            },
+        ],
+    }
+}
+
 /// Whether an overlay of the game folder `root` is still mounted in a namespace that has a process. The namespace lives on
 /// as long as the program that started the overlay, or a process of its tree (Wine's services, for example), and the
 /// writable layer stays locked meanwhile. So a session is seen here even after its launcher has exited. Each namespace
@@ -327,6 +376,44 @@ mod tests {
     use super::*;
     use crate::platform::seen_while_running;
     use crate::test_support::scratch;
+
+    #[test]
+    fn the_store_folders_follow_xdg_and_include_the_flatpak_installs() {
+        let home = Path::new("/home/slot");
+        let folders = store_folders_from(home, None, None, None);
+        assert_eq!(
+            folders.heroic,
+            [
+                home.join(".config/heroic"),
+                home.join(".var/app/com.heroicgameslauncher.hgl/config/heroic"),
+            ]
+        );
+        assert_eq!(folders.lutris[0].config, home.join(".config/lutris"));
+        assert_eq!(folders.lutris[0].data, home.join(".local/share/lutris"));
+        assert_eq!(
+            folders.lutris[1].data,
+            home.join(".var/app/net.lutris.Lutris/data/lutris")
+        );
+        assert_eq!(folders.legendary, Some(home.join(".config/legendary")));
+        assert_eq!(
+            folders.minigalaxy,
+            Some(home.join(".config/minigalaxy/config.json"))
+        );
+        assert_eq!(folders.epic_data, None);
+
+        let custom = store_folders_from(
+            home,
+            Some("/custom/config".into()),
+            Some("/custom/data".into()),
+            None,
+        );
+        assert_eq!(custom.heroic[0], Path::new("/custom/config/heroic"));
+        assert_eq!(custom.lutris[0].data, Path::new("/custom/data/lutris"));
+        assert_eq!(
+            custom.legendary,
+            Some(PathBuf::from("/custom/config/legendary"))
+        );
+    }
 
     /// The command line the way `/proc/<pid>/cmdline` stores it: arguments separated by NUL.
     fn command(parts: &[&str]) -> Vec<u8> {

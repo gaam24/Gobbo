@@ -51,27 +51,36 @@ pub struct Settings {
     /// Absolute paths. The settings file is added automatically.
     #[serde(default)]
     pub profile_data: Vec<String>,
+    /// Where this install came from: `steam`, `gog`, `epic`, `heroic`, `legendary`, `lutris` or `manual`. Empty for games added before this field existed.
+    #[serde(default)]
+    pub source: String,
+    /// The Wine prefix of an install that is not from Steam: the folder that holds `drive_c`. Adding the game fills in
+    /// the prefix Heroic or Lutris uses for it; empty means the prefix Gobbo owns. A Steam install keeps Steam's prefix.
+    #[serde(default)]
+    pub prefix_dir: String,
 }
 
 impl Settings {
     /// The folder-valued settings. Saving trims them and the path guard allows them; a new folder field is added here
     /// once instead of in every caller.
-    pub const fn paths(&self) -> [&str; 4] {
+    pub const fn paths(&self) -> [&str; 5] {
         [
             self.game_root.as_str(),
             self.settings_dir.as_str(),
             self.mods_root.as_str(),
             self.proton_dir.as_str(),
+            self.prefix_dir.as_str(),
         ]
     }
 
     /// Mutable form of [`Settings::paths`], for the save-time trim.
-    pub const fn paths_mut(&mut self) -> [&mut String; 4] {
+    pub const fn paths_mut(&mut self) -> [&mut String; 5] {
         [
             &mut self.game_root,
             &mut self.settings_dir,
             &mut self.mods_root,
             &mut self.proton_dir,
+            &mut self.prefix_dir,
         ]
     }
 }
@@ -93,10 +102,13 @@ pub fn save_settings(root: &Data, game_id: &str, settings: Settings) -> Result<(
     write_settings(root, game_id, settings)
 }
 
-/// `save_settings` for a caller that already holds the settings lock.
+/// `save_settings` for a caller that already holds the settings lock. Moving an install to another folder
+/// re-classifies its source with the same rule `add_game` uses, and takes the prefix the store names for it unless the
+/// same save also changes the prefix; editing anything else keeps both.
 fn write_settings(root: &Data, game_id: &str, settings: Settings) -> Result<(), AppError> {
     crate::games::load(game_id)?;
     let data = root.game(game_id);
+    let previous = load_settings(&data);
     let mut settings = settings;
 
     for value in settings.paths_mut() {
@@ -104,6 +116,16 @@ fn write_settings(root: &Data, game_id: &str, settings: Settings) -> Result<(), 
         *value = trimmed;
     }
 
+    if settings.game_root != previous.game_root {
+        let home = crate::games::paths::home();
+        let path = std::path::Path::new(settings.game_root.trim());
+        let install = crate::games::detect::classify_install(&home, path);
+        settings.source = install.store.to_string();
+
+        if settings.prefix_dir == previous.prefix_dir {
+            settings.prefix_dir = install.prefix_text();
+        }
+    }
     let settings = Settings {
         game_root: settings.game_root,
         settings_dir: settings.settings_dir,
@@ -121,6 +143,8 @@ fn write_settings(root: &Data, game_id: &str, settings: Settings) -> Result<(), 
             .map(|path| path.trim().to_string())
             .filter(|path| !path.is_empty())
             .collect(),
+        source: settings.source,
+        prefix_dir: settings.prefix_dir,
     };
     crate::domain::arguments::parse_env(&settings.launch_env)?;
     fs::create_dir_all(&data.dir).map_err(io_at(&data.dir))?;
@@ -196,6 +220,7 @@ mod tests {
             settings_dir: " /settings ".into(),
             mods_root: " /mods ".into(),
             proton_dir: " /proton ".into(),
+            prefix_dir: " /prefix ".into(),
             ..Settings::default()
         };
 
@@ -204,6 +229,9 @@ mod tests {
             *value = trimmed;
         }
 
-        assert_eq!(settings.paths(), ["/game", "/settings", "/mods", "/proton"]);
+        assert_eq!(
+            settings.paths(),
+            ["/game", "/settings", "/mods", "/proton", "/prefix"]
+        );
     }
 }

@@ -336,7 +336,7 @@ fn steam_manifest(folder: &Path) -> Option<SteamSuggestion> {
         let Ok(text) = fs::read_to_string(entry.path()) else {
             continue;
         };
-        let install_dir = super::super::steam::vdf_values(&text, "installdir")
+        let install_dir = super::super::stores::steam::vdf_values(&text, "installdir")
             .into_iter()
             .next();
         if install_dir
@@ -344,10 +344,10 @@ fn steam_manifest(folder: &Path) -> Option<SteamSuggestion> {
             .is_some_and(|dir| dir.eq_ignore_ascii_case(&folder_name))
         {
             return Some(SteamSuggestion {
-                app_id: super::super::steam::vdf_values(&text, "appid")
+                app_id: super::super::stores::steam::vdf_values(&text, "appid")
                     .first()
                     .and_then(|value| value.parse().ok())?,
-                name: super::super::steam::vdf_values(&text, "name")
+                name: super::super::stores::steam::vdf_values(&text, "name")
                     .into_iter()
                     .next(),
                 install_dir,
@@ -361,29 +361,25 @@ fn steam_manifest(folder: &Path) -> Option<SteamSuggestion> {
 fn store_ids(folder: &Path) -> StoreIds {
     let mut ids = StoreIds::default();
     let home = super::super::paths::home();
-    let program_data = std::env::var_os("PROGRAMDATA").map(PathBuf::from);
 
-    for candidate in super::super::stores::candidates(&home, program_data.as_deref()) {
-        if !same_folder(&candidate.root, folder) {
+    for candidate in super::super::stores::candidates(&home) {
+        if !super::super::detect::same_folder(&candidate.root, folder) {
             continue;
         }
 
-        match candidate.store {
-            super::super::stores::Store::Gog => ids.gog.push(candidate.id),
-            super::super::stores::Store::Epic => ids.epic.push(candidate.id),
-            super::super::stores::Store::Heroic => ids.heroic.push(candidate.id),
-            super::super::stores::Store::Lutris => ids.lutris.push(candidate.id),
+        // The id goes to the list it belongs to: a GOG game installed through Heroic or Lutris is a GOG id.
+        let list = match candidate.kind {
+            super::super::stores::IdKind::Gog => &mut ids.gog,
+            super::super::stores::IdKind::Epic => &mut ids.epic,
+            super::super::stores::IdKind::Lutris => &mut ids.lutris,
+        };
+
+        if !list.contains(&candidate.id) {
+            list.push(candidate.id);
         }
     }
 
     ids
-}
-
-fn same_folder(left: &Path, right: &Path) -> bool {
-    match (fs::canonicalize(left), fs::canonicalize(right)) {
-        (Ok(left), Ok(right)) => left == right,
-        _ => left == right,
-    }
 }
 
 /// A lower-case ASCII slug from a title: the form of a game id. Non-ASCII letters that have a common Latin spelling

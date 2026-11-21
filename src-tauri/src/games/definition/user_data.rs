@@ -94,7 +94,12 @@ pub struct Detect {
     /// Files that identify the game folder, relative to it.
     #[serde(default)]
     pub markers: Vec<String>,
+    /// Files that identify the folder of the game's native Linux build, relative to it. Used only on Linux; when empty,
+    /// detection uses `markers` there as it always has.
+    #[serde(default)]
+    pub linux_markers: Vec<String>,
     /// One marker is enough, for a game whose builds name their files differently. By default every marker must exist.
+    /// The same rule applies to `linux_markers`.
     #[serde(default)]
     pub any_marker: bool,
 }
@@ -106,8 +111,8 @@ pub struct Executable {
     pub name: String,
     /// Relative to the game folder.
     pub path: String,
-    /// The native Linux program, when the game ships one. Empty or missing falls back to `path`; a Steam game still
-    /// starts through Proton, so a definition adds this only for a launcher that can use it.
+    /// The native Linux program, when the game ships one. Empty or missing falls back to `path`. A definition declares
+    /// one only when that program starts directly, whatever store the install came from.
     #[serde(default)]
     pub path_linux: Option<String>,
     /// Arguments added before the user's arguments, for example `-windowed`.

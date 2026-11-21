@@ -20,7 +20,7 @@ pub fn may_open(root: &Data, game_id: Option<&str>, path: &Path) -> bool {
         roots.push(data.dir.clone());
         let settings = load_settings(&data);
 
-        if let Ok(deployed) = deployment_root(&game, &settings) {
+        if let Ok(deployed) = deployment_root(&data, &game, &settings) {
             roots.push(deployed);
         }
 

@@ -92,7 +92,8 @@ export function GameSettings({
 				/>
 			),
 		},
-		...(platform === "linux"
+		// A native install has no Proton tab: there is nothing for it to choose. Windows installs are always native.
+		...(platform === "linux" && status.runtime !== "native"
 			? [
 					{
 						id: "proton" as const,
@@ -106,6 +107,9 @@ export function GameSettings({
 								refreshing={form.protonRefreshing}
 								onPickBuild={form.setProtonBuild}
 								onPickFolder={form.pickProton}
+								prefixDir={form.prefixDir}
+								onPickPrefix={form.pickPrefix}
+								onResetPrefix={form.resetPrefix}
 								onRefreshBuilds={form.refreshProtonBuilds}
 								offered={form.protonOptions}
 								onSwitch={form.toggleProtonOption}

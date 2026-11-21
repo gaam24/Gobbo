@@ -23,13 +23,62 @@ pub use linux::overlay_session_pids;
 #[cfg(not(windows))]
 pub use linux::{
     Process, find_proton, game_is_running, installed_protons, overlay_in_use, proton_at,
-    proton_named, steam_installs, steam_root, stop_game, supports_user_data_redirect,
+    proton_named, steam_installs, steam_root, stop_game, store_folders,
+    supports_user_data_redirect,
 };
 #[cfg(windows)]
 pub use windows::{
-    Process, game_is_running, installed_protons, steam_installs, stop_game,
+    Process, game_is_running, installed_protons, steam_installs, stop_game, store_folders,
     supports_user_data_redirect,
 };
+
+/// Where the game stores other than Steam keep their data on this computer. Each system fills in what it has and
+/// leaves the rest empty: Windows has the Epic launcher and GOG Galaxy's registry, Linux has Lutris and the Flatpak
+/// folders. The stores read the files; this only says where they are.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct StoreFolders {
+    /// The Epic launcher's data folder, which holds `Manifests`: `AppDataPath` from the registry, as the launcher writes
+    /// it, else `%ProgramData%/Epic/EpicGamesLauncher/Data`.
+    pub epic_data: Option<std::path::PathBuf>,
+    /// The folder of the older Epic list `LauncherInstalled.dat`: `%ProgramData%/Epic/UnrealEngineLauncher`.
+    pub epic_list: Option<std::path::PathBuf>,
+    /// Folders whose subfolders may be GOG games, each with its `goggame-<id>.info` files.
+    pub gog_libraries: Vec<std::path::PathBuf>,
+    /// The `(product id, folder)` pairs GOG Galaxy and GOG's installers leave in the registry.
+    pub gog_registry: Vec<(String, std::path::PathBuf)>,
+    /// minigalaxy's `config.json`, which names the folder it installs GOG games into.
+    pub minigalaxy: Option<std::path::PathBuf>,
+    /// Heroic's config folders: the native one and, on Linux, the Flatpak one.
+    pub heroic: Vec<std::path::PathBuf>,
+    /// Legendary's own config folder, for Epic games installed with Legendary outside Heroic.
+    pub legendary: Option<std::path::PathBuf>,
+    /// Lutris's folders: the native ones and the Flatpak ones.
+    pub lutris: Vec<LutrisFolders>,
+}
+
+/// One Lutris install's folders. Lutris keeps its game files in `<config>/games` while `config` exists, else in
+/// `<data>/games`, and its database in `<data>/pga.db`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LutrisFolders {
+    pub config: std::path::PathBuf,
+    pub data: std::path::PathBuf,
+}
+
+/// Legendary's config folder, the same rule on every system: `LEGENDARY_CONFIG_PATH`, else
+/// `$XDG_CONFIG_HOME/legendary`, else `~/.config/legendary` (also on Windows, where Legendary uses no `%APPDATA%`).
+fn legendary_dir(
+    home: &std::path::Path,
+    configured: Option<std::ffi::OsString>,
+    xdg: Option<std::ffi::OsString>,
+) -> std::path::PathBuf {
+    configured.map_or_else(
+        || {
+            xdg.map_or_else(|| home.join(".config"), std::path::PathBuf::from)
+                .join("legendary")
+        },
+        std::path::PathBuf::from,
+    )
+}
 
 /// A Proton build on this computer: the name Steam shows for it, and the folder that holds the `proton` file.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, specta::Type)]
@@ -80,6 +129,29 @@ fn seen_while_running(game_root: &std::path::Path, mut child: std::process::Chil
     child.kill().unwrap();
     child.wait().unwrap();
     running
+}
+
+#[cfg(test)]
+mod store_folder_tests {
+    use super::legendary_dir;
+    use std::path::Path;
+
+    #[test]
+    fn legendary_takes_its_override_then_xdg_then_the_home_config_folder() {
+        let home = Path::new("/home/slot");
+        assert_eq!(
+            legendary_dir(home, Some("/custom/legendary".into()), Some("/xdg".into())),
+            Path::new("/custom/legendary")
+        );
+        assert_eq!(
+            legendary_dir(home, None, Some("/xdg".into())),
+            Path::new("/xdg/legendary")
+        );
+        assert_eq!(
+            legendary_dir(home, None, None),
+            home.join(".config/legendary")
+        );
+    }
 }
 
 #[cfg(test)]

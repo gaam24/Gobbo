@@ -16,6 +16,94 @@ pub const fn supports_user_data_redirect() -> bool {
     true
 }
 
+/// Where the other stores keep their data on Windows: the Epic launcher's folders (its data folder from the registry,
+/// as MO2 reads it), GOG's registry entries and default folders, Heroic under `%APPDATA%` and Legendary. Windows has no
+/// Lutris and no Flatpak.
+pub fn store_folders(home: &Path) -> super::StoreFolders {
+    let env_dir = |name: &str| std::env::var_os(name).map(PathBuf::from);
+    let program_data = env_dir("PROGRAMDATA");
+    let appdata = env_dir("APPDATA").unwrap_or_else(|| home.join("AppData/Roaming"));
+    let mut gog_libraries: Vec<PathBuf> = ["ProgramFiles(x86)", "ProgramFiles"]
+        .into_iter()
+        .filter_map(env_dir)
+        .map(|folder| folder.join("GOG Galaxy").join("Games"))
+        .collect();
+
+    // GOG's offline installers default to `<system drive>\GOG Games`.
+    if let Some(drive) = std::env::var_os("SystemDrive") {
+        let mut root = drive;
+        root.push("\\");
+        gog_libraries.push(PathBuf::from(root).join("GOG Games"));
+    }
+
+    super::StoreFolders {
+        epic_data: registry_string(EPIC_KEYS, "AppDataPath")
+            .map(PathBuf::from)
+            .or_else(|| {
+                program_data
+                    .as_ref()
+                    .map(|folder| folder.join("Epic").join("EpicGamesLauncher").join("Data"))
+            }),
+        epic_list: program_data.map(|folder| folder.join("Epic").join("UnrealEngineLauncher")),
+        gog_libraries,
+        gog_registry: gog_registry(),
+        minigalaxy: None,
+        heroic: vec![appdata.join("heroic")],
+        legendary: Some(super::legendary_dir(
+            home,
+            std::env::var_os("LEGENDARY_CONFIG_PATH"),
+            std::env::var_os("XDG_CONFIG_HOME"),
+        )),
+        lutris: Vec::new(),
+    }
+}
+
+/// The Epic launcher's key, in the 32-bit view first, where the 32-bit launcher writes it.
+const EPIC_KEYS: [&str; 2] = [
+    "SOFTWARE\\WOW6432Node\\Epic Games\\EpicGamesLauncher",
+    "SOFTWARE\\Epic Games\\EpicGamesLauncher",
+];
+
+/// The first non-empty string value `name` under one of `keys` in `HKEY_LOCAL_MACHINE`.
+fn registry_string(keys: [&str; 2], name: &str) -> Option<String> {
+    keys.into_iter().find_map(|key| {
+        let value = windows_registry::LOCAL_MACHINE
+            .open(key)
+            .ok()?
+            .get_string(name)
+            .ok()?;
+        (!value.trim().is_empty()).then_some(value)
+    })
+}
+
+/// The install folders GOG leaves in the registry: one subkey per product id with its folder in `path`. Both views are
+/// read, because the 32-bit Galaxy writes to `WOW6432Node`. Only numeric subkeys are product ids.
+fn gog_registry() -> Vec<(String, PathBuf)> {
+    let mut pairs = Vec::new();
+
+    for root in [
+        "SOFTWARE\\WOW6432Node\\GOG.com\\Games",
+        "SOFTWARE\\GOG.com\\Games",
+    ] {
+        let Ok(key) = windows_registry::LOCAL_MACHINE.open(root) else {
+            continue;
+        };
+        let Ok(ids) = key.keys() else {
+            continue;
+        };
+
+        for id in ids.filter(|id| !id.is_empty() && id.bytes().all(|byte| byte.is_ascii_digit())) {
+            if let Ok(path) = key.open(&id).and_then(|game| game.get_string("path"))
+                && !path.trim().is_empty()
+            {
+                pairs.push((id, PathBuf::from(path)));
+            }
+        }
+    }
+
+    pairs
+}
+
 /// The folders where Steam may be installed on Windows: Program Files, where the 32-bit variable names the x86 folder.
 /// A Steam installed elsewhere is not found, and the user adds the game folder.
 pub fn steam_installs(_home: &Path) -> Vec<PathBuf> {

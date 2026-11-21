@@ -129,12 +129,12 @@ pub struct LoaderSuggestion {
     pub variant: Option<String>,
 }
 
-/// The store ids that point at a game folder. A definition opts into one with the matching detect field.
+/// The store ids that point at a game folder, by the detect list each belongs to. A GOG or Epic game installed through
+/// Heroic, Legendary or Lutris carries its GOG product id or Epic `AppName`, so it lands in `gog` or `epic`.
 #[derive(Debug, Clone, Default, Serialize, Type)]
 pub struct StoreIds {
     pub gog: Vec<String>,
     pub epic: Vec<String>,
-    pub heroic: Vec<String>,
     pub lutris: Vec<String>,
 }
 

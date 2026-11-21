@@ -78,6 +78,15 @@ export function AdvancedDetection({ draft, onChange }: { draft: GameDraft; onCha
 				rows={3}
 				placeholder={"bin/game.exe\ncontent/base"}
 			/>
+			<LinesField
+				id="editor-linux-markers"
+				label={t("editor.detection.linuxMarkers")}
+				hint={t("editor.detection.linuxMarkersHint")}
+				value={detect.linux_markers}
+				onChange={(linux_markers) => update({ linux_markers })}
+				rows={3}
+				placeholder="GameName.x86_64"
+			/>
 			<SwitchField
 				id="editor-any-marker"
 				label={t("editor.detection.anyMarker")}

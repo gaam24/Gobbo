@@ -35,11 +35,12 @@ impl FolderReadiness {
 /// The one folder readiness rule. `settings_redirected` is true when an isolated user-data set owns the game's order
 /// file, so a settings folder is not needed. `status` and `target_for` both ask this function.
 pub fn folder_readiness(
+    data: &Data,
     game: &GameDef,
     settings: &Settings,
     settings_redirected: bool,
 ) -> FolderReadiness {
-    let mods_root = deployment_root(game, settings)
+    let mods_root = deployment_root(data, game, settings)
         .map(|path| path.display().to_string())
         .unwrap_or_default();
     FolderReadiness {
@@ -56,6 +57,7 @@ pub fn folder_readiness(
 
 /// Deployment places from the settings. Refuses when folders are missing.
 pub fn target_for(
+    data: &Data,
     game: &GameDef,
     settings: &Settings,
     state: PathBuf,
@@ -64,8 +66,9 @@ pub fn target_for(
     if !is_dir(&settings.game_root) {
         return Err(game_folder_missing());
     }
-    let user_data: Vec<UserDataSet> = user_data::sets(game, settings, profile, &state)?;
+    let user_data: Vec<UserDataSet> = user_data::sets(data, game, settings, profile, &state)?;
     let ready = folder_readiness(
+        data,
         game,
         settings,
         settings_redirected(game, settings, &user_data),
@@ -81,7 +84,7 @@ pub fn target_for(
     let settings_path =
         settings_file(game, settings).map(|path| user_data::write_path(&user_data, &path));
     Ok(Target {
-        root: deployment_root(game, settings)?,
+        root: deployment_root(data, game, settings)?,
         game_root: PathBuf::from(settings.game_root.trim()),
         settings: settings_path,
         state,
@@ -92,13 +95,14 @@ pub fn target_for(
 /// The journal roots for one profile's state folder. It resolves only settings, not existing folders, so an undo still
 /// works after the game folder or the settings folder was moved or removed.
 pub fn journal_roots(
+    data: &Data,
     game: &GameDef,
     settings: &Settings,
     state: PathBuf,
 ) -> Result<JournalRoots, AppError> {
     Ok(JournalRoots::new(
         state,
-        deployment_root(game, settings)?,
+        deployment_root(data, game, settings)?,
         settings_file(game, settings),
     ))
 }
@@ -113,7 +117,13 @@ pub fn build_plan_with_mode(
     inputs: &[ModInput],
     mode: PlanMode,
 ) -> Result<DeployPlan, AppError> {
-    target_for(game, settings, data.profile_state(&profile.id), profile)?;
+    target_for(
+        data,
+        game,
+        settings,
+        data.profile_state(&profile.id),
+        profile,
+    )?;
     Ok(crate::deploy::plan_with_mode(
         &game.deploy,
         inputs,
@@ -130,10 +140,22 @@ pub fn settings_redirected(game: &GameDef, settings: &Settings, sets: &[UserData
 /// The settings point to folders that exist for `profile`, whose state folder is `state`. A settings folder that the
 /// profile's user data redirects counts as ready, as it does for an apply. An automatically resolved mods root may be
 /// created on deploy.
-pub fn is_ready(game: &GameDef, settings: &Settings, profile: &Profile, state: &Path) -> bool {
-    let sets = user_data::sets(game, settings, profile, state).unwrap_or_default();
-    folder_readiness(game, settings, settings_redirected(game, settings, &sets)).all()
-        && deployment_root(game, settings).is_ok()
+pub fn is_ready(
+    data: &Data,
+    game: &GameDef,
+    settings: &Settings,
+    profile: &Profile,
+    state: &Path,
+) -> bool {
+    let sets = user_data::sets(data, game, settings, profile, state).unwrap_or_default();
+    folder_readiness(
+        data,
+        game,
+        settings,
+        settings_redirected(game, settings, &sets),
+    )
+    .all()
+        && deployment_root(data, game, settings).is_ok()
 }
 
 #[cfg(test)]
@@ -161,9 +183,10 @@ mod tests {
         let game = crate::test_support::games::slot();
         let mut settings = folders(&base);
         settings.settings_dir = base.join("missing-settings").display().to_string();
-        let without = folder_readiness(&game, &settings, false);
+        let data = Data::new(base.join("data"));
+        let without = folder_readiness(&data, &game, &settings, false);
         assert!(!without.settings);
-        let redirected = folder_readiness(&game, &settings, true);
+        let redirected = folder_readiness(&data, &game, &settings, true);
         assert!(redirected.settings);
         assert!(without.game && redirected.game);
     }
@@ -175,7 +198,8 @@ mod tests {
         let settings = folders(&base);
         let profile = Profile::new("p1".into(), "Default".into(), Vec::new());
         let state = base.join("state");
-        let is_ready = |settings: &Settings| is_ready(&game, settings, &profile, &state);
+        let data = Data::new(base.join("data"));
+        let is_ready = |settings: &Settings| is_ready(&data, &game, settings, &profile, &state);
         assert!(is_ready(&settings));
         assert!(!is_ready(&Settings::default()));
 

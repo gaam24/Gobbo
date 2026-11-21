@@ -37,6 +37,16 @@ describe("the game definition draft", () => {
 		expect(serializeDraft(parseDraft(text))).toContain('min_gobbo = "0.3.0"');
 	});
 
+	test("a native Linux marker survives a round trip through the editor", () => {
+		const text =
+			'schema = 1\nid = "native"\nname = "Native"\n[detect]\nmarkers = ["Game.exe"]\nlinux_markers = ["Game.x86_64"]\n[deploy]\n';
+		const draft = parseDraft(text);
+		expect(draft.detect.linux_markers).toEqual(["Game.x86_64"]);
+		const written = serializeDraft(draft);
+		expect(written).toContain('linux_markers = [ "Game.x86_64" ]');
+		expect(parseDraft(written).detect.linux_markers).toEqual(["Game.x86_64"]);
+	});
+
 	test("a loader string and a named variant round-trip", () => {
 		const base = { ...EMPTY_DRAFT, id: "unity", name: "Unity" };
 		expect(serializeDraft(setLoader(base, "bepinex", ""))).toContain('loader = "bepinex"');

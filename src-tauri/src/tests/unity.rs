@@ -72,6 +72,8 @@ pub(super) fn steam_game(base: &Path, game: &GameDef) -> PathBuf {
         fs::create_dir_all(path.parent().expect("a marker has a folder")).unwrap();
         fs::write(path, b"").unwrap();
     }
+    // The fixture is the Windows build under Proton, as Steam installs it for these tests; a native build is a different
+    // folder with the Linux program instead.
 
     let app_id = game.detect.steam_app_ids[0];
     fs::create_dir_all(library.join(format!("steamapps/compatdata/{app_id}/pfx"))).unwrap();

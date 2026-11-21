@@ -88,7 +88,7 @@ fn capture(
     let profiles = load_profiles(&scope.game)?;
     let profile_view = profiles.get(profile)?;
     let state = scope.game.profile_state(profile);
-    let sets = user_data::sets(game, settings, profile_view, &state)?;
+    let sets = user_data::sets(&scope.game, game, settings, profile_view, &state)?;
     let mut manifest_sets = Vec::new();
 
     for set in sets.iter().filter(|set| set.isolated) {

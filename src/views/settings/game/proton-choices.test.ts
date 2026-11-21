@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 
 import type { ProtonBuild } from "@/bindings";
-import { protonChoices } from "@/views/settings/game/proton-choices";
+import { protonAutomaticLabel, protonChoices } from "@/views/settings/game/proton-choices";
 
 const ge: ProtonBuild = {
 	name: "GE-Proton9-20",
@@ -24,4 +24,12 @@ test("a chosen folder that is not detected stays in the list, first", () => {
 
 test("a chosen folder that is detected is listed once", () => {
 	expect(protonChoices(builds, proton.folder)).toEqual(builds);
+});
+
+test("the automatic entry is Steam's choice for a Steam install", () => {
+	expect(protonAutomaticLabel("steam_proton")).toBe("settings.proton.steamChoice");
+});
+
+test("the automatic entry is the newest build for another install", () => {
+	expect(protonAutomaticLabel("owned_proton")).toBe("settings.proton.newest");
 });

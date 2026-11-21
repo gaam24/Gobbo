@@ -13,6 +13,15 @@ use std::path::PathBuf;
 /// The game folder the user gave, as a path. It must not be empty, and it must have the files the game definition marks.
 /// Adding and checking a game give the same error for a folder that is not the game's.
 fn game_folder(game: &games::GameDef, game_root: &str) -> Result<PathBuf, AppError> {
+    game_folder_for(game, game_root, !cfg!(windows))
+}
+
+/// `game_folder` with the marker rule's platform given, so a test can check both sides on one machine.
+fn game_folder_for(
+    game: &games::GameDef,
+    game_root: &str,
+    is_linux: bool,
+) -> Result<PathBuf, AppError> {
     let game_root = game_root.trim();
 
     if game_root.is_empty() {
@@ -21,7 +30,7 @@ fn game_folder(game: &games::GameDef, game_root: &str) -> Result<PathBuf, AppErr
 
     let path = PathBuf::from(game_root);
 
-    if !detect::has_markers(&path, game) {
+    if !detect::has_markers_for(is_linux, &path, game) {
         return Err(AppError::user("games.not_game_folder")
             .with("path", game_root)
             .with("game", &game.name));
@@ -31,10 +40,19 @@ fn game_folder(game: &games::GameDef, game_root: &str) -> Result<PathBuf, AppErr
 }
 
 /// Checks a game folder without adding the game. Returns the first of the game's marker files that the folder has, or
-/// `None` when the game defines no markers.
+/// `None` when the game defines no markers (or only the native Linux ones are present).
 pub fn check_game_folder(game_id: &str, game_root: &str) -> Result<Option<String>, AppError> {
     let game = games::load(game_id)?;
-    let path = game_folder(&game, game_root)?;
+    check_game_folder_in(&game, game_root, !cfg!(windows))
+}
+
+/// `check_game_folder` with the definition and the marker rule's platform given, for a test on either system.
+fn check_game_folder_in(
+    game: &games::GameDef,
+    game_root: &str,
+    is_linux: bool,
+) -> Result<Option<String>, AppError> {
+    let path = game_folder_for(game, game_root, is_linux)?;
     Ok(game
         .detect
         .markers
@@ -52,19 +70,23 @@ pub fn add_game(root: &Data, game_id: &str, game_root: &str) -> Result<Vec<Manag
     let game_root = game_root.trim();
     restore_removed(root, game_id)?;
     let current = crate::context::load_settings(&root.game(game_id));
-    let settings_dir = game
-        .find_order_dir(&path, &crate::games::paths::home())
-        .map(|dir| dir.display().to_string())
-        .unwrap_or(current.settings_dir);
-    save_settings(
-        root,
-        game_id,
-        Settings {
-            game_root: game_root.to_string(),
-            settings_dir,
-            ..current
-        },
-    )?;
+    let home = crate::games::paths::home();
+    let install = detect::classify_install(&home, &path);
+    let mut settings = Settings {
+        game_root: game_root.to_string(),
+        source: install.store.to_string(),
+        prefix_dir: install.prefix_text(),
+        ..current
+    };
+    let prefix = crate::context::target::prefix(root, &game, &settings);
+    let under_proton =
+        crate::context::target::runtime(&game, &settings) != crate::games::runtime::Runtime::Native;
+
+    if let Some(dir) = game.find_order_dir(&path, &home, prefix, under_proton) {
+        settings.settings_dir = dir.display().to_string();
+    }
+
+    save_settings(root, game_id, settings)?;
     managed_games(root)
 }
 
@@ -122,4 +144,180 @@ pub fn delete_removed_game(root: &Data, game_id: &str) -> Result<(), AppError> {
     games::load(game_id)?;
     let removed = removed_path(&root.dir, game_id);
     crate::infra::fs::remove_path(&removed).map_err(io_at(&removed))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::{Path, PathBuf};
+
+    use super::add_game;
+    use crate::context::{Data, Settings, load_settings, save_settings};
+    use crate::test_support::games as test_games;
+    use crate::test_support::{scratch, write};
+
+    /// A slot-shaped game folder with the markers its definition needs.
+    fn install_slot(base: &Path, dir: &str) -> PathBuf {
+        let root = base.join(dir);
+        write(&root.join("bin/game.exe"), "");
+        write(&root.join("content/base/x.txt"), "");
+        root
+    }
+
+    /// A definition with a Windows build and a native Linux build.
+    fn native_game() -> crate::games::GameDef {
+        crate::games::GameDef::parse(
+            r#"
+schema = 1
+id = "native-game"
+name = "Native Game"
+[detect]
+markers = ["Game.exe"]
+linux_markers = ["Game.x86_64"]
+[[executables]]
+name = "Game"
+path = "Game.exe"
+path_linux = "Game.x86_64"
+[deploy]
+[[deploy.slots]]
+dir = "Mods"
+"#,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn locate_accepts_a_native_folder_on_linux_and_a_windows_folder_on_both() {
+        let base = scratch!("locate-native");
+        let windows = base.join("Windows Game");
+        let linux = base.join("Native Game");
+        write(&windows.join("Game.exe"), "");
+        write(&linux.join("Game.x86_64"), "");
+        let game = native_game();
+
+        assert_eq!(
+            super::check_game_folder_in(&game, &windows.display().to_string(), false).unwrap(),
+            Some("Game.exe".to_string())
+        );
+        assert_eq!(
+            super::check_game_folder_in(&game, &windows.display().to_string(), true).unwrap(),
+            Some("Game.exe".to_string())
+        );
+        assert!(super::check_game_folder_in(&game, &linux.display().to_string(), false).is_err());
+        assert_eq!(
+            super::check_game_folder_in(&game, &linux.display().to_string(), true).unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn adding_a_game_remembers_the_store_that_claims_its_folder() {
+        test_games::install();
+        let base = scratch!("add-source");
+        let steam = install_slot(&base.join("steamapps/common"), "Slot");
+        let gog = install_slot(&base.join("GOG Games"), "Slot Gog");
+        write(&gog.join("goggame-456.info"), "{}");
+
+        let steam_root = Data::new(base.join("data-steam"));
+        add_game(
+            &steam_root,
+            test_games::SLOT_ID,
+            &steam.display().to_string(),
+        )
+        .unwrap();
+        assert_eq!(
+            load_settings(&steam_root.game(test_games::SLOT_ID)).source,
+            "steam"
+        );
+
+        let gog_root = Data::new(base.join("data-gog"));
+        add_game(&gog_root, test_games::SLOT_ID, &gog.display().to_string()).unwrap();
+        assert_eq!(
+            load_settings(&gog_root.game(test_games::SLOT_ID)).source,
+            "gog"
+        );
+    }
+
+    #[test]
+    fn moving_the_game_folder_takes_the_store_prefix_unless_the_same_save_picks_one() {
+        let install = crate::games::detect::Install {
+            store: "heroic",
+            prefix: Some(PathBuf::from("/prefixes/Slot/pfx")),
+        };
+        assert_eq!(install.prefix_text(), "/prefixes/Slot/pfx");
+        let none = crate::games::detect::Install {
+            store: "manual",
+            prefix: None,
+        };
+        assert_eq!(none.prefix_text(), "");
+
+        // A save that changes only the folder takes the store's prefix (none here); one that also picks a prefix keeps it.
+        test_games::install();
+        let base = scratch!("save-prefix");
+        let first = install_slot(&base.join("Games"), "Slot One");
+        let second = install_slot(&base.join("Games"), "Slot Two");
+        let root = Data::new(base.join("data"));
+        let chosen = base.join("Prefixes/Slot/pfx").display().to_string();
+        save_settings(
+            &root,
+            test_games::SLOT_ID,
+            Settings {
+                game_root: first.display().to_string(),
+                prefix_dir: chosen.clone(),
+                ..Settings::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            load_settings(&root.game(test_games::SLOT_ID)).prefix_dir,
+            chosen
+        );
+
+        save_settings(
+            &root,
+            test_games::SLOT_ID,
+            Settings {
+                game_root: second.display().to_string(),
+                ..load_settings(&root.game(test_games::SLOT_ID))
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            load_settings(&root.game(test_games::SLOT_ID)).prefix_dir,
+            ""
+        );
+    }
+
+    #[test]
+    fn saving_a_different_game_folder_reclassifies_the_store() {
+        test_games::install();
+        let base = scratch!("save-source");
+        let gog = install_slot(&base.join("GOG Games"), "Slot Gog");
+        write(&gog.join("goggame-456.info"), "{}");
+        let steam = install_slot(&base.join("library/steamapps/common"), "Slot Steam");
+        let root = Data::new(base.join("data"));
+        save_settings(
+            &root,
+            test_games::SLOT_ID,
+            Settings {
+                game_root: gog.display().to_string(),
+                ..Settings::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(load_settings(&root.game(test_games::SLOT_ID)).source, "gog");
+
+        save_settings(
+            &root,
+            test_games::SLOT_ID,
+            Settings {
+                game_root: steam.display().to_string(),
+                ..load_settings(&root.game(test_games::SLOT_ID))
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            load_settings(&root.game(test_games::SLOT_ID)).source,
+            "steam"
+        );
+    }
 }

@@ -1,6 +1,7 @@
 //! The prerequisites of a tool: what is missing from the Proton prefix, and the installers that put it there.
 
 use crate::context::Data;
+use crate::context::Settings;
 #[cfg(not(windows))]
 use crate::context::load_stopped;
 use crate::error::AppError;
@@ -17,7 +18,9 @@ use crate::error::{ErrorKind, io_at};
 #[cfg(not(windows))]
 use crate::games::Prerequisite;
 #[cfg(not(windows))]
-use crate::games::steam;
+use crate::games::prefix::other_prefix;
+#[cfg(not(windows))]
+use crate::games::runtime::Runtime;
 #[cfg(not(windows))]
 use crate::launch::executable::check_start;
 #[cfg(not(windows))]
@@ -33,11 +36,17 @@ use std::path::PathBuf;
 #[cfg(not(windows))]
 const PREREQUISITES_DIR: &str = "prerequisites";
 
-/// The prerequisites of a tool that are not in the Proton prefix, by name. A game without a prefix yet has nothing to
-/// install into, and a game that is not a Steam game has no prefix at all: both give an empty list.
+/// The prerequisites of a tool that are not in the Proton prefix, by name. A Windows program checks the Steam prefix of
+/// a Steam install and the prefix Gobbo owns for one from another store. A game without a prefix yet, or one that starts
+/// a Linux program, has nothing to check: both give an empty list.
 #[cfg(not(windows))]
-pub fn missing_prerequisites(game: &GameDef, tool: &Tool, game_root: &str) -> Vec<String> {
-    let Some(wine) = steam::proton_prefix(game, Path::new(game_root.trim())) else {
+pub fn missing_prerequisites(
+    game: &GameDef,
+    data: &Data,
+    tool: &Tool,
+    settings: &Settings,
+) -> Vec<String> {
+    let Some(wine) = crate::context::target::prefix(data, game, settings) else {
         return Vec::new();
     };
     tool.prerequisites
@@ -49,7 +58,12 @@ pub fn missing_prerequisites(game: &GameDef, tool: &Tool, game_root: &str) -> Ve
 
 /// Windows runs the tool with the runtime it has, so nothing is checked there.
 #[cfg(windows)]
-pub const fn missing_prerequisites(_game: &GameDef, _tool: &Tool, _game_root: &str) -> Vec<String> {
+pub const fn missing_prerequisites(
+    _game: &GameDef,
+    _data: &Data,
+    _tool: &Tool,
+    _settings: &Settings,
+) -> Vec<String> {
     Vec::new()
 }
 
@@ -80,7 +94,12 @@ pub fn install_prerequisites(
     check_start(&settings)?;
     let tool = tool_of(&game, tool_id)?;
     let game_root = PathBuf::from(settings.game_root.trim());
-    let wine = steam_prefix(&game, &game_root)?.wine();
+    let runtime = crate::context::target::runtime(&game, &settings);
+    let wine = match runtime {
+        Runtime::SteamProton => steam_prefix(&game, &game_root)?.wine(),
+        Runtime::OwnedProton => other_prefix(&data, &game.id, &settings.prefix_dir),
+        Runtime::Native => return Ok(()),
+    };
 
     for prerequisite in &tool.prerequisites {
         if is_installed(&wine, prerequisite) {
@@ -90,11 +109,13 @@ pub fn install_prerequisites(
         let installer = fetch_installer(&data, prerequisite)?;
         let code = run_in_prefix(
             &game,
+            &data,
             &settings,
             &game_root,
             &installer,
             &prerequisite.args,
             home,
+            runtime,
         )?;
 
         if !matches!(code, 0 | 3010) || !is_installed(&wine, prerequisite) {

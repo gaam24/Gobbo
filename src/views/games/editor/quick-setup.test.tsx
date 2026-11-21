@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { renderToString } from "react-dom/server";
 
+import type { FolderInspection_Serialize } from "@/bindings";
 import { applyLanguage } from "@/i18n";
 import { EMPTY_DRAFT, localIssues } from "@/views/games/editor/draft";
 import { QuickSetup } from "@/views/games/editor/quick-setup";
@@ -9,7 +10,21 @@ await applyLanguage("en");
 
 const draft = { ...EMPTY_DRAFT, id: "example", name: "Example Game" };
 
-function render(idWarning: string | null) {
+function inspectionWith(stores: FolderInspection_Serialize["stores"]): FolderInspection_Serialize {
+	return {
+		folder: "/games/example",
+		name: "Example Game",
+		suggested_id: "example-game",
+		executables: [],
+		directories: [],
+		markers: [],
+		steam: null,
+		loaders: [],
+		stores,
+	};
+}
+
+function render(idWarning: string | null, inspection: FolderInspection_Serialize | null = null) {
 	return renderToString(
 		<QuickSetup
 			draft={draft}
@@ -23,7 +38,7 @@ function render(idWarning: string | null) {
 			onBrowse={() => {
 				// The dialog is not part of this check.
 			}}
-			inspection={null}
+			inspection={inspection}
 			inspecting={false}
 			inspectError={null}
 			presets={[]}
@@ -51,4 +66,21 @@ test("the quick step names the folder, the layout and the missing program", () =
 test("an id that belongs to another definition is shown next to the field", () => {
 	const html = render("A user definition with this id already exists. Choose another or edit that game.");
 	expect(html).toContain("A user definition with this id already exists");
+});
+
+test("the quick step shows a badge for each store the folder was recognized by", () => {
+	const html = render(
+		null,
+		inspectionWith({
+			gog: ["1495134320"],
+			epic: ["ExampleGame"],
+			lutris: ["example-lutris"],
+		}),
+	);
+	expect(html).toContain("GOG");
+	expect(html).toContain("1495134320");
+	expect(html).toContain("Epic");
+	expect(html).toContain("ExampleGame");
+	expect(html).toContain("Lutris");
+	expect(html).toContain("example-lutris");
 });

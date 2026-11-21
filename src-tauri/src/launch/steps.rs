@@ -39,7 +39,7 @@ pub fn run_steps(
     let planned = mod_steps::plan(&steps, &enabled, phase);
     let game_root = Path::new(settings.game_root.trim());
     let session = overlay_session_state(data)?.map(|state| {
-        let deployment = crate::deploy::target::deployment_root(game, settings)
+        let deployment = crate::deploy::target::deployment_root(data, game, settings)
             .unwrap_or_else(|_| game_root.to_path_buf());
         (
             Session::with_roots(&state, &deployment, game_root, Vec::new()),
@@ -68,7 +68,7 @@ pub fn run_steps(
 
         return Ok(());
     };
-    let launcher = launcher_of(game, settings, home)?;
+    let launcher = launcher_of(game, data, settings, home)?;
 
     for id in planned {
         record_step_running(data, &id, phase);
@@ -103,15 +103,24 @@ pub fn run_steps(
     Ok(())
 }
 
-/// The launcher the steps of `game` start through. On Linux a Steam game starts them through Proton, as it starts itself;
-/// Windows starts a step's program directly, as it starts the game.
+/// The launcher the steps of `game` start through. On Linux a Windows program of a step runs in the game's prefix: the
+/// Steam prefix for a Steam install, one Gobbo owns for an install from another store. Windows starts it directly.
 #[cfg(not(windows))]
 fn launcher_of(
     game: &GameDef,
+    data: &crate::context::Data,
     settings: &Settings,
     home: &Path,
 ) -> Result<Option<overlay::Launcher>, AppError> {
-    crate::launch::proton::step_launcher(game, settings, Path::new(settings.game_root.trim()), home)
+    let runtime = crate::context::target::runtime(game, settings);
+    crate::launch::proton::step_launcher(
+        game,
+        data,
+        settings,
+        Path::new(settings.game_root.trim()),
+        home,
+        runtime,
+    )
 }
 
 /// The launcher of the steps on Windows: none, the program starts directly.
@@ -119,10 +128,11 @@ fn launcher_of(
 #[expect(
     clippy::missing_const_for_fn,
     clippy::unnecessary_wraps,
-    reason = "the Linux version of this function can fail and uses all three arguments"
+    reason = "the Linux version of this function can fail and uses all four arguments"
 )]
 fn launcher_of(
     _game: &GameDef,
+    _data: &crate::context::Data,
     _settings: &Settings,
     _home: &Path,
 ) -> Result<Option<overlay::Launcher>, AppError> {

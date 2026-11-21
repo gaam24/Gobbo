@@ -86,7 +86,13 @@ pub fn check_pack(
                 .map(|message| issue(false, message.with("profile", &profile.name))),
         );
 
-        if is_ready(&game, &settings, profile, &data.profile_state(&profile.id)) {
+        if is_ready(
+            &data,
+            &game,
+            &settings,
+            profile,
+            &data.profile_state(&profile.id),
+        ) {
             let inputs = library.inputs(&listed);
 
             if let Ok(plan) = build_plan_with_mode(

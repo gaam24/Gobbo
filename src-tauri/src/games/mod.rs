@@ -4,8 +4,11 @@
 //! - `validate/`: the rules that need several fields at once.
 //! - `loaders.rs`: the shared presets in the `loaders` folder, merged under a game's own rules.
 //! - `layout.rs`: where mods go in the game.
-//! - `detect.rs`: finding the game in Steam libraries.
-//! - `steam.rs`: the VDF values, compatibility tool and Proton prefix shared by detection and launch.
+//! - `detect.rs`: the marker rule and the scan that asks every store for a game's installs.
+//! - `stores/`: one adapter per store: Steam's libraries, VDF, compatibility tool and Proton prefix in `steam.rs`, and
+//!   the install lists of Epic, GOG, Heroic, Legendary and Lutris.
+//! - `prefix.rs`: the store of an install and the Proton prefix its paths resolve with.
+//! - `runtime.rs`: how an install starts on this computer, from the files in its folder.
 //! - `paths.rs`: the path templates such as `{documents}` that the definitions use.
 //! - `view.rs`: the part of a definition the interface shows.
 //! - `catalog.rs`: the list of every definition, its icon and the shareable zip.
@@ -21,10 +24,11 @@ pub mod editor;
 mod layout;
 mod loaders;
 pub mod paths;
+pub mod prefix;
 pub mod proxy;
 mod remote;
-pub mod steam;
-mod stores;
+pub mod runtime;
+pub mod stores;
 mod validate;
 mod view;
 
@@ -74,29 +78,24 @@ impl GameDef {
         toml::from_str(text)
     }
 
-    /// The values this game's path templates resolve with, for an installation in `game_root`: its Proton prefix when
-    /// it has one, the user's `home`, and the folder of the order file the user chose.
-    pub fn path_context(
+    /// The folder of the game's order file on this computer, when the game has one and the folder already exists.
+    /// `prefix` and `under_proton` describe the install being added.
+    pub fn find_order_dir(
         &self,
         game_root: &Path,
         home: &Path,
-        settings: Option<&Path>,
-    ) -> paths::Context {
-        paths::Context {
-            game_root: game_root.to_path_buf(),
-            prefix: steam::proton_prefix(self, game_root),
-            home: home.to_path_buf(),
-            settings: settings.map(Path::to_path_buf),
-        }
-    }
-
-    /// The folder of the game's order file on this computer, when the game has one and the folder already exists.
-    pub fn find_order_dir(&self, game_root: &Path, home: &Path) -> Option<PathBuf> {
+        prefix: Option<PathBuf>,
+        under_proton: bool,
+    ) -> Option<PathBuf> {
         let order = self.load_order.as_ref()?;
-        let file = self
-            .path_context(game_root, home, None)
-            .resolve(&order.file)
-            .ok()?;
+        let context = paths::Context {
+            game_root: game_root.to_path_buf(),
+            prefix,
+            under_proton,
+            home: home.to_path_buf(),
+            settings: None,
+        };
+        let file = context.resolve(&order.file).ok()?;
         let dir = file.parent()?;
         dir.is_dir().then(|| dir.to_path_buf())
     }

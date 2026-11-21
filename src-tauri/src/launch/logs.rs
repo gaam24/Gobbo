@@ -110,7 +110,8 @@ fn game_root(data: &Data) -> Option<PathBuf> {
 fn deployed_layers(data: &Data, game: &GameDef, game_root: &Path) -> Option<Layers> {
     let state = data.deployed_state().or_else(|| data.incomplete_state())?;
     let settings = load_settings(data);
-    let deployment = deployment_root(game, &settings).unwrap_or_else(|_| game_root.to_path_buf());
+    let deployment =
+        deployment_root(data, game, &settings).unwrap_or_else(|_| game_root.to_path_buf());
     Some(Session::with_roots(&state, &deployment, game_root, Vec::new()).layers())
 }
 

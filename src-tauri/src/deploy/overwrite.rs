@@ -89,7 +89,7 @@ pub fn overwrite_to_mod(root: &Data, game_id: &str, name: &str) -> Result<(), Ap
         return Err(AppError::user("overwrite.name_empty"));
     }
 
-    let inner = deployment_root(&game, &settings)
+    let inner = deployment_root(&data, &game, &settings)
         .ok()
         .and_then(|root| {
             root.strip_prefix(settings.game_root.trim())

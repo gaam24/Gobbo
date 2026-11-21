@@ -6,6 +6,7 @@ export function statusFixture(stage: GameStage_Serialize, overrides: Partial<Sta
 	return {
 		game_name: "Game",
 		game_subtitle: "",
+		runtime: "steam_proton",
 		stage,
 		next_action: "apply",
 		blocker: null,
@@ -19,6 +20,8 @@ export function statusFixture(stage: GameStage_Serialize, overrides: Partial<Sta
 			profile_data: [],
 			proton_options: [],
 			proton_fps_limit: null,
+			source: "steam",
+			prefix_dir: "",
 		},
 		game_ready: true,
 		settings_ready: true,

@@ -18,6 +18,8 @@ loader = { id = "bepinex", variant = "6" }
 [detect]
 steam_app_ids = [1466060]
 steam_install_dirs = ["Tainted Grail The Fall of Avalon"] # not confirmed yet; the appmanifest of the game names the real folder
+# GOG product id from GOG's product database (gogdb.org/product/1887281589).
+gog_ids = ["1887281589"]
 markers = ["Fall of Avalon.exe", "Fall of Avalon_Data/app.info"]
 
 [[executables]]

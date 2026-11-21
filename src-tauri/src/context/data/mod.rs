@@ -35,6 +35,9 @@ pub const DEPLOYMENT_FILE: &str = "deployment.json";
 #[derive(Clone)]
 pub struct Data {
     pub dir: PathBuf,
+    /// The app data root this handle was opened from. A game handle keeps it so paths stored at the root, such as the
+    /// Proton prefix Gobbo owns, resolve the same way from a game handle and from the root handle.
+    root: Option<PathBuf>,
     /// The app's read-through caches; a test or a direct `Data::new` has none. Every game handle shares them.
     caches: Option<Arc<Caches>>,
 }
@@ -90,7 +93,11 @@ pub(super) fn cached<T>(
 impl Data {
     /// A data folder handle with no read-through caches, for a test or a direct caller.
     pub const fn new(dir: PathBuf) -> Self {
-        Self { dir, caches: None }
+        Self {
+            dir,
+            root: None,
+            caches: None,
+        }
     }
 
     /// The app's data folder. Reading the library reuses the parsed index until the file changes.
@@ -99,6 +106,11 @@ impl Data {
             caches: Some(Arc::default()),
             ..Self::new(dir)
         }
+    }
+
+    /// The app data root, whether this is the root handle or one of its game handles.
+    pub fn root(&self) -> &Path {
+        self.root.as_deref().unwrap_or(&self.dir)
     }
 
     fn library_cache(&self) -> Option<&FileCache<Library>> {
@@ -197,6 +209,7 @@ impl Data {
     pub fn game(&self, id: &str) -> Self {
         Self {
             dir: self.dir.join(crate::migrations::GAMES_DIR).join(id),
+            root: Some(self.root().to_path_buf()),
             caches: self.caches.clone(),
         }
     }

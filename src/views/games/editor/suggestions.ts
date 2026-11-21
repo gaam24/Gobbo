@@ -39,8 +39,6 @@ export function applySuggestions(draft: GameDraft, inspection: FolderInspection_
 
 	if (!detect.epic_ids?.length && inspection.stores.epic.length > 0) detect.epic_ids = inspection.stores.epic;
 
-	if (!detect.heroic_slugs?.length && inspection.stores.heroic.length > 0) detect.heroic_slugs = inspection.stores.heroic;
-
 	if (!detect.lutris_slugs?.length && inspection.stores.lutris.length > 0) detect.lutris_slugs = inspection.stores.lutris;
 	next = { ...next, detect };
 	const hasLayout = next.loader !== undefined || (next.deploy.slots?.length ?? 0) > 0 || (next.deploy.mirror?.length ?? 0) > 0;

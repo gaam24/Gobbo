@@ -74,7 +74,7 @@ pub fn diagnose(root: &Data, game_id: &str) -> Result<MountDiagnostics, AppError
             active,
         });
 
-        for set in user_data::sets(&game, &settings, profile, &state)?
+        for set in user_data::sets(&data, &game, &settings, profile, &state)?
             .into_iter()
             .filter(|set| set.isolated)
         {

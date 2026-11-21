@@ -25,6 +25,7 @@ export function QuickGame({
 }: QuickProps) {
 	const { t } = useTranslation();
 	const detectedSteam = inspection?.steam;
+	const stores = inspection?.stores;
 
 	const setName = (name: string) =>
 		onChange({
@@ -67,6 +68,27 @@ export function QuickGame({
 								{detectedSteam.app_id}
 							</Badge>
 						)}
+						{stores?.gog.length ? (
+							<Badge variant="outline">
+								{t("stores.gog")}
+								{" · "}
+								{stores.gog.join(", ")}
+							</Badge>
+						) : null}
+						{stores?.epic.length ? (
+							<Badge variant="outline">
+								{t("stores.epic")}
+								{" · "}
+								{stores.epic.join(", ")}
+							</Badge>
+						) : null}
+						{stores?.lutris.length ? (
+							<Badge variant="outline">
+								{t("stores.lutris")}
+								{" · "}
+								{stores.lutris.join(", ")}
+							</Badge>
+						) : null}
 						{inspection.executables.length > 0 && (
 							<Badge variant="outline">
 								{t("editor.quick.programs", {

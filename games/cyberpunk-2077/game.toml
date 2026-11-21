@@ -13,6 +13,8 @@ providers = { nexus = { key = "cyberpunk2077" } }
 [detect]
 steam_app_ids = [1091500]
 steam_install_dirs = ["Cyberpunk 2077"]
+# GOG product id from GOG's product database (gogdb.org/product/1423049311).
+gog_ids = ["1423049311"]
 markers = ["bin/x64/Cyberpunk2077.exe"]
 
 [[executables]]

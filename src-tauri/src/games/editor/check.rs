@@ -90,6 +90,7 @@ fn section_of(message: &str) -> &'static str {
         "deploy"
     } else if message.contains("executable")
         || message.contains("detect marker")
+        || message.contains("detect linux marker")
         || message.contains("required file")
         || message.contains("requirement")
     {
@@ -266,4 +267,21 @@ pub fn merged(text: &str) -> Result<GameDef, AppError> {
     let mut game = GameDef::parse(text).map_err(invalid_user_definition)?;
     super::super::loaders::apply(&mut game, &loader_dirs()).map_err(invalid_user_definition)?;
     Ok(game)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::section_of;
+
+    #[test]
+    fn both_marker_problems_are_shown_in_the_detection_section() {
+        assert_eq!(
+            section_of("detect marker is not a relative path"),
+            "detection"
+        );
+        assert_eq!(
+            section_of("detect linux marker is not a relative path"),
+            "detection"
+        );
+    }
 }

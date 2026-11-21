@@ -43,6 +43,7 @@ pub fn seeded(upper: &Path) -> PathBuf {
 /// The sets of one profile for the next launch or deployment. A missing profile choice means `shared`: a profile that
 /// predates the definition must not start isolating data on its own.
 pub fn sets(
+    data: &Data,
     game: &GameDef,
     settings: &Settings,
     profile: &Profile,
@@ -52,7 +53,7 @@ pub fn sets(
         return Ok(Vec::new());
     }
 
-    let context = path_context(game, settings);
+    let context = path_context(data, game, settings);
     let mut sets = Vec::with_capacity(game.user_data.len());
 
     for definition in game.user_data_sets() {
@@ -247,7 +248,7 @@ pub fn capture_settings(
         return Ok(false);
     };
     let state = data.profile_state(&profile.id);
-    let sets = sets(game, settings, profile, &state)?;
+    let sets = sets(data, game, settings, profile, &state)?;
     let Some(set) = sets.iter().find(|set| set.relative(&file).is_some()) else {
         return Ok(false);
     };
@@ -285,11 +286,17 @@ impl UserDataStore<'_> {
         let state = data.profile_state(profile);
 
         if let Some(target) = self.target.filter(|target| target.id == profile) {
-            return sets(self.game, self.settings, target, &state);
+            return sets(data, self.game, self.settings, target, &state);
         }
 
         let profiles = load_profiles(data)?;
-        sets(self.game, self.settings, profiles.get(profile)?, &state)
+        sets(
+            data,
+            self.game,
+            self.settings,
+            profiles.get(profile)?,
+            &state,
+        )
     }
 }
 
@@ -438,7 +445,7 @@ mod tests {
     fn a_resolved_set_uses_the_profile_upper_layer_for_a_redirect() {
         let (data, game, settings, _) = fixture("user-data-set");
         let profile = profile(true);
-        let sets = sets(&game, &settings, &profile, &data.profile_state("p1")).unwrap();
+        let sets = sets(&data, &game, &settings, &profile, &data.profile_state("p1")).unwrap();
         assert_eq!(sets.len(), 1);
         assert!(sets[0].redirects());
         assert_eq!(sets[0].kind, Kind::Saves);
@@ -448,7 +455,7 @@ mod tests {
     fn a_missing_choice_is_shared() {
         let (data, game, settings, _) = fixture("user-data-shared");
         let profile = profile(false);
-        let sets = sets(&game, &settings, &profile, &data.profile_state("p1")).unwrap();
+        let sets = sets(&data, &game, &settings, &profile, &data.profile_state("p1")).unwrap();
         assert!(!sets[0].isolated);
     }
 
@@ -458,7 +465,7 @@ mod tests {
         let (data, mut game, settings, _) = fixture("user-data-linux");
         game.user_data[0].path_linux = Some("{settings}/linux-user".into());
         let profile = profile(false);
-        let sets = sets(&game, &settings, &profile, &data.profile_state("p1")).unwrap();
+        let sets = sets(&data, &game, &settings, &profile, &data.profile_state("p1")).unwrap();
         assert_eq!(
             sets[0].real,
             PathBuf::from(&settings.settings_dir).join("linux-user")
@@ -471,7 +478,7 @@ mod tests {
         let profile = profile(true);
         let mut game = game;
         game.user_data[0].mode = Mode::Copy;
-        let sets = sets(&game, &settings, &profile, &data.profile_state("p1")).unwrap();
+        let sets = sets(&data, &game, &settings, &profile, &data.profile_state("p1")).unwrap();
         fs::create_dir_all(&real).unwrap();
         fs::write(real.join("save.txt"), "one").unwrap();
         capture_copy(&sets).unwrap();
@@ -488,7 +495,7 @@ mod tests {
         let profile = profile(true);
         fs::create_dir_all(real.join("gamesaves")).unwrap();
         fs::write(real.join("gamesaves/a.sav"), "save").unwrap();
-        let sets = sets(&game, &settings, &profile, &data.profile_state("p1")).unwrap();
+        let sets = sets(&data, &game, &settings, &profile, &data.profile_state("p1")).unwrap();
         prepare(&sets).unwrap();
         seed_redirect(&sets[0]).unwrap();
         let seeded = sets[0].upper.join("gamesaves/a.sav");
@@ -507,7 +514,7 @@ mod tests {
         let profile = profile(true);
         fs::create_dir_all(real.join("gamesaves")).unwrap();
         fs::write(real.join("gamesaves/a.sav"), "save").unwrap();
-        let mut sets = sets(&game, &settings, &profile, &data.profile_state("p1")).unwrap();
+        let mut sets = sets(&data, &game, &settings, &profile, &data.profile_state("p1")).unwrap();
         // A redirect is a Windows mode; the marker is written the same way on every platform, so the test sets the mode.
         sets[0].mode = Mode::Redirect;
 
@@ -572,7 +579,7 @@ default = "isolated"
     fn a_redirect_prepares_the_upper_layer_and_the_real_folder() {
         let (data, game, settings, real) = fixture("user-data-prepare");
         let profile = profile(true);
-        let sets = sets(&game, &settings, &profile, &data.profile_state("p1")).unwrap();
+        let sets = sets(&data, &game, &settings, &profile, &data.profile_state("p1")).unwrap();
         let _ = fs::remove_dir_all(&real);
         prepare(&sets).unwrap();
         assert!(real.is_dir());

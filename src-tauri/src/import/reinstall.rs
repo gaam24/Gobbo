@@ -95,7 +95,7 @@ pub fn reinstall_mod_with(
         }
 
         let settings = crate::context::load_settings(data);
-        let roots = crate::context::target::deployment_root(game, &settings)
+        let roots = crate::context::target::deployment_root(data, game, &settings)
             .ok()
             .map(|root| crate::import::install::top_level_folders(&root))
             .unwrap_or_default();

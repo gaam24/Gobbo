@@ -47,7 +47,7 @@ pub fn owner(data: &Data) -> Result<Option<String>, AppError> {
 
 /// Paths from the game definition, resolved for this installation. The definition is the only place that
 /// knows which files a game has; the code only resolves the templates.
-pub fn game_paths(game: &GameDef, settings: &Settings) -> Vec<String> {
+pub fn game_paths(data: &Data, game: &GameDef, settings: &Settings) -> Vec<String> {
     if game.profile_data.is_empty() {
         return Vec::new();
     }
@@ -56,7 +56,7 @@ pub fn game_paths(game: &GameDef, settings: &Settings) -> Vec<String> {
         return Vec::new();
     }
 
-    let context = path_context(game, settings);
+    let context = path_context(data, game, settings);
     game.profile_data
         .iter()
         .filter_map(|template| {
@@ -65,13 +65,13 @@ pub fn game_paths(game: &GameDef, settings: &Settings) -> Vec<String> {
                 .ok()
                 .map(|path| path.display().to_string())
         })
-        .filter(|path| !inside_user_data(game, settings, Path::new(path)))
+        .filter(|path| !inside_user_data(data, game, settings, Path::new(path)))
         .collect()
 }
 
 /// The paths materialized for one profile: the game definition, the user's extra list and the settings file.
-pub fn paths(game: &GameDef, settings: &Settings) -> Vec<String> {
-    let mut paths = game_paths(game, settings);
+pub fn paths(data: &Data, game: &GameDef, settings: &Settings) -> Vec<String> {
+    let mut paths = game_paths(data, game, settings);
     paths.extend(
         settings
             .profile_data
@@ -89,7 +89,7 @@ pub fn paths(game: &GameDef, settings: &Settings) -> Vec<String> {
     }
     // A user-data set owns its whole subtree. The legacy copy list must not also capture the order file or a path the
     // user added inside it, or the real folder would be written while the overlay redirects the set.
-    paths.retain(|path| !inside_user_data(game, settings, Path::new(path)));
+    paths.retain(|path| !inside_user_data(data, game, settings, Path::new(path)));
     let mut seen = std::collections::BTreeSet::new();
     paths.retain(|path| seen.insert(path.clone()));
     paths
@@ -98,19 +98,24 @@ pub fn paths(game: &GameDef, settings: &Settings) -> Vec<String> {
 /// Whether `path` is a user-data root or lies below one. Windows compares ignoring case; Linux compares the paths as
 /// they are.
 /// Drops the paths a user-data set owns. An old manifest from before the set was declared must not touch them.
-fn without_user_data(game: &GameDef, settings: &Settings, paths: Vec<String>) -> Vec<String> {
+fn without_user_data(
+    data: &Data,
+    game: &GameDef,
+    settings: &Settings,
+    paths: Vec<String>,
+) -> Vec<String> {
     paths
         .into_iter()
-        .filter(|path| !inside_user_data(game, settings, Path::new(path)))
+        .filter(|path| !inside_user_data(data, game, settings, Path::new(path)))
         .collect()
 }
 
-fn inside_user_data(game: &GameDef, settings: &Settings, path: &Path) -> bool {
+fn inside_user_data(data: &Data, game: &GameDef, settings: &Settings, path: &Path) -> bool {
     if game.user_data.is_empty() {
         return false;
     }
 
-    let context = path_context(game, settings);
+    let context = path_context(data, game, settings);
     game.user_data.iter().any(|set| {
         context
             .resolve(set.path_for_platform())
@@ -146,7 +151,7 @@ pub fn capture_settings(
         return Ok(());
     };
 
-    if inside_user_data(game, settings, &file) {
+    if inside_user_data(data, game, settings, &file) {
         return Ok(());
     }
 
@@ -188,9 +193,10 @@ impl Store for DataStore<'_> {
 
     fn entries(&self, data: &Data, profile: &str) -> Result<Vec<Entry>, AppError> {
         let paths = without_user_data(
+            data,
             self.game,
             self.settings,
-            read_manifest(data, profile).unwrap_or_else(|| paths(self.game, self.settings)),
+            read_manifest(data, profile).unwrap_or_else(|| paths(data, self.game, self.settings)),
         );
         Ok(paths
             .into_iter()
@@ -202,7 +208,7 @@ impl Store for DataStore<'_> {
     }
 
     fn prepare(&self, data: &Data, profile: &str) -> Result<(), AppError> {
-        write_manifest(data, profile, &paths(self.game, self.settings))
+        write_manifest(data, profile, &paths(data, self.game, self.settings))
     }
 }
 
@@ -273,22 +279,22 @@ mod tests {
 
     #[test]
     fn game_definition_paths_are_resolved_and_do_not_duplicate_the_settings_file() {
-        let (_, mut game, mut settings, settings_file, saves) = fixture("game-paths");
+        let (data, mut game, mut settings, settings_file, saves) = fixture("game-paths");
         // A real game root keeps `{game}` and `{settings}` resolvable without touching the home folder.
         settings.game_root = saves.display().to_string();
         game.profile_data = vec![SETTINGS_FILE_TEMPLATE.to_string()];
 
-        let resolved = game_paths(&game, &settings);
+        let resolved = game_paths(&data, &game, &settings);
         assert_eq!(resolved, [settings_file.display().to_string()]);
 
-        let all = paths(&game, &settings);
+        let all = paths(&data, &game, &settings);
         let expected = settings_file.display().to_string();
         assert_eq!(all.iter().filter(|path| **path == expected).count(), 1);
     }
 
     #[test]
     fn a_settings_file_inside_a_user_data_set_is_left_to_the_set() {
-        let (_, mut game, mut settings, settings_file, _) = fixture("user-data-overlap");
+        let (data, mut game, mut settings, settings_file, _) = fixture("user-data-overlap");
         let game_root = settings_file.parent().unwrap();
         settings.game_root = game_root.display().to_string();
         game.user_data = vec![crate::games::UserData {
@@ -301,7 +307,7 @@ mod tests {
             inherit: true,
         }];
 
-        let all = paths(&game, &settings);
+        let all = paths(&data, &game, &settings);
         assert!(
             !all.contains(&settings_file.display().to_string()),
             "the legacy list must not also capture the order file: {all:?}"
@@ -310,11 +316,11 @@ mod tests {
 
     #[test]
     fn a_missing_settings_folder_adds_no_settings_file() {
-        let (_, mut game, mut settings, _, _) = fixture("no-settings");
+        let (data, mut game, mut settings, _, _) = fixture("no-settings");
         game.profile_data.clear();
         settings.profile_data.clear();
         settings.settings_dir.clear();
-        assert!(paths(&game, &settings).is_empty());
+        assert!(paths(&data, &game, &settings).is_empty());
     }
 
     #[test]

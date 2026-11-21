@@ -10,10 +10,14 @@ use crate::error::ErrorKind;
 use crate::error::game_running as game_is_running_error;
 use crate::games::Executable;
 use crate::games::GameDef;
+#[cfg(not(windows))]
+use crate::games::runtime::Runtime;
 use crate::infra::clock::now_seconds;
 use crate::launch::executable::launch_args;
 use crate::launch::executable::pick_executable;
 use crate::launch::executable::{check_start, executable_missing};
+#[cfg(not(windows))]
+use crate::launch::proton::owned_proton_command;
 #[cfg(not(windows))]
 use crate::launch::proton::proton_command;
 use crate::launch::report;
@@ -284,13 +288,24 @@ pub(super) fn program_launch(
     let deployed_state = data.deployed_state();
     let with_mods = deployed_state.is_some();
 
-    // Windows has no Proton, so every game runs its own file there. On Linux a game with Steam app ids starts through Proton.
+    // The install decides the runtime: a Windows program of a Steam install goes through Steam's Proton, and one from
+    // another store through Proton in its own prefix. A native build, and anything on Windows, starts directly.
     #[cfg(not(windows))]
-    if runs_through_proton(game) {
-        return proton_command(game, data, settings, &game_root, exe, home, with_mods);
+    {
+        match crate::context::target::runtime(game, settings) {
+            Runtime::SteamProton => {
+                return proton_command(game, data, settings, &game_root, exe, home, with_mods);
+            }
+            Runtime::OwnedProton => {
+                return owned_proton_command(
+                    game, data, settings, &game_root, exe, home, with_mods,
+                );
+            }
+            Runtime::Native => {}
+        }
     }
 
-    // A game without Steam app ids runs its own file: no Proton, no prefix, only the user's environment and arguments.
+    // A program of this system runs its own file: no Proton, no prefix, only the user's environment and arguments.
     // In an overlay the file may come from a mod, so the layers say where it really is.
     let session = match deployed_state {
         Some(state) if has_overlay_session(&state)? => Some(super::overlay_session(
@@ -323,11 +338,6 @@ pub(super) fn program_launch(
     }
 
     Ok((launch, with_mods, "launch.native_failed"))
-}
-
-/// Whether the game starts through Proton: on Linux, a game with Steam app ids. Windows has no Proton.
-pub const fn runs_through_proton(game: &GameDef) -> bool {
-    !cfg!(windows) && !game.detect.steam_app_ids.is_empty()
 }
 
 /// The variables a game starts with. Under Proton come the chosen Proton options, then the settings' own variables (a
@@ -425,6 +435,8 @@ mod tests {
         let game_data = root.game(test_games::MIRROR_ID);
         let mut game = test_games::mirror();
         game.detect.steam_app_ids.clear();
+        let program = game.executables[0].path.clone();
+        game.executables[0].path_linux = Some(program);
 
         // Folder A holds the program, and the saved config points at it.
         let folder_a = base.join("a");

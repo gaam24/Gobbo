@@ -1,10 +1,11 @@
+use crate::context::Data;
+use crate::context::Settings;
 use crate::games::GameDef;
 use crate::import::tool::unpack_tool;
 use crate::launch::tools::prerequisites::missing_prerequisites;
 use crate::test_support::games as test_games;
 use crate::test_support::{make_zip, scratch};
 use std::fs;
-#[cfg(not(windows))]
 use std::path::PathBuf;
 
 #[cfg(not(windows))]
@@ -14,15 +15,20 @@ fn game() -> GameDef {
     test_games::slot()
 }
 
-/// A game folder in a Steam library, with the fixture's Proton prefix.
+/// A game folder in a Steam library, with the fixture's Proton prefix, its data and its settings.
 #[cfg(not(windows))]
-fn steam_game(name: &str) -> (PathBuf, PathBuf) {
-    let library = scratch!(name).join("library");
+fn steam_game(name: &str) -> (PathBuf, PathBuf, Data, Settings) {
+    let base = scratch!(name);
+    let library = base.join("library");
     let game_root = library.join("steamapps/common/Slot Game");
     fs::create_dir_all(&game_root).unwrap();
     let wine = library.join("steamapps/compatdata/1001/pfx");
     fs::create_dir_all(&wine).unwrap();
-    (game_root, wine)
+    let settings = Settings {
+        game_root: game_root.display().to_string(),
+        ..Settings::default()
+    };
+    (game_root, wine, Data::new(base.join("data")), settings)
 }
 
 #[test]
@@ -105,7 +111,18 @@ fn windows_runs_a_tool_with_the_runtime_it_has() {
     let game = game();
     let tool = game.tool_for_source("nexus", "4242").unwrap();
 
-    assert!(missing_prerequisites(&game, tool, "C:/Slot Game").is_empty());
+    assert!(
+        missing_prerequisites(
+            &game,
+            &Data::new(PathBuf::from("data")),
+            tool,
+            &Settings {
+                game_root: "C:/Slot Game".to_string(),
+                ..Settings::default()
+            }
+        )
+        .is_empty()
+    );
 }
 
 #[cfg(not(windows))]
@@ -113,16 +130,15 @@ fn windows_runs_a_tool_with_the_runtime_it_has() {
 fn a_prerequisite_is_missing_until_its_runtime_is_in_the_prefix() {
     let game = game();
     let tool = game.tool_for_source("nexus", "4242").unwrap();
-    let (game_root, wine) = steam_game("runtime");
-    let root = game_root.display().to_string();
+    let (_, wine, data, settings) = steam_game("runtime");
     assert_eq!(
-        missing_prerequisites(&game, tool, &root),
+        missing_prerequisites(&game, &data, tool, &settings),
         vec![RUNTIME.to_string()]
     );
 
     fs::create_dir_all(wine.join("drive_c/Runtime/8.0.33")).unwrap();
 
-    assert!(missing_prerequisites(&game, tool, &root).is_empty());
+    assert!(missing_prerequisites(&game, &data, tool, &settings).is_empty());
 }
 
 #[test]
@@ -130,8 +146,86 @@ fn a_game_without_a_prefix_has_no_missing_prerequisites() {
     let game = game();
     let tool = game.tool_for_source("nexus", "4242").unwrap();
     let dir = scratch!("no-prefix");
+    let settings = Settings {
+        game_root: dir.display().to_string(),
+        ..Settings::default()
+    };
 
-    assert!(missing_prerequisites(&game, tool, &dir.display().to_string()).is_empty());
+    assert!(missing_prerequisites(&game, &Data::new(dir.join("data")), tool, &settings).is_empty());
+}
+
+#[cfg(not(windows))]
+#[test]
+fn a_non_steam_game_checks_and_installs_prerequisites_in_the_owned_prefix() {
+    use crate::games::runtime::Runtime;
+    use crate::launch::proton::run_in_prefix;
+    use std::os::unix::fs::PermissionsExt;
+
+    let game = game();
+    let tool = game.tool_for_source("nexus", "4242").unwrap();
+    let base = scratch!("owned-prerequisites");
+    let game_root = base.join("Games/Owned Game");
+    fs::create_dir_all(&game_root).unwrap();
+    let data = Data::new(base.join("data"));
+    let wine = data.game(&game.id).dir.join("compatdata/pfx");
+    let settings = Settings {
+        game_root: game_root.display().to_string(),
+        source: "gog".into(),
+        ..Settings::default()
+    };
+
+    // Nothing is checked until the game has run and created the prefix.
+    assert!(missing_prerequisites(&game, &data, tool, &settings).is_empty());
+    fs::create_dir_all(wine.join("drive_c/Runtime/8.0.33")).unwrap();
+    assert!(missing_prerequisites(&game, &data, tool, &settings).is_empty());
+    fs::remove_dir_all(wine.join("drive_c/Runtime/8.0.33")).unwrap();
+    assert_eq!(
+        missing_prerequisites(&game, &data, tool, &settings),
+        vec![RUNTIME.to_string()]
+    );
+
+    // The installer runs in the same prefix, with no Steam app id.
+    let proton_dir = base.join("Proton");
+    fs::create_dir_all(&proton_dir).unwrap();
+    let out = base.join("out.txt");
+    let proton = proton_dir.join("proton");
+    fs::write(
+        &proton,
+        format!(
+            "#!/bin/sh\nprintf '%s\\n' \"$STEAM_COMPAT_DATA_PATH\" \"$SteamAppId\" \"$@\" > '{}'\n",
+            out.display()
+        ),
+    )
+    .unwrap();
+    fs::set_permissions(&proton, fs::Permissions::from_mode(0o755)).unwrap();
+    let settings = Settings {
+        proton_dir: proton_dir.display().to_string(),
+        ..settings
+    };
+    let code = run_in_prefix(
+        &game,
+        &data,
+        &settings,
+        &game_root,
+        std::path::Path::new("installer.exe"),
+        &["-q".into()],
+        &base.join("home"),
+        Runtime::OwnedProton,
+    )
+    .unwrap();
+    assert_eq!(code, 0);
+    let written = fs::read_to_string(&out).unwrap();
+    let lines: Vec<&str> = written.lines().collect();
+    assert_eq!(
+        lines[0],
+        data.game(&game.id)
+            .dir
+            .join("compatdata")
+            .display()
+            .to_string()
+    );
+    assert_eq!(lines[1], "");
+    assert_eq!(lines[2], "waitforexitandrun");
 }
 
 #[cfg(not(windows))]

@@ -116,6 +116,92 @@ fn an_external_root_resolves_from_the_proton_prefix() {
     let _ = fs::remove_dir_all(&base);
 }
 
+/// A non-Steam install resolves its Windows user folders inside the prefix Gobbo owns, once the game has created it.
+#[cfg(target_os = "linux")]
+#[test]
+fn an_external_root_of_a_non_steam_game_resolves_from_the_owned_prefix() {
+    let base = scratch!("external-owned-prefix");
+    let game_root = base.join("Games/External Game");
+    fs::create_dir_all(&game_root).unwrap();
+    fs::write(game_root.join("game.exe"), b"").unwrap();
+    let data = Data::new(base.join("data"));
+    let compatdata = data.game(EXTERNAL_GAME).dir.join("compatdata");
+    let appdata = compatdata.join("pfx/drive_c/users/steamuser/AppData/Roaming/External Game");
+    fs::create_dir_all(&appdata).unwrap();
+    save_settings(
+        &data,
+        EXTERNAL_GAME,
+        Settings {
+            game_root: game_root.display().to_string(),
+            source: "gog".to_string(),
+            ..Settings::default()
+        },
+    )
+    .unwrap();
+
+    let status = status(&data, EXTERNAL_GAME).unwrap();
+    assert!(status.needs_mods_root);
+    assert!(status.mods_ready);
+    assert_eq!(status.mods_root, appdata.display().to_string());
+    let _ = fs::remove_dir_all(&base);
+}
+
+/// A Windows install outside Steam never takes the native `root_linux`: before the prefix exists the root waits for it,
+/// and after the first run it resolves inside the prefix. Mods never move between two folders.
+#[cfg(target_os = "linux")]
+#[test]
+fn a_windows_install_outside_steam_keeps_its_root_before_and_after_the_first_run() {
+    let base = scratch!("external-first-run");
+    let game_root = base.join("Games/External Game");
+    fs::create_dir_all(&game_root).unwrap();
+    fs::write(game_root.join("game.exe"), b"MZ").unwrap();
+    let data = Data::new(base.join("data"));
+    save_folders(&data, EXTERNAL_GAME, &game_root, "");
+
+    let before = status(&data, EXTERNAL_GAME).unwrap();
+    assert_eq!(before.runtime, crate::games::runtime::Runtime::OwnedProton);
+    // The root waits for the prefix; it is not the native Linux folder.
+    assert_eq!(before.mods_root, "");
+
+    let appdata = data
+        .game(EXTERNAL_GAME)
+        .dir
+        .join("compatdata/pfx/drive_c/users/steamuser/AppData/Roaming/External Game");
+    fs::create_dir_all(&appdata).unwrap();
+    let after = status(&data, EXTERNAL_GAME).unwrap();
+    assert_eq!(after.mods_root, appdata.display().to_string());
+    let _ = fs::remove_dir_all(&base);
+}
+
+/// A prefix the user chose (or Heroic or Lutris named) replaces the one Gobbo owns for the game's Windows folders.
+#[cfg(target_os = "linux")]
+#[test]
+fn an_external_root_resolves_from_a_chosen_prefix() {
+    let base = scratch!("external-chosen-prefix");
+    let game_root = base.join("Games/External Game");
+    fs::create_dir_all(&game_root).unwrap();
+    fs::write(game_root.join("game.exe"), b"MZ").unwrap();
+    let prefix = base.join("Prefixes/External Game/pfx");
+    let appdata = prefix.join("drive_c/users/steamuser/AppData/Roaming/External Game");
+    fs::create_dir_all(&appdata).unwrap();
+    let data = Data::new(base.join("data"));
+    save_settings(
+        &data,
+        EXTERNAL_GAME,
+        Settings {
+            game_root: game_root.display().to_string(),
+            prefix_dir: prefix.display().to_string(),
+            ..Settings::default()
+        },
+    )
+    .unwrap();
+
+    let status = status(&data, EXTERNAL_GAME).unwrap();
+    assert_eq!(status.settings.prefix_dir, prefix.display().to_string());
+    assert_eq!(status.mods_root, appdata.display().to_string());
+    let _ = fs::remove_dir_all(&base);
+}
+
 #[cfg(windows)]
 #[test]
 fn an_external_root_resolves_from_the_roaming_appdata_folder() {

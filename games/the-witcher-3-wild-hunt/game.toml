@@ -24,6 +24,8 @@ inherit = false
 [detect]
 steam_app_ids = [292030]
 steam_install_dirs = ["The Witcher 3"]
+# GOG product id from GOG's product database (gogdb.org/product/1495134320), the one GOTY/Complete/Remastered product every GOG owner has.
+gog_ids = ["1495134320"]
 markers = ["bin/x64_dx12/witcher3.exe", "content/content0"]
 
 [[executables]]

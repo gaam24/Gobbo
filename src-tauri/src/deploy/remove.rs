@@ -130,7 +130,7 @@ fn undo_prepared_holding(
             return Err(game_is_running_error());
         }
 
-        let roots = journal_roots(&game, &settings, state.clone())?;
+        let roots = journal_roots(data, &game, &settings, state.clone())?;
         undo(&roots).map_err(AppError::from)?;
         // A layer that cannot be removed (a file still held open) keeps the profile deployed, so a later cleanup
         // tries again instead of forgetting the files.

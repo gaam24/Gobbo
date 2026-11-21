@@ -57,8 +57,9 @@ fn readiness_asks_only_for_the_folders_that_are_missing() {
     std::fs::create_dir_all(&game_root).unwrap();
     std::fs::create_dir_all(&settings_dir).unwrap();
     let game = crate::test_support::games::slot();
+    let data = crate::context::Data::new(base.join("data"));
 
-    let empty = readiness(&game, &Settings::default(), false);
+    let empty = readiness(&data, &game, &Settings::default(), false);
     assert!(!empty.game_ready);
     assert!(!empty.settings_ready);
     assert!(empty.mods_ready);
@@ -68,7 +69,7 @@ fn readiness_asks_only_for_the_folders_that_are_missing() {
         settings_dir: settings_dir.display().to_string(),
         ..Settings::default()
     };
-    let ready = readiness(&game, &set, false);
+    let ready = readiness(&data, &game, &set, false);
     assert!(ready.game_ready);
     assert!(ready.settings_ready);
     assert!(ready.mods_ready);
@@ -77,10 +78,10 @@ fn readiness_asks_only_for_the_folders_that_are_missing() {
         mods_root: base.join("no-mods").display().to_string(),
         ..set
     };
-    assert!(!readiness(&game, &overridden, false).mods_ready);
+    assert!(!readiness(&data, &game, &overridden, false).mods_ready);
 
     let external = crate::test_support::games::external();
-    let ready = readiness(&external, &Settings::default(), false);
+    let ready = readiness(&data, &external, &Settings::default(), false);
     assert_eq!(ready.mods_ready, !ready.mods_root.is_empty());
 }
 
@@ -207,4 +208,19 @@ fn a_status_read_does_not_create_the_library_or_archive_folders() {
     crate::status::sync_profiles(&root, id).unwrap();
     assert!(data.library().is_dir());
     assert!(data.archives().is_dir());
+}
+
+#[test]
+fn the_subtitle_names_the_store_or_the_steam_app_id() {
+    let ids = [1001];
+    assert_eq!(subtitle_for("steam", &ids), "Steam 1001");
+    assert_eq!(subtitle_for("gog", &[]), "GOG");
+    assert_eq!(subtitle_for("epic", &[]), "Epic");
+    assert_eq!(subtitle_for("heroic", &[]), "Heroic");
+    assert_eq!(subtitle_for("lutris", &[]), "Lutris");
+    assert_eq!(subtitle_for("manual", &[]), "Manual");
+    assert_eq!(subtitle_for("", &ids), "Steam 1001");
+    assert_eq!(subtitle_for("", &[]), "Manual");
+    assert_eq!(subtitle_for("unknown", &ids), "Steam 1001");
+    assert_eq!(subtitle_for("unknown", &[]), "");
 }

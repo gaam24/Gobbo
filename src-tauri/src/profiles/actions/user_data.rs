@@ -80,7 +80,7 @@ pub fn move_profile_user_data(
         return Err(AppError::user("user_data.not_redirect").with("id", set_id));
     }
 
-    move_set(&game, &settings, &state, profile, set_id)?;
+    move_set(&data, &game, &settings, &state, profile, set_id)?;
     profiles
         .get_mut(profile_id)?
         .set_user_data_isolation(set_id, Isolation::Shared);
@@ -89,12 +89,13 @@ pub fn move_profile_user_data(
 
 /// The resolved sets of one profile, for the move and the size read.
 fn resolved_sets(
+    data: &Data,
     game: &crate::games::GameDef,
     settings: &crate::context::Settings,
     state: &std::path::Path,
     profile: &crate::domain::profiles::Profile,
 ) -> Result<Vec<crate::domain::user_data::Set>, AppError> {
-    user_data::sets(game, settings, profile, state)
+    user_data::sets(data, game, settings, profile, state)
 }
 
 /// The set with `set_id`, or the user-facing `user_data.unknown_set` error.
@@ -111,13 +112,14 @@ fn find_set<'a>(
 /// producer of this layer format.
 #[cfg(windows)]
 fn move_set(
+    data: &Data,
     game: &crate::games::GameDef,
     settings: &crate::context::Settings,
     state: &std::path::Path,
     profile: &crate::domain::profiles::Profile,
     set_id: &str,
 ) -> Result<(), AppError> {
-    let sets = resolved_sets(game, settings, state, profile)?;
+    let sets = resolved_sets(data, game, settings, state, profile)?;
     let set = find_set(&sets, set_id)?;
 
     if !set.redirects() {
@@ -131,6 +133,7 @@ fn move_set(
 /// The Linux overlayfs layer is not moved back yet; copying an overlay upper blindly could lose the files it hides.
 #[cfg(not(windows))]
 fn move_set(
+    _data: &Data,
     _game: &crate::games::GameDef,
     _settings: &crate::context::Settings,
     _state: &std::path::Path,
@@ -159,7 +162,13 @@ pub fn user_data_size(
         return Err(AppError::user("user_data.unknown_set").with("id", set_id));
     }
 
-    let sets = resolved_sets(&game, &settings, &data.profile_state(profile_id), profile)?;
+    let sets = resolved_sets(
+        &data,
+        &game,
+        &settings,
+        &data.profile_state(profile_id),
+        profile,
+    )?;
     let set = find_set(&sets, set_id)?;
 
     if !set.isolated {

@@ -78,10 +78,9 @@ namespaces on Linux, or no hook on Windows) cannot be deployed, and Gobbo says w
 
 ## Linux
 
-Valheim also ships a native Linux build. The current launcher starts Steam games through Proton, so its definition
-covers the Windows build under Proton. An executable can name a Linux path; a non-Steam game uses it
-on Linux. Until the launcher chooses the native program of a Steam game, Gobbo does not offer an install it cannot
-start.
+Valheim also ships a native Linux build. Its definition names the Linux program in `path_linux` and the files that
+mark its folder, so the Games page finds that install and starts it directly, without Proton. The Windows program
+stays for installs that run under Proton.
 
 The overlay details, Steam launch options and Proton settings are in [Linux and Steam](linux.md).
 

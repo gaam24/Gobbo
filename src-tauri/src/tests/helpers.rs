@@ -20,9 +20,16 @@ fn a_mod_folder_is_one_plain_name_inside_the_library() {
 #[cfg(any(target_os = "linux", windows))]
 #[test]
 fn the_launch_hint_starts_the_game_through_gobbo() {
-    let hint = launch_hint("slot");
+    let hint = launch_hint("slot", "steam");
     assert!(hint.starts_with('"'));
     assert!(hint.ends_with(" run slot -- %command%"));
+}
+
+#[cfg(any(target_os = "linux", windows))]
+#[test]
+fn only_steam_installs_get_the_launch_hint() {
+    assert_eq!(launch_hint("slot", "gog"), "");
+    assert_eq!(launch_hint("slot", "manual"), "");
 }
 
 #[test]

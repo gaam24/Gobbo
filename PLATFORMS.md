@@ -17,6 +17,7 @@ Here's what each platform supports today.
 | User data: shared                     | Yes                                 | Yes                                                           |
 | Launch: native executable             | Yes                                 | Yes                                                           |
 | Launch: Proton                        | No                                  | Yes                                                           |
+| Launch: a Windows game from another store | Yes (directly)                  | Yes, through the newest installed Proton, in the store's prefix or one Gobbo owns |
 | Tools: Proton prerequisites           | No                                  | Yes                                                           |
 | Process list and stop                 | Toolhelp/Windows APIs               | `/proc` and the overlay session                               |
 | Deep links (`nxm://`, future schemes) | Yes, registered by the app          | Yes, registered by the app                                    |
@@ -46,7 +47,7 @@ The game folder is never written by a hooked call. If the hook can't prove a pat
 
 - **Windows:** WebView2, the Visual C++ runtime used by the build, and a working keyring.
 - **Linux:** WebKitGTK/GTK, a running keyring (Secret Service), and a kernel with overlayfs and unprivileged user namespaces. Overlay is the only deployment method; without it Gobbo can't deploy mods.
-- **Proton:** a Steam installation and a Proton build. A game runs with the Proton build Steam assigns to it by default. The game settings list the Proton builds found on the computer and let the user pick one; the choice is saved per game.
+- **Proton:** a Steam installation and a Proton build. A game runs with the Proton build Steam assigns to it by default. The game settings list the Proton builds found on the computer and let the user pick one; the choice is saved per game. A game that is not from Steam needs any installed Proton build. It runs in the prefix Heroic or Lutris names for it, or one the user picks, or else one Gobbo creates in the game's data folder. Whether a game runs natively or under Proton follows the files in its folder, not the definition alone.
 
 ## Verification
 

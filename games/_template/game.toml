@@ -37,6 +37,7 @@ providers = { nexus = { key = "examplegame" } }
 steam_app_ids = [123456]
 steam_install_dirs = ["Example Game"]
 markers = ["ExampleGame.exe"] # files that identify the game folder
+# linux_markers = ["GameName.x86_64"] # files of the native Linux build, used only on Linux
 # any_marker = true           # one marker is enough (builds with different file names)
 
 # The programs the game starts with. The first one is the default.

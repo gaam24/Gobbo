@@ -459,6 +459,7 @@ function status(overrides: Partial<Status> = {}): Status {
 	return {
 		game_name: "Game",
 		game_subtitle: "",
+		runtime: "steam_proton",
 		stage: { kind: "ready", enabled: 1, total: 1 },
 		next_action: "apply",
 		settings: {

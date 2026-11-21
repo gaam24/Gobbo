@@ -68,8 +68,13 @@ fn make_room_undoes_a_legacy_and_an_overlay_profile_once() {
     // The fixture uses a load order, where an overlay apply makes room from every other profile too.
     let def = test_games::slot();
     assert!(def.has_load_order());
-    let roots = crate::deploy::target::journal_roots(&def, &f.settings(), game.profile_state("p3"))
-        .unwrap();
+    let roots = crate::deploy::target::journal_roots(
+        &f.data,
+        &def,
+        &f.settings(),
+        game.profile_state("p3"),
+    )
+    .unwrap();
     overlay::make_room(&prepared, "p3", def.has_load_order(), false, &roots).unwrap();
 
     assert!(!placed.exists(), "the legacy deployment is undone");

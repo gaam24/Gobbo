@@ -18,7 +18,7 @@
       "schema": 1,
       "verified": false,
       "file": "games/cyberpunk-2077/game.toml",
-      "sha256": "88372d0e41fb363436b51a93858905ed18fe155644835574539824a6c8f1d95d",
+      "sha256": "790bfb83c8150a50e623c5888df7ec169ac642254dfe4beddf60984b271e0557",
       "icon": "games/cyberpunk-2077/icon.webp",
       "iconSha256": "edb4681f1fe86d9e728eaeb0b3dc41ee548c6d971ef6c9ea41cc9727e9c6e0ae"
     },
@@ -51,7 +51,7 @@
       "loader": "bepinex",
       "verified": false,
       "file": "games/tainted-grail-the-fall-of-avalon/game.toml",
-      "sha256": "a98f7dead9d166aa8a663e85e62ff9b931c3d298abd689243cdf837eed330472",
+      "sha256": "c3f37f82a55b0610a8303840a01f0a08da4ed4c08252d751c3ee01a7fb0b1e98",
       "icon": "games/tainted-grail-the-fall-of-avalon/icon.webp",
       "iconSha256": "c4c47306aef23b635ed2e0da1d783e86ada6e98b4de4445305012e1466fb667f"
     },
@@ -72,7 +72,7 @@
       "schema": 1,
       "verified": false,
       "file": "games/the-witcher-3-wild-hunt/game.toml",
-      "sha256": "9a19345ca0155c25311c34f4e0aaa62ec493fc01d209fea49e68aa97421ad8f4",
+      "sha256": "88caba3d945a1772d80fae5e6cc13751c7e9154a02f7d62b41a55a014dfe8134",
       "icon": "games/the-witcher-3-wild-hunt/icon.webp",
       "iconSha256": "a93870d1381c93648f6023687d19b723eb7b6b54641ae4b413b132a58f5bf63c"
     },
@@ -93,7 +93,7 @@
       "loader": "bepinex",
       "verified": false,
       "file": "games/valheim/game.toml",
-      "sha256": "917b731ef42e90667f7535d158bef01fd4bfa46da302efed859cf2ed2858c452",
+      "sha256": "3e5b7043b08898057347746493ec4a04a5d6f85073397be67468a4d3e388cca3",
       "icon": "games/valheim/icon.webp",
       "iconSha256": "7a640498dd2dde2dabf452c1ade02afdf7630cbded3086aa800b6d227fcaf1ab"
     }

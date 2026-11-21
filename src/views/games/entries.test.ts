@@ -18,14 +18,15 @@ function game(id: string, name: string): GameView {
 	};
 }
 
-function scan(id: string, root: string | null): GameScan {
+function scan(id: string, root: string | null, store = "steam"): GameScan {
 	return {
 		id,
-		found: root === null ? null : { game_root: root, library: "/library/steam", store: "steam" },
+		found: root === null ? null : { game_root: root, library: "/library/steam", store },
+		others: [],
 	};
 }
 
-const managed: ManagedGame[] = [{ id: "added", game_root: "/games/added", ready: true }];
+const managed: ManagedGame[] = [{ id: "added", game_root: "/games/added", ready: true, source: "gog" }];
 
 test("an added game wins over a scan result and keeps its folder", () => {
 	const added = game("added", "Added");
@@ -35,6 +36,8 @@ test("an added game wins over a scan result and keeps its folder", () => {
 		status: "added",
 		root: "/games/added",
 		ready: true,
+		store: "gog",
+		others: [],
 	});
 });
 
@@ -43,10 +46,29 @@ test("a game without an answer yet is searching, then found or missing", () => {
 	const missing = game("missing", "Missing");
 	expect(buildGameEntries([found, missing], [], null).map((entry) => entry.status)).toEqual(["searching", "searching"]);
 
-	const entries = buildGameEntries([found, missing], [], [scan("found", "/games/found"), scan("missing", null)]);
+	const entries = buildGameEntries([found, missing], [], [scan("found", "/games/found", "lutris"), scan("missing", null)]);
 	expect(entries).toEqual([
-		{ game: found, status: "found", root: "/games/found", ready: false },
-		{ game: missing, status: "missing", root: null, ready: false },
+		{ game: found, status: "found", root: "/games/found", ready: false, store: "lutris", others: [] },
+		{ game: missing, status: "missing", root: null, ready: false, store: null, others: [] },
+	]);
+});
+
+test("a found game keeps every other install in scan order", () => {
+	const multi = game("multi", "Multi Install");
+	const result = scan("multi", "/games/preferred", "steam");
+	result.others = [
+		{ game_root: "/games/other-a", library: "/library/gog", store: "gog" },
+		{ game_root: "/games/other-b", library: "/library/epic", store: "epic" },
+	];
+	expect(buildGameEntries([multi], [], [result])).toEqual([
+		{
+			game: multi,
+			status: "found",
+			root: "/games/preferred",
+			ready: false,
+			store: "steam",
+			others: result.others,
+		},
 	]);
 });
 

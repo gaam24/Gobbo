@@ -14,7 +14,9 @@
   `collect_commands![...]` invocation `builder()` includes and the command permissions. Every command module lives in
   the module it serves; this layer is only the registration point.
 - Modules: each folder owns its commands, use cases and engine. `games/` (the definition model in `definition/`, the
-  loader presets in `loaders.rs`, validation, detection, the shared Steam/Proton data in `steam.rs`, paths, the catalog
+  loader presets in `loaders.rs`, validation, the scan in `detect.rs`, one adapter per store in `stores/` (Steam's
+  libraries and Proton data in `stores/steam.rs`; where each store keeps its files comes from `platform::store_folders`),
+  how an install starts in `runtime.rs`, paths, the catalog
   in `catalog.rs`, the official catalog downloaded from GitHub in `remote/` (the manifest fetch, the schema gate and
   the checksummed install), the catalog commands and the definition editor in `editor/`; the import dry run is
   `import/preview.rs`),

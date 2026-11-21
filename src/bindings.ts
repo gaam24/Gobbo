@@ -216,7 +216,7 @@ export const commands = {
 	setModPriority: (game: string, id: string, priority: number | null) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("set_mod_priority", { game, id, priority })),
 	/**  Games added to Gobbo, with the game folder and whether that folder exists. Games outside this list have no tabs. */
 	managedGames: () => typedError<ManagedGame[], AppError_Serialize>(__TAURI_INVOKE("managed_games")),
-	/**  Looks for supported games in the Steam libraries on this computer. Read-only; nothing changes. */
+	/**  Looks for supported games in the Steam libraries and the other stores on this computer. Read-only; nothing changes. */
 	scanGames: () => typedError<GameScan_Serialize[], AppError_Serialize>(__TAURI_INVOKE("scan_games")),
 	/**
 	 *  Opens the page a game definition names for a required file, for example the `BepInEx` releases page. The URL comes
@@ -2375,7 +2375,7 @@ export type Found = {
 	game_root: string,
 	/**  The store folder the game came from: the Steam library, or the folder a store names. */
 	library: string,
-	/**  The store that named the folder: `steam`, `gog`, `epic`, `heroic` or `lutris`. */
+	/**  The store that named the folder: `steam`, `gog`, `epic`, `heroic`, `legendary` or `lutris`. */
 	store: string,
 };
 
@@ -2479,19 +2479,36 @@ export type GameProviderView = {
 	key: string,
 };
 
-/**  The result of searching for one supported game. `found` is empty when the game is in no library. */
+/**
+ *  The result of searching for one supported game. `found` is the preferred install; `others` are the other installs of
+ *  the same game the scan saw.
+ */
 export type GameScan = GameScan_Serialize | GameScan_Deserialize;
 
-/**  The result of searching for one supported game. `found` is empty when the game is in no library. */
+/**
+ *  The result of searching for one supported game. `found` is the preferred install; `others` are the other installs of
+ *  the same game the scan saw.
+ */
 export type GameScan_Deserialize = {
+	/**  The game's id from its definition. */
 	id: string,
+	/**  The preferred install, or empty when the game is nowhere. */
 	found?: Found | null,
+	/**  The other installs, Steam first then store order; a folder claimed twice appears once. */
+	others: Found[],
 };
 
-/**  The result of searching for one supported game. `found` is empty when the game is in no library. */
+/**
+ *  The result of searching for one supported game. `found` is the preferred install; `others` are the other installs of
+ *  the same game the scan saw.
+ */
 export type GameScan_Serialize = {
+	/**  The game's id from its definition. */
 	id: string,
+	/**  The preferred install, or empty when the game is nowhere. */
 	found: Found | null,
+	/**  The other installs, Steam first then store order; a folder claimed twice appears once. */
+	others: Found[],
 };
 
 /**  The state of a game, from the folders it needs to the list that is applied to it. */
@@ -3058,6 +3075,8 @@ export type LoaderVariantView = {
 export type ManagedGame = {
 	id: string,
 	game_root: string,
+	/**  Where this install came from: `steam`, `gog`, `epic`, `heroic`, `legendary`, `lutris` or `manual`. */
+	source: string,
 	ready: boolean,
 };
 
@@ -4445,6 +4464,15 @@ export type RunReport_Serialize = {
 	dlls: DllReport | null,
 };
 
+/**  How an install starts on this computer. */
+export type Runtime = 
+/**  Through Proton, in the Steam prefix of a Steam install. */
+"steam_proton" | 
+/**  Through Proton, in the prefix of another store or one Gobbo owns: a Windows program that is not from Steam. */
+"owned_proton" | 
+/**  Directly, as a program of this system. */
+"native";
+
 /**  A definition that was written. The window uses the name for its notice and the id to add the game. */
 export type SavedDefinition = {
 	id: string,
@@ -4509,6 +4537,13 @@ export type Settings_Deserialize = {
 	 *  Absolute paths. The settings file is added automatically.
 	 */
 	profile_data?: string[],
+	/**  Where this install came from: `steam`, `gog`, `epic`, `heroic`, `legendary`, `lutris` or `manual`. Empty for games added before this field existed. */
+	source?: string,
+	/**
+	 *  The Wine prefix of an install that is not from Steam: the folder that holds `drive_c`. Adding the game fills in
+	 *  the prefix Heroic or Lutris uses for it; empty means the prefix Gobbo owns. A Steam install keeps Steam's prefix.
+	 */
+	prefix_dir?: string,
 };
 
 /**  Settings entered in the app. Saved in `config.json` in the game's data folder. */
@@ -4537,6 +4572,13 @@ export type Settings_Serialize = {
 	 *  Absolute paths. The settings file is added automatically.
 	 */
 	profile_data: string[],
+	/**  Where this install came from: `steam`, `gog`, `epic`, `heroic`, `legendary`, `lutris` or `manual`. Empty for games added before this field existed. */
+	source: string,
+	/**
+	 *  The Wine prefix of an install that is not from Steam: the folder that holds `drive_c`. Adding the game fills in
+	 *  the prefix Heroic or Lutris uses for it; empty means the prefix Gobbo owns. A Steam install keeps Steam's prefix.
+	 */
+	prefix_dir: string,
 };
 
 /**  The folder that keeps a game from being ready. */
@@ -4954,6 +4996,11 @@ export type Status_Deserialize = {
 	game_name: string,
 	/**  A short description of the game under its name, for example `Steam 292030`. */
 	game_subtitle: string,
+	/**
+	 *  How this install starts on this computer, from the files in its folder. The Proton settings apply only when it
+	 *  is not `native`, which it always is on Windows.
+	 */
+	runtime: Runtime,
 	/**  The one derived state of the game. Every screen reads this instead of deriving the state from booleans. */
 	stage: GameStage_Deserialize,
 	/**  The one thing to do next, derived from `stage`. */
@@ -5040,6 +5087,11 @@ export type Status_Serialize = {
 	game_name: string,
 	/**  A short description of the game under its name, for example `Steam 292030`. */
 	game_subtitle: string,
+	/**
+	 *  How this install starts on this computer, from the files in its folder. The Proton settings apply only when it
+	 *  is not `native`, which it always is on Windows.
+	 */
+	runtime: Runtime,
 	/**  The one derived state of the game. Every screen reads this instead of deriving the state from booleans. */
 	stage: GameStage_Serialize,
 	/**  The one thing to do next, derived from `stage`. */
@@ -5204,11 +5256,13 @@ export type StorageMode =
 /**  A folder named by `GOBBO_DATA_DIR`, for tests and advanced use. */
 "custom";
 
-/**  The store ids that point at a game folder. A definition opts into one with the matching detect field. */
+/**
+ *  The store ids that point at a game folder, by the detect list each belongs to. A GOG or Epic game installed through
+ *  Heroic, Legendary or Lutris carries its GOG product id or Epic `AppName`, so it lands in `gog` or `epic`.
+ */
 export type StoreIds = {
 	gog: string[],
 	epic: string[],
-	heroic: string[],
 	lutris: string[],
 };
 

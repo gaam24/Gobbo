@@ -1,5 +1,6 @@
-import { FolderOpen, RefreshCw } from "lucide-react";
+import { FolderOpen, RefreshCw, RotateCcw } from "lucide-react";
 import type { ProtonBuild, Status } from "@/bindings";
+import { PathText } from "@/components/app/path-text";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
@@ -7,11 +8,12 @@ import { Switch } from "@/components/ui/switch";
 import { useTranslation } from "@/i18n";
 import { usePlatform } from "@/lib/platform";
 import { Section, SettingRow, SettingsGroup } from "@/views/settings/controls";
-import { PROTON_STEAM, protonChoices } from "@/views/settings/game/proton-choices";
+import { PROTON_STEAM, protonAutomaticLabel, protonChoices } from "@/views/settings/game/proton-choices";
 import { PROTON_FPS_LIMITS, PROTON_OPTION_GROUPS, type ProtonOption } from "@/views/settings/game/proton-options";
 
-/// Everything Proton does for the game: the build it starts with and the switches for its runtime. Both act at once.
-/// Proton runs games on Linux only, so the section is not shown anywhere else.
+/// Everything Proton does for the game: the build it starts with, the prefix of an install that is not from Steam, and
+/// the switches for its runtime. All act at once. Proton runs games on Linux only, so the section is not shown anywhere
+/// else.
 export function ProtonSection({
 	status,
 	protonBuilds,
@@ -20,6 +22,9 @@ export function ProtonSection({
 	onPickBuild,
 	onPickFolder,
 	onRefreshBuilds,
+	prefixDir,
+	onPickPrefix,
+	onResetPrefix,
 	offered,
 	onSwitch,
 	fpsLimit,
@@ -32,6 +37,10 @@ export function ProtonSection({
 	onPickBuild: (folder: string) => void | Promise<void>;
 	onPickFolder: () => void | Promise<void>;
 	onRefreshBuilds: () => void | Promise<void>;
+	/// The chosen Wine prefix of an install that is not from Steam; empty for the one Gobbo owns.
+	prefixDir: string;
+	onPickPrefix: () => void | Promise<void>;
+	onResetPrefix: () => void | Promise<void>;
 	offered: readonly ProtonOption[];
 	onSwitch: (option: ProtonOption, on: boolean) => void | Promise<void>;
 	fpsLimit: number | null;
@@ -62,7 +71,7 @@ export function ProtonSection({
 							<SelectValue />
 						</SelectTrigger>
 						<SelectContent>
-							<SelectItem value={PROTON_STEAM}>{t("settings.proton.steamChoice")}</SelectItem>
+							<SelectItem value={PROTON_STEAM}>{t(protonAutomaticLabel(status.runtime))}</SelectItem>
 							{protonChoices(protonBuilds ?? [], protonDir).map((build) => (
 								<SelectItem key={build.folder} value={build.folder}>
 									{build.name}
@@ -86,6 +95,33 @@ export function ProtonSection({
 					</Button>
 				</div>
 			</SettingRow>
+
+			{status.runtime === "owned_proton" && (
+				<SettingRow title={t("settings.proton.prefix")} hint={t("settings.proton.prefixHint")} help={t("settings.proton.prefixHelp")}>
+					<div className="flex min-w-0 items-center gap-2">
+						{prefixDir ? (
+							<PathText path={prefixDir} className="text-muted-foreground min-w-0 flex-1" />
+						) : (
+							<span className="text-muted-foreground min-w-0 flex-1 truncate text-sm">{t("settings.proton.prefixOwned")}</span>
+						)}
+						{prefixDir && (
+							<Button
+								type="button"
+								variant="outline"
+								size="icon"
+								aria-label={t("settings.proton.prefixReset")}
+								title={t("settings.proton.prefixReset")}
+								onClick={() => void onResetPrefix()}
+							>
+								<RotateCcw />
+							</Button>
+						)}
+						<Button type="button" variant="outline" className="shrink-0" onClick={() => void onPickPrefix()}>
+							<FolderOpen /> {t("settings.proton.prefixChoose")}
+						</Button>
+					</div>
+				</SettingRow>
+			)}
 
 			<SettingRow
 				title={t("settings.proton.fpsLimit")}

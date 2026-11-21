@@ -677,3 +677,204 @@ fn a_steam_game_starts_in_its_game_folder_and_passes_the_install_path() {
     assert_eq!(lines[0], f.game_root.display().to_string());
     assert_eq!(lines[1], f.game_root.display().to_string());
 }
+
+/// The prefix Gobbo owns lives with the game's data and is the one a non-Steam Windows program starts in.
+#[cfg(target_os = "linux")]
+#[test]
+fn a_windows_program_from_a_plain_folder_starts_in_the_owned_prefix() {
+    let (f, out) = owned_fixture("launch-owned");
+    let mut game = test_games::mirror();
+    game.detect.steam_app_ids.clear();
+    let (launch, with_mods, spawn_error) =
+        launch_command(&game, &f.data, MIRROR_GAME, None, &f.base).unwrap();
+    assert!(!with_mods);
+    assert_eq!(spawn_error, "launch.proton_failed");
+    let Launch::Plain(mut command) = launch else {
+        panic!("a game without deployment starts as a plain command");
+    };
+    assert_eq!(command.get_current_dir(), Some(f.game_root.as_path()));
+    assert!(command.status().unwrap().success());
+
+    let written = fs::read_to_string(&out).unwrap();
+    let lines: Vec<&str> = written.lines().collect();
+    assert_eq!(
+        lines[0],
+        f.data
+            .game(MIRROR_GAME)
+            .dir
+            .join("compatdata")
+            .display()
+            .to_string()
+    );
+    assert_eq!(lines[1], f.game_root.display().to_string());
+    assert_eq!(lines[2], "", "an owned prefix has no Steam app id");
+    assert_eq!(lines[3], "waitforexitandrun");
+    assert_eq!(
+        lines[4],
+        f.game_root.join("bin/x64/game.exe").display().to_string()
+    );
+    assert_eq!(lines[5], "hidden");
+}
+
+/// The definition may list Steam app ids for a game that is also sold elsewhere. The install's source, not the
+/// definition, decides the runtime, so a GOG install no longer asks for a Steam prefix it does not have.
+#[cfg(target_os = "linux")]
+#[test]
+fn a_cross_store_install_uses_the_owned_prefix_instead_of_the_steam_one() {
+    let (f, out) = owned_fixture("launch-cross-store");
+    let game = test_games::mirror();
+    assert!(!game.detect.steam_app_ids.is_empty());
+    let (launch, _, _) = launch_command(&game, &f.data, MIRROR_GAME, None, &f.base).unwrap();
+    let Launch::Plain(mut command) = launch else {
+        panic!("a game without deployment starts as a plain command");
+    };
+    assert!(command.status().unwrap().success());
+
+    let written = fs::read_to_string(&out).unwrap();
+    let lines: Vec<&str> = written.lines().collect();
+    assert_eq!(
+        lines[0],
+        f.data
+            .game(MIRROR_GAME)
+            .dir
+            .join("compatdata")
+            .display()
+            .to_string()
+    );
+    assert_eq!(lines[2], "", "a GOG install has no Steam app id");
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn a_step_of_a_non_steam_game_runs_in_the_owned_prefix() {
+    use crate::games::{Phase, Step};
+
+    const GAME_FOLDER: &str = "{game}";
+
+    require_overlay_namespaces!();
+    let (f, out) = owned_fixture("step-owned");
+    deploy_overlay(&f);
+    fs::write(f.game_root.join("bin/x64/tool.exe"), "").unwrap();
+    let data = f.data.game(MIRROR_GAME);
+    let folder = fs::read_dir(data.dir.join("library"))
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .file_name()
+        .to_string_lossy()
+        .into_owned();
+    fs::write(
+        data.dir.join("mod_steps.toml"),
+        format!("[mods.\"{folder}\"]\nbefore_start = [\"compile\"]\n"),
+    )
+    .unwrap();
+    let mut game = test_games::mirror();
+    game.detect.steam_app_ids.clear();
+    game.steps.push(Step {
+        id: "compile".into(),
+        phase: Phase::BeforeStart,
+        program: "bin/x64/tool.exe".into(),
+        args: vec!["-out".into(), format!("{}/r6/cache/final.bin", GAME_FOLDER)],
+        when_dir: Some("r6/scripts".into()),
+        clean: Vec::new(),
+        outputs: Vec::new(),
+        log: None,
+    });
+
+    run_steps(
+        &data,
+        &game,
+        Phase::BeforeStart,
+        &f.base,
+        &crate::context::load_settings(&data),
+    )
+    .unwrap();
+
+    let written = fs::read_to_string(&out).unwrap();
+    let lines: Vec<&str> = written.lines().collect();
+    assert_eq!(lines[0], data.dir.join("compatdata").display().to_string());
+    assert_eq!(lines[2], "");
+    assert_eq!(lines[3], "waitforexitandrun");
+    assert_eq!(
+        lines[4],
+        f.game_root.join("bin/x64/tool.exe").display().to_string()
+    );
+    assert_eq!(lines[5], "-out");
+    assert_eq!(lines[7], "visible");
+    undo_deployment(&f.data, MIRROR_GAME).unwrap();
+}
+
+/// A GOG install travels through a scan, is added with its store, deploys and starts in the overlay as a native program.
+#[cfg(target_os = "linux")]
+#[test]
+fn a_gog_install_scans_adds_deploys_and_starts_in_the_overlay() {
+    use crate::context::load_settings;
+    use crate::settings::managed::add_game;
+
+    require_overlay_namespaces!();
+    let base = scratch!("gog-e2e");
+    let home = base.join("home");
+    let game_root = home.join("GOG Games/Slot Install");
+    fs::create_dir_all(game_root.join("bin")).unwrap();
+    fs::create_dir_all(game_root.join("content/base")).unwrap();
+    fs::write(game_root.join("bin/game.exe"), "").unwrap();
+    fs::write(game_root.join("goggame-2002.info"), "{}").unwrap();
+
+    let mut game = test_games::slot();
+    game.detect.gog_ids = vec!["2002".into()];
+    let program = game.executables[0].path.clone();
+    game.executables[0].path_linux = Some(program);
+    let folders = crate::platform::StoreFolders {
+        gog_libraries: vec![home.join("GOG Games")],
+        ..crate::platform::StoreFolders::default()
+    };
+    let scans = crate::games::detect::scan_in(&[], std::slice::from_ref(&game), &folders);
+    assert_eq!(
+        scans[0].found.as_ref().map(|found| found.store.as_str()),
+        Some("gog")
+    );
+
+    let data = Data::new(base.join("data"));
+    add_game(&data, SLOT_GAME, &game_root.display().to_string()).unwrap();
+    assert_eq!(load_settings(&data.game(SLOT_GAME)).source, "gog");
+    fs::create_dir_all(base.join("settings")).unwrap();
+    save_settings(
+        &data,
+        SLOT_GAME,
+        Settings {
+            settings_dir: base.join("settings").display().to_string(),
+            ..load_settings(&data.game(SLOT_GAME))
+        },
+    )
+    .unwrap();
+
+    let zip =
+        crate::test_support::make_zip(&base, "gog-mod.zip", &[("Mods/modA/content/x.ws", "x")]);
+    import(&data, SLOT_GAME, &zip, None, &mut |_, _| {}).unwrap();
+    let rows: Vec<Row> = status(&data, SLOT_GAME)
+        .unwrap()
+        .mods
+        .iter()
+        .map(|view| row(&view.folder, true))
+        .collect();
+    save_profile(&data, SLOT_GAME, &rows).unwrap();
+    apply_deployment(&data, SLOT_GAME).unwrap();
+    assert!(
+        overlay_session_state(&data.game(SLOT_GAME))
+            .unwrap()
+            .is_some()
+    );
+
+    let (launch, with_mods, spawn_error) =
+        launch_command(&game, &data, SLOT_GAME, None, &home).unwrap();
+    assert!(with_mods);
+    assert_eq!(spawn_error, "launch.native_failed");
+    let Launch::Layered { program, .. } = launch else {
+        panic!("a deployed game starts in the overlay layer");
+    };
+    assert_eq!(
+        program,
+        game_root.join("bin/game.exe").display().to_string()
+    );
+}

@@ -17,9 +17,10 @@ use build::PlanOutcome;
 use rustc_hash::{FxHashMap, FxHashSet};
 use views::Status;
 
-/// The command for Steam launch options: starts the game through Gobbo, that is, in the overlay layer.
-pub fn launch_hint(game_id: &str) -> String {
-    if !crate::platform::supports_overlay() {
+/// The command for Steam launch options: starts the game through Gobbo, that is, in the overlay layer. Empty for games
+/// from another store, where Steam launch options do not apply.
+pub fn launch_hint(game_id: &str, source: &str) -> String {
+    if source != "steam" || !crate::platform::supports_overlay() {
         return String::new();
     }
 

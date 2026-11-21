@@ -39,6 +39,7 @@ export interface DetectDraft {
 	heroic_slugs?: string[];
 	lutris_slugs?: string[];
 	markers?: string[];
+	linux_markers?: string[];
 	any_marker?: boolean;
 }
 
@@ -342,7 +343,7 @@ function cleanDetect(detect: DetectDraft): Record<string, unknown> {
 
 	if (appIds.length > 0) out.steam_app_ids = appIds;
 
-	for (const key of ["steam_install_dirs", "gog_ids", "epic_ids", "heroic_slugs", "lutris_slugs", "markers"] as const) {
+	for (const key of ["steam_install_dirs", "gog_ids", "epic_ids", "heroic_slugs", "lutris_slugs", "markers", "linux_markers"] as const) {
 		const values = cleanLines(detect[key]);
 
 		if (values) out[key] = values;

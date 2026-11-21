@@ -90,6 +90,14 @@ export function useGameSettings(status: Status, onSave: (patch: Partial<Settings
 		if (picked) void setProtonBuild(picked);
 	};
 
+	const setPrefix = (folder: string) => saveNow({ prefix_dir: folder });
+
+	const pickPrefix = async () => {
+		const picked = await pickFolder();
+
+		if (picked) void setPrefix(picked);
+	};
+
 	const profileData = status.settings.profile_data ?? [];
 
 	const addProfileData = async (directory: boolean) => {
@@ -115,6 +123,9 @@ export function useGameSettings(status: Status, onSave: (patch: Partial<Settings
 		protonDir: status.settings.proton_dir ?? "",
 		setProtonBuild,
 		pickProton,
+		prefixDir: status.settings.prefix_dir ?? "",
+		pickPrefix,
+		resetPrefix: () => setPrefix(""),
 		protonOptions,
 		toggleProtonOption,
 		protonFpsLimit: status.settings.proton_fps_limit ?? null,
