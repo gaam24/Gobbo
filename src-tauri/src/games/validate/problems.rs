@@ -12,6 +12,20 @@ impl Problems {
         self.0.push(problem.into());
     }
 
+    /// `min_gobbo`: a release number such as `0.3.0`, no newer than this app. A newer floor refuses the file, so an
+    /// old app never serves a definition that depends on a later fix.
+    pub(super) fn min_gobbo(&mut self, what: &str, min: &str) {
+        let app = env!("CARGO_PKG_VERSION");
+
+        if !is_release_version(min) {
+            self.push(format!(
+                "{what} min_gobbo must be a release number such as 0.3.0: {min:?}"
+            ));
+        } else if crate::domain::version::compare(min, app) == std::cmp::Ordering::Greater {
+            self.push(format!("{what} needs Gobbo {min} or newer; this is {app}"));
+        }
+    }
+
     /// Every path must be relative and stay inside the game (or the mod): no drive, no leading `/`, no `..`.
     pub(super) fn relative<'a>(&mut self, what: &str, paths: impl IntoIterator<Item = &'a String>) {
         for path in paths {
@@ -97,4 +111,13 @@ pub(super) fn is_sha512(text: &str) -> bool {
         && text
             .bytes()
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+}
+
+/// A release number: three dot-separated groups of digits, such as `0.3.0`.
+pub(in crate::games) fn is_release_version(version: &str) -> bool {
+    let parts: Vec<&str> = version.split('.').collect();
+    parts.len() == 3
+        && parts
+            .iter()
+            .all(|part| !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_digit()))
 }

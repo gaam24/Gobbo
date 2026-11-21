@@ -32,6 +32,7 @@
 		"bench:list": "bun scripts/bench-list.ts",
 		"icons": "bun scripts/icons.ts",
 		"icons:check": "bun scripts/icons.ts --check",
+		"catalog": "bun scripts/catalog-manifest.ts",
 		"deadcode": "knip",
 		"check:rust": "cd src-tauri && cargo fmt --all --check && cargo clippy --workspace --all-targets --locked -- -D warnings && cargo test --workspace --features bench --locked",
 		"prepare": "lefthook install",

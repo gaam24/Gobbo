@@ -32,6 +32,11 @@ describe("the game definition draft", () => {
 		expect(text).not.toContain('prefix = ""');
 	});
 
+	test("an app version floor survives a round trip through the editor", () => {
+		const text = 'schema = 1\nid = "example"\nname = "Example"\nmin_gobbo = "0.3.0"\n[detect]\n[deploy]\n';
+		expect(serializeDraft(parseDraft(text))).toContain('min_gobbo = "0.3.0"');
+	});
+
 	test("a loader string and a named variant round-trip", () => {
 		const base = { ...EMPTY_DRAFT, id: "unity", name: "Unity" };
 		expect(serializeDraft(setLoader(base, "bepinex", ""))).toContain('loader = "bepinex"');

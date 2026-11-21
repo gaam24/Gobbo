@@ -46,6 +46,7 @@ pub fn run() {
     crate::infra::log::init(&storage.root);
     crate::infra::log::install_panic_hook();
     crate::games::set_user_definition_dirs(storage.root.clone());
+    crate::games::set_catalog_definition_dirs(storage.root.clone());
     crate::infra::log::info(format!(
         "Gobbo {} starting in {}",
         env!("CARGO_PKG_VERSION"),
@@ -128,6 +129,8 @@ pub fn run() {
                     .unwrap_or_else(|| resources.join("loaders"));
                 games::set_definition_dirs(games, loaders);
             }
+
+            games::drop_stale_catalog();
 
             let dir = app.path().app_data_dir()?;
             let data = match crate::context::open(dir.clone(), &crate::providers::archive_name_from)

@@ -22,6 +22,7 @@ mod layout;
 mod loaders;
 pub mod paths;
 pub mod proxy;
+mod remote;
 pub mod steam;
 mod stores;
 mod validate;
@@ -52,7 +53,12 @@ pub use view::GameView;
 
 pub use catalog::{GameCatalog, GameOrigin, catalog, definitions, export, icon};
 #[cfg(test)]
-pub use catalog::{definitions_from, icon_file, write_export};
+pub use catalog::{definitions_from, icon_file, icon_file_from, write_export};
+
+pub use remote::{
+    CatalogInstallOutcome, CatalogInstallStep, CatalogStatus, check_catalog, drop_stale_catalog,
+    install_catalog,
+};
 
 pub use crate::domain::deploy::{Deploy, Mirror, Slot};
 pub use crate::domain::mod_steps::Phase;
@@ -119,6 +125,9 @@ impl LoadOrder {
 static DEFINITION_DIRS: OnceLock<DefinitionDirs> = OnceLock::new();
 /// The user's own definitions under `<data>/definitions`. Kept apart from the bundled folders and set once at start.
 static USER_DEFINITIONS: OnceLock<PathBuf> = OnceLock::new();
+/// The official definitions downloaded into `<data>/catalog`. The same category of process-wide definition-folder
+/// state as `USER_DEFINITIONS`, kept apart from the bundled folders and set once at start.
+static CATALOG_DEFINITIONS: OnceLock<PathBuf> = OnceLock::new();
 /// Parsed definitions by path, keyed by length and modification time. The cache keeps one shared `Arc` per unchanged
 /// `game.toml`, so the hot read paths hand the same value to every caller.
 static DEFINITIONS: OnceLock<crate::infra::file_cache::FileCache<GameDef>> = OnceLock::new();
@@ -145,6 +154,13 @@ pub fn set_user_definition_dirs(data_root: PathBuf) {
     let _ = USER_DEFINITIONS.set(data_root.join("definitions"));
 }
 
+/// Sets the root of the official downloaded definitions: `<data>/catalog`, with `games/` and `loaders/` below it.
+/// Ignored when it was already set. When the app never sets a data root, the catalog folders are absent and the
+/// layering degrades to bundled and user definitions only.
+pub fn set_catalog_definition_dirs(data_root: PathBuf) {
+    let _ = CATALOG_DEFINITIONS.set(data_root.join("catalog"));
+}
+
 /// The folder with user game definitions, when the app has set its data root.
 pub fn user_games_dir() -> Option<PathBuf> {
     USER_DEFINITIONS.get().map(|root| root.join("games"))
@@ -153,6 +169,16 @@ pub fn user_games_dir() -> Option<PathBuf> {
 /// The folder with user loader presets, when the app has set its data root.
 fn user_loaders_dir() -> Option<PathBuf> {
     USER_DEFINITIONS.get().map(|root| root.join("loaders"))
+}
+
+/// The folder with official game definitions, when the app has set its data root.
+pub fn catalog_games_dir() -> Option<PathBuf> {
+    CATALOG_DEFINITIONS.get().map(|root| root.join("games"))
+}
+
+/// The folder with official loader presets, when the app has set its data root.
+fn catalog_loaders_dir() -> Option<PathBuf> {
+    CATALOG_DEFINITIONS.get().map(|root| root.join("loaders"))
 }
 
 /// The folder with game definitions: the bundled resource folder, or the repository folder in development.
@@ -194,21 +220,38 @@ pub fn forget_all_definitions() {
     }
 }
 
-/// The `game.toml` of one game by id. An id that cannot name a game folder gives an empty path.
+/// The `game.toml` of one game by id. An id that cannot name a game folder gives an empty path. A user definition wins
+/// over an official one, which wins over the bundled file.
 pub fn definition_path(id: &str) -> PathBuf {
+    definition_path_from(
+        user_games_dir().as_deref(),
+        catalog_games_dir().as_deref(),
+        games_dir(),
+        id,
+    )
+}
+
+/// The effective `game.toml` of one game, searching the explicit folders in user, official, bundled order. A caller
+/// that passes its own folders reads the same precedence without depending on the process-wide data root.
+fn definition_path_from(
+    user: Option<&Path>,
+    catalog: Option<&Path>,
+    bundled: &Path,
+    id: &str,
+) -> PathBuf {
     if !is_valid_id(id) {
         return PathBuf::new();
     }
 
-    if let Some(user) = user_games_dir() {
-        let path = user.join(id).join("game.toml");
+    for dir in [user, catalog].into_iter().flatten() {
+        let path = dir.join(id).join("game.toml");
 
         if path.is_file() {
             return path;
         }
     }
 
-    games_dir().join(id).join("game.toml")
+    bundled.join(id).join("game.toml")
 }
 
 /// Loads the definition of one game by id, for example `the-witcher-3-wild-hunt`. Its loader preset is merged first and
@@ -289,8 +332,36 @@ pub fn load_dir(dir: &Path) -> Result<Vec<GameDef>, AppError> {
     Ok(games)
 }
 
-/// Reads one `game.toml`, merges its loader preset and checks the result. Every problem is reported in one error.
+/// Reads one `game.toml`, merges its loader preset and checks the result. Every problem is reported in one error. The
+/// loader folders are searched in user, official, bundled order, so a user preset still wins over an official one.
 fn read_definition(path: &Path, loaders_dir: &Path) -> Result<GameDef, AppError> {
+    let dirs = loader_dirs(
+        user_loaders_dir().as_deref(),
+        catalog_loaders_dir().as_deref(),
+        loaders_dir,
+    );
+    read_definition_with(path, &dirs)
+}
+
+/// The loader folders in precedence order: user, official catalog, bundled.
+fn loader_dirs(user: Option<&Path>, catalog: Option<&Path>, bundled: &Path) -> Vec<PathBuf> {
+    let mut dirs = Vec::with_capacity(3);
+
+    if let Some(user) = user {
+        dirs.push(user.to_path_buf());
+    }
+
+    if let Some(catalog) = catalog {
+        dirs.push(catalog.to_path_buf());
+    }
+
+    dirs.push(bundled.to_path_buf());
+    dirs
+}
+
+/// Reads one definition with an explicit set of loader folders. The caller owns the precedence, so a test can pass
+/// scratch folders without touching the process-wide definition roots.
+fn read_definition_with(path: &Path, loader_dirs: &[PathBuf]) -> Result<GameDef, AppError> {
     let text = std::fs::read_to_string(path).map_err(io_at(path))?;
     let mut game = GameDef::parse(&text).map_err(|e| invalid_definition(path, e))?;
     // A merge replaces an entry with the same key, so it would hide a duplicate that is already in this file.
@@ -300,14 +371,7 @@ fn read_definition(path: &Path, loaders_dir: &Path) -> Result<GameDef, AppError>
         return Err(invalid_definition(path, duplicates.join("; ")));
     }
 
-    let mut loader_dirs = Vec::with_capacity(2);
-
-    if let Some(user) = user_loaders_dir() {
-        loader_dirs.push(user);
-    }
-
-    loader_dirs.push(loaders_dir.to_path_buf());
-    loaders::apply(&mut game, &loader_dirs).map_err(|detail| invalid_definition(path, detail))?;
+    loaders::apply(&mut game, loader_dirs).map_err(|detail| invalid_definition(path, detail))?;
     let problems = game.validate();
 
     if problems.is_empty() {

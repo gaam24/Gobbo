@@ -6,6 +6,8 @@ export interface GameDraft {
 	schema: number;
 	id: string;
 	name: string;
+	/// Not in the form: kept so saving a definition from the editor does not drop its app version floor.
+	min_gobbo?: string;
 	verified?: VerifiedDraft;
 	providers?: Record<string, { key?: string }>;
 	loader?: string | { id: string; variant?: string };
@@ -282,6 +284,9 @@ function cleanDraft(draft: GameDraft): Record<string, unknown> {
 		}
 	}
 
+	const minGobbo = draft.min_gobbo?.trim();
+
+	if (minGobbo) out.min_gobbo = minGobbo;
 	if (draft.verified?.date) out.verified = cleanVerified(draft.verified);
 	const providers = entriesWith(draft.providers, (entry) => (entry.key ?? "").trim() !== "");
 

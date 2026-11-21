@@ -971,6 +971,7 @@ const en = {
 	},
 	games: {
 		userDefinition: "User definition",
+		catalogOrigin: "From the catalog",
 		bundledDefinition: "Bundled definition",
 		verified: "Verified",
 		unverified: "Unverified",
@@ -1036,6 +1037,28 @@ const en = {
 			body: "Your mods, archives and profiles stay on disk in the game's data folder. You can bring them back from the Storage page or by adding the game again.",
 		},
 	},
+	catalog: {
+		banner: "Definition updates: {{changed}} · New games: {{available}}",
+		open: "Review game definitions",
+		checkNow: "Check for new game definitions",
+		upToDate: "Game definitions are up to date.",
+		title: "Game definitions",
+		hint: "New and updated definitions from the official catalog. Pick the ones to download.",
+		tab: {
+			updates: "Updates",
+			available: "Available games",
+		},
+		select: "Select {{name}}",
+		loader: "Loader: {{loader}}",
+		requiresVersion: "Requires Gobbo {{version}}",
+		requiresNewer: "Requires a newer Gobbo",
+		download: "Download selected",
+		downloading: "Downloading definitions…",
+		installing: "Installing definitions…",
+		emptyUpdates: "No updated definitions.",
+		emptyAvailable: "No new games in the catalog.",
+		failedTitle: "Some definitions couldn't be installed",
+	},
 	editor: {
 		loading: "Loading the definition…",
 		loadFailed: "Couldn't open the definition",
@@ -1100,7 +1123,7 @@ const en = {
 			id: "Id",
 			idHint: "The folder name under the user definitions. Lowercase letters, digits and dashes.",
 			idStable: "The id can't change after the first save; make a copy if you need a different one.",
-			idBundled: "A built-in game already uses this id. Pick another one.",
+			idBundled: "A built-in or downloaded game already uses this id. Pick another one.",
 			idTaken: "One of your definitions already uses this id. Pick another one, or edit that game instead.",
 			modsTitle: "How mods get in",
 			modsHint: "Pick how the game loads mods. Everything else is in the advanced form.",
@@ -1500,6 +1523,11 @@ const en = {
 			title: "Check collection versions",
 			toggle: "Check when a game opens",
 			hint: "Checks each mod site for the newest revision of the active profile's collections. You can also check any time from the collection menu.",
+		},
+		catalog: {
+			title: "Check game definitions on launch",
+			toggle: "Check for new game definitions when the app starts",
+			hint: "Reads the official catalog once at startup and offers new or updated game definitions on the Games page.",
 		},
 		efficiency: {
 			label: "Efficiency mode",
@@ -2519,6 +2547,13 @@ const en = {
 		archive: {
 			too_many_entries: "The archive has {{count}} entries, but Gobbo only accepts up to {{limit}}.",
 			too_large: "The archive unpacks to {{bytes}} bytes, but Gobbo only accepts up to {{limit}}.",
+		},
+		catalog: {
+			fetch: "Couldn't read the game catalog: {{detail}}",
+			unsupported: "The game catalog needs a newer version of Gobbo.",
+			unknown: "The catalog doesn't list this game.",
+			changed: "The catalog changed during the download.",
+			invalid: "The downloaded game definition isn't valid.",
 		},
 		history: {
 			nothing: "There's nothing to undo or redo.",

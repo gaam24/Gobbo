@@ -10,7 +10,7 @@ use std::collections::BTreeSet;
 use problems::{Problems, is_provider_key, is_variant};
 
 use crate::domain::pathkey;
-use crate::games::definition::GameDef;
+use crate::games::definition::{GameDef, SUPPORTED_SCHEMA};
 use gobbo_overlay_core::MountSpec;
 
 pub(in crate::games) use loader::duplicate_problems;
@@ -33,8 +33,12 @@ impl GameDef {
     }
 
     fn check_identity(&self, problems: &mut Problems) {
-        if self.schema != 1 {
+        if self.schema == 0 || self.schema > SUPPORTED_SCHEMA {
             problems.push(format!("unknown schema version: {}", self.schema));
+        }
+
+        if let Some(min) = &self.min_gobbo {
+            problems.min_gobbo("game", min);
         }
 
         if !crate::games::is_valid_id(&self.id) {

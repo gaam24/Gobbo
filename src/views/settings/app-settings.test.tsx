@@ -56,6 +56,8 @@ function settings(registered: boolean) {
 						onEfficiencyMode={nothing}
 						checkCollectionsOnLaunch
 						onCheckCollectionsOnLaunch={nothing}
+						checkCatalogOnLaunch
+						onCheckCatalogOnLaunch={nothing}
 						dataFolder="/tmp/gobbo"
 						storage={null}
 						onOpenFolder={nothing}
@@ -85,4 +87,11 @@ test("only the selected settings tab is visible", () => {
 	const html = renderToString(settings(true));
 	expect(html).toContain("Remember the window");
 	expect(html).not.toContain("Create support bundle");
+});
+
+test("the catalog check toggle renders next to the collection check", () => {
+	const html = renderToString(settings(true));
+	expect(html).toContain("Check for new game definitions when the app starts");
+	expect(html).toContain('id="check-catalog-on-launch"');
+	expect(html).toContain("Check when a game opens");
 });

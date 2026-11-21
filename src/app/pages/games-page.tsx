@@ -2,6 +2,7 @@ import { Suspense } from "react";
 
 import { useGameEditor } from "@/app/contexts/game-editor-context";
 import { useGames } from "@/app/contexts/games-context";
+import { useSettingsData } from "@/app/contexts/settings-context";
 import { useWorkspace } from "@/app/contexts/workspace-context";
 import { GameEditor, GamesPanel } from "@/app/lazy-views";
 
@@ -23,6 +24,7 @@ export function GamesPage() {
 		checkGameFolder,
 	} = useGames();
 	const { gameActions, openPathFor, copyPath, selectGame } = useWorkspace();
+	const { checkCatalogOnLaunch } = useSettingsData();
 	const { target, closeGameEditor, openGameEditor } = useGameEditor();
 
 	if (target) {
@@ -42,7 +44,8 @@ export function GamesPage() {
 				scanError={scanError}
 				definitionProblems={definitionProblems}
 				catalogError={catalogError}
-				onReload={() => void reloadGames()}
+				checkCatalogOnLaunch={checkCatalogOnLaunch}
+				onReload={() => reloadGames()}
 				scannedAt={scannedAt}
 				scanning={scanning}
 				onScan={scanGames}

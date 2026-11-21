@@ -16,6 +16,8 @@
     "process:allow-restart",
     "allow-list-games",
     "allow-game-icon",
+    "allow-catalog-check",
+    "allow-catalog-install",
     "allow-inspect-game-folder",
     "allow-loader-presets",
     "allow-definition-source",

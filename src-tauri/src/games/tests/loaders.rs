@@ -237,6 +237,18 @@ dir = "Extra"
 }
 
 #[test]
+fn a_loader_for_a_newer_app_is_refused() {
+    let text = LOADER.replacen("name = ", "min_gobbo = \"999.0.0\"\nname = ", 1);
+    let problems = presets::LoaderDef::parse(&text).unwrap().validate();
+    assert!(
+        problems
+            .iter()
+            .any(|problem| problem.contains("loader needs Gobbo 999.0.0")),
+        "{problems:?}"
+    );
+}
+
+#[test]
 fn loader_validation_checks_the_variant_and_the_root() {
     let no_default = LOADER.replacen("default_variant = \"a\"\n", "", 1);
     let problems = presets::LoaderDef::parse(&no_default).unwrap().validate();
@@ -603,6 +615,69 @@ fn a_requirement_path_already_in_requires_is_not_listed_twice() {
         .filter(|path| path.eq_ignore_ascii_case("proxy.dll"))
         .count();
     assert_eq!(proxy, 1, "{:?}", game.requires);
+}
+
+/// A game that names a loader which each folder supplies under the same id, with a different name per folder.
+const PRECEDENCE_GAME: &str = r#"
+schema = 1
+id = "precedence-game"
+name = "Precedence Game"
+loader = "fixture-loader"
+
+[detect]
+markers = ["game.exe"]
+
+[[executables]]
+name = "Game"
+path = "game.exe"
+"#;
+
+fn loader_named(name: &str) -> String {
+    format!(
+        "schema = 1\nid = \"fixture-loader\"\nname = \"{name}\"\n\n[deploy]\n[[deploy.slots]]\ndir = \"Mods\"\n"
+    )
+}
+
+#[test]
+fn a_loader_prefers_user_then_official_then_bundled() {
+    let base = scratch!("loader-precedence");
+    let user = base.join("user");
+    let catalog = base.join("catalog");
+    let bundled = base.join("bundled");
+    write(
+        &user.join("fixture-loader.toml"),
+        &loader_named("User Loader"),
+    );
+    write(
+        &catalog.join("fixture-loader.toml"),
+        &loader_named("Official Loader"),
+    );
+    write(
+        &bundled.join("fixture-loader.toml"),
+        &loader_named("Bundled Loader"),
+    );
+    let game_path = base.join("game.toml");
+    write(&game_path, PRECEDENCE_GAME);
+
+    let resolved = |dirs: Vec<std::path::PathBuf>| {
+        read_definition_with(&game_path, &dirs)
+            .expect("the game loads with any of the presets")
+            .resolved_loader
+            .expect("the game names a loader")
+            .name
+    };
+    assert_eq!(
+        resolved(loader_dirs(Some(&user), Some(&catalog), &bundled)),
+        "User Loader"
+    );
+    assert_eq!(
+        resolved(loader_dirs(None, Some(&catalog), &bundled)),
+        "Official Loader"
+    );
+    assert_eq!(
+        resolved(loader_dirs(None, None, &bundled)),
+        "Bundled Loader"
+    );
 }
 
 #[test]

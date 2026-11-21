@@ -8,7 +8,8 @@
 	},
 	"files": {
 		"ignoreUnknown": true,
-		"includes": ["**", "!node_modules", "!dist", "!public", "!src-tauri", "!src/bindings.ts", "!**/*.md"]
+		// catalog.json is generated and byte-compared by the guard; reformatting it would make every run look stale.
+		"includes": ["**", "!node_modules", "!dist", "!public", "!src-tauri", "!src/bindings.ts", "!catalog.json", "!**/*.md"]
 	},
 	"assist": {
 		"enabled": true,
@@ -27,6 +28,8 @@
 		"formatWithErrors": false
 	},
 	"javascript": {
+		// Repository scripts use Bun's native APIs (for example Bun.CryptoHasher) without importing them.
+		"globals": ["Bun"],
 		"formatter": {
 			"quoteStyle": "double",
 			"jsxQuoteStyle": "double",

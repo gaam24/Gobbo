@@ -21,12 +21,20 @@ use crate::domain::deploy::Deploy;
 use crate::domain::mod_steps::Phase;
 use crate::domain::user_data::Isolation;
 
+/// The newest `game.toml` schema this app's parser understands. A definition with a higher schema is refused, and the
+/// catalog blocks it until the app is updated, so an older app never tries to read a file it cannot interpret.
+pub const SUPPORTED_SCHEMA: u32 = 1;
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct GameDef {
     pub schema: u32,
     pub id: String,
     pub name: String,
+    /// The oldest Gobbo release that serves this definition correctly, such as `"0.3.0"`. Set it when the file
+    /// depends on a fix or a feature an older app lacks even though it would still parse there.
+    #[serde(default)]
+    pub min_gobbo: Option<String>,
     /// A real installation was tested: the date, the systems and the versions. Absent on a game that is not verified.
     #[serde(default)]
     pub verified: Option<Verified>,

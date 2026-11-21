@@ -83,6 +83,11 @@ export function GameRow({
 							{t("games.userDefinition")}
 						</Badge>
 					)}
+					{game.origin === "official" && (
+						<Badge variant="outline" className="shrink-0">
+							{t("games.catalogOrigin")}
+						</Badge>
+					)}
 					{game.verified ? (
 						<span className="shrink-0" title={verifiedHint(t, game.verified)}>
 							<StatusBadge tone="success">{t("games.verified")}</StatusBadge>

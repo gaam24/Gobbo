@@ -73,6 +73,9 @@ first form keeps its path.
 The file name must match `id`. The id is a slug: lowercase letters, digits and `-`. `name` is the display name the
 interface shows, for example `BepInEx`. A variant name is lowercase letters, digits, `-`, `_` or `.`.
 
+`min_gobbo = "0.3.0"` names the oldest Gobbo release that serves the preset correctly, as in `game.toml`; every game
+that names the preset inherits it.
+
 `default_variant` is required when the preset has variants, so `loader = "id"` always means one version. It is an error
 to name a default when there are no variants.
 
@@ -157,8 +160,10 @@ in Rust.
 - One loader per game. A preset may contain several slots and mirrors, so it can describe more than one layout.
 - No auto-detection of the installed loader version. The game definition chooses the variant; the definition editor
   suggests a variant when it finds the preset's files in the game folder.
-- A user loader lives in `<data>/definitions/loaders/<id>.toml` and wins over a bundled preset with the same id. The
-  definition editor lists both. Shipped loaders stay read-only.
+- A user loader lives in `<data>/definitions/loaders/<id>.toml` and wins over a bundled or catalog-downloaded preset
+  with the same id. The definition editor lists all three. Shipped and downloaded loaders stay read-only.
+- A preset ships in the definition catalog with the games: an install brings the loader a game names when it is
+  missing locally or out of date. See the catalog section in [games/README.md](../games/README.md).
 - An exported game definition includes the user loader it names under `loaders/`. Importing the package installs both,
   so a shared game works even when the receiver does not have that loader yet.
 - Editing a loader in a development build needs an app restart, because the game definition cache is keyed by

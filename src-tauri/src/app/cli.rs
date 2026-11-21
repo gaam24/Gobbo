@@ -45,8 +45,10 @@ fn run_command(args: &[String]) -> Result<i32, AppError> {
 
     let root = storage::root_for_cli()?;
     crate::games::set_user_definition_dirs(root.clone());
+    crate::games::set_catalog_definition_dirs(root.clone());
     crate::infra::log::init(&root);
     crate::infra::log::install_panic_hook();
+    crate::games::drop_stale_catalog();
     crate::infra::log::info(format!(
         "Gobbo {} run starting in {}",
         env!("CARGO_PKG_VERSION"),

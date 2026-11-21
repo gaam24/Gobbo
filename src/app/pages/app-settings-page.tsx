@@ -19,6 +19,7 @@ export function AppSettingsPage() {
 		minimizeToTray,
 		efficiencyMode,
 		checkCollectionsOnLaunch,
+		checkCatalogOnLaunch,
 	} = useSettingsData();
 	const {
 		saveLanguage,
@@ -29,6 +30,7 @@ export function AppSettingsPage() {
 		saveMinimizeToTray,
 		saveEfficiencyMode,
 		saveCheckCollectionsOnLaunch,
+		saveCheckCatalogOnLaunch,
 		refreshSourceLinks,
 		ensureSourceLinks,
 	} = useSettingsActions();
@@ -67,6 +69,8 @@ export function AppSettingsPage() {
 				onEfficiencyMode={saveEfficiencyMode}
 				checkCollectionsOnLaunch={checkCollectionsOnLaunch}
 				onCheckCollectionsOnLaunch={saveCheckCollectionsOnLaunch}
+				checkCatalogOnLaunch={checkCatalogOnLaunch}
+				onCheckCatalogOnLaunch={saveCheckCatalogOnLaunch}
 				dataFolder={dataFolder}
 				storage={storage}
 				onOpenFolder={openFolderPath}

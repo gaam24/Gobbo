@@ -129,6 +129,7 @@ Unknown keys are errors. Paths are relative to the game folder (or to the deploy
 | `schema`       | `1`.                                                                                                                                                                     |
 | `id`           | Lowercase letters, digits and `-`; the folder name.                                                                                                                      |
 | `name`         | The name shown to the user.                                                                                                                                              |
+| `min_gobbo`    | The oldest Gobbo release that serves this file correctly, such as `"0.3.0"`. Optional; see the catalog section.                                                          |
 | `providers`    | Tables per external provider the game is on, for example `[providers.nexus]`. A provider without an entry is not offered.                                                |
 | `loader`       | A shared preset from `loaders/<id>.toml`: a string for its default variant, or `{ id = "...", variant = "..." }`.                                                        |
 | `requires`     | Files the game needs before mods work, with no display name or page. A mod can provide them. Requirement paths are required too.                                         |
@@ -371,9 +372,10 @@ A definition can also live outside the repository, in the data folder:
 - `<data>/definitions/games/<id>/game.toml`, with an optional `icon.webp` or `icon.png`;
 - `<data>/definitions/loaders/<id>.toml` for a loader preset.
 
-A user loader with the same id as a bundled preset wins, so a user can test a new loader version without rebuilding
-Gobbo. A user game with the id of a bundled game is refused: the Games page names the file and keeps the bundled game.
-The same page reports an invalid file with its path; the rest of the catalog still loads. The folder is read whenever
+A user loader with the same id as a bundled or downloaded preset wins, so a user can test a new loader version
+without rebuilding Gobbo. A user game with the id of a bundled or downloaded game is refused: the Games page names
+the file and keeps the bundled or downloaded one. The same page reports an invalid file with its path; the rest of
+the catalog still loads. The folder is read whenever
 the Games page opens, so a new or edited definition needs no restart. **Games → Add your own game** writes this folder
 for the user; a definition created there can be edited again from the Games page or from the game settings. The editor
 shows the same loader presets as a hand-written file and can dry-run a draft against a mod archive with the import
@@ -396,3 +398,29 @@ definition without the table shows no badge. The table describes a real test; do
 and any user loader the game names into one zip. Another Gobbo imports it with **Games → Import definition**, or by
 dropping the zip on the window. The import preview shows the game, its loader, the files and any definition it would
 replace before anything is written.
+
+## The definition catalog
+
+`catalog.json` at the repository root is the distribution file the app fetches: every shipped game and loader with
+its SHA-256, ready for a Gobbo to download without an app release. It is generated, committed and guarded like
+`src/bindings.ts`: `bun run catalog` rebuilds it from the folders, and `bun run guard` fails when a change under
+`games/` or `loaders/` ships without regenerating it, so a definition change carries its catalog entry in the same PR.
+
+The app reads the catalog once per launch, the first time the Games page opens, and compares each entry's checksum
+with the local file. An install downloads only the picked ids — `game.toml`, the icon, and the loader preset a game
+names when that loader is missing locally or out of date — verifies every checksum, validates the merged definition
+in a throwaway folder and only then moves the files into `<data>/catalog/`, the loader before the game. A checksum
+mismatch fails that id with a retryable error: GitHub may serve a newer file than its cached catalog for a few
+minutes.
+
+A definition that needs a newer Gobbo says so with `min_gobbo = "0.3.0"`, the release that first serves it correctly.
+Set it when the file depends on a fix or a feature an older app lacks, also when an older app would still parse it: a
+fix in the code does not change the file, so nothing else can tell. A loader preset takes the same key, and a game
+inherits the higher floor of itself and its loader. An app older than the floor refuses the file with the version it
+needs, and the catalog lists the entry as needing that Gobbo version without offering it. The game the user already
+has keeps its current definition until they update. The `schema` key stays the gate for a change in the file format.
+
+A downloaded definition is read-only like a bundled one and shadows the bundled file with the same id. After an app
+update, the first start removes the downloaded copies that the new version ships itself, so a stale download never
+hides a newer bundled file; the next check offers the repository version again if it differs. A downloaded
+definition with no bundled counterpart stays installed, also when the repository drops it.

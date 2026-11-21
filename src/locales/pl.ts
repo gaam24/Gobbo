@@ -1049,6 +1049,7 @@ const pl = {
 	},
 	games: {
 		userDefinition: "Definicja użytkownika",
+		catalogOrigin: "Z katalogu",
 		bundledDefinition: "Definicja dołączona",
 		verified: "Sprawdzona",
 		unverified: "Niesprawdzona",
@@ -1113,6 +1114,28 @@ const pl = {
 			title: "Usunąć {{name}} z Gobbo?",
 			body: "Biblioteka modów, archiwa i profile zostają na dysku, w folderze danych gry. Przywrócisz je na stronie „Miejsce na dysku” albo dodając grę jeszcze raz.",
 		},
+	},
+	catalog: {
+		banner: "Aktualizacje definicji: {{changed}} · Nowe gry: {{available}}",
+		open: "Przejrzyj definicje gier",
+		checkNow: "Sprawdź nowe definicje gier",
+		upToDate: "Definicje gier są aktualne.",
+		title: "Definicje gier",
+		hint: "Nowe i zaktualizowane definicje z oficjalnego katalogu. Wybierz te, które chcesz pobrać.",
+		tab: {
+			updates: "Aktualizacje",
+			available: "Dostępne gry",
+		},
+		select: "Wybierz {{name}}",
+		loader: "Loader: {{loader}}",
+		requiresVersion: "Wymaga Gobbo {{version}}",
+		requiresNewer: "Wymaga nowszej wersji Gobbo",
+		download: "Pobierz wybrane",
+		downloading: "Pobieranie definicji…",
+		installing: "Instalowanie definicji…",
+		emptyUpdates: "Brak zaktualizowanych definicji.",
+		emptyAvailable: "W katalogu nie ma nowych gier.",
+		failedTitle: "Nie udało się zainstalować części definicji",
 	},
 	editor: {
 		loading: "Wczytywanie definicji…",
@@ -1180,7 +1203,7 @@ const pl = {
 			id: "Id",
 			idHint: "Nazwa folderu w definicjach użytkownika. Małe litery, cyfry i myślniki.",
 			idStable: "Id nie zmienia się po pierwszym zapisie; żeby je zmienić, utwórz kopię.",
-			idBundled: "To id należy do dołączonej gry. Wybierz inne.",
+			idBundled: "Dołączona lub pobrana gra już używa tego id. Wybierz inne.",
 			idTaken: "Definicja użytkownika z tym id już istnieje. Wybierz inne id albo edytuj tę grę.",
 			modsTitle: "Jak mody trafiają do gry",
 			modsHint: "Wybierz, jak gra wczytuje mody. Pozostałe pola są niżej, w sekcji zaawansowanej.",
@@ -1588,6 +1611,11 @@ const pl = {
 			title: "Sprawdzanie wersji kolekcji",
 			toggle: "Sprawdzaj przy otwarciu gry",
 			hint: "Gobbo pyta każdego dostawcę o najnowszą rewizję kolekcji w aktywnym profilu. Możesz też sprawdzić to w każdej chwili z menu kolekcji.",
+		},
+		catalog: {
+			title: "Sprawdzanie definicji gier przy starcie",
+			toggle: "Sprawdzaj nowe definicje gier przy uruchomieniu aplikacji",
+			hint: "Przy starcie Gobbo czyta oficjalny katalog i pokazuje nowe lub zaktualizowane definicje gier na stronie „Gry”.",
 		},
 		efficiency: {
 			label: "Tryb efektywności",
@@ -2630,6 +2658,13 @@ const pl = {
 		archive: {
 			too_many_entries: "Archiwum ma {{count}} pozycji, a Gobbo przyjmuje najwyżej {{limit}}.",
 			too_large: "Po rozpakowaniu archiwum zajmie {{bytes}} bajtów, a Gobbo przyjmuje najwyżej {{limit}}.",
+		},
+		catalog: {
+			fetch: "Nie udało się odczytać katalogu gier: {{detail}}",
+			unsupported: "Katalog gier wymaga nowszej wersji Gobbo.",
+			unknown: "Katalog nie zawiera tej gry.",
+			changed: "Katalog zmienił się w trakcie pobierania.",
+			invalid: "Pobrana definicja gry jest nieprawidłowa.",
 		},
 		history: {
 			nothing: "Nie ma czego cofnąć ani ponowić.",

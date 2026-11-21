@@ -18,6 +18,7 @@
 | `src-tauri/crates/overlay-hook/`      | Windows DLL loaded into the game; hooks file APIs. May use `unsafe`.                                           |
 | `games/`                              | One folder per supported game with `game.toml` (data only; no branches on a game id).                          |
 | `loaders/`                            | Shared loader presets in `<id>.toml` (data only; no branches on a loader id).                                  |
-| `scripts/`                            | Build/package scripts, the overlay hook DLL, and the release measurement script.                               |
+| `catalog.json`                        | The generated catalog the app fetches: every game and loader with its checksum.                                 |
+| `scripts/`                            | Build/package scripts, the catalog generator, the overlay hook DLL, and the release measurement script.        |
 | `.agents/`                            | The procedural layer: a few focused skills. Rules stay in the AGENTS pyramid.                                  |
 | `plans/`                              | Local, git-ignored plans and roadmaps.                                                                         |

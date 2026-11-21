@@ -6,8 +6,8 @@ use std::path::{Path, PathBuf};
 
 use super::super::definition::GameDef;
 use super::super::{
-    GameOrigin, games_dir, invalid_user_definition, is_valid_id, loaders_dir, user_games_dir,
-    user_loaders_dir,
+    GameOrigin, catalog_games_dir, catalog_loaders_dir, games_dir, invalid_user_definition,
+    is_valid_id, loaders_dir, user_games_dir, user_loaders_dir,
 };
 use super::{
     DefinitionCheck, DefinitionProblemView, DefinitionSource, DefinitionSummary, ExecutableSummary,
@@ -21,12 +21,16 @@ pub fn check(text: &str) -> DefinitionCheck {
     check_with(text, &loader_dirs())
 }
 
-/// The folders searched for loader presets: the user's first, the bundled folder second.
+/// The folders searched for loader presets: the user's first, the official catalog second, the bundled folder last.
 fn loader_dirs() -> Vec<PathBuf> {
-    let mut dirs = Vec::with_capacity(2);
+    let mut dirs = Vec::with_capacity(3);
 
     if let Some(user) = user_loaders_dir() {
         dirs.push(user);
+    }
+
+    if let Some(catalog) = catalog_loaders_dir() {
+        dirs.push(catalog);
     }
 
     dirs.push(loaders_dir().to_path_buf());
@@ -148,14 +152,20 @@ fn invalid_error(check: &DefinitionCheck) -> AppError {
     invalid_user_definition(detail).with("id", &check.id)
 }
 
-/// Reads a definition for the editor. A user definition wins over a bundled one with the same id, exactly as it does
-/// when the catalog loads.
+/// Reads a definition for the editor. A user definition wins over an official one, which wins over a bundled file,
+/// exactly as it does when the catalog loads.
 pub fn source(id: &str) -> Result<DefinitionSource, AppError> {
-    source_from(user_games_dir().as_deref(), games_dir(), id)
+    source_from(
+        user_games_dir().as_deref(),
+        catalog_games_dir().as_deref(),
+        games_dir(),
+        id,
+    )
 }
 
 pub(super) fn source_from(
     user: Option<&Path>,
+    catalog: Option<&Path>,
     shipped: &Path,
     id: &str,
 ) -> Result<DefinitionSource, AppError> {
@@ -164,8 +174,10 @@ pub(super) fn source_from(
     }
 
     let user_path = user.map(|dir| dir.join(id).join("game.toml"));
-    let (path, origin) = match user_path {
-        Some(path) if path.is_file() => (path, GameOrigin::User),
+    let catalog_path = catalog.map(|dir| dir.join(id).join("game.toml"));
+    let (path, origin) = match (user_path, catalog_path) {
+        (Some(path), _) if path.is_file() => (path, GameOrigin::User),
+        (_, Some(path)) if path.is_file() => (path, GameOrigin::Official),
         _ => (shipped.join(id).join("game.toml"), GameOrigin::Bundled),
     };
 
@@ -181,16 +193,24 @@ pub(super) fn source_from(
     })
 }
 
-/// Writes a definition into the user folder. Invalid text is refused before anything is written. A bundled game may
-/// not be replaced; a user game is replaced only when `overwrite` is set.
+/// Writes a definition into the user folder. Invalid text is refused before anything is written. A bundled or official
+/// game may not be replaced; a user game is replaced only when `overwrite` is set.
 pub fn save(text: &str, overwrite: bool) -> Result<SavedDefinition, AppError> {
     let user = user_games_dir()
         .ok_or_else(|| AppError::new("games.user_definitions_unavailable").kind(ErrorKind::Bug))?;
-    save_to(&user, games_dir(), &loader_dirs(), text, overwrite)
+    save_to(
+        &user,
+        catalog_games_dir().as_deref(),
+        games_dir(),
+        &loader_dirs(),
+        text,
+        overwrite,
+    )
 }
 
 pub(super) fn save_to(
     user: &Path,
+    catalog: Option<&Path>,
     shipped: &Path,
     loader_dirs: &[PathBuf],
     text: &str,
@@ -211,7 +231,10 @@ pub(super) fn save_to(
         )));
     }
 
-    if shipped.join(&game.id).join("game.toml").is_file() {
+    let bundled = shipped.join(&game.id).join("game.toml").is_file();
+    let official = catalog.is_some_and(|dir| dir.join(&game.id).join("game.toml").is_file());
+
+    if bundled || official {
         return Err(AppError::user("games.definition_bundled").with("id", &game.id));
     }
 

@@ -1,22 +1,28 @@
-//! The loader presets the editor offers. The user's files are read first, so a user preset replaces a bundled one with
-//! the same id. An invalid file stays in the list with its problems: the window names it, and the rest still works.
+//! The loader presets the editor offers: the user's files first, then the official catalog, then the bundled folder.
+//! A preset in an earlier folder replaces the same id in a later one. An invalid file stays in the list with its
+//! problems: the window names it, and the rest still works.
 
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::PathBuf;
 
 use super::super::loaders::{LoaderDef, LoaderRules, with_requirement_paths};
-use super::super::{GameOrigin, loaders_dir, user_loaders_dir};
+use super::super::{GameOrigin, catalog_loaders_dir, loaders_dir, user_loaders_dir};
 use super::{LoaderPresetView, LoaderVariantView};
 use crate::domain::deploy::Deploy;
 
-/// The loader presets the editor offers, user presets first. An invalid file is returned with its problems instead of
-/// hiding the rest, so the window can name the file the user needs to fix.
+/// The loader presets the editor offers: the user's first, the official catalog second, the bundled folder last. A
+/// preset in an earlier folder replaces the same id in a later one. An invalid file is returned with its problems
+/// instead of hiding the rest, so the window can name the file the user needs to fix.
 pub fn loader_presets() -> Vec<LoaderPresetView> {
-    let mut dirs = Vec::with_capacity(2);
+    let mut dirs = Vec::with_capacity(3);
 
     if let Some(user) = user_loaders_dir() {
         dirs.push((user, GameOrigin::User));
+    }
+
+    if let Some(catalog) = catalog_loaders_dir() {
+        dirs.push((catalog, GameOrigin::Official));
     }
 
     dirs.push((loaders_dir().to_path_buf(), GameOrigin::Bundled));

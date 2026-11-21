@@ -18,6 +18,7 @@ import { LanguageSettings } from "@/views/settings/language-settings";
 import { StorageSettings } from "@/views/settings/storage-settings";
 import { SupportSection } from "@/views/settings/support-section";
 import {
+	CheckCatalogSetting,
 	CheckCollectionsSetting,
 	MinimizeToTraySetting,
 	ProviderLinkSetting,
@@ -64,6 +65,8 @@ export function AppSettings({
 	onEfficiencyMode,
 	checkCollectionsOnLaunch,
 	onCheckCollectionsOnLaunch,
+	checkCatalogOnLaunch,
+	onCheckCatalogOnLaunch,
 	dataFolder,
 	storage,
 	onOpenFolder,
@@ -86,6 +89,9 @@ export function AppSettings({
 	/// The active profile's collection revisions are read again when a game opens.
 	checkCollectionsOnLaunch: boolean;
 	onCheckCollectionsOnLaunch: (on: boolean) => void | Promise<void>;
+	/// The official catalog is read when the Games page opens.
+	checkCatalogOnLaunch: boolean;
+	onCheckCatalogOnLaunch: (on: boolean) => void | Promise<void>;
 	/// The data folder, and the actions for it.
 	dataFolder: string;
 	/// The storage mode and the file that records it.
@@ -113,6 +119,7 @@ export function AppSettings({
 					<RememberWindowSetting on={rememberWindow} onChange={onRememberWindow} />
 					<MinimizeToTraySetting on={minimizeToTray} onChange={onMinimizeToTray} />
 					<CheckCollectionsSetting on={checkCollectionsOnLaunch} onChange={onCheckCollectionsOnLaunch} />
+					<CheckCatalogSetting on={checkCatalogOnLaunch} onChange={onCheckCatalogOnLaunch} />
 					{platform === "windows" && <EfficiencySetting mode={efficiencyMode} onMode={onEfficiencyMode} />}
 				</Section>
 			),

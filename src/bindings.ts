@@ -23,6 +23,16 @@ export const commands = {
 	listGames: () => typedError<GameCatalog_Serialize, AppError_Serialize>(__TAURI_INVOKE("list_games")),
 	/**  The game icon from `games/<id>/icon.webp` (or `icon.png`) as a data URL. `None` when there is no icon. */
 	gameIcon: (game: string) => typedError<string | null, AppError_Serialize>(__TAURI_INVOKE("game_icon", { game })),
+	/**
+	 *  Compares the official catalog with the definitions on this computer: what changed, what is available and what needs
+	 *  a newer app. Nothing is written; a network failure is a retryable error the window may ignore.
+	 */
+	catalogCheck: () => typedError<CatalogStatus_Serialize, AppError_Serialize>(__TAURI_INVOKE("catalog_check")),
+	/**
+	 *  Downloads the selected definitions from the official catalog into the data folder. Progress goes through the channel;
+	 *  each id reports its own result so one bad definition does not stop the others.
+	 */
+	catalogInstall: (ids: string[], progress: Channel<CatalogInstallStep_Deserialize>) => typedError<CatalogInstallOutcome_Serialize[], AppError_Serialize>(__TAURI_INVOKE("catalog_install", { ids, progress })),
 	/**  Writes a shareable zip with the definition and its icon. */
 	exportDefinition: (game: string, path: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("export_definition", { game, path })),
 	/**  Reads a game folder and suggests a name, id, programs, markers, loader and store ids for the editor. Read-only. */
@@ -624,6 +634,8 @@ export type AppSettings_Deserialize = {
 	 *  per collection, on the same budget as every other provider read. On from the start.
 	 */
 	check_collections_on_launch?: boolean,
+	/**  Asks the official catalog for new or changed game definitions when the app starts. On from the start. */
+	check_catalog_on_launch?: boolean,
 };
 
 /**
@@ -657,6 +669,8 @@ export type AppSettings_Serialize = {
 	 *  per collection, on the same budget as every other provider read. On from the start.
 	 */
 	check_collections_on_launch: boolean,
+	/**  Asks the official catalog for new or changed game definitions when the app starts. On from the start. */
+	check_catalog_on_launch: boolean,
 };
 
 export type ApplyView = {
@@ -723,6 +737,143 @@ export type BlockerKey =
 "problems" | 
 /**  The library is empty or nothing is enabled. */
 "no_mods";
+
+/**
+ *  The part of a manifest entry the Games page draws. `min_gobbo` is the higher floor of the game and its loader, so a
+ *  blocked entry can say which app version it needs.
+ */
+export type CatalogEntryView = CatalogEntryView_Serialize | CatalogEntryView_Deserialize;
+
+/**
+ *  The part of a manifest entry the Games page draws. `min_gobbo` is the higher floor of the game and its loader, so a
+ *  blocked entry can say which app version it needs.
+ */
+export type CatalogEntryView_Deserialize = {
+	/**  The game id the window sends back to install. */
+	id: string,
+	/**  The display name of the game. */
+	name: string,
+	/**  The loader preset id, when the game names one. */
+	loader?: string | null,
+	/**  Whether a real installation was tested. */
+	verified: boolean,
+	/**  The oldest Gobbo release that serves this game and its loader correctly. */
+	min_gobbo?: string | null,
+};
+
+/**
+ *  The part of a manifest entry the Games page draws. `min_gobbo` is the higher floor of the game and its loader, so a
+ *  blocked entry can say which app version it needs.
+ */
+export type CatalogEntryView_Serialize = {
+	/**  The game id the window sends back to install. */
+	id: string,
+	/**  The display name of the game. */
+	name: string,
+	/**  The loader preset id, when the game names one. */
+	loader: string | null,
+	/**  Whether a real installation was tested. */
+	verified: boolean,
+	/**  The oldest Gobbo release that serves this game and its loader correctly. */
+	min_gobbo: string | null,
+};
+
+/**  The result of installing one id. One bad id does not stop the others, so each carries its own answer. */
+export type CatalogInstallOutcome = CatalogInstallOutcome_Serialize | CatalogInstallOutcome_Deserialize;
+
+/**  The result of installing one id. One bad id does not stop the others, so each carries its own answer. */
+export type CatalogInstallOutcome_Deserialize = {
+	/**  The id the window asked for. */
+	id: string,
+	/**  Whether the definition was installed, and if not, why. */
+	result: CatalogInstallResult_Deserialize,
+	/**  A note about a skipped part, such as a loader the manifest does not list. */
+	note?: string | null,
+};
+
+/**  The result of installing one id. One bad id does not stop the others, so each carries its own answer. */
+export type CatalogInstallOutcome_Serialize = {
+	/**  The id the window asked for. */
+	id: string,
+	/**  Whether the definition was installed, and if not, why. */
+	result: CatalogInstallResult_Serialize,
+	/**  A note about a skipped part, such as a loader the manifest does not list. */
+	note?: string,
+};
+
+/**  Whether one id was installed or why it was refused. */
+export type CatalogInstallResult = CatalogInstallResult_Serialize | CatalogInstallResult_Deserialize;
+
+/**  Whether one id was installed or why it was refused. */
+export type CatalogInstallResult_Deserialize = 
+/**  The files were placed in the catalog folders. */
+{ status: "installed" } | 
+/**  The id was refused; the error has a stable code the window translates. */
+{ status: "failed"; 
+/**  Why this id was not installed. */
+error: AppError_Deserialize };
+
+/**  Whether one id was installed or why it was refused. */
+export type CatalogInstallResult_Serialize = 
+/**  The files were placed in the catalog folders. */
+{ status: "installed" } | 
+/**  The id was refused; the error has a stable code the window translates. */
+{ status: "failed"; 
+/**  Why this id was not installed. */
+error: AppError_Serialize };
+
+/**  The steps of one catalog install, in order, as the window sees them. */
+export type CatalogInstallStep = CatalogInstallStep_Serialize | CatalogInstallStep_Deserialize;
+
+/**  The steps of one catalog install, in order, as the window sees them. */
+export type CatalogInstallStep_Deserialize = 
+/**  A definition, icon or loader file is downloading. `percent` is unknown when the server sends no length. */
+{ step: "downloading"; 
+/**  The share of the file received, from 0 to 100. */
+percent?: number | null } | 
+/**  The files passed validation and are being moved into place. */
+{ step: "installing" };
+
+/**  The steps of one catalog install, in order, as the window sees them. */
+export type CatalogInstallStep_Serialize = 
+/**  A definition, icon or loader file is downloading. `percent` is unknown when the server sends no length. */
+{ step: "downloading"; 
+/**  The share of the file received, from 0 to 100. */
+percent: number | null } | 
+/**  The files passed validation and are being moved into place. */
+{ step: "installing" };
+
+/**
+ *  The catalog compared with the local definitions. User-owned ids appear in none of the lists: their files are theirs
+ *  to change, and the catalog never offers to overwrite them.
+ */
+export type CatalogStatus = CatalogStatus_Serialize | CatalogStatus_Deserialize;
+
+/**
+ *  The catalog compared with the local definitions. User-owned ids appear in none of the lists: their files are theirs
+ *  to change, and the catalog never offers to overwrite them.
+ */
+export type CatalogStatus_Deserialize = {
+	/**  Local definitions whose checksum differs from the catalog. */
+	changed: CatalogEntryView_Deserialize[],
+	/**  Ids that exist in no local definition folder. */
+	available: CatalogEntryView_Deserialize[],
+	/**  Ids that need a newer app: a newer schema, or a `min_gobbo` above this version on the game or its loader. */
+	blocked: CatalogEntryView_Deserialize[],
+};
+
+/**
+ *  The catalog compared with the local definitions. User-owned ids appear in none of the lists: their files are theirs
+ *  to change, and the catalog never offers to overwrite them.
+ */
+export type CatalogStatus_Serialize = {
+	/**  Local definitions whose checksum differs from the catalog. */
+	changed: CatalogEntryView_Serialize[],
+	/**  Ids that exist in no local definition folder. */
+	available: CatalogEntryView_Serialize[],
+	/**  Ids that need a newer app: a newer schema, or a `min_gobbo` above this version on the game or its loader. */
+	blocked: CatalogEntryView_Serialize[],
+};
 
 export type ChangeKind = "created" | "modified" | "removed";
 
@@ -2257,6 +2408,8 @@ export type GameLog_Serialize = {
 export type GameOrigin = 
 /**  Shipped with Gobbo in `games/`. */
 "bundled" | 
+/**  Downloaded from the official catalog into `<data>/catalog/games/`. Read-only, like a bundled definition. */
+"official" | 
 /**  Added by the user under `<data>/definitions/games/`. */
 "user";
 

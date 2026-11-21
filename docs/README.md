@@ -44,7 +44,7 @@ The [README](../README.md) is the front door: what Gobbo is, what it does and ho
 | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
 | [Platforms](../PLATFORMS.md)                                                  | The Windows and Linux differences, and what each platform supports.                              |
 | [Design system](../DESIGN.md)                                                 | Tokens, typography, spacing, shape, motion and the component rules.                              |
-| [Game definitions](../games/README.md)                                        | `game.toml`, slots, mirrors, full-root layouts, user data, steps, tools and the supported games. |
+| [Game definitions](../games/README.md)                                        | `game.toml`, slots, mirrors, full-root layouts, user data, steps, tools, the definition catalog and the supported games. |
 | [Loader presets](../loaders/README.md)                                        | Shared layouts such as BepInEx.                                                                  |
 | [Overlay hook architecture](../src-tauri/crates/overlay-hook/ARCHITECTURE.md) | The invariants, hook table, path model and diagnostics contract.                                 |
 | [Backend module map](../src-tauri/docs/module-map.md)                         | Modules, layers and where a change belongs.                                                      |

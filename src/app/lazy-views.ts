@@ -21,6 +21,11 @@ export const DefinitionImportDialog = lazy(async () => {
 	return { default: component };
 });
 
+export const CatalogDialog = lazy(async () => {
+	const { CatalogDialog: component } = await import("@/views/games/catalog-dialog");
+	return { default: component };
+});
+
 export const AppSettings = lazy(async () => {
 	const { AppSettings: component } = await import("@/views/settings/app-settings");
 	return { default: component };

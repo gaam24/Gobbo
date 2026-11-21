@@ -9,6 +9,8 @@ task_commands::cancel_task
 task_commands::dismiss_task
 games::list_games
 games::game_icon
+games::catalog_check
+games::catalog_install
 games::export_definition
 games::inspect_game_folder
 games::loader_presets

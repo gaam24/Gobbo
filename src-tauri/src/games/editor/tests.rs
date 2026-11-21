@@ -104,6 +104,7 @@ fn saving_refuses_a_bundled_id_and_writes_a_user_definition_only_once() {
 
     let error = save_to(
         &user,
+        None,
         &shipped,
         std::slice::from_ref(&loader_dir),
         &valid_text(),
@@ -114,6 +115,7 @@ fn saving_refuses_a_bundled_id_and_writes_a_user_definition_only_once() {
 
     let saved = save_to(
         &user,
+        None,
         &shipped,
         std::slice::from_ref(&loader_dir),
         &text,
@@ -125,6 +127,7 @@ fn saving_refuses_a_bundled_id_and_writes_a_user_definition_only_once() {
 
     let error = save_to(
         &user,
+        None,
         &shipped,
         std::slice::from_ref(&loader_dir),
         &text,
@@ -133,7 +136,32 @@ fn saving_refuses_a_bundled_id_and_writes_a_user_definition_only_once() {
     .expect_err("an existing definition needs overwrite");
     assert_eq!(error.code, "games.definition_exists");
 
-    save_to(&user, &shipped, &[loader_dir], &text, true).expect("overwrite");
+    save_to(&user, None, &shipped, &[loader_dir], &text, true).expect("overwrite");
+}
+
+#[test]
+fn saving_refuses_an_official_id() {
+    let base = scratch!("editor-save-official");
+    let user = base.join("user");
+    let catalog = base.join("catalog");
+    let shipped = base.join("shipped");
+    write(&catalog.join("slot").join("game.toml"), &valid_text());
+    let loader_dir = loaders();
+
+    let error = save_to(
+        &user,
+        Some(&catalog),
+        &shipped,
+        std::slice::from_ref(&loader_dir),
+        &valid_text(),
+        false,
+    )
+    .expect_err("an official id must be refused");
+    assert_eq!(error.code, "games.definition_bundled");
+    assert!(
+        !user.join("slot").join("game.toml").exists(),
+        "nothing is written for a refused id"
+    );
 }
 
 #[test]
@@ -187,13 +215,66 @@ fn a_loader_preset_list_reads_the_shipped_presets() {
 }
 
 #[test]
-fn a_user_definition_wins_over_a_bundled_one() {
+fn a_loader_preset_list_prefers_user_then_official_then_bundled() {
+    let base = scratch!("presets-precedence");
+    let text = |name: &str| {
+        format!(
+            "schema = 1\nid = \"fixture-loader\"\nname = \"{name}\"\n\n[deploy]\n[[deploy.slots]]\ndir = \"Mods\"\n"
+        )
+    };
+    write(
+        &base.join("bundled").join("fixture-loader.toml"),
+        &text("Bundled Fixture Loader"),
+    );
+    write(
+        &base.join("catalog").join("fixture-loader.toml"),
+        &text("Catalog Fixture Loader"),
+    );
+    write(
+        &base.join("user").join("fixture-loader.toml"),
+        &text("User Fixture Loader"),
+    );
+
+    let presets = presets_from(&[
+        (base.join("user"), GameOrigin::User),
+        (base.join("catalog"), GameOrigin::Official),
+        (base.join("bundled"), GameOrigin::Bundled),
+    ]);
+    let loader = presets
+        .iter()
+        .find(|preset| preset.id == "fixture-loader")
+        .expect("the preset");
+    assert_eq!(loader.name, "User Fixture Loader");
+    assert_eq!(loader.origin, GameOrigin::User);
+    assert!(
+        presets
+            .iter()
+            .filter(|preset| preset.id == "fixture-loader")
+            .count()
+            == 1,
+        "the shadowed copies are deduped"
+    );
+}
+
+#[test]
+fn a_user_definition_wins_over_an_official_and_a_bundled_one() {
     let base = scratch!("editor-source");
     let user = base.join("user");
+    let catalog = base.join("catalog");
     let shipped = base.join("shipped");
     write(&shipped.join("mine").join("game.toml"), "bundled");
+    write(&catalog.join("mine").join("game.toml"), "official");
     write(&user.join("mine").join("game.toml"), "user");
-    let source = source_from(Some(&user), &shipped, "mine").expect("the user file");
+
+    let source = source_from(Some(&user), Some(&catalog), &shipped, "mine").expect("the user file");
     assert_eq!(source.origin, GameOrigin::User);
     assert_eq!(source.text, "user");
+
+    let source = source_from(None, Some(&catalog), &shipped, "mine").expect("the official file");
+    assert_eq!(source.origin, GameOrigin::Official);
+    assert_eq!(source.text, "official");
+
+    let source = source_from(None, None, &shipped, "mine").expect("the bundled file");
+    assert_eq!(source.origin, GameOrigin::Bundled);
+    assert_eq!(source.text, "bundled");
 }

@@ -18,6 +18,9 @@ pub(super) struct LoaderDef {
     pub(super) schema: u32,
     pub(super) id: String,
     pub(super) name: String,
+    /// The oldest Gobbo release that serves this preset correctly, like `min_gobbo` in `game.toml`.
+    #[serde(default)]
+    pub(super) min_gobbo: Option<String>,
     #[serde(default)]
     pub(super) default_variant: Option<String>,
     #[serde(default)]

@@ -1,7 +1,8 @@
 import { cn } from "cn";
-import { FileUp, RefreshCw, Search } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { FileUp, RefreshCw, Search, SearchCheck } from "lucide-react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useUiActions } from "@/app/contexts/ui-context";
+import { CatalogDialog } from "@/app/lazy-views";
 import type { DefinitionProblem_Serialize, GameScan, GameView, ManagedGame } from "@/bindings";
 import { ListGroupHeader, PageEmpty } from "@/components/app/page-layout";
 import { ConfirmRemoveGame } from "@/components/confirm-remove-game";
@@ -17,6 +18,10 @@ import { pickFiles } from "@/lib/tauri";
 import { buildGameEntries, filterGameEntries, GAME_ROW_GRID, GAME_STATUSES } from "@/views/games/entries";
 import { GameRow } from "@/views/games/game-row";
 import { LocateDialog } from "@/views/games/locate-dialog";
+import { hasCatalogUpdates, useCatalog } from "@/views/games/use-catalog";
+
+/// Set once the silent launch check ran, so reopening the page does not ask GitHub again until the app restarts.
+let catalogCheckedThisLaunch = false;
 
 /// Every supported game, in three groups by status: added (the only ones that can be modded), found on this computer,
 /// and not found. The search narrows all groups; the status groups replace a separate filter.
@@ -27,6 +32,7 @@ export function GamesPanel({
 	scanError,
 	definitionProblems,
 	catalogError,
+	checkCatalogOnLaunch,
 	onReload,
 	scannedAt,
 	scanning,
@@ -49,7 +55,10 @@ export function GamesPanel({
 	definitionProblems: DefinitionProblem_Serialize[];
 	/// The failure of the game catalog, shown with a retry that reads it again.
 	catalogError: string | null;
-	onReload: () => void;
+	/// Whether the official catalog is checked the first time this page opens after the app starts.
+	checkCatalogOnLaunch: boolean;
+	/// Re-reads the definitions and the added games, also used when a catalog install finishes.
+	onReload: () => void | Promise<void>;
 	/// The scan is started by the page, not awaited; the button only reports its state.
 	onScan: () => void;
 	/// When `scans` was produced, for the "Searched at" line.
@@ -77,12 +86,21 @@ export function GamesPanel({
 		name: string;
 	} | null>(null);
 	const [locating, setLocating] = useState<{ id: string; name: string } | null>(null);
+	const [catalogOpen, setCatalogOpen] = useState(false);
+	const { status: catalogStatus, checking, progress, check, install } = useCatalog({ onInstalled: onReload });
 
 	// Opening the page reads the definitions again, so a file the user just added works without a restart.
 	useEffect(() => {
-		onReload();
+		void onReload();
 		onScan();
 	}, [onReload, onScan]);
+
+	// One silent catalog check per app launch, the first time this page opens. A manual check works either way.
+	useEffect(() => {
+		if (!checkCatalogOnLaunch || catalogCheckedThisLaunch) return;
+		catalogCheckedThisLaunch = true;
+		void check(true);
+	}, [check, checkCatalogOnLaunch]);
 
 	const entries = useMemo(() => buildGameEntries(games, managed, scans, scanError !== null), [games, managed, scans, scanError]);
 	const visible = filterGameEntries(entries, "all", query);
@@ -116,6 +134,16 @@ export function GamesPanel({
 						<Button variant="outline" onClick={onScan} disabled={scanning}>
 							<RefreshCw /> {t("games.rescan")}
 						</Button>
+						<Button
+							variant="ghost"
+							size="icon-sm"
+							aria-label={t("catalog.checkNow")}
+							title={t("catalog.checkNow")}
+							onClick={() => void check(false)}
+							disabled={checking}
+						>
+							<SearchCheck aria-hidden />
+						</Button>
 					</>
 				}
 				toolbar={
@@ -141,7 +169,7 @@ export function GamesPanel({
 								<AlertTitle>{t("games.catalogFailed")}</AlertTitle>
 								<AlertDescription>{catalogError}</AlertDescription>
 								<AlertAction>
-									<Button variant="outline" size="sm" onClick={onReload}>
+									<Button variant="outline" size="sm" onClick={() => void onReload()}>
 										{t("common.retry")}
 									</Button>
 								</AlertAction>
@@ -162,7 +190,7 @@ export function GamesPanel({
 									</ul>
 								</AlertDescription>
 								<AlertAction>
-									<Button variant="outline" size="sm" onClick={onReload}>
+									<Button variant="outline" size="sm" onClick={() => void onReload()}>
 										{t("common.retry")}
 									</Button>
 								</AlertAction>
@@ -180,6 +208,24 @@ export function GamesPanel({
 								</AlertAction>
 							</Alert>
 						)}
+					</div>
+				)}
+
+				{hasCatalogUpdates(catalogStatus) && (
+					<div className="px-6 pt-4">
+						<Alert>
+							<AlertTitle>
+								{t("catalog.banner", {
+									changed: catalogStatus?.changed.length ?? 0,
+									available: catalogStatus?.available.length ?? 0,
+								})}
+							</AlertTitle>
+							<AlertAction>
+								<Button variant="outline" size="sm" aria-label={t("catalog.open")} onClick={() => setCatalogOpen(true)}>
+									{t("catalog.open")}
+								</Button>
+							</AlertAction>
+						</Alert>
 					</div>
 				)}
 
@@ -246,6 +292,12 @@ export function GamesPanel({
 					if (confirmRemove) void onRemove(confirmRemove.id);
 				}}
 			/>
+
+			{catalogOpen && (
+				<Suspense fallback={null}>
+					<CatalogDialog status={catalogStatus} progress={progress} onInstall={install} onClose={() => setCatalogOpen(false)} />
+				</Suspense>
+			)}
 		</div>
 	);
 }

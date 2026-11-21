@@ -9,8 +9,8 @@ use serde::Serialize;
 use crate::error::{AppError, ErrorKind, FileError, io_at};
 
 use super::{
-    GameDef, GameView, definition_path, games_dir, is_valid_id, loaders_dir, read_cached,
-    user_games_dir, user_loaders_dir,
+    GameDef, GameView, catalog_games_dir, definition_path, games_dir, is_valid_id, loaders_dir,
+    read_cached, user_games_dir, user_loaders_dir,
 };
 
 /// Where a game definition came from.
@@ -19,6 +19,8 @@ use super::{
 pub enum GameOrigin {
     /// Shipped with Gobbo in `games/`.
     Bundled,
+    /// Downloaded from the official catalog into `<data>/catalog/games/`. Read-only, like a bundled definition.
+    Official,
     /// Added by the user under `<data>/definitions/games/`.
     User,
 }
@@ -37,29 +39,44 @@ pub struct GameCatalog {
     pub problems: Vec<DefinitionProblem>,
 }
 
-/// Every definition from the bundled and the user folders, with invalid or duplicate user definitions reported instead
-/// of hiding the rest. The files are read on each call, so a new or edited definition appears without a restart.
+/// Every definition from the official, bundled and user folders, with invalid or duplicate definitions reported
+/// instead of hiding the rest. The files are read on each call, so a new or edited definition appears without a
+/// restart. An official file shadows a bundled file with the same id; a user file never replaces either.
 type Definitions = (Vec<(GameDef, GameOrigin)>, Vec<DefinitionProblem>);
 
 pub fn definitions() -> Result<Definitions, AppError> {
-    definitions_from(games_dir(), user_games_dir().as_deref(), loaders_dir())
+    definitions_from(
+        games_dir(),
+        catalog_games_dir().as_deref(),
+        user_games_dir().as_deref(),
+        loaders_dir(),
+    )
 }
 
 pub fn definitions_from(
     shipped: &Path,
+    catalog: Option<&Path>,
     user: Option<&Path>,
     loaders: &Path,
 ) -> Result<Definitions, AppError> {
     let mut games: Vec<(GameDef, GameOrigin)> = Vec::new();
     let mut problems = Vec::new();
     let mut seen: BTreeSet<String> = BTreeSet::new();
-    let mut dirs = vec![(shipped.to_path_buf(), GameOrigin::Bundled)];
+    let mut dirs = Vec::with_capacity(3);
+
+    if let Some(catalog) = catalog {
+        dirs.push((catalog.to_path_buf(), GameOrigin::Official));
+    }
+
+    dirs.push((shipped.to_path_buf(), GameOrigin::Bundled));
 
     if let Some(user) = user {
         dirs.push((user.to_path_buf(), GameOrigin::User));
     }
 
     for (dir, origin) in dirs {
+        // A downloaded catalog file and a user file can both be fixed by the user; a broken bundled file is a bug.
+        let fixable = matches!(origin, GameOrigin::Official | GameOrigin::User);
         let entries = match std::fs::read_dir(&dir) {
             Ok(entries) => entries,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
@@ -83,7 +100,7 @@ pub fn definitions_from(
                 Ok(game) => {
                     let folder = entry.file_name().to_string_lossy().into_owned();
 
-                    if origin == GameOrigin::User && game.id != folder {
+                    if fixable && game.id != folder {
                         problems.push(DefinitionProblem {
                             path: path.display().to_string(),
                             error: super::invalid_user_definition(format!(
@@ -96,20 +113,24 @@ pub fn definitions_from(
                     }
 
                     if !seen.insert(game.id.clone()) {
-                        problems.push(DefinitionProblem {
-                            path: path.display().to_string(),
-                            error: AppError::user("games.duplicate_definition")
-                                .with("id", &game.id)
-                                .with("path", path.display()),
-                        });
+                        // A user file with an official or bundled id can be fixed; the bundled copy an official file
+                        // shadows is the designed layering, not a problem to report.
+                        if origin == GameOrigin::User {
+                            problems.push(DefinitionProblem {
+                                path: path.display().to_string(),
+                                error: AppError::user("games.duplicate_definition")
+                                    .with("id", &game.id)
+                                    .with("path", path.display()),
+                            });
+                        }
                         continue;
                     }
 
                     games.push(((*game).clone(), origin));
                 }
                 Err(error) => {
-                    // A user can fix a bad user definition; a broken shipped one is a bug in Gobbo.
-                    let error = if origin == GameOrigin::User && error.kind == ErrorKind::Bug {
+                    // The user can re-download a bad official file or fix a user one; a broken shipped file is a bug.
+                    let error = if fixable && error.kind == ErrorKind::Bug {
                         error.kind(ErrorKind::UserAction)
                     } else {
                         error
@@ -152,19 +173,35 @@ pub fn icon(id: &str) -> Result<Option<String>, AppError> {
     )))
 }
 
-/// The first icon file of a game, user definitions before bundled ones.
+/// The first icon file of a game: user, then official catalog, then bundled.
 pub fn icon_file(id: &str) -> Option<(PathBuf, &'static str)> {
+    icon_file_from(
+        user_games_dir().as_deref(),
+        catalog_games_dir().as_deref(),
+        games_dir(),
+        id,
+    )
+}
+
+/// The first icon file of a game in the explicit user, official, bundled folders. The caller owns the precedence, so
+/// a test can pass scratch folders without touching the process-wide definition roots.
+pub fn icon_file_from(
+    user: Option<&Path>,
+    catalog: Option<&Path>,
+    bundled: &Path,
+    id: &str,
+) -> Option<(PathBuf, &'static str)> {
     if !is_valid_id(id) {
         return None;
     }
 
-    let mut dirs = Vec::with_capacity(2);
+    let mut dirs = Vec::with_capacity(3);
 
-    if let Some(user) = user_games_dir() {
-        dirs.push(user.join(id));
+    for dir in [user, catalog].into_iter().flatten() {
+        dirs.push(dir.join(id));
     }
 
-    dirs.push(games_dir().join(id));
+    dirs.push(bundled.join(id));
 
     for dir in dirs {
         for (name, mime) in [("icon.webp", "image/webp"), ("icon.png", "image/png")] {

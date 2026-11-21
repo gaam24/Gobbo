@@ -1,5 +1,7 @@
 //! The game catalog: the games in `games/`, their icons, and the scan of the Steam libraries for them.
 
+use tauri::ipc::Channel;
+
 use crate::commands::blocking;
 use crate::domain::pathkey::path_key;
 use crate::error::AppError;
@@ -117,6 +119,29 @@ pub async fn scan_games() -> Result<Vec<detect::GameScan>, AppError> {
             &crate::games::paths::home_dir()?,
             &definitions,
         ))
+    })
+    .await
+}
+
+/// Compares the official catalog with the definitions on this computer: what changed, what is available and what needs
+/// a newer app. Nothing is written; a network failure is a retryable error the window may ignore.
+#[tauri::command]
+#[specta::specta]
+pub async fn catalog_check() -> Result<games::CatalogStatus, AppError> {
+    blocking(games::check_catalog).await
+}
+
+/// Downloads the selected definitions from the official catalog into the data folder. Progress goes through the channel;
+/// each id reports its own result so one bad definition does not stop the others.
+#[tauri::command]
+#[specta::specta]
+pub async fn catalog_install(
+    ids: Vec<String>,
+    progress: Channel<games::CatalogInstallStep>,
+) -> Result<Vec<games::CatalogInstallOutcome>, AppError> {
+    blocking(move || {
+        let mut send = crate::commands::channel_sink(progress);
+        games::install_catalog(&ids, &mut send)
     })
     .await
 }

@@ -15,7 +15,8 @@
   the module it serves; this layer is only the registration point.
 - Modules: each folder owns its commands, use cases and engine. `games/` (the definition model in `definition/`, the
   loader presets in `loaders.rs`, validation, detection, the shared Steam/Proton data in `steam.rs`, paths, the catalog
-  in `catalog.rs`, the catalog commands and the definition editor in `editor/`; the import dry run is
+  in `catalog.rs`, the official catalog downloaded from GitHub in `remote/` (the manifest fetch, the schema gate and
+  the checksummed install), the catalog commands and the definition editor in `editor/`; the import dry run is
   `import/preview.rs`),
   `library/` (mutations: rescan, delete, metadata, the manual source id in `source_id.rs`, generic `fields.rs`,
   `relations.rs` for the requirement checks and warnings, `sync.rs` keeping each profile in step

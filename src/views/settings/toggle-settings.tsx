@@ -71,3 +71,15 @@ export function CheckCollectionsSetting({ on, onChange }: { on: boolean; onChang
 		</SettingRow>
 	);
 }
+
+/// Whether the official game catalog is read when the Games page opens. The manual check in the page header works
+/// either way.
+export function CheckCatalogSetting({ on, onChange }: { on: boolean; onChange: (on: boolean) => void | Promise<void> }) {
+	const { t } = useTranslation();
+	const toggle = t("settings.catalog.toggle");
+	return (
+		<SettingRow title={t("settings.catalog.title")} htmlFor="check-catalog-on-launch" hint={toggle} help={t("settings.catalog.hint")}>
+			<Switch id="check-catalog-on-launch" aria-label={toggle} checked={on} onCheckedChange={(checked) => void onChange(checked)} />
+		</SettingRow>
+	);
+}

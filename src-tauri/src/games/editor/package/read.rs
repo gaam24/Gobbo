@@ -80,10 +80,16 @@ pub(super) fn read_package(path: &Path, context: &PackageContext) -> Result<Pack
         overwrites.push(format!("game {id}"));
     }
 
-    if !id.is_empty() && context.bundled_games.join(&id).join("game.toml").is_file() {
+    let shipped = context.bundled_games.join(&id).join("game.toml").is_file();
+    let official = context
+        .catalog_games
+        .as_deref()
+        .is_some_and(|dir| dir.join(&id).join("game.toml").is_file());
+
+    if !id.is_empty() && (shipped || official) {
         problems.push(problem(
             "general",
-            format!("the id {id} belongs to a bundled game"),
+            format!("the id {id} belongs to a bundled or official game"),
         ));
     }
 
@@ -94,13 +100,18 @@ pub(super) fn read_package(path: &Path, context: &PackageContext) -> Result<Pack
             .is_file()
         {
             overwrites.push(format!("loader {loader_id}"));
-        } else if context
-            .bundled_loaders
-            .join(format!("{loader_id}.toml"))
-            .is_file()
-        {
-            // A user preset shadows the bundled one for every game. Treat it as an explicit replacement.
-            overwrites.push(format!("bundled loader {loader_id}"));
+        } else {
+            let file = format!("{loader_id}.toml");
+            let shipped = context.bundled_loaders.join(&file).is_file();
+            let official = context
+                .catalog_loaders
+                .as_deref()
+                .is_some_and(|dir| dir.join(&file).is_file());
+
+            if shipped || official {
+                // A user preset shadows the bundled or official one for every game. Treat it as an explicit replacement.
+                overwrites.push(format!("bundled loader {loader_id}"));
+            }
         }
     }
 

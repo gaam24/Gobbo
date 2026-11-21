@@ -1,0 +1,110 @@
+{
+  "apiVersion": 1,
+  "games": [
+    {
+      "id": "content-warning",
+      "name": "Content Warning",
+      "schema": 1,
+      "loader": "bepinex",
+      "verified": false,
+      "file": "games/content-warning/game.toml",
+      "sha256": "e682d51b2671a2dbca03f8294b84e8f74bdc6f297d3a374a1d34ba4e165fea3a",
+      "icon": "games/content-warning/icon.webp",
+      "iconSha256": "b332c753710b7a94d45152ce80f8ad77f87e20d19ca81d90baf373d24db67493"
+    },
+    {
+      "id": "cyberpunk-2077",
+      "name": "Cyberpunk 2077",
+      "schema": 1,
+      "verified": false,
+      "file": "games/cyberpunk-2077/game.toml",
+      "sha256": "88372d0e41fb363436b51a93858905ed18fe155644835574539824a6c8f1d95d",
+      "icon": "games/cyberpunk-2077/icon.webp",
+      "iconSha256": "edb4681f1fe86d9e728eaeb0b3dc41ee548c6d971ef6c9ea41cc9727e9c6e0ae"
+    },
+    {
+      "id": "lethal-company",
+      "name": "Lethal Company",
+      "schema": 1,
+      "loader": "bepinex",
+      "verified": false,
+      "file": "games/lethal-company/game.toml",
+      "sha256": "cbda26330ea1d993a6f6ca72d7c6150a9fad26b2b33c86d7c700afbcc163df76",
+      "icon": "games/lethal-company/icon.webp",
+      "iconSha256": "ec658ad0d2133a001c5d362969284a2abddbb67081481ee62c1bb97ca0a0366a"
+    },
+    {
+      "id": "repo",
+      "name": "R.E.P.O.",
+      "schema": 1,
+      "loader": "bepinex",
+      "verified": false,
+      "file": "games/repo/game.toml",
+      "sha256": "2db4ea6d686d860fdd53e1a87d3309bd309c28174ec37793db6c2e5c0a282b58",
+      "icon": "games/repo/icon.webp",
+      "iconSha256": "ace288869f231f7f4bf50188e5bcb7d58e1c5f0c1e5490a1d57d9718d4e25329"
+    },
+    {
+      "id": "tainted-grail-the-fall-of-avalon",
+      "name": "Tainted Grail: The Fall of Avalon",
+      "schema": 1,
+      "loader": "bepinex",
+      "verified": false,
+      "file": "games/tainted-grail-the-fall-of-avalon/game.toml",
+      "sha256": "a98f7dead9d166aa8a663e85e62ff9b931c3d298abd689243cdf837eed330472",
+      "icon": "games/tainted-grail-the-fall-of-avalon/icon.webp",
+      "iconSha256": "c4c47306aef23b635ed2e0da1d783e86ada6e98b4de4445305012e1466fb667f"
+    },
+    {
+      "id": "tcg-card-shop-simulator",
+      "name": "TCG Card Shop Simulator",
+      "schema": 1,
+      "loader": "bepinex",
+      "verified": false,
+      "file": "games/tcg-card-shop-simulator/game.toml",
+      "sha256": "894d44511bd66b067d20efa8bba1e996097f4c4fc91b618f269989ef52b1ab61",
+      "icon": "games/tcg-card-shop-simulator/icon.webp",
+      "iconSha256": "f6dd831c4da52c4a4394ac1050a8d8d8fa8b3f62715a7365a1d62b4cf98680af"
+    },
+    {
+      "id": "the-witcher-3-wild-hunt",
+      "name": "The Witcher 3: Wild Hunt",
+      "schema": 1,
+      "verified": false,
+      "file": "games/the-witcher-3-wild-hunt/game.toml",
+      "sha256": "9a19345ca0155c25311c34f4e0aaa62ec493fc01d209fea49e68aa97421ad8f4",
+      "icon": "games/the-witcher-3-wild-hunt/icon.webp",
+      "iconSha256": "a93870d1381c93648f6023687d19b723eb7b6b54641ae4b413b132a58f5bf63c"
+    },
+    {
+      "id": "the-witcher-enhanced-edition",
+      "name": "The Witcher: Enhanced Edition",
+      "schema": 1,
+      "verified": false,
+      "file": "games/the-witcher-enhanced-edition/game.toml",
+      "sha256": "c1174079048928d77294f2a0afa74b3df888a5a640205d3837d654d18d29bec6",
+      "icon": "games/the-witcher-enhanced-edition/icon.webp",
+      "iconSha256": "780bab81281077a2f5dd23ae3b6adaa45f07b9dcc6140f58604f4650f679efc8"
+    },
+    {
+      "id": "valheim",
+      "name": "Valheim",
+      "schema": 1,
+      "loader": "bepinex",
+      "verified": false,
+      "file": "games/valheim/game.toml",
+      "sha256": "917b731ef42e90667f7535d158bef01fd4bfa46da302efed859cf2ed2858c452",
+      "icon": "games/valheim/icon.webp",
+      "iconSha256": "7a640498dd2dde2dabf452c1ade02afdf7630cbded3086aa800b6d227fcaf1ab"
+    }
+  ],
+  "loaders": [
+    {
+      "id": "bepinex",
+      "name": "BepInEx",
+      "schema": 1,
+      "file": "loaders/bepinex.toml",
+      "sha256": "c426dc829296aa0946eae037f368af2275a19698a07df2202c4d5b423833d868"
+    }
+  ]
+}

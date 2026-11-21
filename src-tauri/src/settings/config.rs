@@ -37,6 +37,9 @@ pub struct AppSettings {
     /// per collection, on the same budget as every other provider read. On from the start.
     #[serde(default = "on_by_default")]
     pub check_collections_on_launch: bool,
+    /// Asks the official catalog for new or changed game definitions when the app starts. On from the start.
+    #[serde(default = "on_by_default")]
+    pub check_catalog_on_launch: bool,
 }
 
 /// When Gobbo asks Windows for Efficiency mode (`EcoQoS`). `Auto` keeps the app at normal priority while the user works
@@ -89,6 +92,7 @@ impl Default for AppSettings {
             minimize_to_tray: true,
             efficiency_mode: EfficiencyMode::Auto,
             check_collections_on_launch: true,
+            check_catalog_on_launch: true,
         }
     }
 }
@@ -144,6 +148,13 @@ mod tests {
     fn settings_without_links_take_none() {
         assert!(read("{}").source_links.is_empty());
         assert!(AppSettings::default().source_links.is_empty());
+    }
+
+    #[test]
+    fn an_old_settings_file_checks_the_catalog_on_launch() {
+        assert!(read("{}").check_catalog_on_launch);
+        assert!(AppSettings::default().check_catalog_on_launch);
+        assert!(!read(r#"{"check_catalog_on_launch":false}"#).check_catalog_on_launch);
     }
 
     #[test]

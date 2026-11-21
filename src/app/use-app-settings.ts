@@ -65,6 +65,7 @@ export function useAppSettings({
 	const [minimizeToTray, setMinimizeToTray] = useState(true);
 	const [efficiencyMode, setEfficiencyMode] = useState<AppSettings_Serialize["efficiency_mode"]>("auto");
 	const [checkCollectionsOnLaunch, setCheckCollectionsOnLaunch] = useState(true);
+	const [checkCatalogOnLaunch, setCheckCatalogOnLaunch] = useState(true);
 	const [inspectorCollapsed, setInspectorCollapsed] = useState(false);
 	const [dataFolder, setDataFolder] = useState("");
 	const [storage, setStorage] = useState<StorageInfo | null>(null);
@@ -262,6 +263,7 @@ export function useAppSettings({
 		setMinimizeToTray(settings.minimize_to_tray);
 		setEfficiencyMode(settings.efficiency_mode);
 		setCheckCollectionsOnLaunch(settings.check_collections_on_launch);
+		setCheckCatalogOnLaunch(settings.check_catalog_on_launch);
 		setInspectorCollapsed(settings.inspector_collapsed);
 	}, []);
 
@@ -321,6 +323,11 @@ export function useAppSettings({
 		saveSetting({ check_collections_on_launch: on }, () => setCheckCollectionsOnLaunch(on));
 	};
 
+	/// The official catalog is checked when the Games page opens. A change is read at the next page open.
+	const saveCheckCatalogOnLaunch = (on: boolean) => {
+		saveSetting({ check_catalog_on_launch: on }, () => setCheckCatalogOnLaunch(on));
+	};
+
 	/// Takes the download links of the given providers. A provider added registers its links with the system; one left
 	/// out gives them up.
 	const saveSourceLinks = (taken: string[]) => {
@@ -360,6 +367,7 @@ export function useAppSettings({
 		minimizeToTray,
 		efficiencyMode,
 		checkCollectionsOnLaunch,
+		checkCatalogOnLaunch,
 		inspectorCollapsed,
 		loadAppSettings,
 		saveInspectorCollapsed,
@@ -370,6 +378,7 @@ export function useAppSettings({
 		saveMinimizeToTray,
 		saveEfficiencyMode,
 		saveCheckCollectionsOnLaunch,
+		saveCheckCatalogOnLaunch,
 		saveSourceLinks,
 		refreshSourceLinks,
 		ensureSourceLinks,

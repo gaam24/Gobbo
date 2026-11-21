@@ -39,12 +39,28 @@ A game that is missing from the list can be added as a user definition without r
 - `<data>/definitions/games/<id>/game.toml`, with an optional `icon.webp` or `icon.png`;
 - `<data>/definitions/loaders/<id>.toml` for a loader preset.
 
-A user loader with the same id as a bundled preset wins. A user game with the id of a bundled game is refused: the
-Games page names the file and keeps the bundled game. The folder is read whenever the Games page opens, so an edited
-definition needs no restart.
+A user loader with the same id as a bundled or downloaded preset wins. A user game with the id of a bundled or
+downloaded game is refused: the Games page names the file and keeps the bundled or downloaded one. The folder is read
+whenever the Games page opens, so an edited definition needs no restart.
 
 The full schema, the primitives and the test steps are in [games/README.md](../../games/README.md). A game ships only
 after it has been tested on a real installation.
+
+## New games without an app update
+
+Gobbo does not wait for a release to support a new game. The first time the Games page opens after Gobbo starts, it
+checks the Gobbo repository for the current list of official definitions — quietly, and only when there is a network.
+The **Check for new game definitions** button next to **Rescan** asks again at any time.
+
+- A banner above the games list names what is new: updated definitions and games you do not have yet.
+- **View** opens the download dialog. Updates come pre-checked; pick the games you want, and Gobbo downloads only
+  those. A loader a game needs comes with it.
+- An entry that needs a newer Gobbo shows the version it needs and cannot be picked. The game you already have keeps
+  its current definition until you update Gobbo.
+- Downloaded definitions are read-only. After you update Gobbo, the downloads the new version already ships are
+  removed, so an old download never hides a newer bundled definition.
+
+The launch check can be turned off in the app settings, next to the collection update check.
 
 ## How mods reach the game
 

@@ -38,6 +38,9 @@ skill: if a skill disagrees with a guide, the guide wins and the skill is fixed 
 - Keep the existing structure and naming. Prefer the smallest change that solves the problem.
 - No new dependency without a reason, a license check and a maintenance check.
 - A user-visible change gets a `CHANGELOG.md` entry under **Unreleased**.
+- A changelog entry is short and written for users: one bullet per change, a bold one-line summary and at most one
+  plain sentence after it (`- **Mods load again after an update.** The deploy no longer skips renamed files.`).
+  Leave out internals — paths, file names, checksums, keys, how the code does it; those belong in the docs.
 - Do not commit generated build output (`target/`, `dist/`, `src-tauri/overlay-hook/`). The staged hook DLL is ignored.
 - Biome formats code, JSON, CSS and config only. Markdown — including `SKILL.md` and subagent frontmatter — is written by
   hand; do not add it back to `biome.jsonc`.

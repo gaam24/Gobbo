@@ -18,6 +18,10 @@ impl LoaderDef {
             problems.push(format!("unknown schema version: {}", self.schema));
         }
 
+        if let Some(min) = &self.min_gobbo {
+            problems.min_gobbo("loader", min);
+        }
+
         if !is_valid_id(&self.id) {
             problems.push(format!(
                 "loader id must contain only lowercase letters, digits or '-': {:?}",

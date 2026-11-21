@@ -323,10 +323,11 @@ export function useGameEditor(id: string | null, onClose: () => void): GameEdito
 	};
 
 	const idWarning = (() => {
-		if (origin === "bundled") return t("editor.quick.idBundled");
-		const bundled = games.some((game) => game.id === draft.id.trim() && game.origin === "bundled");
+		// Bundled and downloaded definitions are read-only, so their ids are just as unavailable as a bundled one.
+		if (origin === "bundled" || origin === "official") return t("editor.quick.idBundled");
+		const reserved = games.some((game) => game.id === draft.id.trim() && (game.origin === "bundled" || game.origin === "official"));
 
-		if (bundled) return t("editor.quick.idBundled");
+		if (reserved) return t("editor.quick.idBundled");
 		const taken = !editing && games.some((game) => game.id === draft.id.trim() && game.origin === "user");
 		return taken ? t("editor.quick.idTaken") : null;
 	})();

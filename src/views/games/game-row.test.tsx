@@ -24,10 +24,10 @@ const game: GameView = {
 	providers: [],
 };
 
-function row(status: "added" | "found") {
+function row(status: "added" | "found", shown = game) {
 	return renderToString(
 		<GameRow
-			entry={{ game, status, root: "/games/test", ready: status === "added" }}
+			entry={{ game: shown, status, root: "/games/test", ready: status === "added" }}
 			onAdd={() => Promise.resolve(true)}
 			onSelect={nothing}
 			onOpen={nothing}
@@ -47,4 +47,13 @@ test("an added game opens from its name, like its tile in the rail", () => {
 
 test("a game that is not added keeps its name as plain text", () => {
 	expect(row("found")).not.toContain('title="Open Test Game"');
+});
+
+test("a downloaded game shows the catalog badge", () => {
+	const official: GameView = { ...game, origin: "official" };
+	expect(row("added", official)).toContain("From the catalog");
+});
+
+test("a bundled game shows no catalog badge", () => {
+	expect(row("added")).not.toContain("From the catalog");
 });

@@ -27,6 +27,8 @@ interface SettingsData {
 	efficiencyMode: AppSettings_Serialize["efficiency_mode"];
 	/// Whether the active profile's collection revisions are read again when a game opens.
 	checkCollectionsOnLaunch: boolean;
+	/// Whether the official catalog is read when the Games page opens.
+	checkCatalogOnLaunch: boolean;
 	inspectorCollapsed: boolean;
 }
 
@@ -53,6 +55,7 @@ interface SettingsActions {
 	saveMinimizeToTray: (on: boolean) => void | Promise<void>;
 	saveEfficiencyMode: (mode: AppSettings_Serialize["efficiency_mode"]) => void | Promise<void>;
 	saveCheckCollectionsOnLaunch: (on: boolean) => void | Promise<void>;
+	saveCheckCatalogOnLaunch: (on: boolean) => void | Promise<void>;
 	saveSourceLinks: (providers: string[]) => void | Promise<void>;
 	refreshSourceLinks: () => void | Promise<void>;
 	ensureSourceLinks: () => void | Promise<void>;
@@ -97,6 +100,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 		minimizeToTray,
 		efficiencyMode,
 		checkCollectionsOnLaunch,
+		checkCatalogOnLaunch,
 		inspectorCollapsed,
 		loadAppSettings,
 		saveInspectorCollapsed,
@@ -107,6 +111,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 		saveMinimizeToTray,
 		saveEfficiencyMode,
 		saveCheckCollectionsOnLaunch,
+		saveCheckCatalogOnLaunch,
 		saveSourceLinks,
 		refreshSourceLinks,
 		ensureSourceLinks,
@@ -128,11 +133,13 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 			minimizeToTray,
 			efficiencyMode,
 			checkCollectionsOnLaunch,
+			checkCatalogOnLaunch,
 			inspectorCollapsed,
 		}),
 		[
 			accounts,
 			browserProviders,
+			checkCatalogOnLaunch,
 			checkCollectionsOnLaunch,
 			dataFolder,
 			efficiencyMode,
@@ -159,6 +166,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 			saveMinimizeToTray,
 			saveEfficiencyMode,
 			saveCheckCollectionsOnLaunch,
+			saveCheckCatalogOnLaunch,
 			saveSourceLinks,
 			refreshSourceLinks,
 			ensureSourceLinks,
@@ -174,6 +182,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 			refreshProviders,
 			refreshSourceLinks,
 			rememberSourceAccount,
+			saveCheckCatalogOnLaunch,
 			saveCheckCollectionsOnLaunch,
 			saveEfficiencyMode,
 			saveInspectorCollapsed,

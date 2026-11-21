@@ -5,6 +5,8 @@
 schema = 1
 id = "examplegame"
 name = "Example Game"
+# The oldest Gobbo release this file needs, when it depends on a later fix or feature.
+# min_gobbo = "0.3.0"
 providers = { nexus = { key = "examplegame" } }
 
 # A shared loader preset in loaders/<id>.toml brings the common `requires` and `[deploy]` rules. A string uses the

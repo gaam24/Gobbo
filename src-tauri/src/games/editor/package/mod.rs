@@ -11,7 +11,10 @@ use serde::Serialize;
 use specta::Type;
 
 use super::super::view::GameLoaderView;
-use super::super::{games_dir, loaders_dir, user_games_dir, user_loaders_dir};
+use super::super::{
+    catalog_games_dir, catalog_loaders_dir, games_dir, loaders_dir, user_games_dir,
+    user_loaders_dir,
+};
 use super::DefinitionCheck;
 use super::DefinitionProblemView;
 use crate::error::{AppError, ErrorKind};
@@ -49,6 +52,9 @@ pub struct ImportedDefinitionPackage {
 struct PackageContext {
     user_games: PathBuf,
     user_loaders: PathBuf,
+    /// Absent when the app never set a data root: there is no downloaded catalog to compare against.
+    catalog_games: Option<PathBuf>,
+    catalog_loaders: Option<PathBuf>,
     bundled_games: PathBuf,
     bundled_loaders: PathBuf,
 }
@@ -84,6 +90,8 @@ fn package_context() -> Result<PackageContext, AppError> {
     Ok(PackageContext {
         user_games,
         user_loaders,
+        catalog_games: catalog_games_dir(),
+        catalog_loaders: catalog_loaders_dir(),
         bundled_games: games_dir().to_path_buf(),
         bundled_loaders: loaders_dir().to_path_buf(),
     })
@@ -100,6 +108,8 @@ mod tests {
         PackageContext {
             user_games: base.join("user/games"),
             user_loaders: base.join("user/loaders"),
+            catalog_games: Some(base.join("catalog/games")),
+            catalog_loaders: Some(base.join("catalog/loaders")),
             bundled_games: base.join("bundled/games"),
             bundled_loaders: base.join("bundled/loaders"),
         }
@@ -189,6 +199,34 @@ dir = "Mods"
         ctx: &PackageContext,
     ) -> Result<DefinitionPackagePreview, AppError> {
         Ok(read_package(path, ctx)?.preview)
+    }
+
+    #[test]
+    fn a_package_cannot_replace_an_official_game() {
+        let base = scratch!("definition-package-official");
+        let ctx = context(&base);
+        let catalog = ctx.catalog_games.as_ref().expect("a catalog folder");
+        write(&catalog.join("slot/game.toml"), SLOT);
+        let archive = make_zip(&base, "slot.zip", &[("game.toml", SLOT)]);
+
+        let preview = read_package(&archive, &ctx)
+            .expect("a readable package")
+            .preview;
+        assert!(
+            preview
+                .problems
+                .iter()
+                .any(|problem| problem.message.contains("official")),
+            "{:?}",
+            preview.problems
+        );
+        let error =
+            import_with(&archive, true, &ctx).expect_err("an official id cannot be replaced");
+        assert_eq!(error.code, "games.package_invalid");
+        assert!(
+            !ctx.user_games.join("slot/game.toml").exists(),
+            "no user copy was written"
+        );
     }
 
     #[test]
