@@ -1,5 +1,6 @@
-//! Downloading a collection's direct or bundle-adjacent file from outside Nexus. The URL comes from an untrusted
-//! manifest, so only HTTPS public hosts are accepted and the size and MD5 are checked when the manifest gives them.
+//! Downloading a collection's direct or bundle-adjacent file from outside the collection provider. The URL comes
+//! from an untrusted manifest, so only HTTPS public hosts are accepted and the size and MD5 are checked when the
+//! manifest gives them.
 
 use std::fs;
 use std::net::IpAddr;
@@ -10,7 +11,7 @@ use url::Url;
 
 use crate::error::{AppError, io_at};
 use crate::infra::http::{self, BodyProblem, PartError};
-use crate::providers::download::{free_download_name, target_name};
+use crate::providers::download::{archive_name, free_download_name};
 
 /// The largest direct file Gobbo downloads. A collection is a recipe, not a disk image.
 const MAX_EXTERNAL_BYTES: u64 = 8 * 1024 * 1024 * 1024;
@@ -50,12 +51,7 @@ pub fn download(
         );
     }
 
-    let name = target_name(&part.info, url, "", "external");
-    let name = if crate::domain::archive::extension_of(&name).is_some() {
-        name
-    } else {
-        format!("{name}.zip")
-    };
+    let name = archive_name(&part.info, url, "", "external", Some("zip"));
     // A direct file has no provider identity, so never treat an existing file with the same name as its own earlier
     // download: number the new one instead of inventing a provider id for the comparison.
     let target = free_download_name(directory, &name, None);

@@ -1,12 +1,12 @@
 import { expect, test } from "bun:test";
 
-import { type Download, downloadSummary } from "@/nexus/use-downloads";
+import { type Download, downloadSummary } from "@/sources/downloads";
 
 function download(overrides: Partial<Download>): Download {
 	return {
 		id: 1,
 		game: "examplegame",
-		name: "CET",
+		name: "Example Mod",
 		source: null,
 		state: "downloading",
 		received_kb: 0,

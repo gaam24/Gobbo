@@ -3,9 +3,9 @@ import path from "node:path";
 import { browser } from "@wdio/globals";
 import type { AppSettings_Serialize as AppSettings } from "../../src/bindings";
 import { invoke, reloadWindow } from "../support/bridge";
-import { dataDir, definitionsDir, fixturesDir } from "../support/env";
-import { listDir, readJson, removeTree, writeFile, zipNames } from "../support/files";
-import { cleanupGame, seedGame, statusOf, uniqueId, waitForStatus } from "../support/seed";
+import { dataDir, fixturesDir } from "../support/env";
+import { listDir, readJson, writeFile, zipNames } from "../support/files";
+import { cleanupFixture, seedGame, statusOf, uniqueId, waitForStatus } from "../support/seed";
 import {
 	bodyText,
 	chooseSelect,
@@ -68,13 +68,16 @@ describe("settings", () => {
 		// The page hint lives behind its question mark, so open the tooltip before reading it.
 		await openTooltipByLabel("More information");
 		let text = await bodyText();
-		assert.ok(text.includes("Shared by every game"), "the app settings hint is missing");
+		assert.ok(
+			text.includes("These apply to every game. Each game has its own settings next to its mod list."),
+			"the app settings hint is missing",
+		);
 		assert.ok(text.includes("Remember the window"), "the window setting is missing");
-		await clickTab("Mod providers");
+		await clickTab("Mod sites");
 		text = await bodyText();
 		assert.ok(text.includes("API key"), "the provider key section is missing");
 		assert.ok(
-			text.includes("No key saved. Update checks are off.") || text.includes("A key is saved. Update checks use it."),
+			text.includes("No key saved, so update checks are off.") || text.includes("A key is saved and used for update checks."),
 			"the provider key state is missing",
 		);
 		assert.ok(text.includes("Download links"), "the link section is missing");
@@ -96,7 +99,9 @@ describe("settings", () => {
 			await waitForText("Język");
 			await waitForAppSetting((settings) => settings.language === "pl");
 			await reloadWindow();
+			// e2e-locale-exception: the Polish window title after the language switch, not an English locale string.
 			await clickByLabel("Ustawienia Gobbo Mods Organizer");
+			// e2e-locale-exception: the Polish window title after the language switch, not an English locale string.
 			await waitForText("Ustawienia Gobbo Mods Organizer");
 			await chooseSelect("#app-language", "English");
 			await browser.waitUntil(async () => (await browser.execute(() => document.documentElement.lang)) === "en", {
@@ -181,8 +186,6 @@ describe("settings", () => {
 		await clickByLabel(name);
 		await waitForHeading(name);
 		assert.equal((await statusOf(id)).settings.launch_args, "-e2e -auto");
-		await cleanupGame(id);
-		removeTree(path.join(definitionsDir, id));
-		removeTree(fixture.root);
+		await cleanupFixture(id, fixture.root);
 	});
 });

@@ -4,12 +4,13 @@ use std::sync::atomic::AtomicBool;
 
 use crate::context::profile::lock_profiles;
 use crate::context::{Data, load_library, load_profiles};
+use crate::domain::library::LibraryView;
 use crate::domain::source::SourceRef;
 use crate::error::AppError;
 use crate::games::{self, GameDef};
 use crate::import::IMPORT_CANCELLED;
 use crate::infra::tasks::stop_if;
-use crate::library::{LibraryView, sync};
+use crate::library::sync;
 use crate::providers;
 use crate::sources::update::{UpdateProgress, download_and_import};
 

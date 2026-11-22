@@ -3,18 +3,20 @@
 
 use crate::context::Data;
 use crate::context::load_library;
+use crate::domain::library::LibraryView;
+use crate::domain::library::view::FindQuery;
 use crate::domain::profiles::Row;
 use crate::error::AppError;
 use crate::games;
 use crate::profiles::actions::save_profile;
 use serde::Serialize;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::BTreeSet;
 
 /// Mod Organizer 2 keeps a separator as a mod whose name ends with this.
 const SEPARATOR_SUFFIX: &str = "_separator";
 
 /// The longest name a separator may have in Gobbo.
-const SEPARATOR_NAME_MAX: usize = 60;
+const SEPARATOR_NAME_MAX: usize = crate::domain::profiles::MAX_NAME_CHARS;
 
 /// One line of a `modlist.txt` that the import keeps.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -82,15 +84,8 @@ pub struct Mo2Import {
 pub fn import_mo2_list(root: &Data, game_id: &str, text: &str) -> Result<Mo2Import, AppError> {
     let game = games::load(game_id)?;
     let library = load_library(&root.game(game_id), &game)?;
-    // Normalize the library folders once, not once per line of the list. The first folder wins, as it did when the
-    // lookup walked `library.versions` for every line.
-    let mut by_key: HashMap<String, (&String, &crate::library::ModVersion)> =
-        HashMap::with_capacity(library.versions.len());
-    for (folder, record) in &library.versions {
-        by_key
-            .entry(crate::domain::naming::match_key(folder))
-            .or_insert((folder, record));
-    }
+    // The shared matcher owns the folder-key index and its "first folder wins" rule.
+    let view = LibraryView::new(&library);
 
     let mut rows = Vec::new();
     let mut families = BTreeSet::new();
@@ -111,15 +106,18 @@ pub fn import_mo2_list(root: &Data, game_id: &str, text: &str) -> Result<Mo2Impo
                 report.separators += 1;
             }
             Mo2Entry::Mod { name, enabled } => {
-                let wanted = crate::domain::naming::match_key(&name);
-
-                match by_key.get(&wanted) {
+                match view.find_with(FindQuery::by_key(&name), None) {
                     None => report.missing.push(name),
                     // Another version of a mod already in the list keeps the place of the first one.
-                    Some(&(folder, record)) => {
-                        if families.insert(record.family.clone()) {
+                    Some(found) => {
+                        // A keyed query always names the folder it matched.
+                        let Some(version) = found.version else {
+                            report.missing.push(name);
+                            continue;
+                        };
+                        if families.insert(version.family.clone()) {
                             rows.push(Row {
-                                folder: folder.clone(),
+                                folder: version.folder.clone(),
                                 enabled,
                                 separator: None,
                             });

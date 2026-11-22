@@ -12,10 +12,10 @@ use crate::context::{Data, load_library, load_profiles};
 use crate::domain::collection::{
     CollectionItem, CollectionItemStatus, CollectionOrigin, CollectionPlan, CollectionSource,
 };
+use crate::domain::library::LibraryView;
 use crate::domain::pack::WaitingMod;
 use crate::error::AppError;
 use crate::games;
-use crate::library::LibraryView;
 use crate::library::waiting::find_version;
 
 /// Creates or updates the profile of one collection, then returns its live session.
@@ -180,7 +180,8 @@ pub(in crate::collections) fn start_with_plan(
 
     let origin_for_status = origin.clone();
     let existing = profile.clone();
-    let before_status = status::statuses(&plan, &library, &existing, Some(&origin_for_status));
+    let before_status =
+        status::statuses_with_view(&plan, &library, &view, &existing, Some(&origin_for_status));
     let mut waiting = Vec::new();
     let mut anchor = match request.position {
         CollectionPosition::Top => profile.mods.first().map(|entry| entry.id.clone()),
@@ -270,7 +271,7 @@ pub(in crate::collections) fn start_with_plan(
 
     save_profiles(&data, &profiles)?;
     let profile = profiles.get(&profile_id)?;
-    let current = status::statuses(&plan, &library, profile, Some(&origin));
+    let current = status::statuses_with_view(&plan, &library, &view, profile, Some(&origin));
     Ok(session_view(profile_id, origin, plan, current))
 }
 

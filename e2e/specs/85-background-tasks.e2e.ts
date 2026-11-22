@@ -1,9 +1,6 @@
 import { strict as assert } from "node:assert";
-import path from "node:path";
 import { browser } from "@wdio/globals";
-import { definitionsDir } from "../support/env";
-import { removeTree } from "../support/files";
-import { cleanupGame, seedGame, uniqueId } from "../support/seed";
+import { cleanupFixture, seedGame, uniqueId } from "../support/seed";
 import { clickByText, clickGame, railView, textOf, waitForSelector, waitForText } from "../support/ui";
 
 const WORKING = "[aria-label='Working']";
@@ -47,8 +44,8 @@ describe("background tasks", () => {
 		const nameA = "Alpha Game";
 		const idB = uniqueId("beta");
 		const nameB = "Beta Game";
-		await seedGame({ id: idA, name: nameA });
-		await seedGame({ id: idB, name: nameB });
+		const { fixture: fixtureA } = await seedGame({ id: idA, name: nameA });
+		const { fixture: fixtureB } = await seedGame({ id: idB, name: nameB });
 
 		try {
 			// Start the work on game A.
@@ -82,10 +79,7 @@ describe("background tasks", () => {
 		} finally {
 			// Clear the injected row so it cannot leak into the next spec in the same window.
 			await emitTask("task-finished", taskFor(idA, "done"));
-			await cleanupGame(idA);
-			await cleanupGame(idB);
-			removeTree(path.join(definitionsDir, idA));
-			removeTree(path.join(definitionsDir, idB));
+			await cleanupFixture([idA, idB], [fixtureA.root, fixtureB.root]);
 		}
 	});
 });

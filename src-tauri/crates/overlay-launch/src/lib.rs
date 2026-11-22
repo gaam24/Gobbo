@@ -4,8 +4,7 @@
 //! rewrites the static import descriptors whose DLL is in the overlay layer, because the loader resolves those before the
 //! hook's detours exist; a DLL next to the program can then come from the layer without a file in the game folder.
 //!
-//! This is the only crate of Gobbo that calls Win32 directly, so it is the only one with `unsafe`. On other
-//! platforms the crate is empty.
+//! Like `overlay-hook`, this crate calls Win32 directly and uses `unsafe`. On other platforms the crate is empty.
 
 #![cfg(windows)]
 
@@ -21,7 +20,6 @@ pub use static_imports::imports;
 use std::ffi::{OsStr, OsString, c_void};
 use std::fs::File;
 use std::io;
-use std::iter::once;
 use std::os::windows::ffi::OsStrExt;
 use std::os::windows::io::AsRawHandle;
 use std::os::windows::io::RawHandle;
@@ -29,22 +27,23 @@ use std::path::{Path, PathBuf};
 use std::ptr::{null, null_mut};
 use std::time::Instant;
 
+use gobbo_overlay_core::wide;
 use windows_sys::Win32::Foundation::{
     CloseHandle, FALSE, HANDLE, HANDLE_FLAG_INHERIT, SetHandleInformation, TRUE, WAIT_OBJECT_0,
     WAIT_TIMEOUT,
 };
 use windows_sys::Win32::System::Threading::{
     CREATE_SUSPENDED, CREATE_UNICODE_ENVIRONMENT, CreateEventW, CreateProcessW,
-    DeleteProcThreadAttributeList, EXTENDED_STARTUPINFO_PRESENT, GetExitCodeProcess, GetProcessId,
-    INFINITE, InitializeProcThreadAttributeList, IsWow64Process, LPPROC_THREAD_ATTRIBUTE_LIST,
+    DeleteProcThreadAttributeList, EXTENDED_STARTUPINFO_PRESENT, GetExitCodeProcess, INFINITE,
+    InitializeProcThreadAttributeList, IsWow64Process, LPPROC_THREAD_ATTRIBUTE_LIST,
     PROC_THREAD_ATTRIBUTE_HANDLE_LIST, PROCESS_INFORMATION, ResetEvent, ResumeThread,
     STARTF_USESTDHANDLES, STARTUPINFOEXW, STARTUPINFOW, TerminateProcess,
     UpdateProcThreadAttribute, WaitForMultipleObjects, WaitForSingleObject,
 };
 
 /// How long the hook may take to load. The game stays suspended until it has, so a load that never returns would
-/// leave a process with no window and no error.
-const HOOK_LOAD_TIMEOUT_MS: u32 = 20_000;
+/// leave a process with no window and no error. The hook's child wait uses the same budget through `ReadyEvent`.
+pub const HOOK_LOAD_TIMEOUT_MS: u32 = 20_000;
 
 /// What to start, and the hook DLL to load into it.
 pub struct Launch<'a> {
@@ -278,7 +277,7 @@ pub fn spawn_hooked(launch: &Launch) -> io::Result<Hooked> {
         timings.stage0_us = micros(started);
         // The event is created before the hook can signal it. The hook signals after its hooks are installed.
         let started = Instant::now();
-        let ready = match ReadyEvent::create(info.hProcess) {
+        let ready = match ReadyEvent::create(info.dwProcessId) {
             Ok(ready) => ready,
             Err(error) => {
                 return Err(stop_suspended(&info, error));
@@ -331,7 +330,7 @@ pub fn spawn_hooked(launch: &Launch) -> io::Result<Hooked> {
         timings.resume_us = micros(started);
         let started = Instant::now();
 
-        if let Err(error) = ready.wait(info.hProcess) {
+        if let Err(error) = ready.wait(Some(info.hProcess)) {
             eprintln!(
                 "gobbo: the hook did not become ready in pid {}, stopping the game: {error}",
                 info.dwProcessId
@@ -483,20 +482,14 @@ fn stop_suspended(info: &PROCESS_INFORMATION, error: io::Error) -> io::Error {
     error
 }
 
-/// The event the hook signals after it has installed its hooks. The launcher creates it before the DLL is loaded, so
-/// the hook can open it from its initialization thread and the game is not resumed before the hooks are in place.
-struct ReadyEvent(HANDLE);
+/// The event the hook signals after it has installed its hooks. The launcher and the hook create it by process id before
+/// the DLL is loaded, so the hook can open it from its initialization thread and the program is not resumed before the
+/// hooks are in place.
+pub struct ReadyEvent(HANDLE);
 
 impl ReadyEvent {
-    /// Creates the event for `process`, unsignalled.
-    fn create(process: HANDLE) -> io::Result<Self> {
-        // SAFETY: `GetProcessId` only reads the id of the process handle.
-        let pid = unsafe { GetProcessId(process) };
-
-        if pid == 0 {
-            return Err(io::Error::last_os_error());
-        }
-
+    /// Creates the event for `pid`, unsignalled.
+    pub fn create(pid: u32) -> io::Result<Self> {
         let name = ready_event_name(pid);
         // SAFETY: `name` is a NUL-terminated name and the event is ours; it is closed by `Drop`.
         let event = unsafe { CreateEventW(null(), TRUE, FALSE, name.as_ptr()) };
@@ -510,23 +503,31 @@ impl ReadyEvent {
         Ok(Self(event))
     }
 
-    /// Waits until the hook reports that its installation finished, or until the game exits first.
-    fn wait(&self, process: HANDLE) -> io::Result<()> {
-        let handles = [self.0, process];
-        // SAFETY: both handles are valid for the duration of the call.
-        let waited =
-            unsafe { WaitForMultipleObjects(2, handles.as_ptr(), FALSE, HOOK_LOAD_TIMEOUT_MS) };
-        match waited {
-            WAIT_OBJECT_0 => Ok(()),
-            value if value == WAIT_OBJECT_0 + 1 => {
+    /// Waits until the hook reports that its installation finished. When `process` is given, the wait ends early if that
+    /// process exits first; a child started by the hook has no such handle yet and only waits for its own event.
+    pub fn wait(&self, process: Option<HANDLE>) -> io::Result<()> {
+        let waited = match process {
+            Some(process) => {
+                let handles = [self.0, process];
+                // SAFETY: both handles are valid for the duration of the call.
+                unsafe { WaitForMultipleObjects(2, handles.as_ptr(), FALSE, HOOK_LOAD_TIMEOUT_MS) }
+            }
+            None => {
+                // SAFETY: `self.0` is an event handle that lives until this value is dropped.
+                unsafe { WaitForSingleObject(self.0, HOOK_LOAD_TIMEOUT_MS) }
+            }
+        };
+        match (waited, process) {
+            (WAIT_OBJECT_0, _) => Ok(()),
+            (value, Some(process)) if value == WAIT_OBJECT_0 + 1 => {
                 let mut code = 0;
-                // SAFETY: `process` is the handle the launcher owns.
+                // SAFETY: `process` is the handle the caller owns.
                 unsafe { GetExitCodeProcess(process, &mut code) };
                 Err(io::Error::other(format!(
                     "the game exited before the overlay hook was ready (code {code})"
                 )))
             }
-            WAIT_TIMEOUT => Err(io::Error::new(
+            (WAIT_TIMEOUT, _) => Err(io::Error::new(
                 io::ErrorKind::TimedOut,
                 format!(
                     "the overlay hook did not report ready within {} seconds",
@@ -629,11 +630,6 @@ fn environment_block(extra: &[(String, String)]) -> Vec<u16> {
 
     block.push(0);
     block
-}
-
-/// A string as a NUL-terminated UTF-16 buffer, for Win32.
-fn wide(text: &OsStr) -> Vec<u16> {
-    text.encode_wide().chain(once(0)).collect()
 }
 
 #[cfg(test)]

@@ -6,6 +6,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::error::{AppError, io_at};
+use crate::infra::storage::is_portable_data_dir;
 use crate::update::archive::is_program_file;
 
 /// The suffix of a file moved aside by an update. Only files with it are removed at start.
@@ -118,7 +119,11 @@ pub fn cleanup_leftovers(program_dir: &Path) {
     for entry in entries.flatten() {
         let path = entry.path();
 
-        if path.file_name().is_some_and(|name| name == "data") {
+        if path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(is_portable_data_dir)
+        {
             continue;
         }
 

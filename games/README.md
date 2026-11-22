@@ -122,6 +122,10 @@ merge rules, variants and versioning.
 Unknown keys are errors. Paths are relative to the game folder (or to the deployment root under `[deploy]`) and use
 `/`. Extensions are lowercase with the dot. Overlay is the only deployment method.
 
+Some keys documented below — verification, copy-only profile data, bare requirements, an alternate Linux root, extra
+store ids, load-order bounds and launch `args`, including a loader's `requires` — are accepted for user-written and
+older definitions but unused by the shipped catalog.
+
 ### Top level
 
 | Key            | Meaning                                                                                                                                                                  |
@@ -163,6 +167,7 @@ the frontend translates.
 | `id`      | Lowercase letters, digits and `-`; unique in the game (`game` is reserved). It names the profile's state folder, not a UI label.                                                                    |
 | `kind`    | `user-data` (default), `settings`, `saves`, `config` or `mods`. One shared translation per kind, for every game.                                                                                    |
 | `path`    | A path template naming the folder, for example `{documents}/The Witcher 3`.                                                                                                                         |
+| `path_linux` | A path template for a native Linux build. Empty or missing falls back to `path`.                                                                                                                 |
 | `mode`    | `redirect` (default) serves it through the overlay; `copy` copies it around a launch. The app falls back to copy.                                                                                   |
 | `default` | `shared` (default) or `isolated` for a new profile. Profiles created before the set use `shared`.                                                                                                   |
 | `inherit` | `true` (default): an isolated redirect sees the existing folder as a read-only base. `false`: the first isolated launch copies the existing folder into the profile once, then the profile owns it. |
@@ -250,7 +255,7 @@ to = "archive/pc/mod"
 | `enable_file`            | A file name Gobbo writes into every mod folder in the slot, for a loader that loads only a folder that has it. UE4SS reads `enabled.txt`. A flat slot cannot use it.                                      |
 | `extensions`             | Only these files go into the slot.                                                                                                                                                                      |
 | `root_extensions`        | Bare files at the archive root with these extensions go into the slot too.                                                                                                                              |
-| `root_folder_extensions` | Folders at the archive root that hold a file with these extensions are mods: `<Plugin>/<plugin>.dll`. In a flat slot the folder names the mod in the library, but its files deploy directly into `dir`. |
+| `root_folder_extensions` | Folders at the archive root that hold a file with these extensions are mods: `<Plugin>/<plugin>.dll`. In a flat slot the folder names the mod in the library, but its files deploy directly into `dir`. Omitted, it copies `root_extensions`; an explicit empty list turns the rule off. |
 | `flat`                   | The files go directly into `dir`, without a folder per mod.                                                                                                                                             |
 
 `[[deploy.mirror]]`: `dir` (a folder or a single file), `extensions` (only these files), `prefix` (a folder directly
@@ -323,9 +328,10 @@ the deployment root. See the loader package section in
 
 ### Path templates
 
-`{game}`, `{prefix}` (the Proton prefix), `{appdata}`, `{local_appdata}`, `{documents}`, `{home}`, and in
-`profile_data` also `{settings}` (the folder of the order file). For a Steam game with a Proton prefix the user
-folders are the ones Windows programs see inside the prefix. For an install that is not from Steam, the prefix is the
+`{game}`, `{prefix}` (the Proton prefix), `{appdata}`, `{local_appdata}`, `{local_low}` (Windows `LocalLow`, inside the
+prefix under Proton), `{documents}`, `{home}`, and in `profile_data` also `{settings}` (the folder of the order file).
+For a Steam game with a Proton prefix the user folders are the ones Windows programs see inside the prefix. For an
+install that is not from Steam, the prefix is the
 one Heroic or Lutris names, the one the user picks, or else the one Gobbo owns in the game's data folder; it exists once
 the game has been started. Under Proton the user folders always resolve inside the prefix, never to the Linux home
 folders, so a template waits for the first start instead of moving. A game's `user_data` sets are the exception: their

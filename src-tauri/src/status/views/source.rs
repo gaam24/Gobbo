@@ -71,7 +71,7 @@ impl UpdateReport {
     /// whether it is an update. A provider file id is exact, so it is preferred over the version string.
     pub fn with_library(
         mut self,
-        view: &crate::library::LibraryView<'_>,
+        view: &crate::domain::library::LibraryView<'_>,
         latest_file: Option<&str>,
     ) -> Self {
         self.installed_folder = view

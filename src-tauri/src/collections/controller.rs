@@ -4,7 +4,7 @@
 //! restarted window resumes from the same place.
 
 use std::collections::BTreeSet;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 
 use serde::{Deserialize, Serialize};
@@ -111,9 +111,9 @@ pub fn classify(view: &CollectionInstallView) -> RoundState {
         .map(|choice| CollectionPrompt::Choice {
             item: choice.key.clone(),
             name: choice.name.clone(),
-            path: choice.path.clone(),
-            module_name: choice.module_name.clone(),
-            steps: choice.steps.clone(),
+            path: choice.choice.path.display().to_string(),
+            module_name: choice.choice.module_name.clone(),
+            steps: choice.choice.steps.clone(),
         })
         .or_else(|| {
             view.needs_user.first().and_then(|key| {
@@ -338,7 +338,7 @@ fn choice_prompt_for_file(
     path: &str,
     original: AppError,
 ) -> Result<CollectionRoundView, AppError> {
-    let (module_name, steps) = match crate::import::inspect(root, game_id, Path::new(path))? {
+    let (module_name, steps) = match crate::import::inspect_at(game_id, Path::new(path))? {
         crate::import::model::ZipInspect::Fomod { module_name, steps } => (module_name, steps),
         crate::import::model::ZipInspect::Plain => return Err(original),
     };
@@ -350,9 +350,11 @@ fn choice_prompt_for_file(
         needs_choice: vec![crate::collections::model::CollectionChoiceNeeded {
             key: item.to_string(),
             name,
-            path: path.to_string(),
-            module_name,
-            steps,
+            choice: crate::import::model::ChoiceNeeded {
+                path: PathBuf::from(path),
+                module_name,
+                steps,
+            },
         }],
         ..view(root, game_id, profile, collection)?
     }))
@@ -461,9 +463,11 @@ mod tests {
                 vec![CollectionChoiceNeeded {
                     key: "fomod".into(),
                     name: "Fomod mod".into(),
-                    path: "/tmp/fomod.zip".into(),
-                    module_name: "Example module".into(),
-                    steps: Vec::new(),
+                    choice: crate::import::model::ChoiceNeeded {
+                        path: "/tmp/fomod.zip".into(),
+                        module_name: "Example module".into(),
+                        steps: Vec::new(),
+                    },
                 }]
             } else {
                 Vec::new()

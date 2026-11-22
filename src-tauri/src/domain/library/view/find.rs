@@ -1,12 +1,16 @@
 //! The one rule that answers "which mod of the library is this?". A pack mod, a waiting entry and a collection member
 //! all describe the mod they want as a `PackMod`; every caller asks this rule instead of keeping its own index, so a
-//! fix to the matching reaches packs, collections and the waiting list at once.
+//! fix to the matching reaches packs, collections and the waiting list at once. A profile importer names the same
+//! description with a different comparison policy, which this rule owns too.
 
 use std::collections::BTreeMap;
 
 use super::LibraryView;
 use crate::domain::library::ModVersion;
-use crate::domain::pack::PackMod;
+use crate::domain::naming::match_key;
+use crate::domain::pack::{PackArchive, PackMod};
+use crate::domain::pathkey::fold_case;
+use crate::domain::source::{ProviderId, SourceMod};
 
 /// How the library mod was recognised, strongest first.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -17,8 +21,100 @@ pub enum FoundBy {
     File,
     /// The family is the provider page (and part) the mod names; the file may differ.
     Page,
-    /// The family has the mod's name; nothing else identifies it.
+    /// The family or folder has the mod's name; nothing else identifies it.
     Name,
+}
+
+/// How a caller's identifiers are compared with the library's.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum MatchPolicy {
+    /// Exact ids and ASCII-case-insensitive names: the rule of packs, collections and waiting entries.
+    #[default]
+    Strict,
+    /// Provider page ids and version labels compared with the app's case fold, with no fallback to a name: the rule of
+    /// a community profile's package slug.
+    FoldCase,
+    /// Names compared by their letter-and-digit key against version folders: the rule of a Mod Organizer 2 list.
+    MatchKey,
+}
+
+static NO_SOURCES: BTreeMap<ProviderId, SourceMod> = BTreeMap::new();
+static NO_FILES: BTreeMap<ProviderId, String> = BTreeMap::new();
+static NO_PARTS: BTreeMap<ProviderId, String> = BTreeMap::new();
+
+/// The description the matcher resolves. `find` builds this from a pack mod; an importer that compares identifiers
+/// differently builds the same query with its own policy.
+pub struct FindQuery<'a> {
+    /// The name the caller knows the mod by.
+    pub name: &'a str,
+    /// The version label the caller names, when it names one.
+    pub version: Option<&'a str>,
+    /// The archive the mod came from, when the caller names one.
+    pub archive: Option<&'a PackArchive>,
+    /// The provider pages the caller names.
+    pub sources: &'a BTreeMap<ProviderId, SourceMod>,
+    /// The exact provider files the caller names.
+    pub source_files: &'a BTreeMap<ProviderId, String>,
+    /// The parts the caller names, per provider.
+    pub source_parts: &'a BTreeMap<ProviderId, String>,
+    /// The part's display name, when the caller names it.
+    pub part_name: Option<&'a str>,
+    /// The page a community or other source-based importer names, when it names one.
+    pub provider: Option<&'a ProviderId>,
+    /// The mod id of that page.
+    pub mod_id: Option<&'a str>,
+    /// How the identifiers are compared.
+    pub policy: super::MatchPolicy,
+}
+
+impl<'a> FindQuery<'a> {
+    /// The strict query of a pack mod, a collection member or a waiting entry.
+    pub(crate) fn of(wanted: &'a PackMod) -> Self {
+        Self {
+            name: &wanted.name,
+            version: wanted.version.as_deref(),
+            archive: wanted.archive.as_ref(),
+            sources: &wanted.sources,
+            source_files: &wanted.source_files,
+            source_parts: &wanted.source_parts,
+            part_name: wanted.part_name.as_deref(),
+            provider: None,
+            mod_id: None,
+            policy: MatchPolicy::Strict,
+        }
+    }
+
+    /// A community profile's package slug and version, compared with the app's case fold.
+    pub fn folded(provider: &'a ProviderId, mod_id: &'a str, version: &'a str) -> Self {
+        Self {
+            name: mod_id,
+            version: Some(version),
+            archive: None,
+            sources: &NO_SOURCES,
+            source_files: &NO_FILES,
+            source_parts: &NO_PARTS,
+            part_name: None,
+            provider: Some(provider),
+            mod_id: Some(mod_id),
+            policy: MatchPolicy::FoldCase,
+        }
+    }
+
+    /// A Mod Organizer 2 folder name, compared with the letter-and-digit key of a library folder.
+    pub fn by_key(name: &'a str) -> Self {
+        Self {
+            name,
+            version: None,
+            archive: None,
+            sources: &NO_SOURCES,
+            source_files: &NO_FILES,
+            source_parts: &NO_PARTS,
+            part_name: None,
+            provider: None,
+            mod_id: None,
+            policy: MatchPolicy::MatchKey,
+        }
+    }
 }
 
 /// The library family a wanted mod stands for.
@@ -53,13 +149,35 @@ impl<'a> LibraryView<'a> {
         wanted: &PackMod,
         imported: Option<&BTreeMap<String, Vec<String>>>,
     ) -> Option<Found<'a>> {
-        if let Some(found) = self.by_archive(wanted, imported) {
+        self.find_with(FindQuery::of(wanted), imported)
+    }
+
+    /// Finds the library mod `query` describes under its comparison policy. The strict policy is the one `find` uses;
+    /// the other two let a profile importer keep its own matching rule without scanning the library itself.
+    pub fn find_with(
+        &self,
+        query: FindQuery<'_>,
+        imported: Option<&BTreeMap<String, Vec<String>>>,
+    ) -> Option<Found<'a>> {
+        match query.policy {
+            MatchPolicy::Strict => self.find_strict(&query, imported),
+            MatchPolicy::FoldCase => self.find_folded(&query),
+            MatchPolicy::MatchKey => self.find_by_key(&query),
+        }
+    }
+
+    fn find_strict(
+        &self,
+        query: &FindQuery<'_>,
+        imported: Option<&BTreeMap<String, Vec<String>>>,
+    ) -> Option<Found<'a>> {
+        if let Some(found) = self.by_archive(query, imported) {
             return Some(found);
         }
         // The provider's exact file id is stronger than the version label: a recipe can name a version differently from
         // the archive it points at.
-        for (provider, source) in &wanted.sources {
-            let Some(file_id) = wanted.source_files.get(provider) else {
+        for (provider, source) in query.sources {
+            let Some(file_id) = query.source_files.get(provider) else {
                 continue;
             };
 
@@ -73,13 +191,13 @@ impl<'a> LibraryView<'a> {
         }
 
         let (family, by) = self
-            .family_of_wanted_page(wanted)
+            .family_of_wanted_page(query)
             .map(|family| (family, FoundBy::Page))
             .or_else(|| {
-                self.family_named_loosely(&wanted.name)
+                self.family_named_loosely(query.name)
                     .map(|family| (family, FoundBy::Name))
             })?;
-        let version = wanted.version.as_deref().map_or_else(
+        let version = query.version.map_or_else(
             || self.default_version(family),
             |label| {
                 self.versions_of(family)
@@ -95,12 +213,46 @@ impl<'a> LibraryView<'a> {
         })
     }
 
+    /// The community profile's rule: a package slug is a provider id, never a display name, and both the id and the
+    /// version are compared with the app's case fold. No exact version leaves the choice to the caller, which selects
+    /// the family's default and reports the other version.
+    fn find_folded(&self, query: &FindQuery<'_>) -> Option<Found<'a>> {
+        let family = self.family_of_source_folded(query.provider?, query.mod_id?)?;
+        let version = query.version.and_then(|label| {
+            let wanted = fold_case(label);
+            self.library.versions.values().find(|version| {
+                version.family == family
+                    && version
+                        .info
+                        .version
+                        .as_deref()
+                        .is_some_and(|known| fold_case(known) == wanted)
+            })
+        });
+        Some(Found {
+            family,
+            version,
+            by: FoundBy::Page,
+        })
+    }
+
+    /// The Mod Organizer 2 rule: a list line names the folder, so the matching version is the one whose folder key is
+    /// the line's key. The first folder of a key wins, and the caller keeps its own filter of one version per family.
+    fn find_by_key(&self, query: &FindQuery<'_>) -> Option<Found<'a>> {
+        let version = self.version_by_key(&match_key(query.name))?;
+        Some(Found {
+            family: version.family.as_str(),
+            version: Some(version),
+            by: FoundBy::Name,
+        })
+    }
+
     fn by_archive(
         &self,
-        wanted: &PackMod,
+        query: &FindQuery<'_>,
         imported: Option<&BTreeMap<String, Vec<String>>>,
     ) -> Option<Found<'a>> {
-        let sha256 = &wanted.archive.as_ref()?.sha256;
+        let sha256 = &query.archive?.sha256;
         let from_archive = self.versions_from_archive(sha256);
         let fresh: Vec<&'a ModVersion> = imported
             .and_then(|map| map.get(sha256.as_str()))
@@ -119,7 +271,7 @@ impl<'a> LibraryView<'a> {
         };
         let version = candidates
             .iter()
-            .find(|version| version.info.name == wanted.name)
+            .find(|version| version.info.name == query.name)
             .or_else(|| candidates.first())
             .copied()?;
         Some(Found {
@@ -129,22 +281,22 @@ impl<'a> LibraryView<'a> {
         })
     }
 
-    /// The family of the page and part `wanted` names. Without a part id, the part whose name the mod carries wins,
+    /// The family of the page and part `query` names. Without a part id, the part whose name the mod carries wins,
     /// then the page's first family, so two addons of one page do not resolve to the same family by accident.
-    fn family_of_wanted_page(&self, wanted: &PackMod) -> Option<&'a str> {
-        wanted
+    fn family_of_wanted_page(&self, query: &FindQuery<'_>) -> Option<&'a str> {
+        query
             .sources
             .iter()
             .find_map(|(provider, source)| {
                 let part = source
                     .part_id
                     .as_deref()
-                    .or_else(|| wanted.source_parts.get(provider).map(String::as_str))?;
+                    .or_else(|| query.source_parts.get(provider).map(String::as_str))?;
                 self.family_of_part(provider, &source.mod_id, part)
             })
             .or_else(|| {
-                let name = wanted.part_name.as_deref().unwrap_or(&wanted.name).trim();
-                wanted.sources.iter().find_map(|(provider, source)| {
+                let name = query.part_name.unwrap_or(query.name).trim();
+                query.sources.iter().find_map(|(provider, source)| {
                     let mut families = self.families_of_page(provider, &source.mod_id);
                     let first = families.next();
                     families
@@ -290,5 +442,62 @@ mod tests {
         entry.sources.clear();
         let found = view.find(&entry, None).unwrap();
         assert_eq!((found.family, found.by), ("fam-a", FoundBy::Name));
+    }
+
+    #[test]
+    fn a_folded_query_uses_the_provider_id_and_the_folded_version_label() {
+        let mut lib = library();
+        let slug_id = "owner-package";
+        lib.families.insert(
+            slug_id.into(),
+            Family {
+                id: slug_id.into(),
+                name: "Not the slug".into(),
+                sources: BTreeMap::from([(
+                    ProviderId::new(PROVIDER),
+                    source("Owner-Package", None),
+                )]),
+                ..Family::default()
+            },
+        );
+        let mut version = mod_version(slug_id, slug_id, "A release", Some("1.2.3"));
+        version.info.version = Some("1.2.3".into());
+        lib.versions.insert(slug_id.into(), version);
+
+        let view = LibraryView::new(&lib);
+        let provider = ProviderId::new(PROVIDER);
+        let exact = view
+            .find_with(FindQuery::folded(&provider, "OWNER-package", "1.2.3"), None)
+            .unwrap();
+        assert_eq!(exact.family, slug_id);
+        assert_eq!(
+            exact.version.map(|version| version.folder.as_str()),
+            Some(slug_id)
+        );
+
+        let other = view
+            .find_with(FindQuery::folded(&provider, "owner-PACKAGE", "9.9.9"), None)
+            .unwrap();
+        assert_eq!(other.family, slug_id);
+        assert!(other.version.is_none());
+    }
+
+    #[test]
+    fn a_keyed_query_uses_the_first_folder_whose_key_matches() {
+        let mut lib = library();
+        lib.versions.insert(
+            "mod-a".into(),
+            mod_version("mod-a", "fam-a", "A release", Some("1.0")),
+        );
+        lib.versions.insert(
+            "mod.a".into(),
+            mod_version("mod.a", "fam-a", "A release", Some("2.0")),
+        );
+        let view = LibraryView::new(&lib);
+        let found = view.find_with(FindQuery::by_key("Mod A!"), None).unwrap();
+        assert_eq!(
+            found.version.map(|version| version.folder.as_str()),
+            Some("mod-a")
+        );
     }
 }

@@ -5,7 +5,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::domain::source::SourceRef;
-use crate::error::{AppError, FileError};
+use crate::error::{AppError, io_at};
 
 /// The suffix that keeps a download's source beside its archive, so an import never has to guess it from the file name.
 pub const SOURCE_SUFFIX: &str = ".source.json";
@@ -31,8 +31,7 @@ pub fn read_source(archive: &Path) -> Option<SourceRef> {
 
 /// Deletes a downloaded archive and its sidecar, ignoring a missing sidecar.
 pub fn delete_download(archive: &Path) -> Result<(), AppError> {
-    crate::infra::fs::remove_file_if_exists(archive)
-        .map_err(|error| AppError::from(FileError::new(archive, error)))?;
+    crate::infra::fs::remove_file_if_exists(archive).map_err(io_at(archive))?;
     let _ = fs::remove_file(source_file(archive));
     Ok(())
 }

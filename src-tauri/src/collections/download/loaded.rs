@@ -25,15 +25,23 @@ pub(super) struct LoadedCollection {
 }
 
 impl LoadedCollection {
-    pub(super) fn statuses(&self) -> status::StatusSet {
-        status::statuses(&self.plan, &self.library, &self.profile, Some(&self.origin))
+    /// The member statuses, using the view the operation built for this library. A view borrows the library, so it
+    /// cannot be a field of this owned struct; the command that loads a collection owns it for the whole operation.
+    pub(super) fn statuses(&self, view: &LibraryView<'_>) -> status::StatusSet {
+        status::statuses_with_view(
+            &self.plan,
+            &self.library,
+            view,
+            &self.profile,
+            Some(&self.origin),
+        )
     }
 
     /// Whether the library already holds the exact provider file a member would download. A page can have several
     /// parts, so the file id, not the version or the family, decides. This is checked before a transfer starts, because
     /// the import would refuse the same archive by its digest afterwards and leave a duplicate in the downloads folder.
-    pub(super) fn has_library_file(&self, source: &SourceRef) -> bool {
-        acquire::existing_file(&LibraryView::new(&self.library), source).is_some()
+    pub(super) fn has_library_file(view: &LibraryView<'_>, source: &SourceRef) -> bool {
+        acquire::existing_file(view, source).is_some()
     }
 }
 

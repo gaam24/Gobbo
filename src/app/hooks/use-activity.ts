@@ -11,6 +11,7 @@ import { clearFailedTask, type FailedTask, useFailedTasks } from "@/lib/failed-t
 import { errorText } from "@/lib/ipc";
 import { formatSize } from "@/lib/mods";
 import { type ImportState, useProgress } from "@/lib/progress-store";
+import { nameOfId } from "@/lib/records";
 import { dedupeKey, type Task, type TaskStages, taskDedupeOf } from "@/lib/tasks";
 import {
 	type RegisteredTask,
@@ -19,7 +20,7 @@ import {
 	useBackendTasks,
 	useRegisteredTasks,
 } from "@/lib/tasks-store";
-import type { Download } from "@/nexus/use-downloads";
+import type { Download } from "@/sources/downloads";
 
 /// The steps each kind of work goes through, in order, as the stage codes the backend reports.
 const IMPORT_STAGES = ["downloading", "hashing", "extracting", "copying"] as const;
@@ -269,7 +270,7 @@ function deployDetail(progress: DeployProgress | null, t: Translate): string | u
 /// The name of a game id from the catalogue, falling back to the id for a game just removed from it.
 function gameNameOf(gameId: string | undefined | null, games: Array<{ id: string; name: string }>): string | undefined {
 	if (!gameId) return undefined;
-	return games.find((game) => game.id === gameId)?.name ?? gameId;
+	return nameOfId(games, gameId);
 }
 
 /// Every failure stays until it is retried or dismissed, regardless of the active game. The game name travels with the

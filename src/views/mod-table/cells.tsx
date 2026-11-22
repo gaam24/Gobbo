@@ -1,13 +1,13 @@
 import { cn } from "cn";
 import { Check, ChevronDown, CircleArrowUp, Download, EyeOff, Trash2 } from "lucide-react";
-import { type ReactNode, useState } from "react";
-import { commands, type UpdateReport, type VersionView } from "@/bindings";
+import type { ReactNode } from "react";
+import type { UpdateReport, VersionView } from "@/bindings";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useTranslation } from "@/i18n";
-import { unwrap } from "@/lib/ipc";
 import { activeConflicts, checkedAtOf, formatCount, formatDate, formatSize, type Mod } from "@/lib/mods";
 import { EMPTY } from "@/views/mod-table/layout";
+import { useModVersions } from "@/views/mod-table/use-mod-versions";
 
 /// The version and its update state, with a picker when more than one version is installed. The arrow and the words
 /// say "update available", not only the colour.
@@ -32,22 +32,7 @@ export function VersionCell({
 	const installed = mod.info.version ?? t("common.none");
 	/// The time of the saved check, shown on hover: the state above is the result of that check.
 	const checkedAt = checkedAtOf(mod);
-	// The status list carries only the version count. The picker asks for the versions when it is opened, so a
-	// library of thousands of mods does not ship every version of every mod on each status.
-	const [versions, setVersions] = useState<VersionView[] | null>(null);
-	const [failed, setFailed] = useState(false);
-	const loadVersions = async () => {
-		// A failed read is retried on the next open; a successful one stays until the row remounts with another
-		// version count, which the call site uses as its key.
-		if (versions !== null) return;
-		setFailed(false);
-
-		try {
-			setVersions(await unwrap(commands.modVersions(gameId, mod.folder)));
-		} catch {
-			setFailed(true);
-		}
-	};
+	const { versions, failed, loadVersions } = useModVersions(gameId, mod.folder);
 
 	/// The provider's latest version is in the library already. The backend names its folder, so it becomes the selected
 	/// one and the user does not have to open the picker to understand that "Installed 1.4" means "1.4 is ready to use".
@@ -199,16 +184,6 @@ export function ConflictText({ wins, loses, onOpen }: { wins: number; loses: num
 		>
 			{content}
 		</Button>
-	);
-}
-
-/// Text that may be missing. The cell truncates long text, so the full text is in the title.
-export function TextCell({ value }: { value: string | null | undefined }) {
-	if (!value) return <span className="text-subtle-foreground text-xs">{EMPTY}</span>;
-	return (
-		<span className="text-muted-foreground block truncate text-xs" title={value}>
-			{value}
-		</span>
 	);
 }
 

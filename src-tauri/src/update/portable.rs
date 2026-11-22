@@ -7,9 +7,10 @@ use tauri_plugin_updater::{Updater, UpdaterExt};
 
 use crate::error::AppError;
 use crate::infra::storage;
+use crate::platform::portable_target;
 use crate::update::archive;
 use crate::update::commands::PortableUpdateStep;
-use crate::update::{portable_target, relaunch, swap};
+use crate::update::{relaunch, swap};
 
 /// Downloads the newer portable version, checks its signature, replaces the program files and starts the new copy.
 /// The data folder is not touched. The command returns only when it fails: on success the app restarts.

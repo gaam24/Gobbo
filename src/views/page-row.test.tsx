@@ -3,7 +3,8 @@ import type { ReactNode } from "react";
 import { renderToString } from "react-dom/server";
 import type { UpdateReport } from "@/bindings";
 import { applyLanguage } from "@/i18n";
-import type { Group, Mod } from "@/lib/mods";
+import type { Group } from "@/lib/mods";
+import { modFixture } from "@/test/fixtures/mod";
 
 // A menu draws its items in a portal, which has no container without a browser. The header's menu is what these checks
 // read, so the dropdown draws its children inline. Every export is replaced: Bun keeps a module mock for later files,
@@ -37,44 +38,6 @@ const nothing = () => {
 	// The header's actions are not part of this check.
 };
 
-/// One installed part of the header, with the fields the cells read.
-function part(id: string, name: string, version: string): Mod {
-	return {
-		id,
-		folder: name,
-		fomod_installer: false,
-		version_count: 1,
-		installed_at: 0,
-		slot: "Mods",
-		update: null,
-		enabled: true,
-		priority: 1,
-		load_priority: null,
-		files: 2,
-		size_kb: 10,
-		wins: 0,
-		loses: 0,
-		archive: null,
-		archive_file: null,
-		skipped: 0,
-		info: { name, version, author: null, description: null },
-		source: null,
-		sources: [],
-		page_id: "nexus:225",
-		page_name: "KS Page",
-		part_id: id,
-		part_name: name,
-		part_category: null,
-		tags: [],
-		instructions: "",
-		unmet_requirements: 0,
-		profiles: [],
-		collections: [],
-		requires_names: [],
-		requirement_groups: [],
-	};
-}
-
 const nameColumns = COLUMNS.slice(0, 3);
 const withCategory = [...nameColumns, ...COLUMNS.filter((column) => column.id === "category")];
 
@@ -101,12 +64,31 @@ function render(group: Group, columns = nameColumns, updates: Record<string, Upd
 
 test("a page header still shows its name, page menu and delete action", () => {
 	const page = {
-		id: "page:nexus:225",
-		pageId: "nexus:225",
-		name: "KS Page",
+		id: "page:provider:225",
+		pageId: "provider:225",
+		name: "Example Page",
 		author: null,
 		category: null,
-		mods: [part("nexus:225", "Base", "1.0"), part("nexus:225#200", "Addon", "2.0")],
+		mods: [
+			modFixture({
+				id: "provider:225",
+				folder: "Base",
+				page_id: "provider:225",
+				page_name: "Example Page",
+				part_id: "provider:225",
+				part_name: "Base",
+				info: { version: "1.0" },
+			}),
+			modFixture({
+				id: "provider:225#200",
+				folder: "Addon",
+				page_id: "provider:225",
+				page_name: "Example Page",
+				part_id: "provider:225#200",
+				part_name: "Addon",
+				info: { version: "2.0" },
+			}),
+		],
 	};
 	const group: Group = {
 		source: "page",
@@ -116,10 +98,10 @@ test("a page header still shows its name, page menu and delete action", () => {
 		page,
 	};
 	const html = render(group);
-	expect(html).toContain("KS Page");
+	expect(html).toContain("Example Page");
 	expect(html).toContain("2 parts");
-	expect(html).toContain('aria-label="Actions for KS Page"');
-	expect(html).toContain("Fold KS Page");
+	expect(html).toContain('aria-label="Actions for Example Page"');
+	expect(html).toContain("Fold Example Page");
 	expect(html).toContain("Delete page…");
 });
 
@@ -128,7 +110,10 @@ test("a user-group header shows its name and a mod count, without the page actio
 		source: "user",
 		id: "group:g1",
 		name: "Quality tweaks",
-		parts: [part("one", "One", "1.0"), part("two", "Two", "2.0")],
+		parts: [
+			modFixture({ id: "one", folder: "One", info: { version: "1.0" } }),
+			modFixture({ id: "two", folder: "Two", info: { version: "2.0" } }),
+		],
 		group: {
 			id: "g1",
 			name: "Quality tweaks",
@@ -150,7 +135,10 @@ test("a translation group shows its language and the translation action", () => 
 		source: "user",
 		id: "group:g2",
 		name: "German pack",
-		parts: [part("one", "One", "1.0"), part("two", "Two", "2.0")],
+		parts: [
+			modFixture({ id: "one", folder: "One", info: { version: "1.0" } }),
+			modFixture({ id: "two", folder: "Two", info: { version: "2.0" } }),
+		],
 		group: {
 			id: "g2",
 			name: "German pack",
@@ -168,12 +156,31 @@ afterAll(() => mock.restore());
 
 test("a page header says the check failed when a part's check failed, not up to date", () => {
 	const page = {
-		id: "page:nexus:225",
-		pageId: "nexus:225",
-		name: "KS Page",
+		id: "page:provider:225",
+		pageId: "provider:225",
+		name: "Example Page",
 		author: null,
 		category: null,
-		mods: [part("nexus:225", "Base", "1.0"), part("nexus:225#200", "Addon", "2.0")],
+		mods: [
+			modFixture({
+				id: "provider:225",
+				folder: "Base",
+				page_id: "provider:225",
+				page_name: "Example Page",
+				part_id: "provider:225",
+				part_name: "Base",
+				info: { version: "1.0" },
+			}),
+			modFixture({
+				id: "provider:225#200",
+				folder: "Addon",
+				page_id: "provider:225",
+				page_name: "Example Page",
+				part_id: "provider:225#200",
+				part_name: "Addon",
+				info: { version: "2.0" },
+			}),
+		],
 	};
 	const group: Group = {
 		source: "page",
@@ -183,7 +190,7 @@ test("a page header says the check failed when a part's check failed, not up to 
 		page,
 	};
 	const failed: UpdateReport = {
-		id: "nexus:225",
+		id: "provider:225",
 		provider: "nexus",
 		mod_id: "225",
 		current: "1.0",
@@ -196,7 +203,7 @@ test("a page header says the check failed when a part's check failed, not up to 
 		error: { code: "source.check_failed", params: {}, kind: "user_action" },
 	};
 	const versionColumns = COLUMNS.filter((column) => column.id === "version");
-	const html = render(group, versionColumns, { "nexus:225": failed });
+	const html = render(group, versionColumns, { "provider:225": failed });
 	expect(html).toContain("Check failed");
 	expect(html).not.toContain("Up to date");
 });

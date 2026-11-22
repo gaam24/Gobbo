@@ -127,7 +127,7 @@ export function ModsView({ gameId, status }: ModsViewProps) {
 	});
 
 	const focused = selection[selection.length - 1] ?? null;
-	const selectedSet = useMemo(() => new Set(selection), [selection]);
+	const selectedSet = new Set(selection);
 
 	/// One stable object for every memoized row and card. The refs carry the newest status and action wrappers, so a
 	/// status answer never changes a row's props; the group is resolved when a menu actually opens.

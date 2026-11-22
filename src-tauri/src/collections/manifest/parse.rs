@@ -200,11 +200,12 @@ fn build(
         ));
     }
 
-    if archive
-        .entries()
-        .iter()
-        .any(|entry| entry.name.starts_with("INI Tweaks/"))
-    {
+    if revision.unsupported_archive_paths.iter().any(|path| {
+        archive
+            .entries()
+            .iter()
+            .any(|entry| entry.name.starts_with(path.as_str()))
+    }) {
         issues.push(issue(
             CollectionIssueSeverity::Unsupported,
             None,
@@ -302,6 +303,7 @@ mod tests {
             external: Vec::new(),
             revisions: Vec::new(),
             archive_link: None,
+            unsupported_archive_paths: Vec::new(),
             complete: false,
         }
     }
@@ -377,27 +379,38 @@ mod tests {
     }
 
     #[test]
-    fn the_real_cete_essentials_manifest_is_read() {
-        let dir = crate::test_support::scratch!("collection-cete-essentials");
-        let path = dir.join("cete-essentials.7z");
-        std::fs::write(
-            &path,
-            include_bytes!("../../../tests/fixtures/collections/cete-essentials.7z"),
-        )
-        .unwrap();
-        let mut revision = revision();
-        revision.info.name = "CET+Essentials".into();
-        revision.info.slug = "n0nymh".into();
-        revision.info.game_key = "cyberpunk2077".into();
-        let plan = read_plan(&path, &revision, "cyberpunk2077").unwrap();
+    fn a_large_plain_manifest_is_read_in_rule_order() {
+        let mods: Vec<String> = (1..=11)
+            .map(|id| {
+                format!(
+                    r#"{{"name":"Example Mod {id}","version":"1.0","optional":false,"domainName":"examplegame","source":{{"type":"nexus","modId":{id},"fileId":{}}}}}"#,
+                    id + 10
+                )
+            })
+            .collect();
+        let text = format!(
+            r#"{{
+              "info": {{"author":"A","name":"Example Collection","description":"D","domainName":"examplegame"}},
+              "mods":[{}],
+              "modRules":[{{"type":"before","source":{{"modId":2,"fileId":12}},"reference":{{"modId":1,"fileId":11}}}}]
+            }}"#,
+            mods.join(",")
+        );
+        let (dir, path) = archive_with(&text, "collection-large-plain");
+        let plan = read_plan(&path, &revision(), "examplegame").unwrap();
         assert_eq!(plan.items.len(), 11);
         assert_eq!(plan.order.len(), 11);
+        assert_eq!(
+            &plan.order[..2],
+            ["nexus:1", "nexus:2"],
+            "the rule orders the pair"
+        );
         assert!(
             plan.items
                 .iter()
                 .all(|item| !item.optional && item.phase == 0)
         );
-        assert!(plan.items.iter().any(|item| item.name == "RED4ext"));
+        assert!(plan.items.iter().any(|item| item.name == "Example Mod 5"));
         assert!(!plan.limited);
         assert!(!plan.has_bundles);
         assert!(!plan.has_patches);

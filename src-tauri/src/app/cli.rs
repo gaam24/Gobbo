@@ -55,7 +55,7 @@ fn run_command(args: &[String]) -> Result<i32, AppError> {
         root.display()
     ));
     let data = crate::context::open(root, &crate::providers::archive_name_from)?;
-    crate::launch::tools::run_game(&data, game, program, rest)
+    crate::launch::tools::running::run_game(&data, game, program, rest)
 }
 
 /// Finds the `games/` and `loaders/` folders of a packaged app next to `exe`. The window uses Tauri's `resource_dir`;

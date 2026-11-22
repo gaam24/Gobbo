@@ -33,13 +33,13 @@ static USER_DATA_MOVE: std::sync::Mutex<()> = std::sync::Mutex::new(());
 fn two_versions_of_a_nexus_mod_are_both_in_the_profile() {
     let f = mirror_fixture("nexus-versions");
     let older = f.zip(
-        "Remove Mods Menu 35686 1.2.0 2026-10-23T17-21Z Q6xF6llIa.zip",
-        &[("r6/scripts/RemoveModsMenu/RemoveModsMenu.reds", "x")],
+        "Example Cleanup Mod 7001 1.2.0 2026-10-23T17-21Z example-uploader.zip",
+        &[("r6/scripts/ExampleCleanupMod/ExampleCleanupMod.reds", "x")],
     );
     import(&f.data, MIRROR_GAME, &older, None, &mut |_, _| {}).unwrap();
     let newer = f.zip(
-        "Remove Mods Menu 35686 1.2.1 2026-11-01T09-00Z Abc123xyz.zip",
-        &[("r6/scripts/RemoveModsMenu/RemoveModsMenu.reds", "y")],
+        "Example Cleanup Mod 7001 1.2.1 2026-11-01T09-00Z Abc123xyz.zip",
+        &[("r6/scripts/ExampleCleanupMod/ExampleCleanupMod.reds", "y")],
     );
     import(&f.data, MIRROR_GAME, &newer, None, &mut |_, _| {}).unwrap();
 

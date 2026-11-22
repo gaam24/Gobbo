@@ -9,16 +9,17 @@ use super::storage;
 use crate::commands::blocking;
 use crate::commands::with_data;
 use crate::context::Data;
+use crate::context::Settings;
 use crate::context::managed::{GameDataUsage, ManagedGame};
 use crate::domain::source::{SourceLinkStatus, SourceLinksReport};
 use crate::error::AppError;
 use crate::settings::config::AppSettings;
 use crate::settings::config::CloseAction;
-use crate::settings::config::Settings;
 
 crate::commands::game_commands! {
     /// Saves the settings of a game.
-    change save_settings(settings: Settings) = |root, game| super::config::save_settings(root, game, settings);
+    change save_settings(settings: Settings) =
+        |root, game| crate::context::save_settings(root, game, settings);
 
     /// Switches one Proton option on or off. The newest saved list is changed, so a quick second switch keeps the first.
     change set_proton_option(option: String, on: bool) =

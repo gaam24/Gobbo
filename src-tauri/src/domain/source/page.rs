@@ -42,6 +42,14 @@ pub struct SourceMeta {
 }
 
 impl SourceMeta {
+    /// The page a check stores: `fresh` merged with `saved` and stamped with this check's time. The merge and the stamp
+    /// live together so every reader of a page writes the same data.
+    pub fn checked(mut fresh: Self, saved: Option<&Self>, checked_at: u32) -> Self {
+        fresh.merge_saved(saved);
+        fresh.checked_at = Some(checked_at);
+        fresh
+    }
+
     /// Keeps the saved picture when the page still names the same address. A new address keeps no copy, so the next
     /// read saves the new picture.
     pub fn keep_picture_from(&mut self, old: Option<&Self>) {

@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use crate::collections::model::CollectionSessionView;
 use crate::collections::status;
 use crate::domain::collection::{CollectionOrigin, CollectionPlan};
-use crate::library::LibraryView;
+use crate::domain::library::LibraryView;
 use crate::library::waiting::find_version;
 
 /// Every family of the profile list that is a member of the collection: the ones it added and the ones the list

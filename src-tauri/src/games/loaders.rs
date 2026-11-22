@@ -18,6 +18,9 @@ pub(super) struct LoaderDef {
     pub(super) schema: u32,
     pub(super) id: String,
     pub(super) name: String,
+    /// The game-relative folder an unpacked community profile keeps this loader's config files in, when it has one.
+    #[serde(default)]
+    pub(super) config_mirror: Option<String>,
     /// The oldest Gobbo release that serves this preset correctly, like `min_gobbo` in `game.toml`.
     #[serde(default)]
     pub(super) min_gobbo: Option<String>,
@@ -66,6 +69,7 @@ impl LoaderDef {
             requirements: self.requirements.clone(),
             install: self.install.clone(),
             deploy: self.deploy.clone(),
+            config_mirror: self.config_mirror.clone(),
         };
 
         if let Some(variant) = variant {
@@ -74,6 +78,10 @@ impl LoaderDef {
                 merge_requirements(rules.requirements, variant.requirements.clone());
             rules.install = merge_installs(rules.install, variant.install.clone());
             rules.deploy = merge_deploy(rules.deploy, variant.deploy.clone());
+
+            if variant.config_mirror.is_some() {
+                rules.config_mirror.clone_from(&variant.config_mirror);
+            }
         }
 
         rules.requires = with_requirement_paths(rules.requires, &rules.requirements);
@@ -85,6 +93,10 @@ impl LoaderDef {
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct LoaderVariant {
+    /// The game-relative folder an unpacked community profile keeps this variant's config files in. A value here
+    /// replaces the preset's; without one the preset's value stays.
+    #[serde(default)]
+    pub(super) config_mirror: Option<String>,
     #[serde(default)]
     pub(super) requires: Vec<String>,
     #[serde(default)]
@@ -102,6 +114,7 @@ pub(super) struct LoaderRules {
     pub(super) requirements: Vec<Requirement>,
     pub(super) install: Option<Install>,
     pub(super) deploy: Deploy,
+    pub(super) config_mirror: Option<String>,
 }
 
 impl LoaderRules {
@@ -180,6 +193,7 @@ pub(super) fn apply(game: &mut GameDef, dirs: &[std::path::PathBuf]) -> Result<(
             let resolved = ResolvedLoader {
                 id: loader.id,
                 name: loader.name,
+                config_mirror: rules.config_mirror.clone(),
                 variant,
                 default_variant,
             };

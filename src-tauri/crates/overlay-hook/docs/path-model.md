@@ -62,7 +62,7 @@ The path layer is the most important part of the crate. Do not add another ad-ho
   app's path keys (`domain/pathkey.rs`) lower-case the same way, except for the few letters whose lower case is several
   characters, so a name the program spells in another case finds its file
   on both sides. Syntax stays ASCII: a drive letter, `\?\`, `UNC\` and the keywords of device names fold ASCII only
-  (`fold_ascii` in `paths/names.rs`), so a letter outside ASCII is never a drive. Known residual: NTFS folds by its own
+  (`overlay-core::fold_ascii_unit`), so a letter outside ASCII is never a drive. Known residual: NTFS folds by its own
   upper-case table, which can differ from Unicode lower case for a few letters; a name that differs only there is
   treated as another name.
 

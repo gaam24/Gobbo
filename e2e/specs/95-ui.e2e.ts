@@ -1,12 +1,9 @@
 import { strict as assert } from "node:assert";
-import path from "node:path";
 import { browser } from "@wdio/globals";
 import type { AppSettings_Serialize as AppSettings } from "../../src/bindings";
 import { invoke, reloadWindow } from "../support/bridge";
-import { definitionsDir } from "../support/env";
-import { removeTree } from "../support/files";
 import { modZip } from "../support/fixtures";
-import { cleanupGame, enableMods, importMods, seedGame, uniqueId } from "../support/seed";
+import { cleanupFixture, enableMods, importMods, seedGame, uniqueId } from "../support/seed";
 import {
 	clearGobboStorage,
 	clickByLabel,
@@ -68,9 +65,7 @@ describe("window and keyboard", () => {
 			timeout: 30_000,
 			timeoutMsg: "the palette did not select the mod",
 		});
-		await cleanupGame(id);
-		removeTree(path.join(definitionsDir, id));
-		removeTree(fixture.root);
+		await cleanupFixture(id, fixture.root);
 	});
 	it("shows the shortcut list with ? and F1 and closes it with Escape", async () => {
 		await reloadWindow();
@@ -103,9 +98,7 @@ describe("window and keyboard", () => {
 		await waitForSelector("[aria-label='Close console']");
 		await pressKeyOn("body", "j", { control: true });
 		await waitForNoSelector("[aria-label='Close console']");
-		await cleanupGame(id);
-		removeTree(path.join(definitionsDir, id));
-		removeTree(fixture.root);
+		await cleanupFixture(id, fixture.root);
 	});
 	it("keeps the rail and the views usable after a narrow window", async () => {
 		await browser.setWindowSize(900, 700);

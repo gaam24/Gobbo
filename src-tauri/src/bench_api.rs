@@ -1,6 +1,12 @@
 //! Fixtures for `benches/backend.rs`. Compiled only with the `bench` feature, so no benchmark state or fixture code
 //! reaches a release build.
 
+#![allow(
+    clippy::expect_used,
+    clippy::panic,
+    reason = "benchmark-only code, mirrors the cfg(test) allowances, never part of a release"
+)]
+
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -8,7 +14,9 @@ use std::sync::Arc;
 use sha2::Sha256;
 
 use crate::context::Data;
+use crate::context::settings::{Settings, save_settings};
 use crate::deploy::{Target, apply, plan_with_mode as deploy_plan, undo};
+use crate::domain::library::{Family, Library, ModInfo, ModInfoEdit, ModVersion};
 use crate::domain::profiles::ListState;
 use crate::domain::profiles::Profiles;
 use crate::domain::profiles::entry::ProfileMod;
@@ -19,17 +27,15 @@ use crate::infra::archive::Archive;
 use crate::infra::io::hash_and_copy;
 use crate::infra::store::unique_suffix;
 use crate::launch::watch;
-use crate::library::{Family, Library, ModInfo, ModInfoEdit, ModVersion};
-use crate::settings::config::{Settings, save_settings};
 use crate::status::sync_profiles as status;
 
+pub use crate::domain::library::LibraryView;
 pub use crate::domain::pathkey::path_key;
 pub use crate::domain::profiles::history::summarize as history_summary;
 pub use crate::domain::resolver::{ModInput, PlanMode, plan_with_mode};
 pub use crate::domain::version::is_newer;
 pub use crate::import::fomod::{SourcePattern, normalize_path};
 pub use crate::infra::text::tail_lines;
-pub use crate::library::LibraryView;
 pub use crate::packs::inspect::bench::PackFixture;
 pub use faster_hex::hex_string as hex;
 
@@ -163,7 +169,7 @@ pub fn synthetic_library_realistic(
                         name: format!("Mod {m}"),
                         version: Some(format!("1.{v}")),
                         author: Some(format!("Author {m}")),
-                        description: description.clone(),
+                        description,
                     },
                     edit: ModInfoEdit::default(),
                     archive: None,

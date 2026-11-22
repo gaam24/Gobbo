@@ -12,13 +12,13 @@ use super::model::SUPPORTED_FORMATS;
 use crate::context::Data;
 use crate::context::Loaded;
 use crate::context::load_game;
+use crate::domain::library::LibraryView;
 use crate::domain::pack::PackMod;
 use crate::domain::profiles::Profile;
 use crate::domain::profiles::Profiles;
 use crate::error::AppError;
 use crate::error::ErrorKind;
 use crate::error::io_at;
-use crate::library::LibraryView;
 use crate::library::waiting::find_version;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
@@ -224,9 +224,9 @@ pub(super) fn pack_update(
 #[doc(hidden)]
 pub mod bench {
     use super::{LibraryView, PackMod};
+    use crate::domain::library::{Family, Library, ModInfo, ModInfoEdit, ModVersion};
     use crate::domain::source::{ProviderId, SourceMod};
     use crate::library::waiting::find_version;
-    use crate::library::{Family, Library, ModInfo, ModInfoEdit, ModVersion};
     use std::sync::Arc;
 
     pub struct PackFixture {

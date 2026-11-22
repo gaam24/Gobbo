@@ -24,9 +24,9 @@ pub use store::apply_meta;
 
 use crate::context::Data;
 use crate::context::library::not_in_library;
+use crate::domain::library::{Family, Library};
 use crate::error::AppError;
 use crate::games::{self, GameDef};
-use crate::library::{Family, Library};
 
 /// Runs `work` with the game, the library and the family it names, under one read.
 pub(super) fn with_family<T>(

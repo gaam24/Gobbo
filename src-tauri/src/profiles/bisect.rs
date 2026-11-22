@@ -10,12 +10,12 @@ use crate::context::load_profiles;
 use crate::context::profile::bisect::{Search, file, read};
 use crate::context::profile::history::save_profiles;
 use crate::context::profile::lock_profiles;
+use crate::domain::library::Library;
 use crate::domain::profiles::Profile;
 use crate::error::AppError;
 use crate::error::io_at;
 use crate::games;
 use crate::infra::json;
-use crate::library::Library;
 use std::collections::BTreeSet;
 use std::fs;
 

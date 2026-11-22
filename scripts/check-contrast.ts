@@ -494,9 +494,10 @@ for (const check of checks) {
 	const ratio = contrastRgb(foreground, background);
 	const passed = ratio >= check.minimum;
 
-	if (!passed) failed += 1;
-
-	if (!passed) console.error(`FAIL ${check.label}: ${ratio.toFixed(2)}:1 (minimum ${check.minimum}:1)`);
+	if (!passed) {
+		failed += 1;
+		console.error(`FAIL ${check.label}: ${ratio.toFixed(2)}:1 (minimum ${check.minimum}:1)`);
+	}
 }
 
 if (failed > 0) {

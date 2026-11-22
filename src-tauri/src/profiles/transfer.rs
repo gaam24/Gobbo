@@ -30,10 +30,10 @@ pub(super) fn copy_profile_data(
     let target_sets = user_data::sets(data, game, settings, target, &target_state)?;
 
     // The target is replaced whole, so a set it no longer isolates cannot leave old files behind.
-    remove_dir_if_exists(&target_state.join("userdata"))
-        .map_err(io_at(&target_state.join("userdata")))?;
-    remove_dir_if_exists(&profile_state::legacy_data(&target_state))
-        .map_err(io_at(&profile_state::legacy_data(&target_state)))?;
+    let target_user_data = user_data::state_dir(&target_state);
+    remove_dir_if_exists(&target_user_data).map_err(io_at(&target_user_data))?;
+    let target_legacy = profile_state::legacy_data(&target_state);
+    remove_dir_if_exists(&target_legacy).map_err(io_at(&target_legacy))?;
     let target_overwrite = profile_state::overwrite(&target_state);
     remove_dir_if_exists(&target_overwrite).map_err(io_at(&target_overwrite))?;
 
@@ -64,7 +64,7 @@ pub(super) fn copy_profile_data(
     let source_legacy = profile_state::legacy_data(&source_state);
 
     if source_legacy.is_dir() {
-        copy_dir(&source_legacy, &profile_state::legacy_data(&target_state))?;
+        copy_dir(&source_legacy, &target_legacy)?;
     }
     // The manifest names the paths the copied store belongs to. It lives outside `data`, so it is copied separately.
     let source_manifest = profile_data::manifest(&source_state);

@@ -2,7 +2,8 @@
 //! and each entry in the `WIN32_FIND_DATAW` form that a listing returns.
 
 use gobbo_overlay_core::{
-    Layer, Whiteouts, fold_unit, is_copy_temp_name, join, wildcard_match, wildcard_match_units,
+    Layer, Whiteouts, fold_unit, is_copy_temp_name, join, wide, wildcard_match,
+    wildcard_match_units,
 };
 use rustc_hash::FxHashMap;
 use std::ffi::c_void;
@@ -23,7 +24,7 @@ use windows_sys::Win32::Storage::FileSystem::{
 
 use crate::paths::{find_exact, visible, with_pattern};
 use crate::state::Mount;
-use crate::text::{same_folded_wide, wide};
+use crate::text::same_folded_wide;
 use crate::win32::PreserveLastError;
 
 /// Whether the folder lists at least one entry the program can see. It stops at the first entry, so a caller that only

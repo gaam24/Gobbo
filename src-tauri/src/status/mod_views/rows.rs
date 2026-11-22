@@ -1,52 +1,62 @@
 //! The row and inspector details of one mod: its record, requirements, page and saved check.
 
 use crate::context::size_kb;
+use crate::domain::library::{Family, Library, LibraryView, ModInfo, ModVersion};
 use crate::domain::mod_steps::ModSteps;
 use crate::domain::profiles::{ProfilesView, entry::ProfileMod};
-use crate::domain::source::DownloadRoute;
+use crate::domain::source::{DownloadRoute, ProviderId};
 use crate::domain::version::{update_state, with_ignored};
 use crate::games::GameDef;
-use crate::library::relations::{SourceLookup, UnmetRequirements, family_name, with_source_name};
-use crate::library::{Family, FamilyFields, Library, LibraryView, ModInfo, ModVersion};
-use crate::providers;
+use crate::library::FamilyFields;
+use crate::library::relations::{
+    SourceLookup, UnmetRequirements, source_alternatives, with_source_name,
+};
 use crate::status::PlanOutcome;
 use crate::status::views::{
     ModExtras, ModView, ProviderDlcs, SourceRequirementView, SourceSyncView, UpdateReport,
     description_preview,
 };
+use rustc_hash::FxHashMap;
 
 use super::sources::{
     page_source, requirement_page_url, source_preview, source_summary, source_views,
 };
 use super::versions::archive_names;
 
+/// The library and the indexes built from it, shared by every row of one status. Building the lookup from the same view
+/// keeps the names, the sources and the enabled families consistent without passing each index to every row.
+pub(in crate::status) struct LibraryContext<'a> {
+    /// The parsed index.
+    pub(in crate::status) library: &'a Library,
+    /// The sorted versions and the lazily built source indexes.
+    pub(in crate::status) view: &'a LibraryView<'a>,
+    /// The enabled families and the names from the same view.
+    pub(in crate::status) lookup: &'a SourceLookup<'a, 'a, 'a>,
+}
+
 /// One mod of the shown profile, with its record in the library, its source data and its conflicts.
-#[expect(
-    clippy::too_many_arguments,
-    reason = "the view needs the library, its indexes, the profile indexes and the plan; grouping them would add a struct used once"
-)]
 pub(in crate::status) fn mod_view(
     index: usize,
     entry: &ProfileMod,
     game: &GameDef,
-    library: &Library,
-    view: &LibraryView<'_>,
+    context: &LibraryContext<'_>,
     profiles: &ProfilesView<'_>,
     plan: &PlanOutcome,
     requirements: &UnmetRequirements<'_>,
 ) -> ModView {
-    let record = library.versions.get(&entry.folder);
-    let family = library.families.get(&entry.id);
+    let record = context.library.versions.get(&entry.folder);
+    let family = context.library.families.get(&entry.id);
     let requires_names: Vec<String> = family.map_or_else(Vec::new, |family| {
         family
             .requires
             .iter()
-            .map(|id| family_name(library, id))
+            .map(|id| context.lookup.family_name(id).to_string())
             .collect()
     });
     let requirement_groups = family.map_or_else(Vec::new, requirement_groups);
-    let (archive_name, parsed_archive) =
-        record.map_or((None, None), |record| archive_names(library, record));
+    let (archive_name, parsed_archive) = record.map_or((None, None), |record| {
+        archive_names(context.library, record)
+    });
     // The row and its preview take their page data from the same source: the first with a page, or the first at all.
     let page = page_source(family);
     let page_id = page.map(|(provider, source)| format!("{provider}:{}", source.mod_id));
@@ -84,7 +94,7 @@ pub(in crate::status) fn mod_view(
         id: entry.id.clone(),
         folder: entry.folder.clone(),
         fomod_installer: record.is_some_and(|record| record.fomod_installer),
-        version_count: u32::try_from(view.versions_of(&entry.id).len()).unwrap_or(u32::MAX),
+        version_count: u32::try_from(context.view.versions_of(&entry.id).len()).unwrap_or(u32::MAX),
         installed_at: record.map_or(0, |record| record.installed_at),
         slot: entry.slot.clone(),
         enabled: entry.enabled,
@@ -97,20 +107,20 @@ pub(in crate::status) fn mod_view(
         archive: archive_name.map(str::to_string),
         archive_file: record
             .and_then(|record| record.archive.as_ref())
-            .and_then(|sha256| library.archive_file_of(sha256)),
+            .and_then(|sha256| context.library.archive_file_of(sha256)),
         skipped: record
             .and_then(|record| record.archive.as_ref())
-            .and_then(|sha256| library.archives.get(sha256))
+            .and_then(|sha256| context.library.archives.get(sha256))
             .map_or(0, |archive| archive.skipped_total),
         info,
         source: source_preview(family),
-        sources: source_views(family, game, library, record),
+        sources: source_views(family, game, context.library, record),
         page_id,
         page_name,
         part_id,
         part_name,
         part_category,
-        update: update_report(family, record, view),
+        update: update_report(family, record, context.view),
         tags: family
             .map(|family| family.tags.iter().cloned().collect())
             .unwrap_or_default(),
@@ -134,49 +144,52 @@ pub(in crate::status) fn mod_view(
 /// The names of a family's provider requirements, grouped the way `sourceLists` groups them in the interface: each
 /// list holds alternatives, and a requirement without a group is a list of its own. The order is kept.
 fn requirement_groups(family: &Family) -> Vec<Vec<String>> {
-    let mut groups: Vec<Vec<String>> = Vec::new();
-    let mut keys: Vec<Option<(String, u32)>> = Vec::new();
+    source_alternatives(&family.requirements)
+        .into_iter()
+        .map(|list| {
+            list.into_iter()
+                .map(|requirement| requirement.name.clone())
+                .collect()
+        })
+        .collect()
+}
 
-    for requirement in &family.requirements {
-        let key = requirement
-            .group
-            .map(|group| (requirement.source.provider.to_string(), group));
-        let known = key
-            .as_ref()
-            .and_then(|key| keys.iter().position(|known| known.as_ref() == Some(key)));
-        if let Some(index) = known {
-            groups[index].push(requirement.name.clone());
-            continue;
-        }
+/// The inputs shared by every row of one `mod_extras` batch: the library lookup, the saved mod steps and the routes of
+/// the providers the batch names. The caller builds them once and passes them to each row.
+pub(in crate::status) struct ExtrasContext<'a> {
+    /// The library names and enabled families, read once for the whole batch.
+    pub(in crate::status) lookup: &'a SourceLookup<'a, 'a, 'a>,
+    /// The saved before/after steps of each mod.
+    pub(in crate::status) mod_steps: &'a ModSteps,
+    /// The routes of the providers named by the batch's requirements.
+    pub(in crate::status) routes: &'a FxHashMap<ProviderId, DownloadRoute>,
+}
 
-        keys.push(key);
-        groups.push(vec![requirement.name.clone()]);
-    }
-
-    groups
+/// Whether a saved account can fetch a provider's file directly, from the routes read once for the whole batch. A
+/// provider missing from the map uses the owner's `Browser` fallback for an unknown provider.
+fn direct_download(routes: &FxHashMap<ProviderId, DownloadRoute>, provider: &ProviderId) -> bool {
+    crate::providers::route_or_browser(routes.get(provider).copied()) == DownloadRoute::Direct
 }
 
 /// The page text, notes and relation details that the list row leaves out. The table asks for the rows in its viewport,
 /// and the inspector for the selected mod.
 pub(in crate::status) fn mod_extras(
     folder: &str,
-    family: Option<&crate::library::Family>,
+    family: Option<&crate::domain::library::Family>,
     record: Option<&ModVersion>,
     game: &GameDef,
-    library: &Library,
-    lookup: &SourceLookup<'_, '_, '_>,
-    mod_steps: &ModSteps,
+    context: &ExtrasContext<'_>,
 ) -> ModExtras {
     let fields = FamilyFields::of(family);
     let incompatible_names = fields
         .incompatible
         .iter()
-        .map(|id| family_name(library, id))
+        .map(|id| context.lookup.family_name(id).to_string())
         .collect();
     let overrides_names = fields
         .overrides
         .iter()
-        .map(|id| family_name(library, id))
+        .map(|id| context.lookup.family_name(id).to_string())
         .collect();
     ModExtras {
         folder: folder.to_string(),
@@ -193,13 +206,11 @@ pub(in crate::status) fn mod_extras(
                     source: requirement.source.clone(),
                     name: requirement.name.clone(),
                     page_url: requirement_page_url(game, &requirement.source),
-                    state: lookup.state_source(&requirement.source),
+                    state: context.lookup.state_source(&requirement.source),
                     // The same route the planner and the download use: a saved account without direct downloads does
-                    // not offer **Get**, even though the provider has the capability.
-                    direct_download: providers::provider(requirement.source.provider.as_str())
-                        .is_some_and(|provider| {
-                            providers::download_route(provider) == DownloadRoute::Direct
-                        }),
+                    // not offer **Get**, even though the provider has the capability. The route was read once for the
+                    // whole batch of rows, instead of once per requirement (a keyring access each time).
+                    direct_download: direct_download(context.routes, &requirement.source.provider),
                     from_source: requirement.from_source,
                     group: requirement.group,
                     ignored: requirement.ignored,
@@ -236,12 +247,14 @@ pub(in crate::status) fn mod_extras(
         incompatible_names,
         overrides: fields.overrides,
         overrides_names,
-        steps_before: mod_steps
+        steps_before: context
+            .mod_steps
             .mods
             .get(folder)
             .map(|phases| phases.before_start.clone())
             .unwrap_or_default(),
-        steps_after: mod_steps
+        steps_after: context
+            .mod_steps
             .mods
             .get(folder)
             .map(|phases| phases.after_end.clone())
@@ -253,7 +266,7 @@ pub(in crate::status) fn mod_extras(
 /// first source whose page a check read answers for the mod, in provider order. A page with no check time (an import
 /// that did not read it, a pack that dropped the time) is not a check.
 pub(in crate::status) fn update_report(
-    family: Option<&crate::library::Family>,
+    family: Option<&crate::domain::library::Family>,
     version: Option<&ModVersion>,
     view: &LibraryView<'_>,
 ) -> Option<UpdateReport> {
@@ -306,4 +319,89 @@ pub(in crate::status) fn update_report(
         }
         .with_library(view, latest_file),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::source::SourceRef;
+
+    /// The grouping rule as it was written before the shared owner existed, kept only as a reference for the
+    /// equivalence test below. A requirement without a group is its own list; a provider and group pair names one
+    /// list of alternatives, in first-seen order.
+    fn old_requirement_groups(family: &Family) -> Vec<Vec<String>> {
+        let mut groups: Vec<Vec<String>> = Vec::new();
+        let mut keys: Vec<Option<(String, u32)>> = Vec::new();
+
+        for requirement in &family.requirements {
+            let key = requirement
+                .group
+                .map(|group| (requirement.source.provider.to_string(), group));
+            let known = key
+                .as_ref()
+                .and_then(|key| keys.iter().position(|known| known.as_ref() == Some(key)));
+            if let Some(index) = known {
+                groups[index].push(requirement.name.clone());
+                continue;
+            }
+
+            keys.push(key);
+            groups.push(vec![requirement.name.clone()]);
+        }
+
+        groups
+    }
+
+    fn requirement(
+        name: &str,
+        provider: &str,
+        id: &str,
+        group: Option<u32>,
+    ) -> crate::domain::source::SourceRequirement {
+        crate::domain::source::SourceRequirement {
+            source: SourceRef::new(provider, id),
+            name: name.into(),
+            from_source: false,
+            group,
+            ignored: false,
+        }
+    }
+
+    #[test]
+    fn requirement_groups_match_the_shared_grouping_rule() {
+        let family = Family {
+            requirements: vec![
+                requirement("ungrouped-a", "provider-a", "1", None),
+                requirement("group-a-1", "provider-a", "2", Some(1)),
+                requirement("group-b-1", "provider-b", "3", Some(1)),
+                requirement("ungrouped-b", "provider-b", "4", None),
+                requirement("group-a-2", "provider-a", "5", Some(1)),
+                requirement("group-b-2", "provider-b", "6", Some(2)),
+                requirement("group-c-1", "provider-a", "7", Some(2)),
+            ],
+            ..Family::default()
+        };
+        let expected: Vec<Vec<String>> = vec![
+            vec!["ungrouped-a".into()],
+            vec!["group-a-1".into(), "group-a-2".into()],
+            vec!["group-b-1".into()],
+            vec!["ungrouped-b".into()],
+            vec!["group-b-2".into()],
+            vec!["group-c-1".into()],
+        ];
+
+        assert_eq!(old_requirement_groups(&family), expected);
+        assert_eq!(requirement_groups(&family), expected);
+    }
+
+    #[test]
+    fn a_direct_route_is_used_only_for_a_provider_in_the_map() {
+        let routes = FxHashMap::from_iter([(ProviderId::new("provider-a"), DownloadRoute::Direct)]);
+        assert!(direct_download(&routes, &ProviderId::new("provider-a")));
+        assert!(!direct_download(&routes, &ProviderId::new("provider-b")));
+
+        let browser =
+            FxHashMap::from_iter([(ProviderId::new("provider-a"), DownloadRoute::Browser)]);
+        assert!(!direct_download(&browser, &ProviderId::new("provider-a")));
+    }
 }

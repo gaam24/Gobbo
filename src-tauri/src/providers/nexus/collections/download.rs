@@ -2,9 +2,12 @@ use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
+use crate::domain::rate::AccountTier;
 use crate::error::AppError;
-use crate::infra::http::{BodyProblem, DownloadInfo};
-use crate::providers::download::{ArchiveRules, fetch_archive, target_name};
+use crate::infra::http::DownloadInfo;
+use crate::providers::SourceProvider;
+use crate::providers::download::{ArchiveRules, archive_name, body_error, fetch_archive};
+use crate::providers::nexus::NexusProvider;
 use crate::providers::nexus::api::{NexusClient, bad_response};
 
 #[derive(Debug, Deserialize)]
@@ -41,27 +44,24 @@ pub(super) fn download_archive(
         .map(|link| link.url.as_str())
         .collect();
     let target = |info: &DownloadInfo, url: &str| {
-        let name = target_name(info, url, "", "collection");
-        let name = if crate::domain::archive::extension_of(&name).is_some() {
-            name
-        } else {
-            format!("{name}.7z")
-        };
+        let name = archive_name(info, url, "", "collection", Some("7z"));
         directory.join(crate::domain::naming::safe_limited_file_name(&name))
     };
+    // A collection recipe is one file, not a burst of mod downloads: the anonymous tier has no slot in the free tier's
+    // safety budget. A retry overwrites the cached archive instead of numbering a second copy.
+    let tier = AccountTier::Anonymous;
+    let body_error = body_error(
+        AppError::user("collection.bad_archive").with("detail", "the server sent an empty archive"),
+        AppError::user("collection.bad_archive")
+            .with("detail", "the server sent a web page instead of an archive"),
+    );
     let rules = ArchiveRules {
-        // A collection recipe is one file, not a burst of mod downloads: it never takes a slot from the free tier's
-        // safety budget.
-        provider: super::ID,
-        tier: crate::domain::rate::AccountTier::Anonymous,
+        policy: NexusProvider.download_policy(tier),
+        pacer_key: super::ID,
+        tier,
         sidecar: None,
         target: &target,
-        body_error: &|problem: BodyProblem| match problem {
-            BodyProblem::Empty => AppError::user("collection.bad_archive")
-                .with("detail", "the server sent an empty archive"),
-            BodyProblem::Html => AppError::user("collection.bad_archive")
-                .with("detail", "the server sent a web page instead of an archive"),
-        },
+        body_error: &body_error,
         no_link: AppError::new("collection.download_failed")
             .with("slug", archive_link)
             .with("code", "no link"),

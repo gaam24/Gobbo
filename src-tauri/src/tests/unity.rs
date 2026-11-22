@@ -10,7 +10,7 @@ use crate::games::GameDef;
 #[cfg(target_os = "linux")]
 use crate::launch::start::overlay_session_state;
 #[cfg(target_os = "linux")]
-use crate::launch::tools::run_game;
+use crate::launch::tools::running::run_game;
 use crate::test_support::make_zip;
 #[cfg(target_os = "linux")]
 use crate::test_support::require_overlay_namespaces;

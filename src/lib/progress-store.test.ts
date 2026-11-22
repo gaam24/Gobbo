@@ -1,12 +1,14 @@
 import { beforeEach, expect, test } from "bun:test";
+import { createElement } from "react";
+import { renderToString } from "react-dom/server";
 import {
+	type ActivityProgress,
 	createGameQueues,
-	progressSnapshot,
-	resetProgress,
 	setActiveGame,
 	setDeployProgress,
 	setImportProgress,
 	setUpdateAllCancel,
+	useProgress,
 } from "@/lib/progress-store";
 import { createStatusCache } from "@/lib/use-game-state";
 import { createCheckRegistry } from "@/sources/use-updates";
@@ -14,73 +16,87 @@ import { statusFixture } from "@/test/fixtures/status";
 
 const readyStage = { kind: "ready", enabled: 0, total: 0 } as const;
 
-const GAME = "game-a";
-const OTHER = "game-b";
 const noop = () => undefined;
 
-beforeEach(() => {
-	resetProgress(GAME);
-	resetProgress(OTHER);
-	setActiveGame(GAME);
-});
+/// The store has no reset export; `setActiveGame(undefined)` is its public way to show no game, which restores the empty
+/// slot. Each test still writes under its own game id, so a previous test's progress cannot leak into the next one.
+beforeEach(() => setActiveGame(undefined));
 
-test("a repeated progress value is not stored again, so the activity card keeps the same snapshot", () => {
+function ProgressProbe({ observe }: { observe: (value: ActivityProgress) => void }) {
+	observe(useProgress());
+	return null;
+}
+
+/// Reads the visible game's slot through the production subscription, the same one the activity card uses. A server
+/// render runs the hook once against the current snapshot, so the probe sees the exact object a component would.
+function currentProgress(): ActivityProgress {
+	const seen: ActivityProgress[] = [];
+	renderToString(createElement(ProgressProbe, { observe: (value) => seen.push(value) }));
+	const snapshot = seen[0];
+	if (snapshot === undefined) throw new Error("the progress hook did not render");
+	return snapshot;
+}
+
+test("a repeated progress value leaves the visible progress unchanged", () => {
+	const game = "t1-game";
+	setActiveGame(game);
 	const value = { stage: "writing", done: 1, total: 4, percent: 25 } as const;
-	setDeployProgress(value, GAME);
-	const afterFirst = progressSnapshot();
-	setDeployProgress(value, GAME);
-	setDeployProgress(value, GAME);
-	expect(progressSnapshot()).toBe(afterFirst);
-	expect(progressSnapshot().deploy).toBe(value);
+	setDeployProgress(value, game);
+	const afterFirst = currentProgress();
+	setDeployProgress(value, game);
+	setDeployProgress(value, game);
+	expect(currentProgress().deploy?.stage).toBe("writing");
+	expect(currentProgress().deploy?.done).toBe(1);
+	expect(currentProgress().deploy?.total).toBe(4);
+	expect(currentProgress().deploy?.percent).toBe(25);
+	// No re-render contract: identical content keeps the snapshot identity the activity card subscribed to.
+	expect(currentProgress()).toBe(afterFirst);
 });
 
-test("a change of progress produces one new snapshot and setting it back clears it", () => {
-	setDeployProgress({ stage: "writing", done: 1, total: 2, percent: 50 }, GAME);
-	const afterFirst = progressSnapshot();
+test("a change of progress updates the visible value and clearing it empties it", () => {
+	const game = "t2-game";
+	setActiveGame(game);
+	setDeployProgress({ stage: "writing", done: 1, total: 2, percent: 50 }, game);
+	expect(currentProgress().deploy?.percent).toBe(50);
 	const next = { stage: "writing", done: 2, total: 2, percent: 100 } as const;
-	setDeployProgress(next, GAME);
-	expect(progressSnapshot()).not.toBe(afterFirst);
-	expect(progressSnapshot().deploy).toBe(next);
-	const afterSecond = progressSnapshot();
-	setDeployProgress(null, GAME);
-	expect(progressSnapshot()).not.toBe(afterSecond);
-	expect(progressSnapshot().deploy).toBeNull();
-});
-
-test("reset without a game id is a no-op, so a game switch cannot wipe another game's work", () => {
-	setDeployProgress({ stage: "writing", done: 1, total: 2, percent: 50 }, GAME);
-	const before = progressSnapshot();
-	resetProgress();
-	expect(progressSnapshot()).toBe(before);
-	expect(progressSnapshot().deploy).not.toBeNull();
+	setDeployProgress(next, game);
+	expect(currentProgress().deploy?.done).toBe(2);
+	expect(currentProgress().deploy?.percent).toBe(100);
+	setDeployProgress(null, game);
+	expect(currentProgress().deploy).toBeNull();
 });
 
 test("progress and the bulk-update cancel survive a switch back to the game that started them", () => {
+	const game = "t4-game";
+	const other = "t4-other";
+	setActiveGame(game);
 	const cancel = noop;
-	setDeployProgress({ stage: "writing", done: 1, total: 2, percent: 50 }, GAME);
-	setUpdateAllCancel(cancel, GAME);
+	setDeployProgress({ stage: "writing", done: 1, total: 2, percent: 50 }, game);
+	setUpdateAllCancel(cancel, game);
 
-	setActiveGame(OTHER);
-	expect(progressSnapshot().deploy).toBeNull();
-	expect(progressSnapshot().updateAllCancel).toBeNull();
+	setActiveGame(other);
+	expect(currentProgress().deploy).toBeNull();
+	expect(currentProgress().updateAllCancel).toBeNull();
 
-	setActiveGame(GAME);
-	expect(progressSnapshot().deploy?.percent).toBe(50);
-	expect(progressSnapshot().updateAllCancel).toBe(cancel);
+	setActiveGame(game);
+	expect(currentProgress().deploy?.percent).toBe(50);
+	expect(currentProgress().updateAllCancel).toBe(cancel);
 });
 
 test("a background game's progress writes to its own slot without changing the visible snapshot", () => {
-	setActiveGame(OTHER);
-	const before = progressSnapshot();
-	setDeployProgress({ stage: "writing", done: 1, total: 2, percent: 50 }, GAME);
-	expect(progressSnapshot()).toBe(before);
-	expect(progressSnapshot().deploy).toBeNull();
+	const game = "t5-game";
+	const other = "t5-other";
+	setActiveGame(other);
+	setDeployProgress({ stage: "writing", done: 1, total: 2, percent: 50 }, game);
+	expect(currentProgress().deploy).toBeNull();
 
-	setActiveGame(GAME);
-	expect(progressSnapshot().deploy?.percent).toBe(50);
+	setActiveGame(game);
+	expect(currentProgress().deploy?.percent).toBe(50);
 });
 
 test("an import entry is copied only when it changes", () => {
+	const game = "t6-game";
+	setActiveGame(game);
 	const state = {
 		stage: "hashing",
 		percent: 10,
@@ -88,16 +104,20 @@ test("an import entry is copied only when it changes", () => {
 		index: 0,
 		total: 1,
 	} as const;
-	setImportProgress("a.zip", state, GAME);
-	const afterFirst = progressSnapshot();
-	setImportProgress("a.zip", { ...state }, GAME);
-	expect(progressSnapshot()).not.toBe(afterFirst);
-	const afterSecond = progressSnapshot();
-	setImportProgress("missing.zip", null, GAME);
-	expect(progressSnapshot()).toBe(afterSecond);
+	setImportProgress("a.zip", state, game);
+	setImportProgress("a.zip", { ...state }, game);
+	expect(currentProgress().importing.get("a.zip")?.name).toBe("a.zip");
+	expect(currentProgress().importing.get("a.zip")?.stage).toBe("hashing");
+	expect(currentProgress().importing.get("a.zip")?.percent).toBe(10);
+	setImportProgress("missing.zip", null, game);
+	expect(currentProgress().importing.has("missing.zip")).toBe(false);
+	expect(currentProgress().importing.size).toBe(1);
 });
 
-test("the import map of one game survives another game's switch and is cleared only for its own game", () => {
+test("the import map of one game survives another game's switch", () => {
+	const game = "t7-game";
+	const other = "t7-other";
+	setActiveGame(game);
 	const state = {
 		stage: "copying",
 		percent: 90,
@@ -105,14 +125,12 @@ test("the import map of one game survives another game's switch and is cleared o
 		index: 1,
 		total: 1,
 	} as const;
-	setImportProgress("a.zip", state, GAME);
-	setActiveGame(OTHER);
-	expect(progressSnapshot().importing.size).toBe(0);
+	setImportProgress("a.zip", state, game);
+	setActiveGame(other);
+	expect(currentProgress().importing.size).toBe(0);
 
-	setActiveGame(GAME);
-	expect(progressSnapshot().importing.get("a.zip")?.name).toBe("a.zip");
-	resetProgress(GAME);
-	expect(progressSnapshot().importing.size).toBe(0);
+	setActiveGame(game);
+	expect(currentProgress().importing.get("a.zip")?.name).toBe("a.zip");
 });
 
 test("a game's queue does not wait for another game's long action", async () => {

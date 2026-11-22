@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::error::ErrorKind;
-use crate::test_support::games::{SLOT, lf};
+use crate::test_support::games::{FULL_ROOT, SLOT, lf};
 use crate::test_support::{scratch, write};
 
 #[test]
@@ -111,20 +111,15 @@ fn a_schema_above_the_supported_one_is_refused() {
 }
 
 #[test]
-fn cyberpunk_2077_accepts_new_loader_files_and_framework_folders() {
-    let path = Path::new(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../games/cyberpunk-2077/game.toml"
-    ));
-    let game = read_definition(path, Path::new(DEV_LOADERS_DIR)).expect("the shipped definition");
+fn a_full_root_game_keeps_arbitrary_paths_and_moves_loose_archives() {
+    let game = GameDef::parse(FULL_ROOT).expect("the fixture definition");
     assert!(game.deploy.full_root);
 
     for file in [
-        "bin/x64/global.ini",
-        "bin/x64/version.dll",
-        "bin/x64/winmm.dll",
-        "red4ext/plugins/future/Future.dll",
-        "futureframework/Future.dll",
+        "bin/x64/new-loader.dll",
+        "bin/x64/extra-tool.dll",
+        "framework/plugins/new-mod/plugin.dll",
+        "newfolder/deep/file.dll",
     ] {
         assert!(
             game.deploy.keeps_game_path(file),
@@ -138,7 +133,7 @@ fn cyberpunk_2077_accepts_new_loader_files_and_framework_folders() {
     );
     assert!(
         game.deploy
-            .move_destination("mods/redmod/loose.archive")
+            .move_destination("mods/other/loose.archive")
             .is_none()
     );
 }
@@ -366,4 +361,121 @@ fn a_user_definition_folder_must_have_the_game_id() {
         "{:?}",
         problems[0].error.params
     );
+}
+
+const SLOT_GAME: &str = r#"
+schema = 1
+id = "slot-game"
+name = "Slot Game"
+
+[detect]
+markers = ["game.exe"]
+
+[[executables]]
+name = "Game"
+path = "game.exe"
+
+[deploy]
+[[deploy.slots]]
+dir = "Mods"
+root_extensions = [".dll", ".pak"]
+"#;
+
+#[test]
+fn a_slot_without_root_folder_extensions_copies_its_root_extensions() {
+    let game = GameDef::parse(SLOT_GAME).unwrap();
+    assert_eq!(
+        game.deploy.slots[0].root_folder_extensions,
+        [".dll", ".pak"]
+    );
+    assert!(game.validate().is_empty(), "{:?}", game.validate());
+
+    let explicit = SLOT_GAME.replacen(
+        "root_extensions = [\".dll\", \".pak\"]",
+        "root_extensions = [\".dll\", \".pak\"]\nroot_folder_extensions = []",
+        1,
+    );
+    let game = GameDef::parse(&explicit).unwrap();
+    assert!(game.deploy.slots[0].root_folder_extensions.is_empty());
+}
+
+/// The production shape for a loader check: a game that can take any preset's layout without its own rules.
+const TRIPWIRE_GAME: &str = r#"
+schema = 1
+id = "tripwire-game"
+name = "Tripwire Game"
+
+[detect]
+markers = ["game.exe"]
+
+[[executables]]
+name = "Game"
+path = "game.exe"
+
+[deploy]
+[[deploy.slots]]
+dir = "Mods"
+"#;
+
+#[test]
+fn every_shipped_definition_and_preset_variant_passes_the_full_validator() {
+    use super::super::loaders as presets;
+
+    let loaders = Path::new(DEV_LOADERS_DIR);
+    let mut games = 0;
+
+    for entry in std::fs::read_dir(DEV_GAMES_DIR).unwrap() {
+        let path = entry.unwrap().path();
+        let name = path.file_name().unwrap().to_string_lossy();
+
+        if !path.is_dir() || name.starts_with('_') {
+            continue;
+        }
+
+        let file = path.join("game.toml");
+
+        if !file.is_file() {
+            continue;
+        }
+
+        // The production path: read the game, merge its preset and check the merged result.
+        let game = read_definition(&file, loaders)
+            .unwrap_or_else(|error| panic!("{}: {error}", file.display()));
+        assert!(
+            game.validate().is_empty(),
+            "{}: {:?}",
+            file.display(),
+            game.validate()
+        );
+        games += 1;
+    }
+
+    assert!(games > 0, "the shipped games are this test's fixture");
+
+    for id in ["bepinex", "unreal"] {
+        let loader = presets::load(loaders, id).unwrap();
+        let mut variants: Vec<Option<&str>> = loader
+            .variants
+            .keys()
+            .map(String::as_str)
+            .map(Some)
+            .collect();
+
+        if variants.is_empty() {
+            variants.push(None);
+        }
+
+        for variant in variants {
+            let mut game = GameDef::parse(TRIPWIRE_GAME).unwrap();
+            loader
+                .rules(variant)
+                .unwrap_or_else(|error| panic!("{id} {variant:?}: {error}"))
+                .apply_to(&mut game);
+            assert!(
+                game.validate().is_empty(),
+                "{id} {variant:?}: {:?}",
+                game.validate()
+            );
+        }
+    }
 }

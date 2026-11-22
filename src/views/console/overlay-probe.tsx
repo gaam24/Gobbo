@@ -1,46 +1,11 @@
-import { useState } from "react";
-import { commands, type OverlayProbeReport } from "@/bindings";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/i18n";
-import { messageOf, unwrap } from "@/lib/ipc";
+import { useOverlayProbe } from "@/views/console/use-overlay-probe";
 
 /// Runs the overlay doctor on demand and lists its checks for x64 and x86.
 export function OverlayProbe({ gameId }: { gameId: string }) {
 	const { t } = useTranslation();
-	const [reports, setReports] = useState<OverlayProbeReport[] | null>(null);
-	const [failure, setFailure] = useState<string | null>(null);
-	const [running, setRunning] = useState(false);
-
-	const run = async () => {
-		setRunning(true);
-		setFailure(null);
-		setReports(null);
-
-		try {
-			setReports(await unwrap(commands.runOverlayProbe(gameId)));
-		} catch (error) {
-			setFailure(messageOf(error));
-		}
-
-		setRunning(false);
-	};
-
-	const openFolder = async () => {
-		setFailure(null);
-
-		try {
-			const path = await unwrap(commands.overlayState(gameId));
-
-			if (path === null) {
-				setFailure(t("console.probeNoOverlay"));
-				return;
-			}
-
-			await unwrap(commands.openPath(gameId, path, false));
-		} catch (error) {
-			setFailure(messageOf(error));
-		}
-	};
+	const { reports, failure, running, run, openFolder } = useOverlayProbe(gameId);
 
 	return (
 		<section aria-labelledby="console-probe" className="grid gap-2">

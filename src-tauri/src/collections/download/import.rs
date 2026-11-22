@@ -154,18 +154,12 @@ pub(super) fn import_member(
     let view = match acquired {
         acquire::Acquired::Imported(view) => view,
         acquire::Acquired::Existing { .. } => return Ok(ItemOutcome::Existing),
-        acquire::Acquired::NeedsChoice {
-            path,
-            module_name,
-            steps,
-        } => {
+        acquire::Acquired::NeedsChoice(needed) => {
             progress(CollectionItemState::NeedsChoice, 0, None);
             return Ok(ItemOutcome::NeedsChoice(Box::new(CollectionChoiceNeeded {
                 key: item.key.clone(),
                 name: item.name.clone(),
-                path: path.display().to_string(),
-                module_name,
-                steps,
+                choice: needed,
             })));
         }
     };

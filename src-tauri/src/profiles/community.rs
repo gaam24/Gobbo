@@ -9,12 +9,12 @@ use serde::Serialize;
 
 use crate::context::Data;
 use crate::context::load_library;
-use crate::domain::pathkey::fold_case;
+use crate::domain::library::view::FindQuery;
+use crate::domain::library::{Library, LibraryView};
 use crate::domain::profiles::Row;
 use crate::domain::source::ProviderId;
 use crate::error::{AppError, io_at};
 use crate::games;
-use crate::library::{Library, LibraryView};
 use crate::profiles::actions;
 use crate::providers::thunderstore;
 use crate::providers::thunderstore::community_profile::{CommunityMod, parse_mods};
@@ -57,7 +57,8 @@ pub struct CommunityProfilePreview {
     pub mods: Vec<CommunityProfileMod>,
     pub missing: u32,
     pub other_versions: u32,
-    /// The profile folder has a `BepInEx/config` (or `config`) folder. Those files are not part of the import.
+    /// The profile folder has the loader's config mirror, or the bare `config` folder. Those files are not part of the
+    /// import.
     pub has_configs: bool,
 }
 
@@ -78,7 +79,11 @@ pub fn inspect(
     path: &str,
 ) -> Result<CommunityProfilePreview, AppError> {
     let game = games::load(game_id)?;
-    let (profile, mods, has_configs) = read_profile(Path::new(path))?;
+    let config_mirror = game
+        .resolved_loader
+        .as_ref()
+        .and_then(|loader| loader.config_mirror.as_deref());
+    let (profile, mods, has_configs) = read_profile(Path::new(path), config_mirror)?;
     let library = load_library(&root.game(game_id), &game)?;
     let resolved = resolve(&library, &mods);
     Ok(preview_of(profile, resolved, has_configs))
@@ -113,7 +118,7 @@ pub fn import(
     }
 
     let profile = crate::context::edit_profiles(root, game_id, |_, game, profiles| {
-        let id = profiles.create(name, None)?;
+        let id = profiles.create_unique(name)?;
         profiles.get_mut(&id)?.user_data = game.user_data_defaults();
         profiles.switch(&id)?;
         Ok(id)
@@ -151,7 +156,10 @@ pub fn import(
     })
 }
 
-fn read_profile(path: &Path) -> Result<(String, Vec<CommunityMod>, bool), AppError> {
+fn read_profile(
+    path: &Path,
+    config_mirror: Option<&str>,
+) -> Result<(String, Vec<CommunityMod>, bool), AppError> {
     let (dir, file, profile) = if path.is_dir() {
         let mods = ["mods.yml", "mods.yaml"]
             .iter()
@@ -187,26 +195,26 @@ fn read_profile(path: &Path) -> Result<(String, Vec<CommunityMod>, bool), AppErr
         return Err(AppError::user("profiles.community.empty").with("path", file.display()));
     }
 
-    let has_configs = dir.join("BepInEx").join("config").is_dir() || dir.join("config").is_dir();
+    // The loader owns the nested folder; the bare `config` folder is the convention an unpacked profile may use with
+    // any loader.
+    let has_configs = config_mirror.is_some_and(|folder| dir.join(folder).is_dir())
+        || dir.join("config").is_dir();
     Ok((profile, mods, has_configs))
 }
 
 /// Matches the file's packages against the library. `item.name` is the Thunderstore package slug (`owner-name`), the
-/// provider's mod id, not a display name: comparing it with `SourceMod::mod_id` is id matching, not name matching. The
-/// version is an exact string match. Both sides go through the app's one case fold, `fold_case`.
+/// provider's mod id, not a display name: the shared matcher compares it with the family's provider id, and both the id
+/// and the version go through the app's one case fold. A package in another version keeps the family's default version.
 fn resolve(library: &Library, mods: &[CommunityMod]) -> Vec<CommunityProfileMod> {
     let provider = ProviderId::new(thunderstore::ID);
     let view = LibraryView::new(library);
     mods.iter()
         .map(|item| {
-            let wanted_id = fold_case(&item.name);
-            let family = library.families.values().find(|family| {
-                family
-                    .sources
-                    .get(&provider)
-                    .is_some_and(|source| fold_case(&source.mod_id) == wanted_id)
-            });
-            let Some(family) = family else {
+            let found = view.find_with(
+                FindQuery::folded(&provider, &item.name, &item.version),
+                None,
+            );
+            let Some(found) = found else {
                 return CommunityProfileMod {
                     name: item.name.clone(),
                     version: item.version.clone(),
@@ -217,17 +225,8 @@ fn resolve(library: &Library, mods: &[CommunityMod]) -> Vec<CommunityProfileMod>
                     selected_version: None,
                 };
             };
-            let wanted_version = fold_case(&item.version);
-            let exact = library.versions.values().find(|version| {
-                version.family == family.id
-                    && version
-                        .info
-                        .version
-                        .as_deref()
-                        .is_some_and(|known| fold_case(known) == wanted_version)
-            });
-            let selected = exact.or_else(|| view.default_version(&family.id));
-            let state = if exact.is_some() {
+            let selected = found.version.or_else(|| view.default_version(found.family));
+            let state = if found.version.is_some() {
                 CommunityMatch::Matched
             } else {
                 CommunityMatch::OtherVersion
@@ -237,7 +236,7 @@ fn resolve(library: &Library, mods: &[CommunityMod]) -> Vec<CommunityProfileMod>
                 version: item.version.clone(),
                 enabled: item.enabled,
                 state,
-                family: Some(family.id.clone()),
+                family: Some(found.family.to_string()),
                 folder: selected.map(|version| version.folder.clone()),
                 selected_version: selected.and_then(|version| version.info.version.clone()),
             }

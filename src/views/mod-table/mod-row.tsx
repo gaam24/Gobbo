@@ -4,13 +4,14 @@ import { cn } from "cn";
 import { GripVertical } from "lucide-react";
 import { Fragment, memo, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import type { ModExtras, UpdateReport } from "@/bindings";
+import { TextCell } from "@/components/app/text-cell";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { useTranslation } from "@/i18n";
 import type { ColumnId, ColumnSpec } from "@/lib/mod-columns";
 import { alternativesText, authorOf, choicesText, formatSize, type Mod } from "@/lib/mods";
 import { PageStatusCell } from "@/sources/status";
-import { ConflictCell, CountCell, DateCell, TextCell, VersionCell } from "@/views/mod-table/cells";
+import { ConflictCell, CountCell, DateCell, VersionCell } from "@/views/mod-table/cells";
 import { EMPTY, ROW } from "@/views/mod-table/layout";
 import type { GroupMenuActions } from "@/views/mod-table/mod-list-props";
 import { itemClicks, ModMenu } from "@/views/mod-table/mod-menu";
@@ -151,7 +152,7 @@ export const ModRow = memo(function ModRow({
 			case "version":
 				return (
 					<VersionCell
-						// A new version count remounts the picker, so a cached list never hides an imported version.
+						// The count keys the cache: a new import remounts the picker instead of hiding behind its list.
 						key={`${mod.folder}:${mod.version_count}`}
 						gameId={gameId}
 						mod={mod}

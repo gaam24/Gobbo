@@ -6,11 +6,10 @@ use std::os::windows::ffi::OsStringExt;
 use std::path::PathBuf;
 
 use detour::TypedDetour;
+use gobbo_overlay_core::wide;
 use windows_sys::Win32::System::LibraryLoader::{
     GetModuleFileNameW, GetModuleHandleW, GetProcAddress, LoadLibraryW,
 };
-
-use crate::text::wide;
 
 /// The full path of a loaded module.
 pub(crate) fn module_path(module: *mut c_void) -> Option<PathBuf> {

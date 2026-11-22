@@ -10,12 +10,12 @@ await applyLanguage("en");
 
 function game(loader: GameView["loader"]): GameView {
 	return {
-		id: "tcg-card-shop-simulator",
-		name: "TCG Card Shop Simulator",
+		id: "example-game",
+		name: "Example Game",
 		origin: "bundled",
 		verified: null,
-		steam_app_ids: [3070070],
-		places: ["BepInEx/plugins"],
+		steam_app_ids: [1234567],
+		places: ["mods/plugins"],
 		loader,
 		needs_settings_dir: false,
 		needs_mods_root: false,
@@ -34,13 +34,13 @@ function render(loader: GameView["loader"]) {
 
 test("the definition shows the loader name, id and variant", () => {
 	const html = render({
-		id: "bepinex",
-		name: "BepInEx",
+		id: "example-loader",
+		name: "Example Loader",
 		variant: "5",
 		default_variant: true,
 	});
-	expect(html).toContain("BepInEx");
-	expect(html).toContain("bepinex");
+	expect(html).toContain("Example Loader");
+	expect(html).toContain("example-loader");
 	expect(html).toContain("Loader variant");
 	expect(html).toContain("default");
 });

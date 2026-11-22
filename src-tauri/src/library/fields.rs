@@ -1,6 +1,6 @@
 //! The generic family fields copied out for the views and the packs.
 
-use super::Family;
+use crate::domain::library::Family;
 
 /// The notes, lists and requirements of a family, copied out for the views and the pack. A mod without a family in the
 /// library gets the empty ones.

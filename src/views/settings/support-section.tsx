@@ -1,33 +1,15 @@
-import { useState } from "react";
-
-import { commands } from "@/bindings";
 import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/field";
 import { useTranslation } from "@/i18n";
-import { messageOf, unwrap } from "@/lib/ipc";
 import { copyText, openPath } from "@/lib/open";
 import { SectionBlock } from "@/views/settings/controls";
+import { useSupportBundle } from "@/views/settings/use-support-bundle";
 
 /// The support bundle is read-only: the log, the version and, for the current game, its definition, setup check and
 /// last run. Paths are redacted by the backend; credentials never enter the bundle.
 export function SupportSection({ gameId }: { gameId: string | null }) {
 	const { t } = useTranslation();
-	const [path, setPath] = useState<string | null>(null);
-	const [busy, setBusy] = useState(false);
-	const [failure, setFailure] = useState<string | null>(null);
-
-	const create = async () => {
-		setBusy(true);
-		setFailure(null);
-
-		try {
-			setPath(await unwrap(commands.createSupportBundle(gameId)));
-		} catch (error) {
-			setFailure(messageOf(error));
-		}
-		// Both the success and the failure path end the busy state here; React Compiler skips a `finally`.
-		setBusy(false);
-	};
+	const { path, busy, failure, setFailure, create } = useSupportBundle(gameId);
 
 	return (
 		<SectionBlock>

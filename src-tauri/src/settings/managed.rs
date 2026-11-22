@@ -13,7 +13,7 @@ use std::path::PathBuf;
 /// The game folder the user gave, as a path. It must not be empty, and it must have the files the game definition marks.
 /// Adding and checking a game give the same error for a folder that is not the game's.
 fn game_folder(game: &games::GameDef, game_root: &str) -> Result<PathBuf, AppError> {
-    game_folder_for(game, game_root, !cfg!(windows))
+    game_folder_for(game, game_root, !crate::platform::is_windows())
 }
 
 /// `game_folder` with the marker rule's platform given, so a test can check both sides on one machine.
@@ -43,7 +43,7 @@ fn game_folder_for(
 /// `None` when the game defines no markers (or only the native Linux ones are present).
 pub fn check_game_folder(game_id: &str, game_root: &str) -> Result<Option<String>, AppError> {
     let game = games::load(game_id)?;
-    check_game_folder_in(&game, game_root, !cfg!(windows))
+    check_game_folder_in(&game, game_root, !crate::platform::is_windows())
 }
 
 /// `check_game_folder` with the definition and the marker rule's platform given, for a test on either system.

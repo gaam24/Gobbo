@@ -1,11 +1,21 @@
 //! The import types the window reads: progress, the import result and the archive preview.
 
 use std::collections::BTreeMap;
+use std::path::PathBuf;
 
 use serde::Serialize;
 
 use crate::domain::library::SkippedFile;
 use crate::import::fomod as fomod_model;
+
+/// The archive and FOMOD answers needed before an import can finish. The acquire outcomes and the collection views
+/// share this one shape, so a new field has a single owner.
+#[derive(Debug, Clone, Serialize, specta::Type)]
+pub struct ChoiceNeeded {
+    pub path: PathBuf,
+    pub module_name: String,
+    pub steps: Vec<FomodStepView>,
+}
 
 /// The result of an import.
 #[derive(Debug, Serialize, specta::Type)]

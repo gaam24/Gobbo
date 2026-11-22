@@ -6,6 +6,8 @@ use std::fs;
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
 
+use gobbo_overlay_decisions::split_newest;
+
 use super::settings::developer_dir;
 
 /// How many developer files are kept, the newest first.
@@ -45,23 +47,21 @@ pub(crate) fn prune_old_files() {
 /// The files to remove: those older than `keep_for`, and every file after the `keep` newest. A file dated after `now` is
 /// not old.
 fn prune_plan(
-    mut files: Vec<(PathBuf, SystemTime)>,
+    files: Vec<(PathBuf, SystemTime)>,
     now: SystemTime,
     keep: usize,
     keep_for: Duration,
 ) -> Vec<PathBuf> {
-    files.sort_by_key(|file| std::cmp::Reverse(file.1));
-    files
-        .into_iter()
-        .enumerate()
-        .filter(|(index, (_, modified))| {
-            *index >= keep
-                || now
-                    .duration_since(*modified)
-                    .is_ok_and(|age| age > keep_for)
-        })
-        .map(|(_, (path, _))| path)
-        .collect()
+    let (kept, beyond_limit) = split_newest(files, keep);
+    let mut removed: Vec<PathBuf> = beyond_limit.into_iter().map(|(path, _)| path).collect();
+
+    for (path, modified) in kept {
+        if now.duration_since(modified).is_ok_and(|age| age > keep_for) {
+            removed.push(path);
+        }
+    }
+
+    removed
 }
 
 #[cfg(test)]

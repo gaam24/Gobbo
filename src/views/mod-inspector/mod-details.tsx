@@ -1,15 +1,7 @@
 import { EllipsisVertical, FileSearch, FolderArchive, FolderOpen, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import { useUiState } from "@/app/contexts/ui-context";
-import {
-	commands,
-	type IntegrityStatus,
-	type ModDetails as ModDetailsData,
-	type ModInfoEdit,
-	type Relations,
-	type Status,
-	type UpdateReport,
-} from "@/bindings";
+import type { ModInfoEdit, Relations, Status, UpdateReport } from "@/bindings";
 import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
@@ -21,13 +13,14 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTranslation } from "@/i18n";
-import { messageOf, unwrap } from "@/lib/ipc";
-import { authorOf, conflictsOf, type FullMod, type Mod, pageDescriptionOf, tagsOf } from "@/lib/mods";
+import { authorOf, conflictsOf, type FullMod, type Mod, pageDescriptionOf } from "@/lib/mods";
 import { ModPicture } from "@/sources/mod-picture";
 import { SourceSection } from "@/sources/source-section";
 import { ConflictsTab, FileWinners } from "@/views/mod-inspector/tabs/conflicts-tab";
 import { FilesTab } from "@/views/mod-inspector/tabs/files-tab";
 import { OverviewTab } from "@/views/mod-inspector/tabs/overview-tab";
+import { useModDetails } from "@/views/mod-inspector/use-mod-details";
+import { useModTags } from "@/views/mods/use-mod-tags";
 
 type InspectorTab = "overview" | "conflicts" | "files" | "sources";
 
@@ -97,7 +90,7 @@ export function ModDetails({
 	update?: UpdateReport;
 	checkedAt?: number;
 }) {
-	const { t, i18n } = useTranslation();
+	const { t } = useTranslation();
 	const { detailsTab, detailsRequest } = useUiState();
 	const [tab, setTab] = useState<InspectorTab>(detailsTab);
 	const [seenRequest, setSeenRequest] = useState(detailsRequest);
@@ -108,13 +101,7 @@ export function ModDetails({
 		setTab(detailsTab);
 	}
 
-	const [details, setDetails] = useState<ModDetailsData | null>(null);
-	// Keyed by folder so a check that finishes after a selection change never shows another mod's result.
-	const [integrity, setIntegrity] = useState<{
-		folder: string;
-		status: IntegrityStatus;
-	} | null>(null);
-	const [verifying, setVerifying] = useState(false);
+	const { details, integrity, verifying, verifyFiles } = useModDetails({ gameId, folder: mod.folder, status, onError });
 	const loaded = details?.folder === mod.folder;
 	const extras = details?.folder === mod.folder ? details.extras : null;
 	// The list row carries only the fields it draws. The inspector reads the full description and page data with the
@@ -140,42 +127,8 @@ export function ModDetails({
 	};
 	const conflicts =
 		details?.folder === mod.folder ? conflictsOf(details.conflicts, mod.id) : new Map<string, { win: number; lose: number }>();
-	const allTags = useMemo(() => tagsOf(status.mods, i18n.language), [i18n.language, status.mods]);
+	const allTags = useModTags(status.mods);
 	const author = authorOf(mod);
-
-	useEffect(() => {
-		let active = true;
-		void (async () => {
-			try {
-				const loadedDetails = await unwrap(commands.modDetails(gameId, mod.folder));
-				// oxlint-disable-next-line typescript/no-unnecessary-condition -- the cleanup flips `active`, which flow analysis cannot see.
-				if (active) setDetails(loadedDetails);
-			} catch (failure) {
-				// oxlint-disable-next-line typescript/no-unnecessary-condition -- the cleanup flips `active`, which flow analysis cannot see.
-				if (active) onError(messageOf(failure));
-			}
-		})();
-		return () => {
-			active = false;
-		};
-		// The list reloads after every change, so the files stay in step with the profile.
-		// oxlint-disable-next-line react/exhaustive-effect-dependencies -- `status` reloads the details on purpose.
-	}, [gameId, mod.folder, status, onError]);
-
-	const verifyFiles = () => {
-		if (verifying) return;
-		setVerifying(true);
-		void (async () => {
-			try {
-				const result = await unwrap(commands.verifyIntegrity(gameId, mod.folder));
-				setIntegrity({ folder: mod.folder, status: result });
-			} catch (failure) {
-				onError(messageOf(failure));
-			}
-
-			setVerifying(false);
-		})();
-	};
 
 	const toggleEnabled = () => void onSetEnabled([mod.id], !mod.enabled);
 	const changeTab = (value: string) => {

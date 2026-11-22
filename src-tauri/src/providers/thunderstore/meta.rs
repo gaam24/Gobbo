@@ -68,10 +68,9 @@ pub fn checked_meta(
     version: &VersionRecord,
     picture: Option<String>,
     saved: Option<&SourceMeta>,
+    checked_at: u32,
 ) -> SourceMeta {
-    let mut meta = meta_of(package, version, picture);
-    meta.merge_saved(saved);
-    meta
+    SourceMeta::checked(meta_of(package, version, picture), saved, checked_at)
 }
 
 /// The packages the newest version depends on, as requirements. Thunderstore lists them for the version, so the user
@@ -205,7 +204,7 @@ mod tests {
             extra: BTreeMap::from([("kept".to_string(), "yes".to_string())]),
             ..SourceMeta::default()
         };
-        let meta = checked_meta(&package(), &version(), None, Some(&saved));
+        let meta = checked_meta(&package(), &version(), None, Some(&saved), 9);
         assert_eq!(
             meta.picture.as_deref(),
             Some("thunderstore-example_owner-example_mod.png"),
@@ -224,7 +223,7 @@ mod tests {
             picture: Some("thunderstore-example_owner-example_mod.png".to_string()),
             ..SourceMeta::default()
         };
-        let meta = checked_meta(&package(), &version(), None, Some(&saved));
+        let meta = checked_meta(&package(), &version(), None, Some(&saved), 9);
         assert_eq!(meta.picture, None);
     }
 

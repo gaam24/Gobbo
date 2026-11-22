@@ -39,7 +39,7 @@ pub(crate) unsafe extern "system" fn get_module_file_name(
     let Some(answer) = guest_long_path(unsafe { read_path(original, module) }) else {
         return 0;
     };
-    copy(&answer, buffer, size)
+    copy_units(&answer, buffer, size)
 }
 
 /// `GetModuleFileNameA`: the ANSI form of the same answer. The path is read through the original `W` function and
@@ -65,7 +65,7 @@ pub(crate) unsafe extern "system" fn get_module_file_name_a(
     let Some(answer) = guest_long_path_ansi(unsafe { read_path(original, module) }) else {
         return 0;
     };
-    copy_a(&answer, buffer, size)
+    copy_units(&answer, buffer, size)
 }
 
 /// The game path of a module path read with a growing buffer: a path in a layer mapped back as text, any other path as
@@ -139,14 +139,14 @@ fn copy_mapped_module_ansi(actual: &[u16], buffer: *mut u8, size: u32) -> u32 {
 
     if let Some(length) = ansi_units(answer, &mut bytes) {
         drop(last_error);
-        return copy_a(&bytes[..length], buffer, size);
+        return copy_units(&bytes[..length], buffer, size);
     }
 
     let Some(answer) = ansi(answer) else {
         return 0;
     };
     drop(last_error);
-    copy_a(&answer, buffer, size)
+    copy_units(&answer, buffer, size)
 }
 
 /// The path of `module` with the original `W` function, growing a stack buffer when the path does not fit.
@@ -183,7 +183,7 @@ pub(crate) unsafe extern "system" fn get_module_file_name_ex(
     let Some(answer) = guest_long_path(unsafe { read_ex_path(original, process, module) }) else {
         return 0;
     };
-    copy(&answer, buffer, size)
+    copy_units(&answer, buffer, size)
 }
 
 /// `GetModuleFileNameExA`: the ANSI form of the same answer.
@@ -210,7 +210,7 @@ pub(crate) unsafe extern "system" fn get_module_file_name_ex_a(
     else {
         return 0;
     };
-    copy_a(&answer, buffer, size)
+    copy_units(&answer, buffer, size)
 }
 
 /// The path of `module` in `process` into `buffer` when it fits. `None` means the caller must use `read_ex_path`.
@@ -356,16 +356,6 @@ fn ansi(path: &[u16]) -> Option<Vec<u8>> {
     Some(buffer)
 }
 
-/// Copies the answer into the program's buffer with the truncation rules of `GetModuleFileNameW`.
-fn copy(path: &[u16], buffer: *mut u16, size: u32) -> u32 {
-    copy_units(path, buffer, size)
-}
-
-/// Copies the ANSI answer with the truncation rules of `GetModuleFileNameA`: the size is in bytes.
-fn copy_a(path: &[u8], buffer: *mut u8, size: u32) -> u32 {
-    copy_units(path, buffer, size)
-}
-
 /// A value whose zero is the terminator of a Win32 buffer.
 trait Zero {
     const ZERO: Self;
@@ -429,7 +419,7 @@ mod tests {
     fn a_small_buffer_is_filled_to_its_last_unit_and_reports_failure() {
         let text: Vec<u16> = "abcde".encode_utf16().collect();
         let mut buffer = [0u16; 4];
-        assert_eq!(copy(&text, buffer.as_mut_ptr(), 4), 4);
+        assert_eq!(copy_units(&text, buffer.as_mut_ptr(), 4), 4);
         assert_eq!(buffer, [97, 98, 99, 0]);
     }
 
@@ -437,7 +427,7 @@ mod tests {
     fn a_buffer_that_fits_gets_the_whole_path() {
         let text: Vec<u16> = "abc".encode_utf16().collect();
         let mut buffer = [0u16; 4];
-        assert_eq!(copy(&text, buffer.as_mut_ptr(), 4), 3);
+        assert_eq!(copy_units(&text, buffer.as_mut_ptr(), 4), 3);
         assert_eq!(buffer, [97, 98, 99, 0]);
     }
 
@@ -455,10 +445,10 @@ mod tests {
     fn the_ansi_copy_uses_bytes_and_terminates_the_buffer() {
         let text = b"abcde";
         let mut buffer = [0u8; 4];
-        assert_eq!(copy_a(text, buffer.as_mut_ptr(), 4), 4);
+        assert_eq!(copy_units(text, buffer.as_mut_ptr(), 4), 4);
         assert_eq!(buffer, [b'a', b'b', b'c', 0]);
         let mut buffer = [0u8; 8];
-        assert_eq!(copy_a(text, buffer.as_mut_ptr(), 8), 5);
+        assert_eq!(copy_units(text, buffer.as_mut_ptr(), 8), 5);
         assert_eq!(&buffer[..6], b"abcde\0");
     }
 }

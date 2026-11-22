@@ -3,6 +3,7 @@ import path from "node:path";
 import process from "node:process";
 import { browser } from "@wdio/globals";
 
+import type { AppSettings_Serialize } from "../src/bindings";
 import { appBinary, appEnvironment, applyProcessEnvironment, artifacts, dataDir, homeDir } from "./support/env";
 import { makeDir, removeTree, writeJson } from "./support/files";
 import { prepareFixtureFolders } from "./support/fixtures";
@@ -16,13 +17,15 @@ makeDir(dataDir);
 makeDir(homeDir);
 makeDir(artifacts);
 prepareFixtureFolders();
-writeJson(path.join(dataDir, "settings.json"), {
+/// The other settings keep their defaults; this object must stay in step with the serialized app settings.
+const initialSettings: Partial<AppSettings_Serialize> = {
 	language: "en",
 	inspector_collapsed: false,
 	source_links: [],
 	remember_window: true,
 	efficiency_mode: "auto",
-});
+};
+writeJson(path.join(dataDir, "settings.json"), initialSettings);
 applyProcessEnvironment();
 
 const defaultSpecs = [
@@ -45,7 +48,7 @@ const defaultSpecs = [
 	"./specs/99-recovery.e2e.ts",
 ];
 
-/// The pull-request suite: the flows that break most visibly, in an order that leaves the later specs a clean state.
+/// The quick local suite: the flows that break most visibly, in an order that leaves the later specs a clean state.
 const smokeSpecs = [
 	"./specs/00-first-run.e2e.ts",
 	"./specs/10-games.e2e.ts",
@@ -57,7 +60,7 @@ const smokeSpecs = [
 ];
 
 /// `E2E_SPECS=./specs/20-import.e2e.ts,./specs/30-mods-list.e2e.ts` runs a subset while a new spec is being written.
-/// `E2E_SMOKE=1` (or `bun run e2e:smoke`) runs the pull-request subset. The nightly job runs every spec.
+/// `E2E_SMOKE=1` (or `bun run e2e:smoke`) runs a quick local subset. A manual CI run runs every spec.
 const selected = process.env.E2E_SPECS?.split(",")
 	.map((entry) => entry.trim())
 	.filter((entry) => entry.length > 0);

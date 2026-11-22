@@ -5,8 +5,6 @@
 //! touch the disk or the network, so the window never waits for them. A command that changes a game answers with the
 //! game's fresh status (`change`), so the interface never needs a second call to see the result.
 
-pub use crate::sources::commands::watch_links;
-
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 

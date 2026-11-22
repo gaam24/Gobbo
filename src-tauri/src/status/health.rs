@@ -60,7 +60,9 @@ pub fn health(root: &Data, game_id: &str) -> Result<HealthReport, AppError> {
             id: format!("problem:{at}:{}", problem.code),
             severity: HealthSeverity::Problem,
             message: problem.clone(),
-            action: Some(action(HealthActionKind::ShowMods)),
+            action: Some(HealthAction {
+                kind: HealthActionKind::ShowMods,
+            }),
         });
     }
 
@@ -69,7 +71,9 @@ pub fn health(root: &Data, game_id: &str) -> Result<HealthReport, AppError> {
             id: format!("warning:{at}:{}", warning.code),
             severity: HealthSeverity::Warning,
             message: warning.clone(),
-            action: Some(action(HealthActionKind::ShowMods)),
+            action: Some(HealthAction {
+                kind: HealthActionKind::ShowMods,
+            }),
         });
     }
 
@@ -78,25 +82,33 @@ pub fn health(root: &Data, game_id: &str) -> Result<HealthReport, AppError> {
             id: "stage:setup".to_string(),
             severity: HealthSeverity::Problem,
             message: Message::new("health.setup"),
-            action: Some(action(HealthActionKind::OpenSettings)),
+            action: Some(HealthAction {
+                kind: HealthActionKind::OpenSettings,
+            }),
         }),
         GameStage::Empty => items.push(HealthItem {
             id: "stage:empty".to_string(),
             severity: HealthSeverity::Warning,
             message: Message::new("health.emptyLibrary"),
-            action: Some(action(HealthActionKind::ShowMods)),
+            action: Some(HealthAction {
+                kind: HealthActionKind::ShowMods,
+            }),
         }),
         GameStage::NoEnabled { total } => items.push(HealthItem {
             id: "stage:no-enabled".to_string(),
             severity: HealthSeverity::Warning,
             message: Message::new("health.noEnabled").with("total", total),
-            action: Some(action(HealthActionKind::ShowMods)),
+            action: Some(HealthAction {
+                kind: HealthActionKind::ShowMods,
+            }),
         }),
         GameStage::Draft { changes, .. } => items.push(HealthItem {
             id: "stage:draft".to_string(),
             severity: HealthSeverity::Warning,
             message: Message::new("health.draft").with("count", changes),
-            action: Some(action(HealthActionKind::Apply)),
+            action: Some(HealthAction {
+                kind: HealthActionKind::Apply,
+            }),
         }),
         GameStage::Blocked { .. } | GameStage::Ready { .. } | GameStage::Applied { .. } => {}
     }
@@ -106,7 +118,9 @@ pub fn health(root: &Data, game_id: &str) -> Result<HealthReport, AppError> {
             id: "conflicts".to_string(),
             severity: HealthSeverity::Warning,
             message: Message::new("health.conflicts").with("count", status.conflict_count),
-            action: Some(action(HealthActionKind::ShowMods)),
+            action: Some(HealthAction {
+                kind: HealthActionKind::ShowMods,
+            }),
         });
     }
 
@@ -115,7 +129,9 @@ pub fn health(root: &Data, game_id: &str) -> Result<HealthReport, AppError> {
             id: "overwrite".to_string(),
             severity: HealthSeverity::Warning,
             message: Message::new("health.overwrite"),
-            action: Some(action(HealthActionKind::OpenOverwrite)),
+            action: Some(HealthAction {
+                kind: HealthActionKind::OpenOverwrite,
+            }),
         });
     }
 
@@ -124,7 +140,9 @@ pub fn health(root: &Data, game_id: &str) -> Result<HealthReport, AppError> {
             id: "bisect".to_string(),
             severity: HealthSeverity::Warning,
             message: Message::new("health.bisect"),
-            action: Some(action(HealthActionKind::ShowMods)),
+            action: Some(HealthAction {
+                kind: HealthActionKind::ShowMods,
+            }),
         });
     }
 
@@ -138,7 +156,9 @@ pub fn health(root: &Data, game_id: &str) -> Result<HealthReport, AppError> {
             id: "requirements".to_string(),
             severity: HealthSeverity::Warning,
             message: Message::new("health.requirements").with("count", requirements),
-            action: Some(action(HealthActionKind::ShowMods)),
+            action: Some(HealthAction {
+                kind: HealthActionKind::ShowMods,
+            }),
         });
     }
 
@@ -146,8 +166,4 @@ pub fn health(root: &Data, game_id: &str) -> Result<HealthReport, AppError> {
         checked_at: now_seconds(),
         items,
     })
-}
-
-const fn action(kind: HealthActionKind) -> HealthAction {
-    HealthAction { kind }
 }

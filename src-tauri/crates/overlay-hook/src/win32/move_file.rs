@@ -4,6 +4,7 @@
 
 use std::ffi::c_void;
 
+use gobbo_overlay_core::wide;
 use windows_sys::Win32::Foundation::{
     ERROR_ACCESS_DENIED, ERROR_ALREADY_EXISTS, ERROR_INVALID_FUNCTION, ERROR_INVALID_PARAMETER,
     ERROR_NOT_SUPPORTED,
@@ -16,7 +17,7 @@ use super::source::{full_name, source_path};
 use super::{PreserveLastError, fail};
 use crate::guard::enter_session;
 use crate::paths::{in_lower, make_write_target, name_taken, place, shown, unsafe_name};
-use crate::text::{display_name, wide};
+use crate::text::display_name;
 use crate::trace::trace_call;
 use crate::whiteouts::hide;
 

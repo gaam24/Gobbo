@@ -35,6 +35,15 @@ pub enum Store {
 }
 
 impl Store {
+    /// The stores in the order a saved source is compared with them.
+    const ALL: [Self; 5] = [
+        Self::Gog,
+        Self::Epic,
+        Self::Heroic,
+        Self::Legendary,
+        Self::Lutris,
+    ];
+
     /// The name the window and the saved settings use for this store.
     pub const fn name(self) -> &'static str {
         match self {
@@ -44,6 +53,22 @@ impl Store {
             Self::Legendary => "legendary",
             Self::Lutris => "lutris",
         }
+    }
+
+    /// The name shown for this store, for example in a game's subtitle.
+    pub const fn display_name(self) -> &'static str {
+        match self {
+            Self::Gog => "GOG",
+            Self::Epic => "Epic",
+            Self::Heroic => "Heroic",
+            Self::Legendary => "Legendary",
+            Self::Lutris => "Lutris",
+        }
+    }
+
+    /// The store the saved source names, when it is one of the stores that keep a game folder.
+    pub fn from_name(name: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|store| store.name() == name)
     }
 }
 

@@ -34,8 +34,11 @@ fn inputs_carry_files_only_for_enabled_versions() {
 #[test]
 fn family_ids_prefer_the_nexus_id_and_fall_back_to_the_name() {
     assert_eq!(
-        family_id_from(Some(&SourceRef::new("nexus", "35686")), "Remove Mods Menu"),
-        "nexus:35686"
+        family_id_from(
+            Some(&SourceRef::new("nexus", "7001")),
+            "Example Cleanup Mod"
+        ),
+        "nexus:7001"
     );
     assert_eq!(
         family_id_from(
@@ -45,8 +48,8 @@ fn family_ids_prefer_the_nexus_id_and_fall_back_to_the_name() {
         "nexus:225#100"
     );
     assert_eq!(
-        family_id_from(None, "Remove Mods Menu!"),
-        "local:remove-mods-menu"
+        family_id_from(None, "Example Cleanup Mod!"),
+        "local:example-cleanup-mod"
     );
     assert_eq!(family_id_from(None, "!!!"), "local:mod");
 }
@@ -54,10 +57,10 @@ fn family_ids_prefer_the_nexus_id_and_fall_back_to_the_name() {
 #[test]
 fn a_manual_import_without_a_part_joins_a_family_only_when_the_names_match() {
     let mut library = Library::default();
-    let mut family = crate::library::Family {
+    let mut family = crate::domain::library::Family {
         id: "nexus:225".into(),
         name: "Addon A".into(),
-        ..crate::library::Family::default()
+        ..crate::domain::library::Family::default()
     };
     family.sources.insert(
         crate::domain::source::ProviderId::new("nexus"),
@@ -106,10 +109,10 @@ fn a_manual_import_without_a_part_joins_a_family_only_when_the_names_match() {
 #[test]
 fn an_import_keeps_one_family_for_a_part_and_separates_another_part() {
     let mut library = Library::default();
-    let mut first = crate::library::Family {
+    let mut first = crate::domain::library::Family {
         id: "nexus:225".into(),
         name: "First addon".into(),
-        ..crate::library::Family::default()
+        ..crate::domain::library::Family::default()
     };
     first.sources.insert(
         crate::domain::source::ProviderId::new("nexus"),

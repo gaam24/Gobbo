@@ -2,24 +2,48 @@
 //! collection, so a profile can be resumed without the network and an update does not overwrite the old recipe.
 
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::context::Data;
 use crate::domain::collection::{CollectionInfo, CollectionOrigin, CollectionPlan, PLAN_FORMAT};
 use crate::error::{AppError, io_at};
 
+/// The folder of one revision, under `collections`. Every reader and writer builds the path the same way.
+fn revision_dir(
+    collections: &Path,
+    provider: &str,
+    game_key: &str,
+    slug: &str,
+    revision: u32,
+) -> PathBuf {
+    collections
+        .join(crate::domain::naming::compact_component(provider))
+        .join(crate::domain::naming::compact_component(game_key))
+        .join(crate::domain::naming::compact_component(slug))
+        .join(format!("r{revision}"))
+}
+
 /// The folder of one revision.
 pub fn dir(data: &Data, info: &CollectionInfo) -> PathBuf {
-    data.collections()
-        .join(crate::domain::naming::compact_component(&info.provider))
-        .join(crate::domain::naming::compact_component(&info.game_key))
-        .join(crate::domain::naming::compact_component(&info.slug))
-        .join(format!("r{}", info.revision))
+    revision_dir(
+        &data.collections(),
+        &info.provider,
+        &info.game_key,
+        &info.slug,
+        info.revision,
+    )
 }
 
 /// The plan file of one revision.
 fn plan_path(data: &Data, info: &CollectionInfo) -> PathBuf {
-    dir(data, info).join("plan.json")
+    revision_dir(
+        &data.collections(),
+        &info.provider,
+        &info.game_key,
+        &info.slug,
+        info.revision,
+    )
+    .join("plan.json")
 }
 
 /// The archive of one revision, when the cache has it.
@@ -47,39 +71,25 @@ pub fn read_plan(data: &Data, info: &CollectionInfo) -> Option<CollectionPlan> {
     (plan.format == PLAN_FORMAT).then_some(plan)
 }
 
-/// Reads the cached plan of a collection named by a profile origin.
-fn read_plan_at(
-    data: &Data,
-    provider: &str,
-    game_key: &str,
-    slug: &str,
-    revision: u32,
-) -> Option<CollectionPlan> {
-    let path = data
-        .collections()
-        .join(crate::domain::naming::compact_component(provider))
-        .join(crate::domain::naming::compact_component(game_key))
-        .join(crate::domain::naming::compact_component(slug))
-        .join(format!("r{revision}"))
-        .join("plan.json");
-    let plan: CollectionPlan = crate::infra::json::read_json_or_none(&path)?;
-    (plan.format == PLAN_FORMAT).then_some(plan)
-}
-
 /// Reads the cached plan of a profile origin, or the missing-plan error. A caller that wants the slug in the error
 /// adds it to the result.
 pub fn read_plan_or_missing(
     data: &Data,
     origin: &CollectionOrigin,
 ) -> Result<CollectionPlan, AppError> {
-    read_plan_at(
-        data,
+    let path = revision_dir(
+        &data.collections(),
         &origin.provider,
         &origin.game_key,
         &origin.slug,
         origin.revision,
     )
-    .ok_or_else(|| AppError::user("collection.cache_missing"))
+    .join("plan.json");
+    let plan: CollectionPlan = crate::infra::json::read_json_or_none(&path)
+        .ok_or_else(|| AppError::user("collection.cache_missing"))?;
+    (plan.format == PLAN_FORMAT)
+        .then_some(plan)
+        .ok_or_else(|| AppError::user("collection.cache_missing"))
 }
 
 /// Writes the plan atomically.

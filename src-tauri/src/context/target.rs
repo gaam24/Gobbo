@@ -65,7 +65,7 @@ pub fn deployment_root(
     }
     let context = path_context(data, game, settings);
     // `root_linux` is for a native Linux install only; on Windows the `root` template always applies.
-    let native = !cfg!(windows) && runtime(game, settings) == Runtime::Native;
+    let native = !crate::platform::is_windows() && runtime(game, settings) == Runtime::Native;
     let template = game.root_template_for(native);
     if template.trim() == GAME_TEMPLATE {
         return Ok(context.game_root);

@@ -41,57 +41,14 @@ struct Setup {
     store_env: Vec<(String, String)>,
 }
 
-/// A game through Proton from the Steam library: its prefix, the Steam variables, and the overlay when it is deployed.
-pub(super) fn proton_command(
-    game: &GameDef,
-    data: &Data,
-    settings: &Settings,
-    game_root: &Path,
-    exe: &Executable,
-    home: &Path,
-    with_mods: bool,
-) -> Result<(Launch, bool, &'static str), AppError> {
-    proton_command_with(
-        game,
-        data,
-        settings,
-        game_root,
-        exe,
-        home,
-        with_mods,
-        Runtime::SteamProton,
-    )
-}
-
-/// A Windows program from another store: it starts through the newest Proton on this computer, in a prefix Gobbo owns.
-pub(super) fn owned_proton_command(
-    game: &GameDef,
-    data: &Data,
-    settings: &Settings,
-    game_root: &Path,
-    exe: &Executable,
-    home: &Path,
-    with_mods: bool,
-) -> Result<(Launch, bool, &'static str), AppError> {
-    proton_command_with(
-        game,
-        data,
-        settings,
-        game_root,
-        exe,
-        home,
-        with_mods,
-        Runtime::OwnedProton,
-    )
-}
-
-/// The Proton launch itself, shared by the two runtimes: only the setup, the variables and the prefix differ.
+/// A Windows program through Proton: the caller passes the runtime, so a Steam install uses Steam's prefix and one from
+/// another store uses the prefix Gobbo owns. The setup, the variables and the prefix are the only differences.
 #[cfg(not(windows))]
 #[expect(
     clippy::too_many_arguments,
     reason = "a launch carries the game, its data and settings, the program, home and the runtime"
 )]
-fn proton_command_with(
+pub(super) fn proton_command(
     game: &GameDef,
     data: &Data,
     settings: &Settings,

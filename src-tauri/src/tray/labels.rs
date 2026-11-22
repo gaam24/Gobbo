@@ -6,6 +6,7 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 use crate::infra::tasks::TASK_KINDS;
+use crate::infra::tasks::state::{FAILED, RUNNING, WAITING};
 use crate::settings::config::{NOTIFICATION_OUTCOMES, task_notification};
 
 /// Every string the tray menu and its notices show. The maps are keyed by the stable codes the backend already emits:
@@ -104,9 +105,9 @@ impl Default for TrayLabels {
                 .map(|&code| (code.to_owned(), kind_label(code).to_owned()))
                 .collect(),
             states: BTreeMap::from([
-                ("running", "Running"),
-                ("waiting", "Waiting for you"),
-                ("failed", "Needs attention"),
+                (RUNNING, "Running"),
+                (WAITING, "Waiting for you"),
+                (FAILED, "Needs attention"),
             ])
             .into_iter()
             .map(|(key, value)| (key.to_owned(), value.to_owned()))

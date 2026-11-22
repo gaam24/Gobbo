@@ -2,8 +2,9 @@
 
 use std::collections::BTreeMap;
 
+use crate::domain::library::Library;
+use crate::domain::library::{AdoptPolicy, Family, adopt_fields};
 use crate::domain::pack::PackMod;
-use crate::library::Library;
 
 /// Copies the pack's family data into the local family where the local field is still empty. What the user has set
 /// stays.
@@ -16,31 +17,22 @@ pub(super) fn adopt_family_data(
     let Some(local) = library.families.get_mut(family) else {
         return;
     };
-    let ids = |list: &[String]| -> Vec<String> {
-        list.iter()
-            .map(|id| {
-                families
-                    .get(id.as_str())
-                    .map_or_else(|| id.clone(), |local| (*local).to_string())
-            })
-            .collect()
+    let source = Family {
+        tags: entry.tags.iter().cloned().collect(),
+        notes: entry.notes.clone(),
+        instructions: entry.instructions.clone(),
+        requires: entry.requires.clone(),
+        requirements: entry.requirements.clone(),
+        source_dlcs: entry.source_dlcs.clone(),
+        incompatible: entry.incompatible.clone(),
+        overrides: entry.overrides.clone(),
+        ..Family::default()
     };
-
-    if local.instructions.is_empty() {
-        local.instructions.clone_from(&entry.instructions);
-    }
-
-    if local.tags.is_empty() {
-        local.tags = entry.tags.iter().cloned().collect();
-    }
-
-    if local.requires.is_empty() {
-        local.requires = ids(&entry.requires);
-    }
-
-    if local.requirements.is_empty() {
-        local.requirements.clone_from(&entry.requirements);
-    }
+    adopt_fields(local, &source, AdoptPolicy::FillEmpty, |id| {
+        families
+            .get(id)
+            .map_or_else(|| id.to_string(), |local| (*local).to_string())
+    });
 
     for (provider, source) in &entry.sources {
         match local.sources.get_mut(provider) {
@@ -51,21 +43,5 @@ pub(super) fn adopt_family_data(
                 local.sources.insert(provider.clone(), source.clone());
             }
         }
-    }
-
-    if local.source_dlcs.is_empty() {
-        local.source_dlcs.clone_from(&entry.source_dlcs);
-    }
-
-    if local.notes.is_empty() {
-        local.notes.clone_from(&entry.notes);
-    }
-
-    if local.incompatible.is_empty() {
-        local.incompatible = ids(&entry.incompatible);
-    }
-
-    if local.overrides.is_empty() {
-        local.overrides = ids(&entry.overrides);
     }
 }

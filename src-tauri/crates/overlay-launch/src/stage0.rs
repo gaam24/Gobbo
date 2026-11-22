@@ -114,16 +114,15 @@ pub struct Early<'a> {
     pub handover: &'a Path,
 }
 
-/// The patched child: what `restore` needs to put the stubs back.
-#[allow(
-    dead_code,
-    reason = "the hook hands the stubs back in the product; restore is the test's way to do the same"
-)]
+/// The patched child: the bytes the hook reads to put the stubs back. The test-only fields let a test restore them
+/// through the child instead of through the handover file.
 pub(crate) struct Patched {
-    process: HANDLE,
     config_address: usize,
-    trampolines: usize,
     stubs: Vec<(usize, Vec<u8>)>,
+    #[cfg(test)]
+    process: HANDLE,
+    #[cfg(test)]
+    trampolines: usize,
 }
 
 impl Patched {
@@ -318,8 +317,10 @@ pub(crate) fn install(
     // they mean. Dropping the guard here would unmap them under a live child.
     std::mem::forget(mappings);
     Ok(Patched {
+        #[cfg(test)]
         process,
         config_address,
+        #[cfg(test)]
         trampolines,
         stubs: originals,
     })

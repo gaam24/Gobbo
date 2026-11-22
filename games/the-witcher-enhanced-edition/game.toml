@@ -80,36 +80,6 @@ root_extensions = [
   ".mdb",
   ".mdl",
 ]
-root_folder_extensions = [
-  ".2da",
-  ".dds",
-  ".tga",
-  ".bmp",
-  ".ico",
-  ".cur",
-  ".dlg",
-  ".lua",
-  ".nss",
-  ".ncs",
-  ".luc",
-  ".utc",
-  ".uti",
-  ".utm",
-  ".utp",
-  ".utt",
-  ".uts",
-  ".ute",
-  ".utd",
-  ".utw",
-  ".uta",
-  ".utx",
-  ".fac",
-  ".wfx",
-  ".cam",
-  ".ndb",
-  ".mdb",
-  ".mdl",
-]
 
 # Path-sensitive folders that must keep their game path. MO2 maps the whole Data tree; these mirrors keep that layout
 # for files the game or its tools look up in a fixed folder. An empty extensions list takes every file in the folder.

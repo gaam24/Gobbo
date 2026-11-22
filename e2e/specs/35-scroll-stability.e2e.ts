@@ -1,11 +1,8 @@
 import { strict as assert } from "node:assert";
-import path from "node:path";
 import { browser } from "@wdio/globals";
 import { reloadWindow } from "../support/bridge";
-import { definitionsDir } from "../support/env";
-import { removeTree } from "../support/files";
 import { modZip } from "../support/fixtures";
-import { cleanupGame, enableMods, importMods, seedGame, uniqueId } from "../support/seed";
+import { cleanupFixture, enableMods, importMods, seedGame, uniqueId } from "../support/seed";
 import { waitForMod } from "../support/ui";
 
 const MODS = 60;
@@ -67,9 +64,7 @@ describe("mod list scroll stability", () => {
 			const lost = steps.filter((step) => step < STEP - 5);
 			assert.equal(lost.length, 0, `the browser cancelled ${lost.length} of ${FRAMES} scroll steps (${lost.slice(0, 5).join(", ")} px)`);
 		} finally {
-			await cleanupGame(id);
-			removeTree(path.join(definitionsDir, id));
-			removeTree(fixture.root);
+			await cleanupFixture(id, fixture.root);
 		}
 	});
 });

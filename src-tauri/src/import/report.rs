@@ -5,7 +5,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use super::archive_base_name;
 use super::model::ArchiveReport;
 use super::wizard::fomod_allowed;
-use crate::context::{Data, load_library, load_settings};
+use crate::context::{Data, load_library};
 use crate::domain::library::ModVersion;
 use crate::error::{AppError, ErrorKind, io_at};
 use crate::games;
@@ -39,11 +39,7 @@ pub fn report(root: &Data, game_id: &str, folder: &str) -> Result<ArchiveReport,
         Some(choices) => Some(fomod_allowed(&archive, choices)?),
         None => None,
     };
-    let settings = load_settings(&data);
-    let roots = crate::context::target::deployment_root(&data, &game, &settings)
-        .ok()
-        .map(|root| install::top_level_folders(&root))
-        .unwrap_or_default();
+    let roots = install::base_roots(&data, &game);
     // The report uses the same FOMOD destinations as the import, so the paths it compares are the ones installed.
     let plan = install::plan_with_roots(
         &archive,

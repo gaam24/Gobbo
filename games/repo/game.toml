@@ -1,4 +1,4 @@
-# R.E.P.O. A Unity game with BepInEx 5 plugins, like Lethal Company.
+# R.E.P.O. A Unity game with BepInEx 5 plugins; see `loaders/bepinex.toml`.
 #
 # BepInEx comes from an enabled mod. The shared layout is the `bepinex` loader preset in loaders/bepinex.toml: the
 # proxy and settings at the root, the plugin slot, the core/config/patchers/monomod mirrors and the archive aliases.

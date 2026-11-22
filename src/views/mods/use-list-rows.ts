@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ModGroup, Status } from "@/bindings";
 import { foldedPageParts, type ListItem, listItems } from "@/lib/mods";
 import { isTextList, readPref, writePref } from "@/lib/ui-prefs";
@@ -66,9 +66,16 @@ export function useListRows({
 		() => new Set([...collapsed].filter((id) => separators.some((separator) => separator.id === id))),
 		[collapsed, separators],
 	);
-	/// Folded groups are kept per game and profile, so the list opens the way it was left, also after a restart.
+	/// Folded groups are kept per game and profile, so the list opens the way it was left, also after a restart. A status
+	/// answer rebuilds `activeCollapsed` from the same ids, so only a change to the stored value writes storage again.
+	const writtenCollapsed = useRef<string | null>(null);
 	useEffect(() => {
-		writePref(foldedKey, activeCollapsed.size > 0 ? [...activeCollapsed] : null);
+		const value = activeCollapsed.size > 0 ? [...activeCollapsed] : null;
+		const signature = `${foldedKey}:${JSON.stringify(value)}`;
+
+		if (writtenCollapsed.current === signature) return;
+		writtenCollapsed.current = signature;
+		writePref(foldedKey, value);
 	}, [activeCollapsed, foldedKey]);
 	useEffect(() => {
 		writePref(pagesKey, foldedPages.size > 0 ? [...foldedPages] : null);

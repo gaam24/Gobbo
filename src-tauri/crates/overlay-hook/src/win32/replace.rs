@@ -3,6 +3,7 @@
 
 use std::ffi::c_void;
 
+use gobbo_overlay_core::wide;
 use windows_sys::Win32::Foundation::{
     ERROR_ACCESS_DENIED, ERROR_INVALID_FUNCTION, ERROR_INVALID_PARAMETER,
 };
@@ -11,7 +12,7 @@ use super::source::{full_name, source_path};
 use super::{PreserveLastError, fail};
 use crate::guard::enter_session;
 use crate::paths::{make_write_target, place, unsafe_name};
-use crate::text::{display_name, wide};
+use crate::text::display_name;
 use crate::whiteouts::hide;
 
 /// `ReplaceFileW`: the replaced file and the backup are the upper copies, and the replacement is taken from the upper

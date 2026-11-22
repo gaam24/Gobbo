@@ -25,7 +25,7 @@ pub enum Runtime {
 
 /// The runtime of the install in `game_root`, whose effective store is `source`.
 pub fn of(game: &GameDef, game_root: &Path, source: &str) -> Runtime {
-    of_for(cfg!(windows), game, game_root, source)
+    of_for(crate::platform::is_windows(), game, game_root, source)
 }
 
 /// [`of`] with the platform given, so both sides can be tested on one machine. Windows always starts the program

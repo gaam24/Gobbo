@@ -76,7 +76,7 @@ mod win32;
 use std::ffi::c_void;
 use std::sync::OnceLock;
 
-use gobbo_overlay_core::MountConfig;
+use gobbo_overlay_core::{MountConfig, MountSpec};
 use windows_sys::Win32::Foundation::CloseHandle;
 use windows_sys::Win32::System::LibraryLoader::DisableThreadLibraryCalls;
 use windows_sys::Win32::System::SystemServices::DLL_PROCESS_ATTACH;
@@ -175,10 +175,10 @@ fn install() -> bool {
     timeline.mark("crash_reporting");
     log_session(&config);
     let game_layers = game_spec.layers();
-    let game_whiteouts = whiteouts::load("game", &game_layers);
+    let game_whiteouts = whiteouts::load(MountSpec::GAME_ID, &game_layers);
     timeline.mark("whiteouts_game");
     let game = Mount::new(
-        "game".to_string(),
+        MountSpec::GAME_ID.to_string(),
         game_spec.guest.clone(),
         game_layers,
         game_whiteouts,

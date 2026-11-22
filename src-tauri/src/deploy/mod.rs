@@ -102,13 +102,6 @@ pub fn root_in_game(root: &Path, game_root: &Path) -> Option<PathBuf> {
 }
 
 impl Target {
-    /// Where the deployment root lies inside the game folder: empty for the game folder itself, `Data` for
-    /// `{game}/Data`. `None` for a root outside the game. Links are resolved when the paths exist, so a symlinked game
-    /// folder does not look like another place.
-    pub fn root_in_game(&self) -> Option<PathBuf> {
-        root_in_game(&self.root, &self.game_root)
-    }
-
     /// The journal roots this deployment may touch. Undo refuses an entry outside them, because a journal is a file
     /// anyone can edit.
     pub fn journal_roots(&self) -> journal::JournalRoots {

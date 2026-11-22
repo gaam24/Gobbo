@@ -11,6 +11,7 @@ import { ItemActions, ItemContent, ItemDescription, ItemTitle } from "@/componen
 import { useTranslation } from "@/i18n";
 import { messageOf, unwrap } from "@/lib/ipc";
 import { useLoad } from "@/lib/use-load";
+import { PREVIEW_KEYS } from "@/views/deploy-preview";
 
 /// What a pack holds before it goes in: the mods already in the library, the ones inside the pack, the ones to get from
 /// Nexus, and the profiles an earlier version of the pack made, with what changes in them.
@@ -67,7 +68,7 @@ export function PackImportDialog({
 										from: update.from || "?",
 									})}
 								</ItemTitle>
-								{(["added", "removed", "updated"] as const).map((key) =>
+								{PREVIEW_KEYS.map((key) =>
 									update[key].length > 0 ? (
 										<ItemDescription key={key}>{`${t(`preview.${key}`)}: ${update[key].join(", ")}`}</ItemDescription>
 									) : null,

@@ -3,14 +3,14 @@
 use super::*;
 use crate::test_support::scratch;
 
-/// The script inside every Remove Mods Menu archive.
-const SCRIPT: &str = "r6/scripts/RemoveModsMenu/RemoveModsMenu.reds";
-/// Remove Mods Menu in version 1.2.0, as Nexus names its archive.
-const OLD_ARCHIVE: &str = "Remove Mods Menu 35686 1.2.0 2026-10-23T17-21Z Q6xF6llIa.zip";
-/// Remove Mods Menu in version 1.2.1, as Nexus names its archive.
-const NEWER_ARCHIVE: &str = "Remove Mods Menu 35686 1.2.1 2026-11-01T09-00Z Abc123xyz.zip";
+/// The script inside every Example Cleanup Mod archive.
+const SCRIPT: &str = "r6/scripts/ExampleCleanupMod/ExampleCleanupMod.reds";
+/// Example Cleanup Mod in version 1.2.0, as Nexus names its archive.
+const OLD_ARCHIVE: &str = "Example Cleanup Mod 7001 1.2.0 2026-10-23T17-21Z example-uploader.zip";
+/// Example Cleanup Mod in version 1.2.1, as Nexus names its archive.
+const NEWER_ARCHIVE: &str = "Example Cleanup Mod 7001 1.2.1 2026-11-01T09-00Z Abc123xyz.zip";
 /// Another archive of version 1.2.0, uploaded later.
-const SAME_VERSION_ARCHIVE: &str = "Remove Mods Menu 35686 1.2.0 2026-11-01T09-00Z Abc123xyz.zip";
+const SAME_VERSION_ARCHIVE: &str = "Example Cleanup Mod 7001 1.2.0 2026-11-01T09-00Z Abc123xyz.zip";
 /// The digest of the later archive, which differs from the digest of the first one.
 const OTHER_DIGEST: &str = "fedcba9876543210";
 
@@ -21,7 +21,7 @@ fn nexus_archive_gets_a_folder_named_after_the_mod_its_id_and_version() {
     let zip = make_zip(&base, OLD_ARCHIVE, &[(SCRIPT, "x")]);
 
     let import = install_into(&zip, &library, &mirror_game(), DIGEST);
-    let folder = "Remove Mods Menu 35686 1.2.0 2026-10-23T17-21Z Q6xF6llIa";
+    let folder = "Example Cleanup Mod 7001 1.2.0 2026-10-23T17-21Z example-uploader";
     assert_eq!(import.mods[0].folder, folder);
     assert!(library.join(folder).join(SCRIPT).is_file());
 }
@@ -37,12 +37,12 @@ fn a_newer_nexus_version_is_kept_next_to_the_old_one() {
     let import = install_into(&newer, &library, &mirror_game(), OTHER_DIGEST);
     assert_eq!(
         import.mods[0].folder,
-        "Remove Mods Menu 35686 1.2.1 2026-11-01T09-00Z Abc123xyz"
+        "Example Cleanup Mod 7001 1.2.1 2026-11-01T09-00Z Abc123xyz"
     );
 
     for folder in [
-        "Remove Mods Menu 35686 1.2.0 2026-10-23T17-21Z Q6xF6llIa",
-        "Remove Mods Menu 35686 1.2.1 2026-11-01T09-00Z Abc123xyz",
+        "Example Cleanup Mod 7001 1.2.0 2026-10-23T17-21Z example-uploader",
+        "Example Cleanup Mod 7001 1.2.1 2026-11-01T09-00Z Abc123xyz",
     ] {
         assert!(library.join(folder).join(SCRIPT).is_file());
     }
@@ -59,7 +59,7 @@ fn two_archives_with_the_same_nexus_version_get_separate_folders() {
     let import = install_into(&again, &library, &mirror_game(), OTHER_DIGEST);
     assert_eq!(
         import.mods[0].folder,
-        "Remove Mods Menu 35686 1.2.0 2026-11-01T09-00Z Abc123xyz"
+        "Example Cleanup Mod 7001 1.2.0 2026-11-01T09-00Z Abc123xyz"
     );
 }
 
@@ -69,10 +69,13 @@ fn older_nexus_archive_keeps_the_folder_name_it_always_had() {
     let library = base.join("library");
     let zip = make_zip(
         &base,
-        "Sort Everything-1234-1-1-1584112564.zip",
-        &[("r6/scripts/SortEverything/a.reds", "x")],
+        "Example Sort Mod-1234-1-1-1584112564.zip",
+        &[("r6/scripts/ExampleSortMod/a.reds", "x")],
     );
 
     let import = install_into(&zip, &library, &mirror_game(), DIGEST);
-    assert_eq!(import.mods[0].folder, "Sort Everything-1234-1-1-1584112564");
+    assert_eq!(
+        import.mods[0].folder,
+        "Example Sort Mod-1234-1-1-1584112564"
+    );
 }

@@ -68,7 +68,7 @@ pub fn init(app: &AppHandle) -> Result<(), AppError> {
     watch(app, "task-finished");
     watch(app, "task-cancelled");
     let exit = app.clone();
-    app.listen("game-exited", move |_event| {
+    app.listen(crate::launch::commands::GAME_EXITED_EVENT, move |_event| {
         let _ = refresh(&exit);
     });
     Ok(())

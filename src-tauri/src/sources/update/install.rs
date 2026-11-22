@@ -139,7 +139,7 @@ pub fn download_and_import(
     match acquired {
         acquire::Acquired::Imported(view) => Ok(view.folders),
         acquire::Acquired::Existing { folder } => Ok(vec![folder]),
-        acquire::Acquired::NeedsChoice { path, .. } => Err(acquire::needs_choice_error(&path)),
+        acquire::Acquired::NeedsChoice(needed) => Err(acquire::needs_choice_error(&needed.path)),
     }
 }
 

@@ -85,8 +85,8 @@ export function ModGrid({
 }: ModListProps) {
 	/// The mouse only, as in the table: a drag starts after a few pixels, so a click still picks.
 	const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
-	const selectionSet = useMemo(() => new Set(selection), [selection]);
-	const positions = useMemo(() => new Map(rows.map((mod, index) => [mod.id, index + 1])), [rows]);
+	const selectionSet = new Set(selection);
+	const positions = new Map(rows.map((mod, index) => [mod.id, index + 1]));
 	const focused = selection[selection.length - 1] ?? null;
 	const grid = useRef<HTMLOListElement>(null);
 	const [width, setWidth] = useState(0);

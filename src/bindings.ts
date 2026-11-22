@@ -264,10 +264,7 @@ export const commands = {
 	protonBuilds: () => typedError<ProtonBuild[], AppError_Serialize>(__TAURI_INVOKE("proton_builds")),
 	/**  The Proton options the game settings can switch on, on this computer. Empty on Windows, where there is no Proton. */
 	protonOptions: () => __TAURI_INVOKE<string[]>("proton_options"),
-	/**
-	 *  Stops every process of the game, also one started outside Gobbo. Returns `true` when a process was stopped.
-	 *  The last launch of a game: its steps and how the game ended. `None` before the first launch from Gobbo.
-	 */
+	/**  The last launch of a game: its steps and how the game ended. `None` before the first launch from Gobbo. */
 	lastRun: (game: string) => typedError<RunReport_Serialize | null, AppError_Serialize>(__TAURI_INVOKE("last_run", { game })),
 	/**  App settings shared by all games, for example the interface language. */
 	appSettings: () => typedError<AppSettings_Serialize, AppError_Serialize>(__TAURI_INVOKE("app_settings")),
@@ -549,7 +546,7 @@ export const commands = {
 	 *  window imports it with its wizard and calls the command again until the list is empty.
 	 */
 	installCollection: (game: string, profile: string, collection: string, progress: Channel<CollectionProgress_Deserialize>) => typedError<CollectionInstallView_Serialize, AppError_Serialize>(__TAURI_INVOKE("install_collection", { game, profile, collection, progress })),
-	/**  The guided flow's next member: a Nexus file page, an automatic bundle/direct install, or a manual instruction. */
+	/**  The guided flow's next member: a provider file page, an automatic bundle/direct install, or a manual instruction. */
 	prepareCollectionItem: (game: string, profile: string, collection: string, item: string) => typedError<CollectionItemAction_Serialize, AppError_Serialize>(__TAURI_INVOKE("prepare_collection_item", { game, profile, collection, item })),
 	/**  Imports a file the user picked for one member, with the wizard's choices when the archive is a FOMOD. */
 	importCollectionFile: (game: string, profile: string, collection: string, item: string, path: string, choices: Choice_Deserialize[] | null) => typedError<CollectionSessionView_Serialize, AppError_Serialize>(__TAURI_INVOKE("import_collection_file", { game, profile, collection, item, path, choices })),
@@ -940,6 +937,32 @@ export type CheckState = "ok" | "warning" | "problem";
 export type Choice = Choice_Serialize | Choice_Deserialize;
 
 /**
+ *  The archive and FOMOD answers needed before an import can finish. The acquire outcomes and the collection views
+ *  share this one shape, so a new field has a single owner.
+ */
+export type ChoiceNeeded = ChoiceNeeded_Serialize | ChoiceNeeded_Deserialize;
+
+/**
+ *  The archive and FOMOD answers needed before an import can finish. The acquire outcomes and the collection views
+ *  share this one shape, so a new field has a single owner.
+ */
+export type ChoiceNeeded_Deserialize = {
+	path: string,
+	module_name: string,
+	steps: FomodStepView_Deserialize[],
+};
+
+/**
+ *  The archive and FOMOD answers needed before an import can finish. The acquire outcomes and the collection views
+ *  share this one shape, so a new field has a single owner.
+ */
+export type ChoiceNeeded_Serialize = {
+	path: string,
+	module_name: string,
+	steps: FomodStepView_Serialize[],
+};
+
+/**
  *  The user's choice from the wizard: an option in a group, by the group's place in the installer. Group names may
  *  repeat, so the position — not the name — decides which group the choice belongs to.
  */
@@ -998,26 +1021,29 @@ export type CollectionBadge = {
 	update: boolean,
 };
 
-/**  One collection item whose archive needs FOMOD choices before it can be imported. */
+/**
+ *  One collection item whose archive needs FOMOD choices before it can be imported. The wizard's fields are the shared
+ *  [`ChoiceNeeded`] payload, flattened so the window keeps the same fields on the wire.
+ */
 export type CollectionChoiceNeeded = CollectionChoiceNeeded_Serialize | CollectionChoiceNeeded_Deserialize;
 
-/**  One collection item whose archive needs FOMOD choices before it can be imported. */
+/**
+ *  One collection item whose archive needs FOMOD choices before it can be imported. The wizard's fields are the shared
+ *  [`ChoiceNeeded`] payload, flattened so the window keeps the same fields on the wire.
+ */
 export type CollectionChoiceNeeded_Deserialize = {
 	key: string,
 	name: string,
-	path: string,
-	module_name: string,
-	steps: FomodStepView_Deserialize[],
-};
+} & ChoiceNeeded_Deserialize;
 
-/**  One collection item whose archive needs FOMOD choices before it can be imported. */
+/**
+ *  One collection item whose archive needs FOMOD choices before it can be imported. The wizard's fields are the shared
+ *  [`ChoiceNeeded`] payload, flattened so the window keeps the same fields on the wire.
+ */
 export type CollectionChoiceNeeded_Serialize = {
 	key: string,
 	name: string,
-	path: string,
-	module_name: string,
-	steps: FomodStepView_Serialize[],
-};
+} & ChoiceNeeded_Serialize;
 
 /**  The counts the preview and the session header show. One item counts once. */
 export type CollectionCounts = {
@@ -1144,7 +1170,7 @@ export type CollectionInstallRequest = CollectionInstallRequest_Serialize | Coll
 
 /**  What the preview dialog sends when the user starts an install. */
 export type CollectionInstallRequest_Deserialize = {
-	/**  The collection URL or `nxm://` link the preview was opened with. */
+	/**  The collection URL or provider deep link the preview was opened with. */
 	link: string,
 	revision?: number | null,
 	/**  `None` creates a profile. */
@@ -1160,7 +1186,7 @@ export type CollectionInstallRequest_Deserialize = {
 
 /**  What the preview dialog sends when the user starts an install. */
 export type CollectionInstallRequest_Serialize = {
-	/**  The collection URL or `nxm://` link the preview was opened with. */
+	/**  The collection URL or provider deep link the preview was opened with. */
 	link: string,
 	revision: number | null,
 	/**  `None` creates a profile. */
@@ -1482,7 +1508,7 @@ export type CollectionPreview_Deserialize = {
 	profile: string,
 	has_archive: boolean,
 	key_saved: boolean,
-	/**  The provider needs a saved key (Nexus). Thunderstore needs none, so the window shows no account notice. */
+	/**  The provider needs a saved key. A provider that needs none shows no account notice. */
 	needs_key: boolean,
 	direct_download: boolean,
 	account?: string | null,
@@ -1499,7 +1525,7 @@ export type CollectionPreview_Serialize = {
 	profile: string,
 	has_archive: boolean,
 	key_saved: boolean,
-	/**  The provider needs a saved key (Nexus). Thunderstore needs none, so the window shows no account notice. */
+	/**  The provider needs a saved key. A provider that needs none shows no account notice. */
 	needs_key: boolean,
 	direct_download: boolean,
 	account: string | null,
@@ -1756,7 +1782,10 @@ export type CommunityProfilePreview_Deserialize = {
 	mods: CommunityProfileMod_Deserialize[],
 	missing: number,
 	other_versions: number,
-	/**  The profile folder has a `BepInEx/config` (or `config`) folder. Those files are not part of the import. */
+	/**
+	 *  The profile folder has the loader's config mirror, or the bare `config` folder. Those files are not part of the
+	 *  import.
+	 */
 	has_configs: boolean,
 };
 
@@ -1767,7 +1796,10 @@ export type CommunityProfilePreview_Serialize = {
 	mods: CommunityProfileMod_Serialize[],
 	missing: number,
 	other_versions: number,
-	/**  The profile folder has a `BepInEx/config` (or `config`) folder. Those files are not part of the import. */
+	/**
+	 *  The profile folder has the loader's config mirror, or the bare `config` folder. Those files are not part of the
+	 *  import.
+	 */
 	has_configs: boolean,
 };
 

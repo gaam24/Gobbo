@@ -3,8 +3,9 @@ import { renderToString } from "react-dom/server";
 
 import type { ModGroup } from "@/bindings";
 import { applyLanguage } from "@/i18n";
-import type { ListItem, Mod } from "@/lib/mods";
+import type { ListItem } from "@/lib/mods";
 import { groupRowId } from "@/lib/mods";
+import { modFixture } from "@/test/fixtures/mod";
 import type { GroupMenuActions, ModListProps } from "@/views/mod-table/mod-list-props";
 import { ModTable } from "@/views/mod-table/mod-table";
 
@@ -89,41 +90,8 @@ test("an empty result says so", () => {
 	expect(html).toContain("No mods match the filter.");
 });
 
-/// One installed mod, with the fields the row and the group header read.
-function mod(id: string, name: string, enabled = true): Mod {
-	return {
-		id,
-		folder: name,
-		fomod_installer: false,
-		version_count: 1,
-		installed_at: 0,
-		slot: "Mods",
-		update: null,
-		enabled,
-		priority: 1,
-		load_priority: null,
-		files: 2,
-		size_kb: 10,
-		wins: 0,
-		loses: 0,
-		archive: null,
-		archive_file: null,
-		skipped: 0,
-		info: { name, version: "1.0", author: null, description: null },
-		source: null,
-		sources: [],
-		tags: [],
-		instructions: "",
-		unmet_requirements: 0,
-		profiles: [],
-		collections: [],
-		requires_names: [],
-		requirement_groups: [],
-	};
-}
-
-const alpha = mod("alpha", "Alpha");
-const beta = mod("beta", "Beta", false);
+const alpha = modFixture({ id: "alpha", folder: "Alpha" });
+const beta = modFixture({ id: "beta", folder: "Beta", enabled: false });
 const groupRows: ListItem[] = [
 	{ kind: "mod", id: alpha.id, mod: alpha },
 	{ kind: "mod", id: beta.id, mod: beta },

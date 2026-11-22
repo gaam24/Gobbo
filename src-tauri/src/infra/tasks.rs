@@ -388,7 +388,7 @@ pub mod kind {
 /// Stable state codes of a task record.
 pub mod state {
     /// The work is running.
-    pub(super) const RUNNING: &str = "running";
+    pub const RUNNING: &str = "running";
     /// The work is waiting for a user action and has no cancellation flag.
     pub const WAITING: &str = "waiting";
     /// The work finished successfully.

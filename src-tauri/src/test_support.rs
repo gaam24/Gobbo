@@ -10,9 +10,9 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use crate::domain::library::{ModInfo, ModInfoEdit, ModVersion};
 use crate::domain::profiles::entry::ProfileMod;
 use crate::domain::profiles::{Entry, Profile, Profiles, Row};
-use crate::library::{ModInfo, ModInfoEdit, ModVersion};
 
 /// A fresh folder for the test that calls it, named after the calling module: `scratch!("name")`.
 macro_rules! scratch {

@@ -25,9 +25,9 @@ mod tests {
 
     #[test]
     fn hashes_are_short_and_stable() {
-        let hash = short_hash("nexus:35686");
+        let hash = short_hash("nexus:12345");
         assert_eq!(hash.len(), 8);
-        assert_eq!(hash, "863992e3");
-        assert_ne!(hash, short_hash("nexus:1511"));
+        assert_eq!(hash, "0670d9ab");
+        assert_ne!(hash, short_hash("nexus:67890"));
     }
 }

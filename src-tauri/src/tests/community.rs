@@ -79,4 +79,21 @@ fn a_community_profile_matches_the_library_and_creates_a_normal_profile() {
         .find(|item| item.folder == "Owner-One-1.2.3")
         .unwrap();
     assert!(one.enabled);
+
+    // A folder imported twice gets a free name, like any other recipe's new profile.
+    let again = import(&f.data, SLOT_GAME, &dir.display().to_string(), "Imported").unwrap();
+    let names: Vec<&str> = again
+        .status
+        .profiles
+        .iter()
+        .map(|profile| profile.name.as_str())
+        .collect();
+    assert!(
+        names.contains(&"Imported"),
+        "the first import keeps its name"
+    );
+    assert!(
+        names.contains(&"Imported (2)"),
+        "the second import gets a free name"
+    );
 }

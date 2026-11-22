@@ -50,29 +50,28 @@ fn play(app: &AppHandle, game: String, apply_draft: bool) {
     let exit_game = game.clone();
     blocking(app.clone(), move |data| {
         let home = home_dir()?;
-        crate::launch::start::launch_game(
+        crate::launch::launch_game_with_notice(
             data,
             &game,
             None,
             apply_draft,
             &home,
-            Some(Box::new(move |_code| {
-                let _ = handle.emit("game-exited", exit_game.clone());
-            })),
+            move |_code| {
+                let _ = handle.emit(crate::launch::commands::GAME_EXITED_EVENT, exit_game);
+            },
+            move || super::after_game_launch(&launch_handle),
         )?;
-        super::after_game_launch(&launch_handle);
         Ok(())
     });
 }
 
 fn stop(app: &AppHandle, game: String) {
     let handle = app.clone();
+    let stopped_game = game.clone();
     blocking(app.clone(), move |data| {
-        if crate::launch::start::stop_game(data, &game)? {
-            crate::launch::report::mark_stopped(data, &game);
-            let _ = handle.emit("game-exited", game.clone());
-        }
-
+        crate::launch::stop_game_with_notice(data, &game, || {
+            let _ = handle.emit(crate::launch::commands::GAME_EXITED_EVENT, stopped_game);
+        })?;
         Ok(())
     });
 }

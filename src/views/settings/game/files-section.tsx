@@ -4,6 +4,50 @@ import { useTranslation } from "@/i18n";
 import { commitOnEnter, Section, SettingRow } from "@/views/settings/controls";
 import { PathActions } from "@/views/settings/path-actions";
 
+/// One folder row: the typed draft commits on blur or Enter, and the buttons act on what is typed, not on what was saved.
+function PathSettingRow({
+	title,
+	htmlFor,
+	hint,
+	value,
+	placeholder,
+	path,
+	onChange,
+	onCommit,
+	onOpen,
+	onCopy,
+}: {
+	title: string;
+	htmlFor: string;
+	hint: string;
+	value: string;
+	placeholder: string;
+	path: string;
+	onChange: (value: string) => void;
+	onCommit: () => void;
+	onOpen: (path: string) => void | Promise<void>;
+	onCopy: (path: string) => void | Promise<void>;
+}) {
+	return (
+		<SettingRow title={title} htmlFor={htmlFor} hint={hint}>
+			<div className="flex flex-wrap gap-2">
+				<Input
+					id={htmlFor}
+					value={value}
+					title={value || undefined}
+					onChange={(event) => onChange(event.currentTarget.value)}
+					onBlur={onCommit}
+					onKeyDown={commitOnEnter}
+					placeholder={placeholder}
+					spellCheck={false}
+					className="min-w-0 flex-1 basis-64"
+				/>
+				<PathActions path={path} onOpen={onOpen} onCopy={onCopy} />
+			</div>
+		</SettingRow>
+	);
+}
+
 /// The game folder and the folders the mods read from. They are drafts until the form is saved, so the buttons next to
 /// each one open and copy what the user has typed, not only what was saved.
 export function FilesSection({
@@ -34,71 +78,47 @@ export function FilesSection({
 
 	return (
 		<Section id="settings-files" title={t("settings.files.title")} hint={t("settings.files.hint")}>
-			<SettingRow
+			<PathSettingRow
 				title={t("settings.gameRoot.title")}
 				htmlFor="game-root"
 				hint={status.game_ready ? t("settings.folder.exists") : t("settings.gameRoot.missing")}
-			>
-				<div className="flex flex-wrap gap-2">
-					<Input
-						id="game-root"
-						value={gameRoot}
-						title={gameRoot || undefined}
-						onChange={(event) => setGameRoot(event.currentTarget.value)}
-						onBlur={onCommit}
-						onKeyDown={commitOnEnter}
-						placeholder={t("settings.gameRoot.placeholder")}
-						spellCheck={false}
-						className="min-w-0 flex-1 basis-64"
-					/>
-					<PathActions path={gameRoot} onOpen={onOpen} onCopy={onCopy} />
-				</div>
-			</SettingRow>
+				value={gameRoot}
+				placeholder={t("settings.gameRoot.placeholder")}
+				path={gameRoot}
+				onChange={setGameRoot}
+				onCommit={onCommit}
+				onOpen={onOpen}
+				onCopy={onCopy}
+			/>
 
 			{status.needs_settings_dir && (
-				<SettingRow
+				<PathSettingRow
 					title={t("settings.settingsDir.title")}
 					htmlFor="settings-dir"
 					hint={status.settings_ready ? t("settings.folder.exists") : t("settings.settingsDir.missing")}
-				>
-					<div className="flex flex-wrap gap-2">
-						<Input
-							id="settings-dir"
-							value={settingsDir}
-							title={settingsDir || undefined}
-							onChange={(event) => setSettingsDir(event.currentTarget.value)}
-							onBlur={onCommit}
-							onKeyDown={commitOnEnter}
-							placeholder={t("settings.settingsDir.placeholder")}
-							spellCheck={false}
-							className="min-w-0 flex-1 basis-64"
-						/>
-						<PathActions path={settingsDir} onOpen={onOpen} onCopy={onCopy} />
-					</div>
-				</SettingRow>
+					value={settingsDir}
+					placeholder={t("settings.settingsDir.placeholder")}
+					path={settingsDir}
+					onChange={setSettingsDir}
+					onCommit={onCommit}
+					onOpen={onOpen}
+					onCopy={onCopy}
+				/>
 			)}
 
 			{status.needs_mods_root && (
-				<SettingRow
+				<PathSettingRow
 					title={t("settings.modsRoot.title")}
 					htmlFor="mods-root"
 					hint={status.mods_ready ? t("settings.modsRoot.hint") : t("settings.modsRoot.missing")}
-				>
-					<div className="flex flex-wrap gap-2">
-						<Input
-							id="mods-root"
-							value={modsRoot}
-							title={modsRoot || undefined}
-							onChange={(event) => setModsRoot(event.currentTarget.value)}
-							onBlur={onCommit}
-							onKeyDown={commitOnEnter}
-							placeholder={status.mods_root || t("settings.modsRoot.placeholder")}
-							spellCheck={false}
-							className="min-w-0 flex-1 basis-64"
-						/>
-						<PathActions path={modsRoot || status.mods_root} onOpen={onOpen} onCopy={onCopy} />
-					</div>
-				</SettingRow>
+					value={modsRoot}
+					placeholder={status.mods_root || t("settings.modsRoot.placeholder")}
+					path={modsRoot || status.mods_root}
+					onChange={setModsRoot}
+					onCommit={onCommit}
+					onOpen={onOpen}
+					onCopy={onCopy}
+				/>
 			)}
 		</Section>
 	);

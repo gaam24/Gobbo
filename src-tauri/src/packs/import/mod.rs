@@ -14,6 +14,7 @@ use crate::context::load_library;
 use crate::context::load_profiles;
 use crate::context::profile::history::save_profiles;
 use crate::context::profile::lock_profiles;
+use crate::domain::library::LibraryView;
 use crate::domain::pack::WaitingMod;
 use crate::domain::profiles::Entry as ProfileEntry;
 use crate::domain::profiles::ModGroup;
@@ -25,7 +26,6 @@ use crate::games;
 use crate::infra::store;
 use crate::launch::steps::load_mod_steps;
 use crate::launch::steps::save_mod_steps;
-use crate::library::LibraryView;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -92,7 +92,7 @@ pub fn import_pack_with_progress(
 
     let manifest = opened.manifest;
     // The index is read and saved under its lock. The archives above took it one by one, each for its own import.
-    let _index = crate::library::lock_index();
+    let _index = crate::context::library::lock_index();
     let _profiles = lock_profiles();
     let mut library = load_library(&data, &game)?;
     let mut steps = load_mod_steps(&data)?;

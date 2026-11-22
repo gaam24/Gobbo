@@ -7,10 +7,10 @@ import type {
 	Status_Serialize as Status,
 } from "../../src/bindings";
 import { CommandFailure, invoke, invokeWithChannel } from "../support/bridge";
-import { dataDir, definitionsDir } from "../support/env";
-import { expectFile, removeTree, zipNames } from "../support/files";
+import { dataDir } from "../support/env";
+import { expectFile, zipNames } from "../support/files";
 import { modZip, packPath } from "../support/fixtures";
-import { cleanupGame, enableMods, importMods, seedGame, statusOf, uniqueId } from "../support/seed";
+import { cleanupFixture, enableMods, importMods, seedGame, statusOf, uniqueId } from "../support/seed";
 
 interface PackGame {
 	id: string;
@@ -39,12 +39,6 @@ async function sourceGame(prefix: string): Promise<PackGame> {
 	await importMods(id, [modZip(`pack-${id}-one.zip`, "Pack One"), modZip(`pack-${id}-two.zip`, "Pack Two")]);
 	await enableMods(id);
 	return { id, name, fixture };
-}
-
-async function cleanup(game: PackGame): Promise<void> {
-	await cleanupGame(game.id);
-	removeTree(path.join(definitionsDir, game.id));
-	removeTree(game.fixture.root);
 }
 
 async function activeProfileId(game: string): Promise<string> {
@@ -88,7 +82,7 @@ describe("mod packs", () => {
 		assert.equal(preview.have, 0);
 		assert.equal(preview.bundled, 2);
 		assert.equal(preview.missing.length, 0);
-		await cleanup(game);
+		await cleanupFixture(game.id, game.fixture.root);
 	});
 	it("writes a pack without archives and reports the missing mods", async () => {
 		const game = await sourceGame("pack-missing");
@@ -109,7 +103,7 @@ describe("mod packs", () => {
 		assert.equal(preview.have, 0);
 		assert.equal(preview.bundled, 0);
 		assert.equal(preview.missing.length, 2);
-		await cleanup(game);
+		await cleanupFixture(game.id, game.fixture.root);
 	});
 	it("imports a pack into a second game and creates its profile", async () => {
 		const source = await sourceGame("pack-source");
@@ -140,7 +134,7 @@ describe("mod packs", () => {
 			expectFile(path.join(dataDir, "games", source.id, "library", mod.folder, "content/x.ws"));
 		}
 
-		await cleanup(source);
+		await cleanupFixture(source.id, source.fixture.root);
 	});
 	it("rejects a pack link that is not an https gobbo link", async () => {
 		const game = await sourceGame("pack-link");
@@ -158,6 +152,6 @@ describe("mod packs", () => {
 
 		const pending = await invoke<string | null>("take_pack_link");
 		assert.equal(pending, null);
-		await cleanup(game);
+		await cleanupFixture(game.id, game.fixture.root);
 	});
 });

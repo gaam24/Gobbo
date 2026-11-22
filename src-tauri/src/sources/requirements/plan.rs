@@ -4,12 +4,13 @@ use std::collections::BTreeSet;
 
 use crate::context::{Data, load_library, load_profiles};
 use crate::domain::library::Library;
+use crate::domain::library::LibraryView;
 use crate::domain::naming::requirement_label;
 use crate::domain::source::{SourceRef, SourceRequirement};
 use crate::error::{AppError, Message};
 use crate::games::{self, GameDef};
+use crate::library::mods_of;
 use crate::library::relations::{RequirementState, SourceLookup};
-use crate::library::{LibraryView, mods_of};
 use crate::providers;
 
 use super::model::{RequirementAction, RequirementPlan, RequirementStep};
@@ -114,9 +115,10 @@ impl Builder<'_> {
             }
         }
 
-        for (at, alternatives) in source_alternatives(&family.requirements)
-            .into_iter()
-            .enumerate()
+        for (at, alternatives) in
+            crate::library::relations::source_alternatives(&family.requirements)
+                .into_iter()
+                .enumerate()
         {
             let alternatives: Vec<&SourceRequirement> = alternatives
                 .into_iter()
@@ -289,10 +291,4 @@ impl Builder<'_> {
             .get(family)
             .map_or_else(|| family.to_string(), |family| family.name.clone())
     }
-}
-
-/// Groups the external requirements into alternatives: entries that share a provider and a group are one list, and
-/// every other requirement is a list of its own. The shared definition with the status keeps the two views equal.
-fn source_alternatives(requirements: &[SourceRequirement]) -> Vec<Vec<&SourceRequirement>> {
-    crate::library::relations::source_alternatives(requirements)
 }

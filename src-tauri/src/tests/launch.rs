@@ -8,6 +8,7 @@ use std::sync::atomic::Ordering;
 #[cfg(unix)]
 use std::time::{Duration, Instant};
 
+use crate::context::Settings;
 #[cfg(unix)]
 use crate::deploy::ops::apply_deployment;
 #[cfg(unix)]
@@ -24,8 +25,7 @@ use crate::launch::start::launch_command;
 use crate::launch::start::overlay_session_state;
 use crate::launch::steps::run_steps;
 #[cfg(unix)]
-use crate::launch::tools::run_game;
-use crate::settings::config::Settings;
+use crate::launch::tools::running::run_game;
 #[cfg(unix)]
 use crate::test_support::require_overlay_namespaces;
 #[cfg(target_os = "linux")]

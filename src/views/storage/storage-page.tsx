@@ -1,5 +1,5 @@
 import { EllipsisVertical, FolderOpen, HardDrive, RefreshCw, Trash2, Undo2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import type { GameDataUsage, GameView } from "@/bindings";
 import { ListGroupHeader, ListRow, PageEmpty } from "@/components/app/page-layout";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -41,7 +41,7 @@ export function StorageView({
 		name: string;
 	} | null>(null);
 
-	const names = useMemo(() => new Map(games.map((game) => [game.id, game.name])), [games]);
+	const names = new Map(games.map((game) => [game.id, game.name]));
 	const active = usage?.filter((entry) => !entry.removed) ?? [];
 	const removed = usage?.filter((entry) => entry.removed) ?? [];
 	const total = usage?.reduce((sum, entry) => sum + entry.size_kb, 0) ?? 0;

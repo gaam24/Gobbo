@@ -108,7 +108,7 @@ pub fn apply_deployment_cancellable(
     let target = target_for(&data, &game, &settings, state, profiles.active())?;
     // The index is read, refreshed and saved under its lock. The deployment below only reads it.
     let (library, mods) = {
-        let _index = crate::library::lock_index();
+        let _index = crate::context::library::lock_index();
         let mut library = load_library(&data, &game)?;
         let mods = active_mods(&profiles, &library, &game);
         library.refresh(&data.library(), &game, &mods)?;

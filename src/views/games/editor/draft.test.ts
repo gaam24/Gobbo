@@ -12,7 +12,7 @@ import {
 
 describe("the game definition draft", () => {
 	test("a title becomes a stable slug", () => {
-		expect(slugify("The Witcher 3: Wild Hunt")).toBe("the-witcher-3-wild-hunt");
+		expect(slugify("Example Game 3: Wild Hunt")).toBe("example-game-3-wild-hunt");
 		expect(slugify("Zażółć gęślą jaźń")).toBe("zazolc-gesla-jazn");
 		expect(slugify("...")).toBe("game");
 	});
@@ -49,10 +49,10 @@ describe("the game definition draft", () => {
 
 	test("a loader package survives a round trip through the editor", () => {
 		const text =
-			'schema = 1\nid = "unreal"\nname = "Unreal"\n[install]\nname = "UE4SS"\nversion = "4.0.0"\nto = "Binaries/Win64"\ncheck = ["Binaries/Win64/ue4ss/UE4SS.dll"]\nurl = "https://example.com/ue4ss.zip"\nsha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"\n[detect]\n[deploy]\n[[deploy.slots]]\ndir = "Mods"\n';
+			'schema = 1\nid = "unreal"\nname = "Unreal"\n[install]\nname = "Example Loader"\nversion = "4.0.0"\nto = "Binaries/Win64"\ncheck = ["Binaries/Win64/example-loader/example-loader.dll"]\nurl = "https://example.com/example-loader.zip"\nsha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"\n[detect]\n[deploy]\n[[deploy.slots]]\ndir = "Mods"\n';
 		const written = serializeDraft(parseDraft(text));
 		expect(written).toContain("[install]");
-		expect(written).toContain('name = "UE4SS"');
+		expect(written).toContain('name = "Example Loader"');
 		expect(written).toContain('version = "4.0.0"');
 		expect(written).toContain('to = "Binaries/Win64"');
 	});

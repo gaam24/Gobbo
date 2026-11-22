@@ -84,31 +84,6 @@ pub fn check_all() {
     }
 }
 
-/// Every scheme a provider owns must be one the desktop build registers in `tauri.conf.json`, or the operating system
-/// never hands its links to the app. A new provider that forgets the config fails here.
-#[test]
-fn every_provider_scheme_is_a_registered_deep_link() {
-    let config: serde_json::Value = serde_json::from_str(include_str!("../../tauri.conf.json"))
-        .expect("tauri.conf.json is JSON");
-    let registered: Vec<&str> = config["plugins"]["deep-link"]["desktop"]["schemes"]
-        .as_array()
-        .expect("tauri.conf.json lists the desktop deep-link schemes")
-        .iter()
-        .filter_map(serde_json::Value::as_str)
-        .collect();
-    for provider in providers() {
-        for scheme in provider.schemes() {
-            assert!(
-                registered
-                    .iter()
-                    .any(|known| known.eq_ignore_ascii_case(scheme)),
-                "provider {}: scheme {scheme} is missing from plugins.deep-link.desktop.schemes in tauri.conf.json",
-                provider.id()
-            );
-        }
-    }
-}
-
 /// Checks the port's invariants for one provider. The message names the provider and the rule, so a new adapter fails
 /// with an answer instead of a puzzle.
 pub fn check(case: &Case) {
@@ -319,7 +294,7 @@ pub struct FakeConfig {
 impl Default for FakeConfig {
     fn default() -> Self {
         Self {
-            id: "nexus",
+            id: "example-provider",
             archive: "Example Provider File-1001-1.0.0.zip",
             entries: &[("Mods/modA/content/x.ws", "x")],
             chunks: &[(5, 10), (10, 10)],

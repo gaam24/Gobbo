@@ -36,6 +36,11 @@ use std::path::PathBuf;
 #[cfg(not(windows))]
 const PREREQUISITES_DIR: &str = "prerequisites";
 
+/// The Windows installer code for success with a restart still pending. Such an install is complete; the game will run
+/// after the user restarts.
+#[cfg(not(windows))]
+const EXIT_RESTART_PENDING: i32 = 3010;
+
 /// The prerequisites of a tool that are not in the Proton prefix, by name. A Windows program checks the Steam prefix of
 /// a Steam install and the prefix Gobbo owns for one from another store. A game without a prefix yet, or one that starts
 /// a Linux program, has nothing to check: both give an empty list.
@@ -118,7 +123,7 @@ pub fn install_prerequisites(
             runtime,
         )?;
 
-        if !matches!(code, 0 | 3010) || !is_installed(&wine, prerequisite) {
+        if !matches!(code, 0 | EXIT_RESTART_PENDING) || !is_installed(&wine, prerequisite) {
             return Err(AppError::new("tools.prerequisite_failed")
                 .with("name", &prerequisite.name)
                 .with("code", code)
@@ -147,7 +152,8 @@ pub const fn install_prerequisites(
 fn fetch_installer(data: &Data, prerequisite: &Prerequisite) -> Result<PathBuf, AppError> {
     let dir = data.dir.join(PREREQUISITES_DIR);
     fs::create_dir_all(&dir).map_err(io_at(&dir))?;
-    let file_name = prerequisite.url.rsplit('/').next().unwrap_or_default();
+    let file_name =
+        crate::domain::naming::file_name_from_url(&prerequisite.url).unwrap_or_default();
     let target = dir.join(naming::safe_limited_file_name(file_name));
 
     if target.is_file()

@@ -21,20 +21,20 @@ const report: RunReport_Serialize = {
 	game_logs: [
 		{
 			kind: "script",
-			path: "r6/logs/redscript_rCURRENT.log",
-			lines: ["REDScript compilation has failed.", "- AudioXL"],
+			path: "logs/script/runtime_CURRENT.log",
+			lines: ["Script compilation has failed.", "- Example Mod"],
 			modified_at: 1_794_660_000,
 		},
 	],
 	mod_logs: [
 		{
 			kind: "mod",
-			path: "red4ext/logs/red4ext-1.log",
+			path: "logs/loader/loader-1.log",
 			lines: ["plugin loaded"],
 			modified_at: 1_794_660_001,
 		},
 	],
-	app_log: ["launch: game=cyberpunk-2077 overlay=true"],
+	app_log: ["launch: game=example-game overlay=true"],
 	game_changes: [],
 	game_changes_total: 0,
 	decisions: [],
@@ -45,9 +45,9 @@ const report: RunReport_Serialize = {
 
 test("the log tab lists every file and opens the selected log beside it", () => {
 	const html = renderToString(<GameLogs report={report} />);
-	expect(html).toContain("launch: game=cyberpunk-2077 overlay=true");
-	expect(html).toContain("redscript_rCURRENT.log");
-	expect(html).toContain("red4ext-1.log");
+	expect(html).toContain("launch: game=example-game overlay=true");
+	expect(html).toContain("runtime_CURRENT.log");
+	expect(html).toContain("loader-1.log");
 	expect(html).toContain("Mods and runtime");
 	expect(html).toContain("gobbo.log");
 });

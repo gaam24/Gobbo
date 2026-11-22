@@ -1,5 +1,5 @@
 {
-	"$schema": "https://unpkg.com/knip@5/schema.json",
+	"$schema": "https://unpkg.com/knip@6/schema.json",
 	"ignore": ["src/bindings.ts", "src/components/ui/**"],
 	"ignoreDependencies": [
 		"@fontsource-variable/schibsted-grotesk",
@@ -14,7 +14,13 @@
 		"@wdio/tauri-service"
 	],
 	"ignoreExportsUsedInFile": true,
-	"entry": ["e2e/wdio.conf.ts", "e2e/specs/**/*.e2e.ts", "scripts/*.ts"],
+	"entry": [
+		"e2e/wdio.conf.ts",
+		"e2e/specs/**/*.e2e.ts",
+		"scripts/{build-release,build-overlay-hook,check-e2e-hooks,e2e-run,package-release,sbom,updater-manifest}.ts",
+		"scripts/{check-agent-policy,check-data-boundary,check-generated,check-layers,check-overlay-invariants}.ts",
+		"scripts/{catalog-manifest,check-contrast,check-ui,check-docs-links,check-translation-leftovers,bench-list,icons,report-bundle-size}.ts"
+	],
 	"project": ["src/**/*.{ts,tsx}", "e2e/**/*.ts", "scripts/**/*.ts"],
 	"ignoreBinaries": ["rustc"]
 }

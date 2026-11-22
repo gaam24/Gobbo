@@ -6,13 +6,13 @@ use crate::context::Loaded;
 use crate::context::load_game;
 use crate::deploy::overlay;
 use crate::deploy::target::build_plan_with_mode;
+use crate::domain::library::LibraryView;
 use crate::domain::profiles::Entry as ProfileEntry;
 use crate::domain::resolver::PlanMode;
 use crate::error::AppError;
 use crate::error::Message;
-use crate::library::LibraryView;
 use crate::library::active_mods;
-use crate::library::relations::relation_warnings;
+use crate::library::relations::{SourceLookup, relation_warnings};
 use serde::Serialize;
 
 #[derive(Debug, Serialize, specta::Type)]
@@ -51,7 +51,7 @@ pub fn preview_deployment(root: &Data, game_id: &str) -> Result<DeployPreview, A
     let replaces = data.prepared_states().contains_key(&profiles.active);
     let view = LibraryView::new(&library);
     let listed = active_mods(&profiles, &library, &game);
-    let name_of = |id: &str| crate::library::relations::family_name(library.as_ref(), id);
+    let lookup = SourceLookup::new(&view, &listed);
 
     let mut preview = DeployPreview {
         replaces,
@@ -108,18 +108,18 @@ pub fn preview_deployment(root: &Data, game_id: &str) -> Result<DeployPreview, A
     preview.added = difference
         .added
         .iter()
-        .map(|entry| name_of(&entry.id))
+        .map(|entry| lookup.family_name(&entry.id).to_string())
         .collect();
     preview.updated = difference
         .updated
         .iter()
-        .map(|(_, entry)| name_of(&entry.id))
+        .map(|(_, entry)| lookup.family_name(&entry.id).to_string())
         .collect();
     preview.moved = difference.moved;
     preview.removed = difference
         .removed
         .iter()
-        .map(|entry| name_of(&entry.id))
+        .map(|entry| lookup.family_name(&entry.id).to_string())
         .collect();
     Ok(preview)
 }

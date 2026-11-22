@@ -14,7 +14,7 @@ import {
 import { applyLanguage, useTranslation } from "@/i18n";
 import { unwrap } from "@/lib/ipc";
 import { withMuted } from "@/lib/notifications";
-import { withoutKey } from "@/lib/records";
+import { nameOfId, withoutKey } from "@/lib/records";
 import { createQueue } from "@/lib/serial-queue";
 import type { useNotices } from "@/lib/use-notices";
 import type { LanguageSetting } from "@/locales/locale";
@@ -28,9 +28,10 @@ async function updateAppSettings(changes: Partial<AppSettingsData>) {
 	await unwrap(commands.saveAppSettings({ ...current, ...changes }));
 }
 
-/// The name of a provider for a message, or its id when the list does not know it.
-function namesOf(providers: SourceProviderInfo[], ids: string[]) {
-	return ids.map((id) => providers.find((provider) => provider.id === id)?.name ?? id).join(", ");
+/// The name of a provider for a message, or its id when the list does not know it. A minimal structural type keeps this
+/// independent of the settings-context/sources module cycle.
+function namesOf(providers: ReadonlyArray<{ id: string; name: string }>, ids: string[]) {
+	return ids.map((id) => nameOfId(providers, id)).join(", ");
 }
 
 /// The providers whose links are lost, as one key. A notice is repeated only when this key changes.
@@ -195,7 +196,7 @@ export function useAppSettings({
 	);
 
 	/// The providers come from the build, and each key stays in the credential store. Both are read once, at the start. A
-	/// failure is reported, because the Nexus key decides whether update checks can run. The download links are checked
+	/// failure is reported, because a provider's saved key decides whether update checks can run. The download links are checked
 	/// in the same pass, so another program that took them is replaced before the first link arrives.
 	const startupLinks = useRef(false);
 	useEffect(() => {

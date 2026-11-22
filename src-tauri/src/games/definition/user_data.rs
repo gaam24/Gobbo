@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::domain::user_data::{Isolation, Kind, Mode};
+use crate::games::layout::prefer_linux;
 
 /// One folder the game writes outside its own folder: saves, settings or both. The definition names the folder and
 /// how Gobbo may isolate it; the profile decides whether it is isolated.
@@ -37,19 +38,12 @@ impl UserData {
     /// The folder template for this platform. Windows uses `path`; Linux prefers a non-empty `path_linux`, because a
     /// Windows path that names `{local_low}` is not meaningful there.
     pub fn path_for_platform(&self) -> &str {
-        if cfg!(windows) {
-            return &self.path;
-        }
-
-        self.linux_path()
+        prefer_linux(&self.path, self.path_linux.as_deref(), !cfg!(windows))
     }
 
     /// The template a Linux build uses: `path_linux` when it is not empty, otherwise `path`.
     pub fn linux_path(&self) -> &str {
-        self.path_linux
-            .as_deref()
-            .filter(|path| !path.trim().is_empty())
-            .unwrap_or(&self.path)
+        prefer_linux(&self.path, self.path_linux.as_deref(), true)
     }
 }
 
@@ -123,14 +117,7 @@ pub struct Executable {
 impl Executable {
     /// The program for this platform. Windows always uses `path`; Linux prefers a non-empty `path_linux`.
     pub fn path_for_platform(&self) -> &str {
-        if cfg!(windows) {
-            return &self.path;
-        }
-
-        self.path_linux
-            .as_deref()
-            .filter(|path| !path.trim().is_empty())
-            .unwrap_or(&self.path)
+        prefer_linux(&self.path, self.path_linux.as_deref(), !cfg!(windows))
     }
 }
 

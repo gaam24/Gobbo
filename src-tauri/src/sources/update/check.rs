@@ -3,12 +3,12 @@
 
 use crate::context::Data;
 use crate::context::edit_family;
+use crate::domain::library::{Library, LibraryView};
 use crate::domain::profiles::Profiles;
 use crate::domain::source::ProviderId;
 use crate::domain::version::{IgnoredVersion, with_ignored};
 use crate::error::AppError;
 use crate::games::{self, GameDef};
-use crate::library::{Library, LibraryView};
 use crate::providers::{self, SourceArchive, SourceUpdate, SourceUpdateRequest};
 use crate::status::views::UpdateReport;
 
@@ -341,8 +341,8 @@ pub fn unignore_version(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::library::Family;
     use crate::domain::source::SourceMod;
-    use crate::library::Family;
     use crate::test_support::{profile, profiles, scratch};
     use std::collections::BTreeMap;
 

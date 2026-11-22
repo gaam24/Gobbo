@@ -28,6 +28,45 @@ use crate::error::AppError;
 use crate::games::GameDef;
 use crate::infra::clock::now_seconds;
 
+/// Starts a game through the one launch use case and does the window work that follows it: `exit_notice` tells the
+/// window when the game ended and `after_start` runs once it started. Both closures carry the caller's app handle, so
+/// the command and the tray share the sequence without either owning a copy of it.
+pub fn launch_game_with_notice(
+    root: &Data,
+    game_id: &str,
+    executable: Option<&str>,
+    apply_draft: bool,
+    home: &Path,
+    exit_notice: impl FnOnce(Option<i32>) + Send + 'static,
+    after_start: impl FnOnce(),
+) -> Result<bool, AppError> {
+    let launched = start::launch_game(
+        root,
+        game_id,
+        executable,
+        apply_draft,
+        home,
+        Some(Box::new(exit_notice)),
+    )?;
+    after_start();
+    Ok(launched)
+}
+
+/// Stops a game through the one stop use case and records that the user asked, so the last run is not treated as a
+/// crash. `stopped` tells the caller which case it was; a game that was not running leaves the last run untouched.
+pub fn stop_game_with_notice(
+    root: &Data,
+    game_id: &str,
+    stopped: impl FnOnce(),
+) -> Result<bool, AppError> {
+    let did_stop = start::stop_game(root, game_id)?;
+    if did_stop {
+        report::mark_stopped(root, game_id);
+        stopped();
+    }
+    Ok(did_stop)
+}
+
 /// The overlay session for a deployed state: the active profile's user-data sets and the deployment root, with the
 /// game folder as the fallback root. The caller decides whether a session is wanted at all.
 pub fn overlay_session(

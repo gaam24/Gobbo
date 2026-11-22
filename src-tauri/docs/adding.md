@@ -23,6 +23,9 @@ A provider is an adapter, not a branch. The rest of the app sees `SourceRef`, `S
    it to the generic model or pass it in.
 8. A provider with paid tiers reports the account's access through `SourceAccount::direct_download` in `validate_key`.
    The window uses that flag, never the provider id, to choose a direct update or the provider's files page.
+9. Set `download_policy` for an account tier when the service paces its downloads: the port defaults to
+   `DownloadPolicy::Unlimited`, and Nexus overrides it for free accounts. The shared queue reads the policy, so the
+   rule stays on the provider instead of in the download code.
 
 ### Adding a feature
 

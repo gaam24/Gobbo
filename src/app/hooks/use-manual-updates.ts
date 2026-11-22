@@ -15,7 +15,7 @@ import { translateCode, unwrap } from "@/lib/ipc";
 import { needsGameSwitch } from "@/lib/task-open";
 import { registerTask, removeTask, updateTask } from "@/lib/tasks-store";
 import { useTauriListener } from "@/lib/use-tauri-listener";
-import type { Download } from "@/nexus/use-downloads";
+import type { Download } from "@/sources/downloads";
 import type { UpdateTarget } from "@/sources/update-targets";
 
 /// The current-line text for the states without a live percentage or an error.

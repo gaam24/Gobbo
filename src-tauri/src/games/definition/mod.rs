@@ -194,6 +194,8 @@ impl<'de> Deserialize<'de> for LoaderRef {
 pub struct ResolvedLoader {
     pub id: String,
     pub name: String,
+    /// The game-relative folder an unpacked community profile keeps this loader's config files in, when it has one.
+    pub config_mirror: Option<String>,
     pub variant: Option<String>,
     /// Whether the variant came from the preset's `default_variant`, not from the game's line.
     pub default_variant: bool,

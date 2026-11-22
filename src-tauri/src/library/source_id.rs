@@ -1,11 +1,12 @@
 //! The external source id of a mod family. The id the user types can move the family to the `<provider>:<id>` family,
 //! which takes over the tags, notes, requirements and profile places of the family before it.
 
+use crate::context::library::not_in_library;
 use crate::context::profile::lock_profiles;
 use crate::context::{Data, edit_library};
+use crate::domain::library::{AdoptPolicy, Family, Library, adopt_fields};
 use crate::domain::source::{ProviderId, SourceMod};
 use crate::error::AppError;
-use crate::library::{Family, Library, not_in_library};
 
 /// Saves the source id the user typed for a family. `None` removes that provider's entry, so the id from the archive
 /// name applies again if the family has one.
@@ -91,60 +92,7 @@ fn move_family(
 /// Takes over the user's data of `source` into `family`: tags, a note and instructions it lacks, and the relations and
 /// provider data it does not have yet.
 fn absorb(family: &mut Family, source: Family) {
-    family.tags.extend(source.tags);
-
-    if family.notes.is_empty() {
-        family.notes = source.notes;
-    }
-
-    if family.instructions.is_empty() {
-        family.instructions = source.instructions;
-    }
-
-    for other in source.requires {
-        if !family.requires.contains(&other) {
-            family.requires.push(other);
-        }
-    }
-
-    for other in source.incompatible {
-        if !family.incompatible.contains(&other) {
-            family.incompatible.push(other);
-        }
-    }
-
-    for requirement in source.requirements {
-        if !family
-            .requirements
-            .iter()
-            .any(|kept| kept.source == requirement.source)
-        {
-            family.requirements.push(requirement);
-        }
-    }
-
-    for (provider, dlcs) in source.source_dlcs {
-        family.source_dlcs.entry(provider).or_insert(dlcs);
-    }
-
-    for (provider, sync) in source.source_sync {
-        family.source_sync.entry(provider).or_insert(sync);
-    }
-
-    for (provider, latest) in source.latest {
-        family.latest.entry(provider).or_insert(latest);
-    }
-
-    for (provider, latest_file) in source.latest_file_ids {
-        family
-            .latest_file_ids
-            .entry(provider)
-            .or_insert(latest_file);
-    }
-
-    for (provider, ignored) in source.ignored_versions {
-        family.ignored_versions.entry(provider).or_insert(ignored);
-    }
+    adopt_fields(family, &source, AdoptPolicy::Merge, ToString::to_string);
 }
 
 /// The page data and the last check of a source that is given the id `mod_id`. They describe one mod, so they are kept

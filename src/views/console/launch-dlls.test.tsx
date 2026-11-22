@@ -11,7 +11,7 @@ test("the console separates injected static imports from the DLLs found in the l
 	const html = renderToString(
 		<LaunchDlls
 			dlls={{
-				layer: ["bin/x64/winmm.dll", "red4ext/RED4ext.dll"],
+				layer: ["bin/x64/winmm.dll", "loader/loader-runtime.dll"],
 				injected: [
 					{
 						name: "WINMM.dll",
@@ -24,6 +24,6 @@ test("the console separates injected static imports from the DLLs found in the l
 	);
 	expect(html).toContain("Mod DLLs the game loaded");
 	expect(html).toContain("WINMM.dll");
-	expect(html).toContain("red4ext/RED4ext.dll");
+	expect(html).toContain("loader/loader-runtime.dll");
 	expect(html).toContain("1 static import patched");
 });

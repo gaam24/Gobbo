@@ -28,6 +28,10 @@ function warn(path: string, message: string) {
 	warnings.push(`${relative(root, path)}: ${message}`);
 }
 
+/// Every legacy alias. The generated ui layer never used `border-brand`, so its check keeps the smaller subset.
+const LEGACY_TOKENS = ["bg-surf", "text-ink", "border-line", "bg-brand", "text-brand", "text-danger", "bg-danger", "border-brand"] as const;
+const GENERATED_UI_TOKENS = LEGACY_TOKENS.filter((token) => token !== "border-brand");
+
 const uiDir = join(src, "components", "ui");
 const files = walk(src);
 
@@ -44,7 +48,7 @@ for (const path of files) {
 			if (text.includes(forbidden)) report(path, `the generated ui layer must not import ${forbidden}`);
 		}
 
-		for (const token of ["bg-surf", "text-ink", "border-line", "bg-brand", "text-brand", "text-danger", "bg-danger"]) {
+		for (const token of GENERATED_UI_TOKENS) {
 			if (text.includes(token)) report(path, `the generated ui layer must not use the app token ${token}`);
 		}
 
@@ -63,7 +67,7 @@ for (const path of files) {
 		if (buttons > 0) warn(path, `${buttons} raw <button> element(s); use Button unless this is a documented custom control`);
 	}
 
-	for (const token of ["bg-surf", "text-ink", "border-line", "text-brand", "bg-brand", "border-brand", "text-danger", "bg-danger"]) {
+	for (const token of LEGACY_TOKENS) {
 		if (text.includes(token)) warn(path, `legacy app token ${token}; migrate to a semantic shadcn token`);
 	}
 }

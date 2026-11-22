@@ -45,6 +45,9 @@ export interface GamePresentation {
 	stateHintKey?: TranslationKey;
 	primary: GameAction;
 	menu: GameAction[];
+	/// The wording of the plain launch and apply actions, shared by the header and the palette.
+	launchLabelKey: TranslationKey;
+	applyLabelKey: TranslationKey;
 	canApply: boolean;
 	canPlay: boolean;
 	canPlayWithoutMods: boolean;
@@ -78,6 +81,7 @@ const BUSY = {
 export function gamePresentation(status: Status, runtime: GameRuntime = IDLE): GamePresentation {
 	if (runtime.gameRunning) {
 		return {
+			...labelKeysOf(status),
 			tone: "danger",
 			stateKey: "header.running",
 			primary: { id: "stop", labelKey: "header.forceClose" },
@@ -120,8 +124,18 @@ function duringBusy(presentation: GamePresentation, busy: Exclude<GameRuntime["b
 	};
 }
 
+/// The wording of the two actions a surface can offer without going through the primary action. It lives here so the
+/// palette does not re-derive it from the stage.
+function labelKeysOf(status: Status): Pick<GamePresentation, "launchLabelKey" | "applyLabelKey"> {
+	return {
+		launchLabelKey: status.deployed ? "header.launch" : "header.playWithoutMods",
+		applyLabelKey: status.stage.kind === "applied" ? "header.applyAgain" : "header.deployWithoutLaunch",
+	};
+}
+
 /// The presentation the status alone decides, before the transient runtime state is applied.
 function statusPresentation(status: Status): GamePresentation {
+	const labels = labelKeysOf(status);
 	const blockedReason = blockerOf(status);
 	const deployedElsewhere = status.profiles.find((profile) => profile.deployed && !profile.active)?.name;
 	const primary = actionOf(status, blockedReason);
@@ -130,6 +144,7 @@ function statusPresentation(status: Status): GamePresentation {
 	switch (status.stage.kind) {
 		case "setup":
 			return {
+				...labels,
 				tone: "warning",
 				stateKey: "header.setupRequired",
 				stateHintKey: blockedReason,
@@ -146,9 +161,10 @@ function statusPresentation(status: Status): GamePresentation {
 		case "blocked": {
 			const play: GameAction = {
 				id: "play",
-				labelKey: status.deployed ? "header.launch" : "header.playWithoutMods",
+				labelKey: labels.launchLabelKey,
 			};
 			return {
+				...labels,
 				tone: "danger",
 				stateKey: "header.needsAttention",
 				stateHintKey: "header.needsAttentionHint",
@@ -166,9 +182,10 @@ function statusPresentation(status: Status): GamePresentation {
 		case "empty": {
 			const play: GameAction = {
 				id: "play",
-				labelKey: "header.playWithoutMods",
+				labelKey: labels.launchLabelKey,
 			};
 			return {
+				...labels,
 				tone: "neutral",
 				stateKey: "header.empty",
 				primary,
@@ -183,6 +200,7 @@ function statusPresentation(status: Status): GamePresentation {
 		}
 		case "no_enabled":
 			return {
+				...labels,
 				tone: "warning",
 				stateKey: "header.noEnabled",
 				stateParams: { total: status.stage.total },
@@ -198,6 +216,7 @@ function statusPresentation(status: Status): GamePresentation {
 			};
 		case "ready":
 			return {
+				...labels,
 				tone: "warning",
 				stateKey: deployedElsewhere ? "header.deployedElsewhere" : "header.notDeployed",
 				stateParams: deployedElsewhere ? { name: deployedElsewhere } : undefined,
@@ -205,7 +224,7 @@ function statusPresentation(status: Status): GamePresentation {
 				menu: [
 					{
 						id: "apply",
-						labelKey: "header.deployWithoutLaunch",
+						labelKey: labels.applyLabelKey,
 						disabled: blockedReason !== undefined,
 						reasonKey: blockedReason,
 					},
@@ -220,6 +239,7 @@ function statusPresentation(status: Status): GamePresentation {
 			};
 		case "draft":
 			return {
+				...labels,
 				tone: "warning",
 				stateKey: "header.draftChanges",
 				stateParams: { count: status.stage.changes },
@@ -228,7 +248,7 @@ function statusPresentation(status: Status): GamePresentation {
 				menu: [
 					{
 						id: "apply",
-						labelKey: "header.deployWithoutLaunch",
+						labelKey: labels.applyLabelKey,
 						disabled: blockedReason !== undefined,
 						reasonKey: blockedReason,
 					},
@@ -244,10 +264,11 @@ function statusPresentation(status: Status): GamePresentation {
 			};
 		case "applied":
 			return {
+				...labels,
 				tone: "success",
 				stateKey: "header.deployed",
 				primary,
-				menu: [{ id: "apply", labelKey: "header.applyAgain" }],
+				menu: [{ id: "apply", labelKey: labels.applyLabelKey }],
 				canApply: true,
 				canPlay: true,
 				canPlayWithoutMods: false,

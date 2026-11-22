@@ -36,7 +36,7 @@ pub struct GameScan {
 /// Whether `root` is the game's folder on this platform. Windows checks `markers`; Linux also accepts a folder with
 /// the files from `linux_markers`, so a native-only install is found.
 pub fn has_markers(root: &Path, game: &GameDef) -> bool {
-    has_markers_for(!cfg!(windows), root, game)
+    has_markers_for(!crate::platform::is_windows(), root, game)
 }
 
 /// The game folder, or the only immediate child that has the markers. A pre-installed game often keeps the real folder

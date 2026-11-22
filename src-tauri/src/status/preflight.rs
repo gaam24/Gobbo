@@ -83,8 +83,8 @@ fn requirement_check(game: &crate::games::GameDef, problem: &Message) -> Preflig
     }
 }
 
-/// Builds the report from the game status. It does not write; `status` itself only makes the library and archive folders,
-/// as the first look at a game already does.
+/// Builds the report from the game status. It does not write: a status read leaves the data folder untouched, and only
+/// `sync_profiles`, called when a game opens, creates the library and archive folders on the change path.
 pub fn preflight(root: &Data, game_id: &str) -> Result<PreflightReport, AppError> {
     let status = crate::status::status(root, game_id)?;
     let game = root.definition(game_id)?;

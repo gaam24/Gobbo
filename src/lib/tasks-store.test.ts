@@ -1,4 +1,6 @@
 import { beforeEach, expect, test } from "bun:test";
+import { createElement } from "react";
+import { renderToString } from "react-dom/server";
 
 import type { TaskView_Serialize } from "@/bindings";
 import {
@@ -6,12 +8,25 @@ import {
 	backendTaskKind,
 	normalizeBackendTask,
 	type RegisteredTask,
-	registeredTasks,
 	registerTask,
 	removeTask,
-	resetRegisteredTasks,
 	updateTask,
+	useRegisteredTasks,
 } from "@/lib/tasks-store";
+
+function TaskProbe({ observe }: { observe: (value: RegisteredTask[]) => void }) {
+	observe(useRegisteredTasks());
+	return null;
+}
+
+/// Reads the registry through the production subscription, the same one the activity card uses.
+function registeredTasks(): RegisteredTask[] {
+	const seen: RegisteredTask[][] = [];
+	renderToString(createElement(TaskProbe, { observe: (value) => seen.push(value) }));
+	const tasks = seen[0];
+	if (tasks === undefined) throw new Error("the task hook did not render");
+	return tasks;
+}
 
 function local(id: string, overrides: Partial<RegisteredTask> = {}): RegisteredTask {
 	return {
@@ -26,7 +41,8 @@ function local(id: string, overrides: Partial<RegisteredTask> = {}): RegisteredT
 }
 
 beforeEach(() => {
-	resetRegisteredTasks();
+	// Clear through the public removal command; the store has no test-only reset.
+	for (const task of registeredTasks()) removeTask(task.id);
 });
 
 test("registering an id twice replaces its row in place", () => {

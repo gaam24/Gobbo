@@ -7,7 +7,7 @@ export interface LanguageTokens {
 }
 
 /** Lowercase codes and aliases, including the native spelling of each language. */
-export const languageTokens: readonly LanguageTokens[] = [
+const languageTokens: readonly LanguageTokens[] = [
 	{ code: "pl", tokens: ["pl", "pl-pl", "polski", "polish"] },
 	{ code: "de", tokens: ["de", "de-de", "deutsch", "german"] },
 	{ code: "fr", tokens: ["fr", "fr-fr", "français", "french"] },

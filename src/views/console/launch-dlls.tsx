@@ -1,24 +1,18 @@
-import { useState } from "react";
 import type { DllReport } from "@/bindings";
 import { BoxList, BoxListRow, Disclosure, SectionHeading } from "@/components/app/content-blocks";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/i18n";
+import { useCopyLines } from "@/lib/use-copy-lines";
 
 /// The DLLs an overlay launch found in the mod layer, and the static imports the launcher points at that layer. The
 /// first list says what the game can load; the second says what was patched before the first instruction.
 export function LaunchDlls({ dlls }: { dlls: DllReport }) {
 	const { t } = useTranslation();
-	const [copied, setCopied] = useState(false);
+	const { copied, copyLines } = useCopyLines();
 	const { layer, injected } = dlls;
 	const copy = async () => {
 		const lines = [...injected.map((dll) => `injected ${dll.name} ${dll.path} <- ${dll.source}`), ...layer.map((path) => `layer ${path}`)];
-
-		try {
-			await navigator.clipboard.writeText(lines.join("\n"));
-			setCopied(true);
-		} catch {
-			// The clipboard needs a secure context; the lists stay on screen for a manual copy.
-		}
+		await copyLines(lines);
 	};
 
 	return (

@@ -1,6 +1,6 @@
 //! Names and folders of the library: the family id of a mod, its slug, the folders in the library and their scans.
 
-use crate::error::{AppError, FileError, io_at};
+use crate::error::{AppError, io_at};
 use std::fs;
 use std::io;
 use std::path::Path;
@@ -32,7 +32,7 @@ pub fn mod_folders(library_dir: &Path) -> Result<Vec<String>, AppError> {
     let entries = match fs::read_dir(library_dir) {
         Ok(entries) => entries,
         Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
-        Err(e) => return Err(AppError::from(FileError::new(library_dir, e))),
+        Err(e) => return Err(io_at(library_dir)(e)),
     };
     let mut folders = Vec::new();
 
@@ -70,8 +70,7 @@ pub fn scan_mod(library_dir: &Path, folder: &str, game: &GameDef) -> Result<ModV
 /// both walk the folder here; the refresh puts the result on the record the index already has.
 pub fn scan_files(library_dir: &Path, folder: &str) -> Result<(Vec<String>, u64), AppError> {
     let dir = library_dir.join(folder);
-    let (files, size_bytes) = crate::infra::fs::list_files_with_sizes(&dir)
-        .map_err(|error| FileError::new(&dir, error))?;
+    let (files, size_bytes) = crate::infra::fs::list_files_with_sizes(&dir).map_err(io_at(&dir))?;
     Ok((files, size_bytes))
 }
 

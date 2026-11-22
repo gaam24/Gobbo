@@ -86,14 +86,14 @@ test("a blocked list offers a fix first and still allows a plain play", () => {
 });
 
 test("a mod that needs the loader leads with one install button named after the loader", () => {
-	const reasons = [{ code: "status.loader_missing", params: { name: "UE4SS" } }];
+	const reasons = [{ code: "status.loader_missing", params: { name: "Example Loader" } }];
 	const presentation = gamePresentation(status({ kind: "blocked", reasons }, { problems: reasons }));
 	expect(presentation.primary).toMatchObject({
 		id: "install-loader",
 		labelKey: "header.installLoader",
-		params: { name: "UE4SS" },
+		params: { name: "Example Loader" },
 	});
-	expect(presentation.nextStep).toMatchObject({ titleKey: "start.loader.title", params: { name: "UE4SS" } });
+	expect(presentation.nextStep).toMatchObject({ titleKey: "start.loader.title", params: { name: "Example Loader" } });
 	expect(presentation.canPlayWithoutMods).toBe(true);
 });
 
@@ -106,6 +106,12 @@ test("an empty library leads with import and allows a plain play", () => {
 	expect(presentation.canPlay).toBe(true);
 	expect(presentation.canPlayWithoutMods).toBe(true);
 	expect(presentation.nextStep?.titleKey).toBe("start.add.title");
+});
+
+test("a deployed empty library names its launch action the same way in the menu and the palette", () => {
+	const presentation = gamePresentation(status({ kind: "empty" }, { deployed: true }));
+	expect(presentation.launchLabelKey).toBe("header.launch");
+	expect(presentation.menu.find((action) => action.id === "play")?.labelKey).toBe(presentation.launchLabelKey);
 });
 
 test("a library with every mod off offers play and points at the switches", () => {

@@ -1,15 +1,15 @@
 //! The provider checks behind the status: requirements that are not met, and the warnings about relations between mods.
 
+use crate::domain::library::ArchiveLabel;
+use crate::domain::library::Family;
+use crate::domain::library::Library;
+use crate::domain::library::LibraryView;
+use crate::domain::library::ModInfo;
 use crate::domain::naming::requirement_label;
 use crate::domain::profiles::entry::ProfileMod;
 use crate::domain::source::SourceRef;
 use crate::domain::source::SourceRequirement;
 use crate::error::Message;
-use crate::library::ArchiveLabel;
-use crate::library::Family;
-use crate::library::Library;
-use crate::library::LibraryView;
-use crate::library::ModInfo;
 use rustc_hash::FxHashMap;
 use serde::Serialize;
 use std::collections::BTreeSet;
@@ -103,6 +103,12 @@ impl<'view, 'data, 'list> SourceLookup<'view, 'data, 'list> {
         }
     }
 
+    /// The name of a family, or its id when the library has no family of that id. The view already holds the names, so
+    /// a caller with a lookup never copies a name into a `String` just to print it.
+    pub fn family_name<'a>(&'a self, id: &'a str) -> &'a str {
+        self.view.family_name(id).unwrap_or(id)
+    }
+
     /// Whether the family is on in the profile. A family that is in the library but has no enabled entry is off.
     pub(crate) fn is_enabled(&self, family: &str) -> bool {
         self.enabled.contains(family)
@@ -132,7 +138,7 @@ pub fn source_alternatives(requirements: &[SourceRequirement]) -> Vec<Vec<&Sourc
 }
 
 /// The name of a family of the library, or its id when the library has no family of that id.
-pub fn family_name(library: &Library, id: &str) -> String {
+fn family_name(library: &Library, id: &str) -> String {
     library
         .families
         .get(id)
@@ -348,7 +354,7 @@ pub fn relation_warnings_with(
                 warnings.push(
                     Message::new("relations.order")
                         .with("mod", &family.name)
-                        .with("other", family_name(library, other)),
+                        .with("other", lookup.family_name(other)),
                 );
             }
         }
@@ -364,8 +370,8 @@ pub fn relation_warnings_with(
                 if pairs.insert(pair.clone()) {
                     warnings.push(
                         Message::new("relations.conflict")
-                            .with("first", family_name(library, &pair.0))
-                            .with("second", family_name(library, &pair.1)),
+                            .with("first", lookup.family_name(&pair.0))
+                            .with("second", lookup.family_name(&pair.1)),
                     );
                 }
             }

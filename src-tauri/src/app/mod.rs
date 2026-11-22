@@ -170,7 +170,7 @@ pub fn run() {
                 crate::infra::log::warn(format!("could not start the system tray: {error}"));
             }
 
-            commands::watch_links(app);
+            crate::sources::commands::watch_links(app);
             Ok(())
         })
         .invoke_handler(builder.invoke_handler());

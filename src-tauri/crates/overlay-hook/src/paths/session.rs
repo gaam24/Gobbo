@@ -7,10 +7,10 @@ use std::os::windows::ffi::OsStringExt;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
+use gobbo_overlay_core::wide;
 use windows_sys::Win32::Storage::FileSystem::{GetLongPathNameW, GetShortPathNameW};
 
 use crate::state::mounts;
-use crate::text::wide;
 
 /// One guest path of the session and the layers that serve it.
 pub(crate) struct MountPaths {

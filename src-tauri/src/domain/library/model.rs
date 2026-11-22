@@ -184,6 +184,141 @@ pub struct Family {
     pub overrides: Vec<String>,
 }
 
+/// How the user data of one family is taken over by another. A move into a family that already exists adds what the
+/// target lacks without dropping what it has; a pack that fills a local copy only supplies fields the copy has none of.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AdoptPolicy {
+    /// Add missing entries to lists and maps, keeping every value the target already has.
+    Merge,
+    /// Take a field from the source only when the target's field is empty.
+    FillEmpty,
+}
+
+/// Takes over the user data of `source` into `target` under `policy`. `remap` translates the family ids of relations
+/// from the source's namespace into the target's, and is the identity when both use the same ids. This is the one rule
+/// for tags, notes, instructions, relations and the provider data that travels with a family; the provider pages
+/// themselves have their own rule at each caller.
+///
+/// The policies deliberately cover different fields. [`AdoptPolicy::Merge`] adds source entries to `tags`, `requires`,
+/// `requirements`, `incompatible`, `source_dlcs`, `source_sync`, `latest`, `latest_file_ids` and `ignored_versions`,
+/// keeping what the target had, and fills only empty `notes` and `instructions`. [`AdoptPolicy::FillEmpty`] copies
+/// `tags`, `notes`, `instructions`, `requires`, `requirements`, `incompatible`, `overrides` and `source_dlcs` only
+/// when the target has none. It leaves the four update-metadata fields (`source_sync`, `latest`, `latest_file_ids`
+/// and `ignored_versions`) untouched, and never merges `overrides`: the shipped pack-adoption flow relies on a local
+/// copy keeping its own saved checks and override order.
+pub fn adopt_fields(
+    target: &mut Family,
+    source: &Family,
+    policy: AdoptPolicy,
+    remap: impl Fn(&str) -> String,
+) {
+    let relations = |ids: &[String]| -> Vec<String> { ids.iter().map(|id| remap(id)).collect() };
+
+    match policy {
+        AdoptPolicy::Merge => {
+            target.tags.extend(source.tags.iter().cloned());
+
+            if target.notes.is_empty() {
+                target.notes.clone_from(&source.notes);
+            }
+
+            if target.instructions.is_empty() {
+                target.instructions.clone_from(&source.instructions);
+            }
+
+            for other in relations(&source.requires) {
+                if !target.requires.contains(&other) {
+                    target.requires.push(other);
+                }
+            }
+
+            for other in relations(&source.incompatible) {
+                if !target.incompatible.contains(&other) {
+                    target.incompatible.push(other);
+                }
+            }
+
+            for requirement in &source.requirements {
+                if !target
+                    .requirements
+                    .iter()
+                    .any(|kept| kept.source == requirement.source)
+                {
+                    target.requirements.push(requirement.clone());
+                }
+            }
+
+            for (provider, dlcs) in &source.source_dlcs {
+                target
+                    .source_dlcs
+                    .entry(provider.clone())
+                    .or_insert_with(|| dlcs.clone());
+            }
+
+            for (provider, sync) in &source.source_sync {
+                target
+                    .source_sync
+                    .entry(provider.clone())
+                    .or_insert_with(|| sync.clone());
+            }
+
+            for (provider, latest) in &source.latest {
+                target
+                    .latest
+                    .entry(provider.clone())
+                    .or_insert_with(|| latest.clone());
+            }
+
+            for (provider, latest_file) in &source.latest_file_ids {
+                target
+                    .latest_file_ids
+                    .entry(provider.clone())
+                    .or_insert_with(|| latest_file.clone());
+            }
+
+            for (provider, ignored) in &source.ignored_versions {
+                target
+                    .ignored_versions
+                    .entry(provider.clone())
+                    .or_insert_with(|| ignored.clone());
+            }
+        }
+        AdoptPolicy::FillEmpty => {
+            if target.tags.is_empty() {
+                target.tags.clone_from(&source.tags);
+            }
+
+            if target.notes.is_empty() {
+                target.notes.clone_from(&source.notes);
+            }
+
+            if target.instructions.is_empty() {
+                target.instructions.clone_from(&source.instructions);
+            }
+
+            if target.requires.is_empty() {
+                target.requires = relations(&source.requires);
+            }
+
+            if target.requirements.is_empty() {
+                target.requirements.clone_from(&source.requirements);
+            }
+
+            if target.incompatible.is_empty() {
+                target.incompatible = relations(&source.incompatible);
+            }
+
+            if target.overrides.is_empty() {
+                target.overrides = relations(&source.overrides);
+            }
+
+            if target.source_dlcs.is_empty() {
+                target.source_dlcs.clone_from(&source.source_dlcs);
+            }
+        }
+    }
+}
+
 impl Family {
     /// The family of a newly found version: named after the version, or after its folder when it has no name.
     pub fn of(version: &ModVersion) -> Self {
@@ -305,7 +440,10 @@ impl ModVersion {
 
 #[cfg(test)]
 mod tests {
-    use super::{ArchiveLabel, ModVersion};
+    use super::{AdoptPolicy, ArchiveLabel, Family, ModVersion};
+    use crate::domain::source::{ProviderId, SourceRef, SourceRequirement, SourceSync};
+    use crate::domain::version::IgnoredVersion;
+    use std::collections::{BTreeMap, BTreeSet};
 
     #[test]
     fn a_label_saved_with_a_name_still_loads_with_it() {
@@ -347,5 +485,120 @@ mod tests {
         assert_eq!(text, r#"{"version":"1.0.0"}"#);
         let back: ArchiveLabel = serde_json::from_str(&text).unwrap();
         assert_eq!(back, label);
+    }
+
+    /// A non-default source family with every field each policy cares about, so the exact field outcomes below pin
+    /// the asymmetry instead of relying on an empty fixture.
+    fn source_family() -> Family {
+        let provider = ProviderId::new("example-provider");
+        Family {
+            id: "example-family".into(),
+            name: "Example Mod".into(),
+            tags: BTreeSet::from(["example-tag".to_string()]),
+            notes: "Source notes".into(),
+            instructions: "Source instructions".into(),
+            requires: vec!["source-dependency".into()],
+            requirements: vec![SourceRequirement {
+                source: SourceRef::new("example-provider", "10").with_file("20"),
+                name: "Source requirement".into(),
+                from_source: true,
+                group: Some(2),
+                ignored: false,
+            }],
+            incompatible: vec!["source-conflict".into()],
+            overrides: vec!["source-override".into()],
+            source_dlcs: BTreeMap::from([(provider.clone(), vec![vec!["Example DLC".into()]])]),
+            source_sync: BTreeMap::from([(
+                provider.clone(),
+                SourceSync {
+                    file_id: "20".into(),
+                    version_id: "30".into(),
+                    checked_at: 100,
+                    mod_level: true,
+                    older_version: Some("1.0".into()),
+                },
+            )]),
+            latest: BTreeMap::from([(provider.clone(), "2.0".into())]),
+            latest_file_ids: BTreeMap::from([(provider.clone(), "40".into())]),
+            ignored_versions: BTreeMap::from([(
+                provider,
+                IgnoredVersion {
+                    version: "1.5".into(),
+                    file_id: Some("15".into()),
+                },
+            )]),
+            ..Family::default()
+        }
+    }
+
+    #[test]
+    fn the_two_adopt_policies_cover_different_fields() {
+        let source = source_family();
+        let provider = ProviderId::new("example-provider");
+        let remap = |id: &str| format!("remapped:{id}");
+
+        // Hardcoded outcomes, not values read back from `source`: a shallow copy, a field copied from the wrong place
+        // or a missed remap cannot pass either policy.
+        let tags = BTreeSet::from(["example-tag".to_string()]);
+        let requirements = vec![SourceRequirement {
+            source: SourceRef::new("example-provider", "10").with_file("20"),
+            name: "Source requirement".into(),
+            from_source: true,
+            group: Some(2),
+            ignored: false,
+        }];
+        let source_dlcs = BTreeMap::from([(provider.clone(), vec![vec!["Example DLC".into()]])]);
+        let source_sync = BTreeMap::from([(
+            provider.clone(),
+            SourceSync {
+                file_id: "20".into(),
+                version_id: "30".into(),
+                checked_at: 100,
+                mod_level: true,
+                older_version: Some("1.0".into()),
+            },
+        )]);
+        let latest = BTreeMap::from([(provider.clone(), "2.0".into())]);
+        let latest_file_ids = BTreeMap::from([(provider.clone(), "40".into())]);
+        let ignored_versions = BTreeMap::from([(
+            provider,
+            IgnoredVersion {
+                version: "1.5".into(),
+                file_id: Some("15".into()),
+            },
+        )]);
+
+        let mut merged = Family::default();
+        super::adopt_fields(&mut merged, &source, AdoptPolicy::Merge, remap);
+        assert_eq!(merged.tags, tags);
+        assert_eq!(merged.notes, "Source notes");
+        assert_eq!(merged.instructions, "Source instructions");
+        assert_eq!(merged.requires, ["remapped:source-dependency"]);
+        assert_eq!(merged.requirements, requirements);
+        assert_eq!(merged.incompatible, ["remapped:source-conflict"]);
+        assert!(merged.overrides.is_empty(), "Merge never takes overrides");
+        assert_eq!(merged.source_dlcs, source_dlcs);
+        assert_eq!(merged.source_sync, source_sync);
+        assert_eq!(merged.latest, latest);
+        assert_eq!(merged.latest_file_ids, latest_file_ids);
+        assert_eq!(merged.ignored_versions, ignored_versions);
+
+        let mut filled = Family::default();
+        super::adopt_fields(&mut filled, &source, AdoptPolicy::FillEmpty, remap);
+        assert_eq!(filled.tags, tags);
+        assert_eq!(filled.notes, "Source notes");
+        assert_eq!(filled.instructions, "Source instructions");
+        assert_eq!(filled.requires, ["remapped:source-dependency"]);
+        assert_eq!(filled.requirements, requirements);
+        assert_eq!(filled.incompatible, ["remapped:source-conflict"]);
+        assert_eq!(filled.overrides, ["remapped:source-override"]);
+        assert_eq!(filled.source_dlcs, source_dlcs);
+        assert!(
+            filled.source_sync.is_empty()
+                && filled.latest.is_empty()
+                && filled.latest_file_ids.is_empty()
+                && filled.ignored_versions.is_empty(),
+            "FillEmpty leaves all four update-metadata fields alone"
+        );
     }
 }

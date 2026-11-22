@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, LazyLock, Mutex, PoisonError};
 
-use gobbo_overlay_core::{Layer, copy_temp_name, join};
+use gobbo_overlay_core::{Layer, copy_temp_name, join, wide};
 use gobbo_overlay_decisions::{Kind, Layer as DecisionLayer};
 use windows_sys::Win32::Foundation::{
     ERROR_ACCESS_DENIED, ERROR_ALREADY_EXISTS, ERROR_DIRECTORY, ERROR_DISK_FULL, ERROR_FILE_EXISTS,
@@ -26,7 +26,6 @@ use super::disk::{exists, make_parent};
 use super::probe::{Missing, Probe, probe_child};
 use crate::diag::{decision_layer, record_decision};
 use crate::state::Mount;
-use crate::text::wide;
 use crate::trace::trace;
 use windows_sys::Win32::Storage::FileSystem::FILE_ATTRIBUTE_DIRECTORY;
 

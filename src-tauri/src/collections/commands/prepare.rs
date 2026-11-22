@@ -11,7 +11,7 @@ use crate::context::Data;
 use crate::error::AppError;
 use crate::sources::downloads::Downloads;
 
-/// The guided flow's next member: a Nexus file page, an automatic bundle/direct install, or a manual instruction.
+/// The guided flow's next member: a provider file page, an automatic bundle/direct install, or a manual instruction.
 #[tauri::command]
 #[specta::specta]
 pub async fn prepare_collection_item(

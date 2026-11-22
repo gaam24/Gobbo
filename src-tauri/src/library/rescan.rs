@@ -3,8 +3,8 @@
 use crate::context::Data;
 use crate::context::load_profiles;
 use crate::context::profile::lock_profiles;
+use crate::domain::library::LibraryView;
 use crate::error::AppError;
-use crate::library::LibraryView;
 use crate::library::sync::sync_profiles;
 
 use crate::context::edit_library_clean;

@@ -21,28 +21,128 @@ use crate::games::{GameDef, Phase};
 /// Called once when the program ends, with its exit code. The command turns it into a window event.
 pub(super) type ExitNotice = Box<dyn FnOnce(Option<i32>) + Send>;
 
+/// Called once the program has started, with the handle of the process it runs as. A tool uses it to watch its cancel
+/// flag instead of searching the process list again.
+pub(super) type SpawnNotice = Box<dyn FnOnce(crate::platform::Process) + Send>;
+
 /// What a run does around the program. A game records and runs steps in the background; a tool only waits for the
 /// program.
 pub(super) struct RunOptions<'a> {
-    pub data: &'a Data,
+    data: &'a Data,
     /// The app data root, which owns `gobbo.lock`. `data` may be a game-level handle, whose own folder is not the root.
-    pub state_root: PathBuf,
-    pub game: &'a GameDef,
-    pub settings: &'a Settings,
-    pub home: &'a Path,
+    state_root: PathBuf,
+    game: &'a GameDef,
+    settings: &'a Settings,
+    home: &'a Path,
     /// The id for the live marker. `None` for a tool.
-    pub game_id: Option<&'a str>,
-    pub steps: bool,
-    pub live: bool,
-    pub background: bool,
-    pub watch: bool,
-    pub report: bool,
+    game_id: Option<&'a str>,
+    steps: bool,
+    live: bool,
+    background: bool,
+    watch: bool,
+    report: bool,
     /// Start a fresh report before the run.
-    pub begin_report: bool,
-    pub with_output: bool,
-    pub finish: bool,
+    begin_report: bool,
+    with_output: bool,
+    finish: bool,
     /// Called when the program ends, so the window can stop polling. Tools leave it unset.
-    pub on_exit: Option<ExitNotice>,
+    on_exit: Option<ExitNotice>,
+    /// The program path and the watcher to start with its process handle. Only a tool sets it.
+    spawn_notice: Option<(PathBuf, SpawnNotice)>,
+}
+
+impl<'a> RunOptions<'a> {
+    /// A game launched from the window: steps and a live marker, a background wait, output and a report, and the
+    /// post-exit save of the profile data.
+    pub(super) fn for_game(
+        data: &'a Data,
+        state_root: PathBuf,
+        game: &'a GameDef,
+        settings: &'a Settings,
+        home: &'a Path,
+        game_id: &'a str,
+        on_exit: Option<ExitNotice>,
+    ) -> Self {
+        Self {
+            data,
+            state_root,
+            game,
+            settings,
+            home,
+            game_id: Some(game_id),
+            steps: true,
+            live: true,
+            background: true,
+            watch: true,
+            report: true,
+            begin_report: false,
+            with_output: true,
+            finish: true,
+            on_exit,
+            spawn_notice: None,
+        }
+    }
+
+    /// A game started from the Steam launch option: a fresh report and a foreground wait; the caller is the process, so
+    /// nothing is marked live in the app.
+    pub(super) fn for_run_command(
+        data: &'a Data,
+        state_root: PathBuf,
+        game: &'a GameDef,
+        settings: &'a Settings,
+        home: &'a Path,
+        game_id: &'a str,
+    ) -> Self {
+        Self {
+            data,
+            state_root,
+            game,
+            settings,
+            home,
+            game_id: Some(game_id),
+            steps: true,
+            live: false,
+            background: false,
+            watch: false,
+            report: true,
+            begin_report: true,
+            with_output: true,
+            finish: true,
+            on_exit: None,
+            spawn_notice: None,
+        }
+    }
+
+    /// A tool: only a detached wait, with no steps, report, live marker or post-exit save. The notice tells its caller
+    /// how it ended.
+    pub(super) fn for_tool(
+        data: &'a Data,
+        state_root: PathBuf,
+        game: &'a GameDef,
+        settings: &'a Settings,
+        home: &'a Path,
+        on_exit: Option<ExitNotice>,
+        spawn_notice: Option<(PathBuf, SpawnNotice)>,
+    ) -> Self {
+        Self {
+            data,
+            state_root,
+            game,
+            settings,
+            home,
+            game_id: None,
+            steps: false,
+            live: false,
+            background: true,
+            watch: false,
+            report: false,
+            begin_report: false,
+            with_output: false,
+            finish: false,
+            on_exit,
+            spawn_notice,
+        }
+    }
 }
 
 /// What a run left behind. `exit_code` is `None` for a background run, whose wait thread records it later.
@@ -75,6 +175,7 @@ pub(super) fn run(
         with_output,
         finish,
         on_exit,
+        spawn_notice,
     } = options;
 
     crate::infra::log::info(format!(
@@ -115,6 +216,14 @@ pub(super) fn run(
     let started = Instant::now();
     let mut running = launch.start(spawn_error, console)?;
     let mut on_exit = on_exit;
+
+    // The process is started now, so the watcher gets its handle instead of searching for it and waiting for it to
+    // appear. A program that is already gone needs no watcher: the wait thread still reports its exit.
+    if let Some((program, notice)) = spawn_notice
+        && let Some(process) = crate::platform::Process::by_program(&program)
+    {
+        notice(process);
+    }
 
     if record {
         report::record_start(data, started, running.timings(), dll_report_us);

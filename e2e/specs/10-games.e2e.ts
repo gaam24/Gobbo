@@ -6,7 +6,7 @@ import { invoke, invokeError, reloadWindow } from "../support/bridge";
 import { dataDir, definitionsDir } from "../support/env";
 import { exists, removeTree, writeFile, writeZip } from "../support/files";
 import { prepareGame, seedSteamGame } from "../support/fixtures";
-import { apply, enableMods, importMods, seedGame, uniqueId } from "../support/seed";
+import { apply, cleanupFixture, enableMods, importMods, seedGame, uniqueId } from "../support/seed";
 import {
 	bodyText,
 	clickByLabel,
@@ -40,7 +40,7 @@ describe("games", () => {
 		await waitForDialog("Locate");
 		const input = await browser.$("#locate-folder");
 		await input.setValue(fixture.root);
-		await waitForText("Found bin/game.exe. This is the game folder.");
+		await waitForText("Found bin/game.exe, so this is the game folder.");
 		await clickByText("Add game", "button", "[role='dialog']");
 		// The first game opens the setup check; the dialog is not the assertion of this test.
 		if ((await dialogCount()) > 0) await closeTopDialog();
@@ -52,10 +52,7 @@ describe("games", () => {
 			"the game was not added",
 		);
 		assert.ok(exists(path.join(dataDir, "games", id, "config.json")), "the game data folder was not created");
-		await invoke("remove_game", { game: id });
-		await invoke("delete_removed_game", { game: id });
-		removeTree(path.join(definitionsDir, id));
-		removeTree(fixture.root);
+		await cleanupFixture(id, fixture.root);
 	});
 	it("finds a game in a fake Steam library and adds it from the catalog", async () => {
 		const id = uniqueId("games-steam");
@@ -80,18 +77,15 @@ describe("games", () => {
 			managed.some((game) => game.id === id),
 			"the detected game was not added",
 		);
-		await invoke("remove_game", { game: id });
-		await invoke("delete_removed_game", { game: id });
-		removeTree(path.join(definitionsDir, id));
-		removeTree(fixture.root);
+		await cleanupFixture(id, fixture.root);
 	});
 	it("removes a game to Storage, restores it and deletes its data", async () => {
 		const id = uniqueId("games-storage");
 		const name = `E2E Storage ${id}`;
 		const { fixture } = await seedGame({ id, name });
 		await openContextMenuByLabel(name);
-		await clickByText("Remove from Gobbo Mods Organizer", "[role='menuitem']");
-		await waitForDialog(`Remove ${name} from Gobbo Mods Organizer?`);
+		await clickByText("Remove from Gobbo", "[role='menuitem']");
+		await waitForDialog(`Remove ${name} from Gobbo?`);
 		await clickByText("Remove", "button", "[role='alertdialog']");
 		await waitForHeading("Games");
 		assert.ok(!exists(path.join(dataDir, "games", id)), "the active data folder was not moved");
@@ -114,25 +108,27 @@ describe("games", () => {
 		// The delete action now lives in the row's More actions dropdown.
 		await clickMenuTrigger("More actions");
 		await clickMenuItem("Delete data");
-		await waitForText(`Delete the data of ${name}?`);
+		await waitForText(`Delete the data for ${name}?`);
 		await clickByText("Delete data", "button", "[role='alertdialog']");
 		await waitForText("No game data yet");
 		assert.ok(!exists(path.join(dataDir, "games", `${id}.removed`)), "the removed data folder was not deleted");
-		removeTree(path.join(definitionsDir, id));
-		removeTree(fixture.root);
+		await cleanupFixture(id, fixture.root);
 	});
 	it("reports a user definition that cannot be read and keeps the other games", async () => {
 		const id = uniqueId("games-broken");
 		const file = path.join(definitionsDir, id, "game.toml");
 		writeFile(file, "schema = 1\nid = [\n");
 		await openGames();
-		await waitForText("Some user definitions could not be loaded");
+		await waitForText("Some of your own game definitions couldn't be loaded");
 		await waitForText(file);
 		await waitForText("Games");
 		removeTree(path.join(definitionsDir, id));
 		await openGames();
 		await waitForText("Games");
-		assert.ok(!(await bodyText()).includes("Some user definitions could not be loaded"), "the broken definition stayed in the catalog");
+		assert.ok(
+			!(await bodyText()).includes("Some of your own game definitions couldn't be loaded"),
+			"the broken definition stayed in the catalog",
+		);
 	});
 	it("shows Verified and Unverified badges on user definitions", async () => {
 		const verifiedId = uniqueId("games-verified");
@@ -151,10 +147,7 @@ describe("games", () => {
 		await waitForText("Verified");
 		await waitForText(`E2E Unverified ${unverifiedId}`);
 		await waitForText("Unverified");
-		removeTree(path.join(definitionsDir, verifiedId));
-		removeTree(path.join(definitionsDir, unverifiedId));
-		removeTree(verified.root);
-		removeTree(unverified.root);
+		await cleanupFixture([verifiedId, unverifiedId], [verified.root, unverified.root]);
 	});
 	it("refuses to remove a game whose mods are applied", async () => {
 		const id = uniqueId("games-deployed");
@@ -168,10 +161,7 @@ describe("games", () => {
 		const error = await invokeError("remove_game", { game: id });
 		assert.equal(error.code, "deploy.active");
 		await invoke("undo", { game: id });
-		await invoke("remove_game", { game: id });
-		await invoke("delete_removed_game", { game: id });
-		removeTree(path.join(definitionsDir, id));
-		removeTree(fixture.root);
+		await cleanupFixture(id, fixture.root);
 	});
 	it("opens a game with a missing settings folder in the setup state", async () => {
 		const id = uniqueId("games-setup");
@@ -185,9 +175,6 @@ describe("games", () => {
 		await waitForGame(name);
 		await clickByLabel(name);
 		await waitForText("Set the settings folder");
-		await invoke("remove_game", { game: id });
-		await invoke("delete_removed_game", { game: id });
-		removeTree(path.join(definitionsDir, id));
-		removeTree(fixture.root);
+		await cleanupFixture(id, fixture.root);
 	});
 });

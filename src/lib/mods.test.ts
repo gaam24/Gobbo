@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import type { ModGroup, ProfileView, Status, UpdateReport } from "@/bindings";
+import type { ModGroup, ProfileView, Status, UpdateReport_Serialize } from "@/bindings";
 import {
 	activeConflicts,
 	applyStatus,
@@ -9,7 +9,6 @@ import {
 	formatModList,
 	formatSize,
 	gridItems,
-	groupMemberIds,
 	groupRowId,
 	hasUpdate,
 	hiddenModIds,
@@ -28,6 +27,8 @@ import {
 	userGroups,
 } from "@/lib/mods";
 import { sourceLists } from "@/sources/requirements";
+import { modFixture } from "@/test/fixtures/mod";
+import { statusFixture } from "@/test/fixtures/status";
 
 const labels = {
 	enabled: "enabled",
@@ -35,7 +36,7 @@ const labels = {
 	requires: "Requires",
 	or: "or",
 };
-const sourceName = (provider: string) => (provider === "nexus" ? "Nexus" : provider);
+const sourceName = (provider: string) => (provider === "provider-a" ? "Provider A" : provider);
 
 const mods: ListedMod[] = [
 	{
@@ -43,9 +44,9 @@ const mods: ListedMod[] = [
 		enabled: true,
 		sources: [
 			{
-				provider: "nexus",
+				provider: "provider-a",
 				mod_id: "4311",
-				page_url: "https://www.nexusmods.com/examplegame/mods/4311",
+				page_url: "https://example.com/mods/4311",
 				file_id: null,
 			},
 		],
@@ -71,7 +72,7 @@ const mods: ListedMod[] = [
 ];
 
 const sourceRequirement = (mod_id: number, group: number | null) => ({
-	source: { provider: "nexus", mod_id: String(mod_id), file_id: null },
+	source: { provider: "provider-a", mod_id: String(mod_id), file_id: null },
 	name: `Mod ${mod_id}`,
 	from_source: true,
 	group,
@@ -80,19 +81,19 @@ const sourceRequirement = (mod_id: number, group: number | null) => ({
 });
 
 const part = (id: string, partId: string, name: string): Mod =>
-	listed({
+	modFixture({
 		id,
 		folder: name,
-		page_id: "nexus:225",
-		page_name: "AudioXL",
+		page_id: "provider-a:225",
+		page_name: "Example Page",
 		part_id: partId,
 		part_name: name,
-		info: { name, version: "1.0", author: "DigitalVixen", description: null },
+		info: { name, version: "1.0", author: "Example Author", description: null },
 	});
 
 /// A plain mod for the user-group tests, with a stable id and a readable folder and name.
 const member = (id: string): Mod =>
-	listed({
+	modFixture({
 		id,
 		folder: id,
 		info: { name: id, version: null, author: null, description: null },
@@ -109,9 +110,9 @@ const userGroup = (id: string, members: string[]): ModGroup => ({
 test("adjacent parts of one page become one page header with the parts under it", () => {
 	const items = listItems(
 		[
-			part("nexus:225", "100", "Base"),
-			part("nexus:225#200", "200", "Addon"),
-			listed({ id: "local:other", folder: "Other", page_id: null }),
+			part("provider-a:225", "100", "Base"),
+			part("provider-a:225#200", "200", "Addon"),
+			modFixture({ id: "local:other", folder: "Other", page_id: null }),
 		],
 		[],
 	);
@@ -119,23 +120,23 @@ test("adjacent parts of one page become one page header with the parts under it"
 	expect(table.map((row) => row.kind)).toEqual(["page", "mod", "mod", "mod"]);
 	expect(table[0]).toMatchObject({
 		kind: "page",
-		id: pageRowId("nexus:225"),
-		page: { name: "AudioXL", author: "DigitalVixen" },
+		id: pageRowId("provider-a:225"),
+		page: { name: "Example Page", author: "Example Author" },
 	});
 
 	if (table[0]?.kind === "page") expect(table[0].page.mods.map((mod) => mod.info.name)).toEqual(["Base", "Addon"]);
-	expect(foldedPageParts([part("a", "100", "Base"), part("b", "200", "Addon")], new Set([pageRowId("nexus:225")]))).toEqual(
+	expect(foldedPageParts([part("a", "100", "Base"), part("b", "200", "Addon")], new Set([pageRowId("provider-a:225")]))).toEqual(
 		new Set(["a", "b"]),
 	);
-	expect(tableItems(items, new Set([pageRowId("nexus:225")])).map((row) => row.kind)).toEqual(["page", "mod"]);
+	expect(tableItems(items, new Set([pageRowId("provider-a:225")])).map((row) => row.kind)).toEqual(["page", "mod"]);
 });
 
 test("the grid keeps a page's cards under one header, and folding hides only the cards", () => {
 	const items = listItems(
 		[
-			part("nexus:225", "100", "Base"),
-			part("nexus:225#200", "200", "Addon"),
-			listed({ id: "local:other", folder: "Other", page_id: null }),
+			part("provider-a:225", "100", "Base"),
+			part("provider-a:225#200", "200", "Addon"),
+			modFixture({ id: "local:other", folder: "Other", page_id: null }),
 		],
 		[],
 	);
@@ -143,14 +144,14 @@ test("the grid keeps a page's cards under one header, and folding hides only the
 	expect(grid.map((unit) => unit.kind)).toEqual(["page", "cards", "cards"]);
 	expect(grid[1]).toMatchObject({
 		kind: "cards",
-		mods: [{ id: "nexus:225" }, { id: "nexus:225#200" }],
+		mods: [{ id: "provider-a:225" }, { id: "provider-a:225#200" }],
 	});
 	expect(grid[2]).toMatchObject({
 		kind: "cards",
 		mods: [{ id: "local:other" }],
 	});
 
-	const folded = gridItems(tableItems(items, new Set([pageRowId("nexus:225")])), 2);
+	const folded = gridItems(tableItems(items, new Set([pageRowId("provider-a:225")])), 2);
 	expect(folded.map((unit) => unit.kind)).toEqual(["page", "cards"]);
 	expect(folded[1]).toMatchObject({
 		kind: "cards",
@@ -159,12 +160,12 @@ test("the grid keeps a page's cards under one header, and folding hides only the
 });
 
 test("a page with one visible part is a plain card in the grid", () => {
-	const items = listItems([part("nexus:225", "100", "Base"), listed({ id: "local:other", folder: "Other", page_id: null })], []);
+	const items = listItems([part("provider-a:225", "100", "Base"), modFixture({ id: "local:other", folder: "Other", page_id: null })], []);
 	const grid = gridItems(tableItems(items), 2);
 	expect(grid.map((unit) => unit.kind)).toEqual(["cards"]);
 	expect(grid[0]).toMatchObject({
 		kind: "cards",
-		mods: [{ id: "nexus:225" }, { id: "local:other" }],
+		mods: [{ id: "provider-a:225" }, { id: "local:other" }],
 	});
 });
 
@@ -179,12 +180,12 @@ test("the grid packs a long page into rows and keeps its cards after the header"
 
 test("a page's installed parts are found by page id, in list order", () => {
 	const pageMods = [
-		part("nexus:225", "100", "Base"),
-		listed({ id: "local:other", folder: "Other" }),
-		part("nexus:225#200", "200", "Addon"),
+		part("provider-a:225", "100", "Base"),
+		modFixture({ id: "local:other", folder: "Other" }),
+		part("provider-a:225#200", "200", "Addon"),
 	];
-	expect(pagePartsOf(pageMods, "nexus:225").map((mod) => mod.id)).toEqual(["nexus:225", "nexus:225#200"]);
-	expect(pagePartsOf(pageMods, "nexus:999")).toEqual([]);
+	expect(pagePartsOf(pageMods, "provider-a:225").map((mod) => mod.id)).toEqual(["provider-a:225", "provider-a:225#200"]);
+	expect(pagePartsOf(pageMods, "provider-a:999")).toEqual([]);
 });
 
 test("two user groups each get one header with their parts under it", () => {
@@ -209,11 +210,13 @@ test("two user groups each get one header with their parts under it", () => {
 
 test("a user group wins over a page header over the same rows", () => {
 	const groups = [userGroup("g1", ["mod-a", "mod-b"])];
-	const pageMods = ["mod-a", "mod-b", "mod-c", "mod-d"].map((id) => listed({ id, folder: id, page_id: "nexus:9", page_name: "Shared" }));
+	const pageMods = ["mod-a", "mod-b", "mod-c", "mod-d"].map((id) =>
+		modFixture({ id, folder: id, page_id: "provider-a:9", page_name: "Shared" }),
+	);
 	const table = tableItems(listItems(pageMods, []), new Set(), groups);
 	expect(table.map((row) => row.kind)).toEqual(["group", "mod", "mod", "page", "mod", "mod"]);
 	expect(table[0]?.id).toBe(groupRowId("g1"));
-	expect(table[3]?.id).toBe(pageRowId("nexus:9"));
+	expect(table[3]?.id).toBe(pageRowId("provider-a:9"));
 });
 
 test("folding a user group hides its parts but keeps the header", () => {
@@ -222,16 +225,6 @@ test("folding a user group hides its parts but keeps the header", () => {
 	const folded = new Set([groupRowId("g1")]);
 	expect(tableItems(listItems(shown, []), folded, groups).map((row) => row.kind)).toEqual(["group", "mod"]);
 	expect(foldedPageParts(shown, folded, groups)).toEqual(new Set(["mod-a", "mod-b"]));
-});
-
-test("a user group header resolves to every member family for a header toggle", () => {
-	const groups = [userGroup("g1", ["mod-a", "mod-b"])];
-	const shown = ["mod-a", "mod-b", "solo"].map((id) => ({
-		...member(id),
-		enabled: false,
-	}));
-	const items = listItems(shown, []);
-	expect(groupMemberIds(items, groupRowId("g1"), groups)).toEqual(["mod-a", "mod-b"]);
 });
 
 test("a user group with one visible member stays a plain row", () => {
@@ -262,9 +255,9 @@ test("instructions sit under their mod in every format", () => {
 			enabled: true,
 			sources: [
 				{
-					provider: "nexus",
+					provider: "provider-a",
 					mod_id: "4311",
-					page_url: "https://www.nexusmods.com/examplegame/mods/4311",
+					page_url: "https://example.com/mods/4311",
 					file_id: null,
 				},
 			],
@@ -281,10 +274,10 @@ test("instructions sit under their mod in every format", () => {
 	];
 	expect(formatModList(withText, "text", labels, sourceName)).toBe("1. Cool Mod 1.2 [enabled]\n   Copy into Mods.\n   Pick the 4K option.");
 	expect(formatModList(withText, "markdown", labels, sourceName)).toBe(
-		"1. **Cool Mod** 1.2 ([Nexus](https://www.nexusmods.com/examplegame/mods/4311)) — enabled\n   Copy into Mods.\n   Pick the 4K option.",
+		"1. **Cool Mod** 1.2 ([Provider A](https://example.com/mods/4311)) — enabled\n   Copy into Mods.\n   Pick the 4K option.",
 	);
 	expect(formatModList(withText, "bbcode", labels, sourceName)).toBe(
-		"[list=1]\n[*][b]Cool Mod[/b] 1.2 [url=https://www.nexusmods.com/examplegame/mods/4311]Nexus[/url] - enabled\nCopy into Mods.\nPick the 4K option.\n[/list]",
+		"[list=1]\n[*][b]Cool Mod[/b] 1.2 [url=https://example.com/mods/4311]Provider A[/url] - enabled\nCopy into Mods.\nPick the 4K option.\n[/list]",
 	);
 });
 
@@ -292,16 +285,16 @@ test("plain text keeps the numbered list with the state in brackets", () => {
 	expect(formatModList(mods, "text", labels, sourceName)).toBe("1. Cool Mod 1.2 [enabled]\n2. Plain_Mod [v2] [disabled]");
 });
 
-test("Markdown bolds the name, links the Nexus page and escapes markup in the name", () => {
+test("Markdown bolds the name, links the provider page and escapes markup in the name", () => {
 	expect(formatModList(mods, "markdown", labels, sourceName)).toBe(
-		"1. **Cool Mod** 1.2 ([Nexus](https://www.nexusmods.com/examplegame/mods/4311)) — enabled\n2. **Plain\\_Mod \\[v2\\]** — disabled",
+		"1. **Cool Mod** 1.2 ([Provider A](https://example.com/mods/4311)) — enabled\n2. **Plain\\_Mod \\[v2\\]** — disabled",
 	);
 });
 
-test("BBCode wraps the list and links the Nexus page, without brackets in the name", () => {
+test("BBCode wraps the list and links the provider page, without brackets in the name", () => {
 	expect(formatModList(mods, "bbcode", labels, sourceName)).toBe(
 		"[list=1]\n" +
-			"[*][b]Cool Mod[/b] 1.2 [url=https://www.nexusmods.com/examplegame/mods/4311]Nexus[/url] - enabled\n" +
+			"[*][b]Cool Mod[/b] 1.2 [url=https://example.com/mods/4311]Provider A[/url] - enabled\n" +
 			"[*][b]Plain_Mod v2[/b] - disabled\n" +
 			"[/list]",
 	);
@@ -309,11 +302,11 @@ test("BBCode wraps the list and links the Nexus page, without brackets in the na
 
 test("the link label comes from the name function, not a fixed provider name", () => {
 	expect(formatModList(mods.slice(0, 1), "bbcode", labels, (provider) => `Provider ${provider}`)).toContain(
-		"[url=https://www.nexusmods.com/examplegame/mods/4311]Provider nexus[/url]",
+		"[url=https://example.com/mods/4311]Provider provider-a[/url]",
 	);
 });
 
-test("what a mod needs is one line under it, with the Nexus alternatives joined by or", () => {
+test("what a mod needs is one line under it, with the provider alternatives joined by or", () => {
 	const needy: ListedMod[] = [
 		{
 			priority: 1,
@@ -342,7 +335,7 @@ test("a source without a saved page URL gets no link, because no URL is built fr
 		{
 			priority: 1,
 			enabled: false,
-			sources: [{ provider: "nexus", mod_id: "4311", page_url: null, file_id: null }],
+			sources: [{ provider: "provider-a", mod_id: "4311", page_url: null, file_id: null }],
 			info: {
 				name: "Plain_Mod [v2]",
 				version: null,
@@ -358,48 +351,9 @@ test("a source without a saved page URL gets no link, because no URL is built fr
 	expect(formatModList(unlinked, "bbcode", labels, sourceName)).toBe("[list=1]\n[*][b]Plain_Mod v2[/b] - disabled\n[/list]");
 });
 
-/// A mod with the fields the filters read, and safe defaults for the rest.
-function listed(overrides: Partial<Mod> = {}): Mod {
-	return {
-		id: "local:cool-mod",
-		folder: "Cool Mod",
-		fomod_installer: false,
-		version_count: 1,
-		installed_at: 0,
-		slot: "Mods",
-		update: null,
-		enabled: true,
-		priority: 1,
-		load_priority: null,
-		files: 2,
-		size_kb: 10,
-		wins: 0,
-		loses: 0,
-		archive: null,
-		archive_file: null,
-		skipped: 0,
-		info: { name: "Cool Mod", version: "1.0", author: null, description: null },
-		source: null,
-		sources: [],
-		page_id: null,
-		page_name: null,
-		part_id: null,
-		part_name: null,
-		part_category: null,
-		tags: [],
-		instructions: "",
-		unmet_requirements: 0,
-		profiles: [],
-		collections: [],
-		requires_names: [],
-		requirement_groups: [],
-		...overrides,
-	};
-}
-
-const update: UpdateReport = {
+const update: UpdateReport_Serialize = {
 	id: "local:cool-mod",
-	provider: "nexus",
+	provider: "provider-a",
 	mod_id: "1",
 	current: "1.0",
 	latest: "2.0",
@@ -425,12 +379,12 @@ test("a mod counts as updatable when the backend says it has an update", () => {
 });
 
 test("matches filters by state, text and tag", () => {
-	const mod = listed({ wins: 1, tags: ["graphics"] });
+	const mod = modFixture({ folder: "Cool Mod", wins: 1, tags: ["graphics"] });
 	expect(matches(mod, "all", "", null, {})).toBe(true);
 	expect(matches(mod, "enabled", "", null, {})).toBe(true);
 	expect(matches(mod, "disabled", "", null, {})).toBe(false);
 	expect(matches(mod, "missing", "", null, {})).toBe(false);
-	expect(matches(listed({ unmet_requirements: 2 }), "missing", "", null, {})).toBe(true);
+	expect(matches(modFixture({ unmet_requirements: 2 }), "missing", "", null, {})).toBe(true);
 	expect(matches(mod, "conflict", "", null, {})).toBe(true);
 	expect(matches(mod, "updates", "", null, { [mod.id]: update })).toBe(true);
 	expect(matches(mod, "updates", "", null, {})).toBe(false);
@@ -442,7 +396,7 @@ test("matches filters by state, text and tag", () => {
 });
 
 test("a search ignores letter case and Polish accents", () => {
-	const mod = listed({ folder: "Źródło Światła" });
+	const mod = modFixture({ folder: "Źródło Światła" });
 	expect(matches(mod, "all", "zrodlo", null, {})).toBe(true);
 	expect(matches(mod, "all", "ŚWIATŁA", null, {})).toBe(true);
 	expect(matches(mod, "all", "swiatla", null, {})).toBe(true);
@@ -450,69 +404,17 @@ test("a search ignores letter case and Polish accents", () => {
 });
 
 test("a disabled mod wins and loses nothing", () => {
-	expect(activeConflicts(listed({ enabled: true, wins: 3, loses: 2 }))).toEqual({ wins: 3, loses: 2 });
-	expect(activeConflicts(listed({ enabled: false, wins: 3, loses: 2 }))).toEqual({ wins: 0, loses: 0 });
+	expect(activeConflicts(modFixture({ enabled: true, wins: 3, loses: 2 }))).toEqual({ wins: 3, loses: 2 });
+	expect(activeConflicts(modFixture({ enabled: false, wins: 3, loses: 2 }))).toEqual({ wins: 0, loses: 0 });
 });
 
-/// A status with the fields the deployment blocker reads, and safe defaults for the rest.
-function status(overrides: Partial<Status> = {}): Status {
-	return {
-		game_name: "Game",
-		game_subtitle: "",
-		runtime: "steam_proton",
-		stage: { kind: "ready", enabled: 1, total: 1 },
-		next_action: "apply",
-		settings: {
-			game_root: "/games/Game",
-			settings_dir: "/games/Game",
-			mods_root: "",
-			proton_dir: "",
-			launch_env: "",
-			launch_args: "",
-			profile_data: [],
-			proton_options: [],
-		},
-		game_ready: true,
-		settings_ready: true,
-		needs_mods_root: false,
-		mods_ready: true,
-		mods_root: "/games/Game",
-		needs_settings_dir: false,
-		deployed: false,
-		draft_changes: 0,
-		deployed_at: null,
-		deployed_list: [],
-		profiles: [],
-		mods: [listed()],
-		revisions: [],
-		build: 0,
-		patch: false,
-		removed: [],
-		order: null,
-		separators: [],
-		groups: [],
-		history: { can_undo: false, can_redo: false },
-		bisect: null,
-		has_overwrite: false,
-		conflict_count: 0,
-		problems: [],
-		warnings: [],
-		library_dir: "/data/library",
-		archives_dir: "/data/archives",
-		profile_dir: null,
-		overwrite_dir: "/data/state/p1/overwrite",
-		game_profile_data: [],
-		user_data: [],
-		launch_hint: "",
-		executables: [],
-		tools: [],
-		...overrides,
-	};
-}
+/// A ready status with safe defaults; a patch test names only the fields it reads.
+const readyStage = { kind: "ready", enabled: 1, total: 1 } as const;
+const status = (overrides: Partial<Status> = {}): Status => ({ ...statusFixture(readyStage), ...overrides });
 
 test("a patch keeps unchanged rows, replaces changed ones and follows the sent order", () => {
-	const a = listed({ id: "a", folder: "fa" });
-	const b = listed({ id: "b", folder: "fb" });
+	const a = modFixture({ id: "a", folder: "fa" });
+	const b = modFixture({ id: "b", folder: "fb" });
 	const before = status({ mods: [a, b], revisions: ["1", "2"], build: 1 });
 	const changed = { ...b, enabled: false };
 	const patch = status({
@@ -529,7 +431,7 @@ test("a patch keeps unchanged rows, replaces changed ones and follows the sent o
 	expect(merged.patch).toBe(false);
 	expect(knownRows(merged)).toEqual({ ids: ["a", "b"], revisions: ["1", "3"] });
 
-	const c = listed({ id: "c", folder: "fc" });
+	const c = modFixture({ id: "c", folder: "fc" });
 	const reordered = status({
 		mods: [c],
 		revisions: ["4"],
@@ -555,7 +457,7 @@ test("a patch keeps unchanged rows, replaces changed ones and follows the sent o
 /// Three mods A, B, C in list order; only A is enabled.
 function list(): Mod[] {
 	return ["A", "B", "C"].map((name, index) =>
-		listed({
+		modFixture({
 			id: name,
 			folder: `f${name}`,
 			enabled: index === 0,
@@ -615,8 +517,8 @@ test("sizes and times left read in the largest unit that fits", () => {
 });
 
 test("the update state is the saved check of each mod, and a failure of this session shows instead", () => {
-	const checked = listed({ id: "local:cool-mod", update });
-	const unchecked = listed({ id: "local:plain", update: null });
+	const checked = modFixture({ id: "local:cool-mod", update });
+	const unchecked = modFixture({ id: "local:plain", update: null });
 	const error = { code: "nexus.down", params: {}, kind: "retryable" as const };
 	expect(updatesOf([checked, unchecked], {})).toEqual({ [checked.id]: update });
 	// A failed check shows over the saved result, and a mod with no saved check shows its failure alone.
@@ -650,7 +552,7 @@ function profileWith(families: string[], active: boolean): ProfileView {
 			families.length > 0
 				? [
 						{
-							provider: "nexus",
+							provider: "provider-a",
 							game_key: "example",
 							slug: "pack",
 							revision: 1,
@@ -666,9 +568,9 @@ function profileWith(families: string[], active: boolean): ProfileView {
 }
 
 test("a disabled mod is hidden when the user hid it or another profile's collection uses it alone", () => {
-	const off = listed({ id: "local:off", enabled: false });
-	const on = listed({ id: "local:on", enabled: true });
-	const shared = listed({
+	const off = modFixture({ id: "local:off", enabled: false });
+	const on = modFixture({ id: "local:on", enabled: true });
+	const shared = modFixture({
 		id: "local:shared",
 		enabled: false,
 		collections: ["Pack"],

@@ -1,6 +1,7 @@
 //! One client for every Nexus request: the base addresses, the key header and the rate limit. The retry and backoff
 //! policy lives in `infra::http::Client`, shared with every provider.
 
+use super::super::ID;
 use super::error::{ApiError, Endpoint};
 use crate::error::AppError;
 use crate::infra::http::{self, Client};
@@ -40,7 +41,7 @@ impl NexusClient {
     }
 
     fn with_key(api_key: Option<String>) -> Self {
-        let mut client = Client::new("nexus")
+        let mut client = Client::new(ID)
             .header("Application-Name", "Gobbo")
             .header("Application-Version", env!("CARGO_PKG_VERSION"));
         if let Some(key) = api_key {
@@ -99,7 +100,7 @@ impl NexusClient {
         let url = format!("{base}{path}");
         // Nexus reports its remaining quota in the response headers. Waiting here only when it is exhausted keeps
         // the normal case at full speed, unlike a fixed gap on every request.
-        let budget = http::api_budget("nexus");
+        let budget = http::api_budget(ID);
         budget.wait();
         let response = body
             .map_or_else(

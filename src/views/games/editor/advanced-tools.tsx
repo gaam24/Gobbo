@@ -84,7 +84,7 @@ export function AdvancedTools({ draft, onChange }: { draft: GameDraft; onChange:
 											source: { provider, mod_id: tool.source?.mod_id ?? "" },
 										})
 									}
-									placeholder="nexus"
+									placeholder="provider-id"
 								/>
 							</EditorField>
 							<EditorField id={`editor-tool-source-mod-${index}`} label={t("editor.tools.sourceMod")}>
@@ -124,7 +124,6 @@ export function AdvancedTools({ draft, onChange }: { draft: GameDraft; onChange:
 							<div className="grid gap-3">
 								{(tool.prerequisites ?? []).map((prerequisite, at) => (
 									<RepeatRow
-										// biome-ignore lint/suspicious/noArrayIndexKey: Form rows have no stable id; the index is their identity.
 										key={`prerequisite-${index}-${at}`} // eslint-disable-line react/no-array-index-key -- same reason
 										title={prerequisite.name || t("editor.tools.prerequisite")}
 										onRemove={() =>
@@ -203,7 +202,6 @@ export function AdvancedTools({ draft, onChange }: { draft: GameDraft; onChange:
 			>
 				{steps.map((step, index) => (
 					<RepeatRow
-						// biome-ignore lint/suspicious/noArrayIndexKey: Form rows have no stable id; the index is their identity.
 						key={`step-${index}`} // eslint-disable-line react/no-array-index-key -- same reason
 						title={step.id || t("editor.tools.step")}
 						onRemove={() => setSteps(steps.filter((_, at) => at !== index))}

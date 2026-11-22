@@ -9,7 +9,7 @@ use crate::domain::collection::{
     CollectionCounts, CollectionItemStatus, CollectionOrigin, CollectionPlan,
 };
 use crate::error::{AppError, Message};
-use crate::import::model::FomodStepView;
+use crate::import::model::{ChoiceNeeded, FomodStepView};
 
 /// A collection opened for preview, with the status of the active profile.
 #[derive(Debug, Serialize, Type)]
@@ -22,7 +22,7 @@ pub struct CollectionPreview {
     pub profile: String,
     pub has_archive: bool,
     pub key_saved: bool,
-    /// The provider needs a saved key (Nexus). Thunderstore needs none, so the window shows no account notice.
+    /// The provider needs a saved key. A provider that needs none shows no account notice.
     pub needs_key: bool,
     pub direct_download: bool,
     pub account: Option<String>,
@@ -51,7 +51,7 @@ pub enum CollectionPosition {
 /// What the preview dialog sends when the user starts an install.
 #[derive(Debug, Clone, Deserialize, Type)]
 pub struct CollectionInstallRequest {
-    /// The collection URL or `nxm://` link the preview was opened with.
+    /// The collection URL or provider deep link the preview was opened with.
     pub link: String,
     pub revision: Option<u32>,
     /// `None` creates a profile.
@@ -101,14 +101,14 @@ pub struct CollectionFailure {
     pub error: AppError,
 }
 
-/// One collection item whose archive needs FOMOD choices before it can be imported.
+/// One collection item whose archive needs FOMOD choices before it can be imported. The wizard's fields are the shared
+/// [`ChoiceNeeded`] payload, flattened so the window keeps the same fields on the wire.
 #[derive(Debug, Serialize, Type)]
 pub struct CollectionChoiceNeeded {
     pub key: String,
     pub name: String,
-    pub path: String,
-    pub module_name: String,
-    pub steps: Vec<FomodStepView>,
+    #[serde(flatten)]
+    pub choice: ChoiceNeeded,
 }
 
 /// One progress step of an automatic collection install.

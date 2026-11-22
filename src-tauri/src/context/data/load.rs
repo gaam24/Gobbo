@@ -163,14 +163,13 @@ mod tests {
         version.archive = Some("sha-a".into());
         version.parsed_sources.insert(
             crate::domain::source::ProviderId::new("nexus"),
-            "35686".into(),
+            "12345".into(),
         );
         library.versions.insert("modA".into(), version);
         library.archives.insert(
             "sha-a".into(),
             Archive {
-                original_name: "Remove Mods Menu 35686 1.2.0 2026-10-23T17-21Z Q6xF6llIa.zip"
-                    .into(),
+                original_name: "Example Mod 12345 1.2.0 2026-01-01T00-00Z example-token.zip".into(),
                 file: "sha-a.zip".into(),
                 named: None,
                 source_files: BTreeMap::new(),
@@ -194,7 +193,7 @@ mod tests {
         assert_eq!(
             loaded.archives["sha-a"].named,
             Some(ArchiveLabel {
-                name: Some("Remove Mods Menu".into()),
+                name: Some("Example Mod".into()),
                 version: "1.2.0".into(),
             })
         );

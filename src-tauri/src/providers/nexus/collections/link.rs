@@ -4,6 +4,7 @@ use crate::domain::source::ProviderId;
 use crate::error::AppError;
 use crate::providers::CollectionLink;
 use crate::providers::link::is_slug;
+use crate::providers::nexus::ID;
 use crate::providers::nexus::link::split_nxm;
 
 /// Reads a website URL or an `nxm://` collection link.
@@ -24,7 +25,7 @@ pub fn parse_collection_link(url: &str) -> Result<CollectionLink, AppError> {
         }
 
         return Ok(CollectionLink {
-            provider: ProviderId::new("nexus"),
+            provider: ProviderId::new(ID),
             game_key: domain.to_ascii_lowercase(),
             slug: slug.to_ascii_lowercase(),
             revision,
@@ -74,7 +75,7 @@ pub fn parse_collection_link(url: &str) -> Result<CollectionLink, AppError> {
     let domain = domain.to_ascii_lowercase();
     let slug = slug.to_ascii_lowercase();
     Ok(CollectionLink {
-        provider: ProviderId::new("nexus"),
+        provider: ProviderId::new(ID),
         page_url: Some(format!(
             "https://www.nexusmods.com/games/{domain}/collections/{slug}"
         )),

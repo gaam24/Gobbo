@@ -11,6 +11,11 @@ import { useTranslation } from "@/i18n";
 import { formatTime, hasUpdate } from "@/lib/mods";
 import { FactList, fact } from "@/views/mod-inspector/fact-list";
 
+/// The steps this card can highlight. Only finishing setup has no id here; the header owns that action. The fix step is
+/// informational: it is shown as current when the backend says fix-problems and has no button, so no tick claims the
+/// header's action.
+type StepId = "add" | "enable" | "loader" | "fix" | "deploy" | null;
+
 /// The next steps of a game that was never deployed, and of a list that changed since the last deployment.
 export interface GettingStartedActions {
 	onImport?: () => void | Promise<void>;
@@ -50,21 +55,37 @@ export function DeploymentSummary({
 	const updatesCount = status.mods.filter((mod) => hasUpdate(updates, mod.id)).length;
 	const presentation = gamePresentation(status, { gameRunning, busy });
 	const blocker = presentation.blockedReason;
-	/// A loader an enabled mod needs is one more step before the apply, shown only while it is missing.
-	const loader = presentation.primary.id === "install-loader" ? presentation.primary : null;
-	/// The buttons of the step to do now: import while the library is empty, then install a missing loader, then apply.
+	/// A draft stage still reports `canApply: true`; the blocker is the other half of the answer. Both apply buttons
+	/// read this one value, so neither can offer an apply the header would refuse.
+	const applyDisabled = !presentation.canApply || blocker !== undefined;
+	/// The backend's next action owns what to do now; the counts below only draw the progress ticks. The header runs the
+	/// actions this card cannot (fixing problems, enabling mods, playing), so no button here may contradict them.
+	const next = presentation.nextStep?.action ?? presentation.primary;
+	const loader = next.id === "install-loader" ? next : null;
+	/// The highlighted step follows the backend's next action, not the raw counts: a fix-problems action must not
+	/// highlight deploying just because every mod is already enabled.
+	const nextTitle = presentation.nextStep?.titleKey;
+	let currentStepId: StepId = null;
+
+	if (next.id === "import") currentStepId = "add";
+	else if (nextTitle === "start.fix.title") currentStepId = "fix";
+	else if (nextTitle === "start.enable.title") currentStepId = "enable";
+	else if (next.id === "install-loader" || nextTitle === "start.loader.title") currentStepId = "loader";
+	else if (next.id === "apply" || next.id === "apply-and-play" || nextTitle === "start.changes.title" || nextTitle === "start.deploy.title")
+		currentStepId = "deploy";
+	/// Only the steps this card owns get a button here, and only when the backend says that step is next.
 	const startActions = () => {
-		if (status.mods.length === 0) {
+		if (next.id === "import") {
 			return (
 				<>
 					{onImport && (
 						<Button size="sm" onClick={() => void onImport()}>
-							<Upload /> {t("mods.import")}
+							<Upload /> {t(next.labelKey, next.params)}
 						</Button>
 					)}
 					{onOpenDownloads && (
 						<Button size="sm" variant="outline" onClick={onOpenDownloads}>
-							<Download /> {t("start.fromNexus")}
+							<Download /> {t("start.fromSources")}
 						</Button>
 					)}
 				</>
@@ -79,12 +100,11 @@ export function DeploymentSummary({
 			);
 		}
 
-		if (enabled.length === 0 || !onDeploy) return null;
-		return (
-			<Button size="sm" disabled={!presentation.canApply} onClick={() => void onDeploy()}>
-				{t("start.deploy.action")}
-			</Button>
-		);
+		if ((next.id === "apply" || next.id === "apply-and-play") && onDeploy) {
+			return <ApplyButton disabled={applyDisabled} onClick={() => void onDeploy()} />;
+		}
+
+		return null;
 	};
 
 	/// The list of enabled mods is open only on request; a closed disclosure does not mount its rows.
@@ -96,11 +116,13 @@ export function DeploymentSummary({
 				<GettingStarted
 					steps={[
 						{
+							id: "add",
 							done: status.mods.length > 0,
 							title: t("start.add.title"),
 							hint: t("start.add.hint"),
 						},
 						{
+							id: "enable",
 							done: enabled.length > 0,
 							title: t("start.enable.title"),
 							hint: t("start.enable.hint"),
@@ -108,18 +130,31 @@ export function DeploymentSummary({
 						...(loader
 							? [
 									{
+										id: "loader" as const,
 										done: false,
 										title: t("start.loader.title", loader.params),
 										hint: t("start.loader.hint", loader.params),
 									},
 								]
 							: []),
+						...(currentStepId === "fix"
+							? [
+									{
+										id: "fix" as const,
+										done: false,
+										title: t("start.fix.title"),
+										hint: t("start.fix.hint"),
+									},
+								]
+							: []),
 						{
+							id: "deploy",
 							done: false,
 							title: t("start.deploy.title"),
 							hint: t("start.deploy.hint"),
 						},
 					]}
+					currentId={currentStepId}
 					actions={startActions()}
 				/>
 			)}
@@ -130,9 +165,7 @@ export function DeploymentSummary({
 						<ItemDescription>{t("start.changes.hint")}</ItemDescription>
 					</ItemContent>
 					<ItemActions>
-						<Button size="sm" variant="outline" disabled={!presentation.canApply} onClick={() => void onDeploy()}>
-							{t("start.deploy.action")}
-						</Button>
+						<ApplyButton variant="outline" disabled={applyDisabled} onClick={() => void onDeploy()} />
 					</ItemActions>
 				</Item>
 			)}
@@ -239,18 +272,38 @@ export function DeploymentSummary({
 	);
 }
 
-/// The way to a first deployment, as steps with a tick: the first step not done is the one to do now, and its buttons
-/// sit right under it.
+/// The apply label and disabled state are shared by both buttons: one for a first deployment, one for a draft.
+function ApplyButton({
+	disabled,
+	onClick,
+	variant = "default",
+}: {
+	disabled: boolean;
+	onClick: () => void;
+	variant?: "default" | "outline";
+}) {
+	const { t } = useTranslation();
+	return (
+		<Button size="sm" variant={variant} disabled={disabled} onClick={onClick}>
+			{t("start.deploy.action")}
+		</Button>
+	);
+}
+
+/// The way to a first deployment, as steps with a tick. The highlighted step is the backend's next action; the ticks
+/// only draw progress and stay decorative.
 function GettingStarted({
 	steps,
+	currentId,
 	actions,
 }: {
-	steps: Array<{ done: boolean; title: string; hint: string }>;
+	steps: Array<{ id: StepId; done: boolean; title: string; hint: string }>;
+	currentId: StepId;
 	/// The buttons of the step to do now.
 	actions: ReactNode;
 }) {
 	const { t } = useTranslation();
-	const current = steps.findIndex((step) => !step.done);
+	const current = steps.findIndex((step) => step.id === currentId);
 	return (
 		<section aria-label={t("start.title")} className="bg-muted grid gap-2 rounded-lg p-4">
 			<SectionHeading title={t("start.title")} />

@@ -1,10 +1,11 @@
 /// <reference types="bun" />
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { releaseVersion } from "./release-version";
 
 /// One owner for the app version: `release.json` at the repository root. Every copy is asserted against it, so a bump
 /// changes that one value and any file left behind fails `bun run guard` (part of `bun run lint`). The
-/// updater tests read `release.json` directly instead of repeating the version. The supported-games tables in
+/// updater tests read it through the shared `releaseVersion()` accessor instead of repeating the version. The supported-games tables in
 /// both READMEs are checked against `games/*/game.toml` for the same reason: adding a definition cannot update one
 /// list and forget the other.
 
@@ -13,7 +14,6 @@ const CARGO_VERSION = /\[workspace\.package\]\s*\n\s*version\s*=\s*"(\d+\.\d+\.\
 const JSON_VERSION = /"version"\s*:\s*"(\d+\.\d+\.\d+)"/;
 const README_STATUS = /\*\*Status:\*\*\s+(\S+),/;
 const BUG_VERSION = /id: version[\s\S]*?placeholder:\s*(\S+)/;
-const TEST_LITERAL = /\b\d+\.\d+\.\d+\b/;
 const ICON_ID = /games\/([a-z0-9-]+)\/icon\.webp/g;
 const TOML_NAME = /^name\s*=\s*"([^"]+)"/m;
 const SEPARATOR = /^-+$/;
@@ -82,9 +82,10 @@ function compareSets(actual: Set<string>, expected: Set<string>, label: string, 
 /// Asserts the version copies and the game tables. Callers pass their own problem list so this folds into the
 /// generated-files guard without a second process.
 export function checkReleaseMeta(problems: string[]): void {
-	const meta: unknown = JSON.parse(read("release.json"));
-	const version = typeof meta === "object" && meta !== null && "version" in meta && typeof meta.version === "string" ? meta.version : "";
-	if (version === "") {
+	let version: string;
+	try {
+		version = releaseVersion();
+	} catch {
 		problems.push("release.json has no version string");
 		return;
 	}
@@ -96,9 +97,10 @@ export function checkReleaseMeta(problems: string[]): void {
 
 	expectVersion(read(".github/ISSUE_TEMPLATE/bug_report.yml"), BUG_VERSION, "bug_report.yml version placeholder", version, problems);
 
-	const updaterTest = read("scripts/updater-manifest.test.ts");
-	if (!updaterTest.includes("release.json")) problems.push("scripts/updater-manifest.test.ts must take its version from release.json");
-	if (TEST_LITERAL.test(updaterTest)) problems.push("scripts/updater-manifest.test.ts has a hard-coded version; read release.json");
+	// The updater test reads through the shared accessor; guard what the accessor points at instead of the test's text.
+	if (!read("scripts/release-version.ts").includes("release.json")) {
+		problems.push("releaseVersion() must read release.json");
+	}
 
 	const games = shippedGames(problems);
 	const readme = read("README.md");
@@ -139,14 +141,4 @@ export function checkReleaseMeta(problems: string[]): void {
 			);
 		}
 	}
-}
-
-if (import.meta.main) {
-	const problems: string[] = [];
-	checkReleaseMeta(problems);
-	if (problems.length > 0) {
-		process.stderr.write(`${problems.join("\n")}\n`);
-		process.exit(1);
-	}
-	process.stdout.write("Release metadata passed.\n");
 }

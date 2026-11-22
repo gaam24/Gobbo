@@ -1,13 +1,13 @@
 //! The sources of a mod: the row preview, the list entries and the inspector details.
 
+use crate::domain::library::{Library, ModVersion};
 use crate::games::GameDef;
-use crate::library::{Library, ModVersion};
 use crate::providers;
 use crate::status::views::{ModSource, ModSourceDetails, SourcePreview, SourceSummary};
 
 /// The first source with page data, or the first source at all. The row, its preview and the full extras use it.
 pub(in crate::status) fn page_source(
-    family: Option<&crate::library::Family>,
+    family: Option<&crate::domain::library::Family>,
 ) -> Option<(
     &crate::domain::source::ProviderId,
     &crate::domain::source::SourceMod,
@@ -22,7 +22,7 @@ pub(in crate::status) fn page_source(
 
 /// The page fields the list row draws: provider, names, picture, category and the adult flag.
 pub(in crate::status) fn source_preview(
-    family: Option<&crate::library::Family>,
+    family: Option<&crate::domain::library::Family>,
 ) -> Option<SourcePreview> {
     let (provider, source) = page_source(family)?;
     Some(source_preview_of(provider, source))
@@ -72,7 +72,7 @@ impl SourceBase<'_> {
 }
 
 fn source_bases<'a>(
-    family: Option<&'a crate::library::Family>,
+    family: Option<&'a crate::domain::library::Family>,
     game: &'a GameDef,
     library: &'a Library,
     version: Option<&'a ModVersion>,
@@ -112,7 +112,7 @@ fn source_bases<'a>(
 
 /// The first source with page data, flattened for the generic columns and the overview.
 pub(in crate::status) fn source_summary(
-    family: Option<&crate::library::Family>,
+    family: Option<&crate::domain::library::Family>,
 ) -> Option<SourceSummary> {
     let (provider, source) = page_source(family)?;
     Some(SourceSummary::from_meta(
@@ -124,7 +124,7 @@ pub(in crate::status) fn source_summary(
 
 /// The external sources of a family for the list, without the page text.
 pub(in crate::status) fn source_views(
-    family: Option<&crate::library::Family>,
+    family: Option<&crate::domain::library::Family>,
     game: &GameDef,
     library: &Library,
     version: Option<&ModVersion>,
@@ -136,7 +136,7 @@ pub(in crate::status) fn source_views(
 
 /// The external sources with their page data, for the inspector.
 pub(in crate::status) fn source_details(
-    family: Option<&crate::library::Family>,
+    family: Option<&crate::domain::library::Family>,
     game: &GameDef,
     library: &Library,
     version: Option<&ModVersion>,

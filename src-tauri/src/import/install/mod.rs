@@ -1,4 +1,4 @@
-//! Imports a mod archive (for example a zip from Nexus) into the library. The game definition says where its mods go
+//! Imports a mod archive (for example a provider download) into the library. The game definition says where its mods go
 //! (`games::Deploy`), and each file of the archive is placed by the first rule that takes it:
 //! 1. a file under a mirrored folder keeps its game path (`archive/pc/mod/...`, `DLC/<dlc>/...`);
 //! 2. a file under a mod root: a folder a slot's marker finds (`<modlet>/ModInfo.xml`, `<mod>/content/...`), or a
@@ -201,7 +201,7 @@ pub(super) struct StagedMod {
 
 /// Archive folders that are documentation or variants, not game files. They are skipped before the layout rules, so a
 /// full-root game does not put a README folder into the game.
-pub fn is_archive_noise(name: &str) -> bool {
+fn is_archive_noise(name: &str) -> bool {
     let first = name.split('/').next().unwrap_or(name).trim_end_matches('/');
     [
         "__macosx",
@@ -543,6 +543,7 @@ mod apply;
 mod errors;
 mod layout;
 mod naming;
+mod roots;
 
 #[cfg(test)]
 pub use apply::fail_after;
@@ -550,6 +551,7 @@ pub use apply::{extract, place};
 pub use errors::InstallError;
 use layout::{LayoutPlan, UnitIndex, attach_mirrored};
 use naming::{free_folder_name, is_folder_for, split_name, wanted_name};
+pub use roots::base_roots;
 
 #[cfg(test)]
 mod tests;

@@ -17,6 +17,7 @@ mod inspect;
 pub mod model;
 mod reinstall;
 mod report;
+mod skipped;
 mod wizard;
 
 use std::path::Path;
@@ -31,7 +32,7 @@ pub use flow::import_archive;
 #[cfg(test)]
 pub use flow::remove_folders;
 pub use flow::{already_in_library, import_batch};
-pub use inspect::{fomod_state, inspect};
+pub use inspect::{inspect_at, state_at};
 #[cfg(test)]
 pub use install::fail_after;
 pub use model::{

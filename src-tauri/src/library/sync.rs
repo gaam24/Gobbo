@@ -2,9 +2,9 @@
 
 use rustc_hash::{FxHashMap, FxHashSet};
 
+use crate::domain::library::{Library, LibraryView};
 use crate::domain::profiles::Entry as ProfileEntry;
 use crate::domain::profiles::Profiles;
-use crate::library::{Library, LibraryView};
 
 use super::waiting;
 

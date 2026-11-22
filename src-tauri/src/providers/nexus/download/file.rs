@@ -10,9 +10,10 @@ use super::super::required_key;
 use crate::domain::rate::AccountTier;
 use crate::domain::source::SourceRef;
 use crate::error::AppError;
-use crate::infra::http::{BodyProblem, DownloadInfo};
-use crate::providers::download::{ArchiveRules, fetch_archive, free_download_name, target_name};
-use crate::providers::nexus::NexusSource;
+use crate::infra::http::DownloadInfo;
+use crate::providers::SourceProvider;
+use crate::providers::download::{ArchiveRules, archive_target, body_error, fetch_archive};
+use crate::providers::nexus::{NexusProvider, NexusSource};
 
 /// Downloads one Nexus file into `dir`, which is the game's downloads folder. Without a file id the file is found by
 /// its name among the mod's files. `download_key` is the short-lived key from an `nxm://` link; without one the account
@@ -98,22 +99,29 @@ fn save(
         |file_id| format!("nexus-{}-{file_id}", source.mod_id),
     );
     let target = |info: &DownloadInfo, url: &str| {
-        let name = target_name(info, url, requested_name, &fallback);
-        free_download_name(dir, &name, Some(&SourceRef::from(source)))
+        archive_target(
+            dir,
+            info,
+            url,
+            requested_name,
+            &fallback,
+            None,
+            Some(&SourceRef::from(source)),
+        )
     };
     let urls: Vec<&str> = links.links.iter().map(|link| link.url.as_str()).collect();
+    let body_error = body_error(
+        crate::providers::bad_response("nexus.bad_response", "the CDN sent an empty file"),
+        AppError::user("nexus.link_expired")
+            .with("detail", "the CDN sent an HTML page instead of an archive"),
+    );
     let rules = ArchiveRules {
-        provider: super::super::ID,
+        policy: NexusProvider.download_policy(tier),
+        pacer_key: super::super::ID,
         tier,
         sidecar: Some(sidecar),
         target: &target,
-        body_error: &|problem: BodyProblem| match problem {
-            BodyProblem::Empty => {
-                crate::providers::bad_response("nexus.bad_response", "the CDN sent an empty file")
-            }
-            BodyProblem::Html => AppError::user("nexus.link_expired")
-                .with("detail", "the CDN sent an HTML page instead of an archive"),
-        },
+        body_error: &body_error,
         no_link: crate::providers::bad_response("nexus.bad_response", "no download link"),
     };
     fetch_archive(dir, &urls, rules, progress).map_err(download_error)

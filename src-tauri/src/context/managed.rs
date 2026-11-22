@@ -61,7 +61,9 @@ fn repair_game_roots(root: &Data, games: &[games::GameDef]) {
             continue;
         }
 
-        let Some(found) = games::detect::game_folder(&current, game, !cfg!(windows)) else {
+        let Some(found) =
+            games::detect::game_folder(&current, game, !crate::platform::is_windows())
+        else {
             continue;
         };
 

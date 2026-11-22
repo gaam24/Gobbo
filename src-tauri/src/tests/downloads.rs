@@ -240,6 +240,7 @@ fn a_provider_link_downloads_and_imports_the_mod() {
     let f = mirror_fixture("download-link-import");
     let _provider =
         crate::providers::testing::install_fake(crate::providers::testing::FakeConfig {
+            id: "nexus",
             entries: &[("bin/x64/plugins/example.asi", "x")],
             ..Default::default()
         });
@@ -317,6 +318,7 @@ fn a_download_cancelled_mid_transfer_leaves_no_files_and_no_row() {
     });
     let _provider =
         crate::providers::testing::install_fake(crate::providers::testing::FakeConfig {
+            id: "nexus",
             entries: &[("bin/x64/plugins/example.asi", "x")],
             chunks: &[(1, 10), (2, 10), (3, 10)],
             on_chunk: Some(on_chunk),

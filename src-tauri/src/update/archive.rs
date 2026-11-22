@@ -6,11 +6,12 @@ use std::io::{self, Cursor};
 use std::path::{Component, Path, PathBuf};
 
 use crate::error::{AppError, io_at};
+use crate::infra::storage::is_portable_data_dir;
 
 /// Whether an archive entry (below the top folder) is a program file. The data folder is the user's, not the program's.
 pub fn is_program_file(relative: &Path) -> bool {
     match relative.components().next() {
-        Some(Component::Normal(first)) => first.to_str() != Some("data"),
+        Some(Component::Normal(first)) => !first.to_str().is_some_and(is_portable_data_dir),
         _ => false,
     }
 }

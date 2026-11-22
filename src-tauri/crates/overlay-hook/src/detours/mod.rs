@@ -7,6 +7,7 @@ use std::ffi::OsStr;
 
 use detour::{Threads, Transaction, TypedDetour};
 use exports::detour;
+use gobbo_overlay_core::wide;
 use windows_sys::Win32::Foundation::{CloseHandle, INVALID_HANDLE_VALUE};
 use windows_sys::Win32::System::Diagnostics::ToolHelp::{
     CreateToolhelp32Snapshot, TH32CS_SNAPTHREAD, THREADENTRY32, Thread32First, Thread32Next,
@@ -15,7 +16,6 @@ use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows_sys::Win32::System::Threading::GetCurrentProcessId;
 
 use crate::diag::{self, HookStatus};
-use crate::text::wide;
 use crate::trace::log;
 
 /// The module that exports a detoured call: the file API is in `kernel32` or `KernelBase`, the NT layer in `ntdll`.
@@ -99,7 +99,7 @@ macro_rules! detours {
                 // A disabled hook keeps its created detour, but it is not part of the transaction.
                 $(
                     if skipped(stringify!($field)) {
-                        mark_disabled(&mut statuses, stringify!($field));
+                        mark(&mut statuses, stringify!($field), |status| status.mark_disabled());
                         log(&format!("detour left off: {}", stringify!($field)));
                     }
                 )*
@@ -121,7 +121,9 @@ macro_rules! detours {
                                 if self.$field.is_some()
                                     && !skipped(stringify!($field))
                                 {
-                                    mark_enabled(&mut statuses, stringify!($field));
+                                    mark(&mut statuses, stringify!($field), |status| {
+                                        status.mark_enabled()
+                                    });
                                 }
                             )*
                             return statuses;
@@ -140,13 +142,17 @@ macro_rules! detours {
                         transaction.enable(hook);
 
                         match unsafe { transaction.commit(suspend) } {
-                            Ok(()) => mark_enabled(&mut statuses, stringify!($field)),
+                            Ok(()) => mark(&mut statuses, stringify!($field), |status| {
+                                status.mark_enabled()
+                            }),
                             Err(error) => {
                                 log(&format!(
                                     "could not enable the {} hook: {error}",
                                     stringify!($field)
                                 ));
-                                mark_failed(&mut statuses, stringify!($field), error.to_string());
+                                mark(&mut statuses, stringify!($field), |status| {
+                                    status.mark_failed(error.to_string())
+                                });
                             }
                         }
                     }
@@ -200,24 +206,9 @@ fn skipped(name: &str) -> bool {
     !diag::settings().calls && TRACE_ONLY.contains(&name)
 }
 
-/// Marks the status with `name` as enabled in the list `create` built.
-fn mark_enabled(statuses: &mut [HookStatus], name: &str) {
+fn mark(statuses: &mut [HookStatus], name: &str, change: impl FnOnce(&mut HookStatus)) {
     if let Some(status) = statuses.iter_mut().find(|status| status.name == name) {
-        status.mark_enabled();
-    }
-}
-
-/// Marks the status with `name` as failed in the list `create` built.
-fn mark_failed(statuses: &mut [HookStatus], name: &str, error: String) {
-    if let Some(status) = statuses.iter_mut().find(|status| status.name == name) {
-        status.mark_failed(error);
-    }
-}
-
-/// Marks the status with `name` as disabled in the list `create` built.
-fn mark_disabled(statuses: &mut [HookStatus], name: &str) {
-    if let Some(status) = statuses.iter_mut().find(|status| status.name == name) {
-        status.mark_disabled();
+        change(status);
     }
 }
 

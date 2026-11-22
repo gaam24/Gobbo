@@ -1,7 +1,7 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { cn } from "cn";
-import { Fragment, type ReactNode } from "react";
+import { Fragment, memo, type ReactNode } from "react";
 import type { ModExtras, UpdateReport } from "@/bindings";
 import { useTranslation } from "@/i18n";
 import type { ColumnId, ColumnSpec } from "@/lib/mod-columns";
@@ -46,7 +46,7 @@ function GroupText({ value }: { value: string | null | undefined }) {
 /// The header of a source page or a user group. The parts below it are the real profile entries; this row only groups
 /// them. It shows what the parts have in common or add up to, and nothing else: the parts keep their own versions and
 /// states. A page keeps its name, author, category and menu; a user group uses its stored name and language.
-export function PageRow({
+export const PageRow = memo(function PageRow({
 	group,
 	columns,
 	folded,
@@ -312,4 +312,4 @@ export function PageRow({
 			</div>
 		</>
 	);
-}
+});

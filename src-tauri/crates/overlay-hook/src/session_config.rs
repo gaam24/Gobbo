@@ -1,8 +1,6 @@
 //! The mount set of one session: the game folder plus the profile's user-data redirects. Gobbo writes it to a JSON
 //! file before the launch; the old three environment variables remain the fallback for `gobbo run` and for tests.
 
-use std::path::Path;
-
 use gobbo_overlay_core::{ENV_MOUNTS, Layers, MountConfig, MountSpec};
 
 use crate::paths::long_path;
@@ -65,25 +63,19 @@ fn valid(config: MountConfig) -> Option<MountConfig> {
     for mount in &config.mounts {
         if mount.id.is_empty()
             || !ids.insert(mount.id.as_str())
-            || !is_absolute(&mount.guest)
-            || !is_absolute(&mount.root)
-            || !is_absolute(&mount.upper)
+            || !mount.guest.is_absolute()
+            || !mount.root.is_absolute()
+            || !mount.upper.is_absolute()
             || mount
                 .staging
                 .as_ref()
-                .is_some_and(|path| !is_absolute(path))
+                .is_some_and(|path| !path.is_absolute())
         {
             return None;
         }
     }
 
     Some(config)
-}
-
-/// A path the hook can compare with the names the program uses. A relative root would make every classification
-/// ambiguous, so it is refused.
-fn is_absolute(path: &Path) -> bool {
-    path.is_absolute()
 }
 
 #[cfg(test)]
@@ -105,10 +97,10 @@ mod tests {
     fn the_game_must_be_first_and_the_ids_are_unique() {
         let mut config = MountConfig {
             version: MountConfig::VERSION,
-            mounts: vec![spec("game"), spec("documents")],
+            mounts: vec![spec(MountSpec::GAME_ID), spec("documents")],
         };
         assert!(valid(config.clone()).is_some());
-        config.mounts[1].id = "game".into();
+        config.mounts[1].id = MountSpec::GAME_ID.into();
         assert!(valid(config).is_none());
     }
 
@@ -116,14 +108,14 @@ mod tests {
     fn a_relative_path_or_an_unknown_version_is_refused() {
         let mut config = MountConfig {
             version: MountConfig::VERSION,
-            mounts: vec![spec("game")],
+            mounts: vec![spec(MountSpec::GAME_ID)],
         };
         assert!(valid(config.clone()).is_some());
         config.version = 99;
         assert!(valid(config).is_none());
         let mut config = MountConfig {
             version: MountConfig::VERSION,
-            mounts: vec![spec("game")],
+            mounts: vec![spec(MountSpec::GAME_ID)],
         };
         config.mounts[0].upper = PathBuf::from("relative");
         assert!(valid(config).is_none());

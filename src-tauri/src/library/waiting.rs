@@ -1,10 +1,10 @@
 //! The mods of a pack that wait for their archive. `sync_profiles` needs it on every status read, and the packs module
 //! uses it while importing, so it lives with the profile list rather than in the pack reader.
 
+use crate::domain::library::LibraryView;
 use crate::domain::pack::PackMod;
 use crate::domain::profiles::Entry as ProfileEntry;
 use crate::domain::profiles::Profile;
-use crate::library::LibraryView;
 
 /// The library family and folder a pack mod stands for, by the shared rule in `LibraryView::find`. A mod with no
 /// version in the pack takes the newest one; a mod whose version the library lacks is not found.

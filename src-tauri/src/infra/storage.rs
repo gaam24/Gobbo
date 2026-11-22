@@ -17,6 +17,13 @@ pub const PORTABLE_MARKER: &str = "gobbo.portable";
 /// The data folder inside the portable folder. It is not the program folder itself: the bundled `games/` definitions
 /// would collide with the per-game data folder `games/<id>`.
 pub const PORTABLE_DATA_DIR: &str = "data";
+
+/// Whether a folder name is the portable data folder. An update never reads or writes it: it holds the user's library
+/// and settings, not the program files the update replaces.
+pub fn is_portable_data_dir(name: &str) -> bool {
+    name == PORTABLE_DATA_DIR
+}
+
 /// The version of the decision file this build understands.
 pub const DECISION_VERSION: u32 = 1;
 

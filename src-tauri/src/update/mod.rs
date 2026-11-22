@@ -9,17 +9,8 @@ pub mod portable;
 pub mod relaunch;
 pub mod swap;
 
+use crate::platform::portable_target;
 use serde::Serialize;
-
-/// The key of the portable archive in the update manifest, for example `linux-x86_64-portable`. `None` where the build
-/// makes no portable archive.
-pub fn portable_target(os: &str, arch: &str) -> Option<&'static str> {
-    match (os, arch) {
-        ("windows", "x86_64") => Some("windows-x86_64-portable"),
-        ("linux", "x86_64") => Some("linux-x86_64-portable"),
-        _ => None,
-    }
-}
 
 /// The update path of this copy, as the window needs it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]

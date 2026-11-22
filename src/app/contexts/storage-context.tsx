@@ -4,6 +4,7 @@ import { useNoticeActions } from "@/app/contexts/notices-context";
 import { commands, type GameDataUsage } from "@/bindings";
 import { useTranslation } from "@/i18n";
 import { unwrap } from "@/lib/ipc";
+import { nameOfId } from "@/lib/records";
 
 interface Storage {
 	usage: GameDataUsage[] | null;
@@ -42,7 +43,7 @@ export function StorageProvider({ children }: { children: ReactNode }) {
 	const [failed, setFailed] = useState(false);
 	const lastScan = useRef(0);
 
-	const nameOf = useCallback((id: string) => games.find((game) => game.id === id)?.name ?? id, [games]);
+	const nameOf = useCallback((id: string) => nameOfId(games, id), [games]);
 
 	const read = useCallback(
 		() =>

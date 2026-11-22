@@ -2,14 +2,15 @@
 
 use std::path::{Path, PathBuf};
 
-use super::ID;
 use super::api;
 use super::link;
+use super::{ID, ThunderstoreProvider};
 use crate::domain::rate::AccountTier;
 use crate::domain::source::SourceRef;
 use crate::error::AppError;
-use crate::infra::http::{BodyProblem, DownloadInfo};
-use crate::providers::download::{ArchiveRules, fetch_archive, free_download_name, target_name};
+use crate::infra::http::DownloadInfo;
+use crate::providers::SourceProvider;
+use crate::providers::download::{ArchiveRules, archive_target, body_error, fetch_archive};
 
 /// Downloads one version of a package into `dir`. The CDN's name wins; when it sends none the file keeps the
 /// package's own `owner-name-version.zip`, so the on-disk name is unchanged for a server that names nothing special.
@@ -24,10 +25,24 @@ pub fn download_into(
     let url = api::download_url(owner, name, version);
     let package_name = format!("{owner}-{name}-{version}.zip");
     let source = SourceRef::new(ID, link::full_name(owner, name)).with_file(version);
-    let target =
-        |info: &DownloadInfo, url: &str| target_path(dir, info, url, &package_name, &source);
+    let target = |info: &DownloadInfo, url: &str| {
+        archive_target(
+            dir,
+            info,
+            url,
+            &package_name,
+            &package_name,
+            None,
+            Some(&source),
+        )
+    };
+    let body_error = body_error(
+        api::bad_response("the server sent an empty file"),
+        api::bad_response("the server sent a web page instead of an archive"),
+    );
     let rules = ArchiveRules {
-        provider: ID,
+        policy: ThunderstoreProvider.download_policy(AccountTier::Anonymous),
+        pacer_key: ID,
         tier: AccountTier::Anonymous,
         sidecar: Some(source.clone()),
         target: &target,
@@ -35,27 +50,6 @@ pub fn download_into(
         no_link: api::bad_response("the package names no download link"),
     };
     fetch_archive(dir, &[url.as_str()], rules, progress).map_err(download_error)
-}
-
-/// The archive's path for one answer: the CDN's name when it has one, otherwise the package's own name, numbered
-/// around any other archive that already holds that name.
-fn target_path(
-    dir: &Path,
-    info: &DownloadInfo,
-    url: &str,
-    package_name: &str,
-    source: &SourceRef,
-) -> PathBuf {
-    let name = target_name(info, url, package_name, package_name);
-    free_download_name(dir, &name, Some(source))
-}
-
-/// The answer is not an archive: an empty file or a web page.
-fn body_error(problem: BodyProblem) -> AppError {
-    match problem {
-        BodyProblem::Empty => api::bad_response("the server sent an empty file"),
-        BodyProblem::Html => api::bad_response("the server sent a web page instead of an archive"),
-    }
 }
 
 /// A missing version is the package's error; any other failure keeps the shared HTTP code.
@@ -82,6 +76,10 @@ mod tests {
 
     /// The error the download gives for this answer, or `None` for an archive.
     fn refused(info: &DownloadInfo, path: &Path) -> Option<AppError> {
+        let body_error = body_error(
+            api::bad_response("the server sent an empty file"),
+            api::bad_response("the server sent a web page instead of an archive"),
+        );
         body_problem(info, path).map(body_error)
     }
 
@@ -120,12 +118,14 @@ mod tests {
         let package = "example_owner-example_mod-5.0.5.zip";
         let plain = info(12, Some("application/zip"));
         assert_eq!(
-            target_path(
+            archive_target(
                 &dir,
                 &plain,
                 "https://thunderstore.io/package/download/example_owner/example_mod/5.0.5/",
                 package,
-                &source
+                package,
+                None,
+                Some(&source)
             ),
             dir.join(package)
         );
@@ -135,12 +135,14 @@ mod tests {
             content_disposition: Some("attachment; filename=\"cdn-name.zip\"".into()),
         };
         assert_eq!(
-            target_path(
+            archive_target(
                 &dir,
                 &named,
                 "https://thunderstore.io/package/download/example_owner/example_mod/5.0.5/",
                 package,
-                &source
+                package,
+                None,
+                Some(&source)
             ),
             dir.join("cdn-name.zip")
         );
@@ -156,23 +158,27 @@ mod tests {
         let taken = dir.join(package);
         std::fs::write(&taken, b"an archive").unwrap();
         assert_eq!(
-            target_path(
+            archive_target(
                 &dir,
                 &plain,
                 "https://example.invalid/download",
                 package,
-                &source
+                package,
+                None,
+                Some(&source)
             ),
             dir.join("example_owner-example_mod-5.0.5 (2).zip")
         );
         crate::infra::sidecar::write_source(&taken, source.clone());
         assert_eq!(
-            target_path(
+            archive_target(
                 &dir,
                 &plain,
                 "https://example.invalid/download",
                 package,
-                &source
+                package,
+                None,
+                Some(&source)
             ),
             taken,
             "the same version still replaces its own earlier download"

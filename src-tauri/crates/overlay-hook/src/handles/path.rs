@@ -6,7 +6,7 @@ use std::path::Path;
 use std::ptr::{null, null_mut};
 use std::sync::OnceLock;
 
-use gobbo_overlay_core::{Layers, fold_unit, relative_to, strip_folded_prefix};
+use gobbo_overlay_core::{Layers, fold_unit, relative_to, strip_folded_prefix, wide};
 use windows_sys::Win32::Foundation::{CloseHandle, INVALID_HANDLE_VALUE};
 use windows_sys::Win32::Storage::FileSystem::{
     FILE_FLAG_BACKUP_SEMANTICS, FILE_READ_ATTRIBUTES, FILE_SHARE_DELETE, FILE_SHARE_READ,
@@ -16,7 +16,6 @@ use windows_sys::Win32::Storage::FileSystem::{
 use crate::guard::Guard;
 use crate::paths::short_path_units;
 use crate::state::{self, Mount};
-use crate::text::wide;
 use crate::win32::PreserveLastError;
 
 /// The volume name form is the low bits of the flags of `GetFinalPathNameByHandleW`.

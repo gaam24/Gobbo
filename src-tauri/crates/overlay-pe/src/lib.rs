@@ -191,8 +191,6 @@ mod tests {
     /// A minimal image: a DOS header, the PE headers, one section with the import table and the names. `pe32` chooses the
     /// bitness; `names` are the imported DLLs, in order.
     fn image(pe32: bool, names: &[&str]) -> Vec<u8> {
-        const SECTION_RAW: usize = 0x200;
-        const SECTION_RVA: u32 = 0x1000;
         let optional_size = if pe32 { 224 } else { 240 };
         let mut bytes = vec![0u8; SECTION_RAW];
         bytes[0] = b'M';

@@ -15,6 +15,7 @@ use crate::domain::source::{
 };
 use crate::domain::version::update_state;
 use crate::error::AppError;
+use crate::infra::clock::now_seconds;
 use crate::providers::link::is_slug;
 use crate::providers::picture::{save_picture, stem};
 use crate::providers::workers::{WORKER_PANIC, per_request};
@@ -52,7 +53,7 @@ impl SourceProvider for ThunderstoreProvider {
     }
 
     fn schemes(&self) -> &'static [&'static str] {
-        &["ror2mm"]
+        &[link::SCHEME]
     }
 
     fn page_url(&self, game_key: &str, mod_id: &str, _tab: Option<&str>) -> Option<String> {
@@ -182,6 +183,7 @@ fn check_one(request: &SourceUpdateRequest) -> SourceUpdate {
                 &version,
                 picture,
                 request.saved_meta.as_ref(),
+                now_seconds(),
             ));
             update.requirements = Some(meta::requirements_of(&version));
             update.latest = Some(version.version_number);

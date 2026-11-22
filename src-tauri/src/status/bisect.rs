@@ -3,7 +3,7 @@
 
 use crate::context::Data;
 use crate::context::profile::bisect::read;
-use crate::library::Library;
+use crate::domain::library::Library;
 use serde::Serialize;
 
 /// The search in the view.

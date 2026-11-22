@@ -14,7 +14,7 @@ use std::ops::Deref;
 use std::path::PathBuf;
 use std::sync::{Arc, LazyLock, OnceLock, PoisonError, RwLock};
 
-use gobbo_overlay_core::{Layers, Whiteouts};
+use gobbo_overlay_core::{Layers, MountSpec, Whiteouts};
 
 use crate::detours::Hooks;
 use crate::diag;
@@ -83,7 +83,7 @@ impl Mount {
     /// The path a decision record carries. The game keeps its game-relative path; a redirect is prefixed with its set
     /// id, so the report can say which profile layer was touched.
     pub(crate) fn decision_path(&self, rel: &str) -> String {
-        if self.id == "game" {
+        if self.id == MountSpec::GAME_ID {
             rel.to_string()
         } else {
             format!("@{}\\{rel}", self.id)

@@ -81,7 +81,7 @@ test("a failed import row shares its group with the backend row of the same impo
 	);
 
 	// The rich local failure wins over the generic backend row, so Working shows one "Needs attention" row.
-	expect(row?.dedupeKey).toBe(registryDedupeKey(backend(`import:${GAME}\n${path}`, "import", importIdentity)));
+	expect(row?.dedupeKey).toBe("import:game-a:/mods/a.zip");
 	expect(row?.state).toBe("failed");
 	expect(row?.gameName).toBe("Game A");
 });
@@ -111,10 +111,8 @@ test("a pack import and its download share one group although their ids differ",
 test("rows without a typed identity keep the id rule so older journals still merge", () => {
 	expect(registryDedupeKey(local("manual-update:game-a"))).toBe("manual-update:game-a");
 	expect(registryDedupeKey(local("import-wizard:game-a"))).toBe("import-wizard:game-a");
-	expect(registryDedupeKey(backend("apply:game-a", "apply", "Other"))).toBe(registryDedupeKey(local("apply:game-a")));
-	expect(registryDedupeKey(backend("collection:game-a\nmain\nx", "collection", "Other"))).toBe(
-		registryDedupeKey(local("collection:game-a|main|x")),
-	);
+	expect(registryDedupeKey(backend("apply:game-a", "apply", "Other"))).toBe("apply:game-a");
+	expect(registryDedupeKey(backend("collection:game-a\nmain\nx", "collection", "Other"))).toBe("collection:game-a:main:x");
 });
 
 test("each game being checked produces its own update row", () => {

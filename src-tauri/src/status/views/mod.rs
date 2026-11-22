@@ -4,10 +4,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::context::Settings;
 use crate::context::profile::history::HistoryState;
+use crate::domain::library::ModInfo;
 use crate::domain::user_data::{Kind, Mode};
 use crate::error::Message;
 use crate::import::fomod;
-use crate::library::ModInfo;
 use crate::status::bisect::BisectView;
 use crate::status::stage::{BlockerKey, GameStage, NextAction};
 use crate::status::steps::StepChoices;

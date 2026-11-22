@@ -4,13 +4,13 @@ use std::ffi::OsStr;
 use std::ptr::null_mut;
 use std::slice;
 
-use gobbo_overlay_core::relative_to;
+use gobbo_overlay_core::{fold_ascii_unit, relative_to, wide};
 use windows_sys::Win32::Storage::FileSystem::GetFullPathNameW;
 
 use super::session;
 use super::target::visible;
 use crate::state::{Mount, mounts};
-use crate::text::{fold_ascii, same_folded_wide, wide};
+use crate::text::same_folded_wide;
 
 /// A path classified without the allocating full-path code.
 enum Fast {
@@ -229,7 +229,9 @@ fn is_named_device(tail: &[u16]) -> bool {
 
 /// A drive-relative prefix such as `C:`.
 fn is_drive(units: &[u16]) -> bool {
-    units.len() >= 2 && (0x61..=0x7A).contains(&fold_ascii(units[0])) && units[1] == u16::from(b':')
+    units.len() >= 2
+        && (0x61..=0x7A).contains(&fold_ascii_unit(units[0]))
+        && units[1] == u16::from(b':')
 }
 
 /// Whether `units` starts with the ASCII text, ignoring ASCII case.
@@ -238,7 +240,7 @@ fn starts_ci(units: &[u16], ascii: &[u8]) -> bool {
         && units[..ascii.len()]
             .iter()
             .zip(ascii)
-            .all(|(unit, ascii)| fold_ascii(*unit) == u16::from(*ascii))
+            .all(|(unit, ascii)| fold_ascii_unit(*unit) == u16::from(*ascii))
 }
 
 /// Whether `units` starts with the ASCII word, followed by `\` or the end.
@@ -356,7 +358,7 @@ fn is_unc_verbatim(units: &[u16]) -> bool {
         && units[4..8]
             .iter()
             .zip(*b"unc\\")
-            .all(|(unit, ascii)| fold_ascii(*unit) == u16::from(ascii))
+            .all(|(unit, ascii)| fold_ascii_unit(*unit) == u16::from(ascii))
 }
 
 /// A drive-absolute name: `C:\...`.

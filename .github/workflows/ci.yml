@@ -2,7 +2,7 @@ name: CI
 
 # Built to spend as few Actions minutes as possible (Windows minutes cost double):
 #   changes   decides from the diff which jobs a push or pull request needs (a few seconds)
-#   web       format, lint, architecture guard, unit tests, web bundle
+#   web       format, lint (types, guard and dead code), unit tests, web bundle
 #   rust      Linux clippy and the full Rust suite
 #   windows   clippy, overlay hook build and the Windows suite, in one job; it runs only when the diff touches code that
 #             Windows compiles differently: a Rust file with `cfg(windows)` code or Win32 calls, the overlay crates, Cargo
@@ -57,8 +57,11 @@ jobs:
           has() { grep -qE "$1" <<< "$files"; }
           workflow='^\.github/workflows/ci\.yml$'
           web=false; rust=false; windows=false
-          # Lint reads the Markdown guides and game tables too, so only images and the license skip the web job.
-          if grep -qvE '\.(png|webp|svg|ico|jpg)$|^LICENSE$' <<< "$files"; then web=true; fi
+          # Web reads the code and tool configs it checks, the Rust sources (fmt + guard), the game/loader data and
+          # generated files (guard), and Vite's HTML entry. Biome excludes Markdown and no step reads Markdown, images,
+          # the license or docs-only files, so those skip the web job.
+          web_sources='^src/|^scripts/|^e2e/|^src-tauri/|^games/|^loaders/|^catalog\.json$|^release\.json$|^index\.html$|^\.gitignore$|^package\.json$|^bun\.lock$|^biome\.jsonc$|^\.oxlintrc\.json$|^tsconfig|^knip\.json$|^vite\.config\.ts$|^components\.json$|^rust-toolchain\.toml$|^lefthook\.yml$'
+          if has "$web_sources|$workflow"; then web=true; fi
           if has "^src-tauri/|^games/|^loaders/|$workflow"; then rust=true; fi
           if has "^src-tauri/(crates/|\.cargo/|Cargo\.|build\.rs|tauri\.windows)|^scripts/build-overlay-hook\.ts$|$workflow"; then
             windows=true
@@ -213,6 +216,7 @@ jobs:
     timeout-minutes: 45
     env:
       WEBKIT_DISABLE_DMABUF_RENDERER: "1" # WebKitGTK under Xvfb has no DMA-BUF renderer
+      CARGO_PROFILE_DEV_DEBUG: "0" # same dev profile as the Rust job, so the shared cache artifacts are reusable
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -245,11 +249,14 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
 
+      # The pinned action uses `shared-key` *instead of* the job-based key, so the same key plus the same dev-profile
+      # debug setting gives an identical cache key to the Rust job. E2E only restores: saving would overwrite the Linux
+      # cache with `--features e2e` artifacts. The e2e-specific code still compiles locally on a cold restore.
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           workspaces: src-tauri
-          shared-key: e2e
-          save-if: ${{ github.ref == 'refs/heads/main' }}
+          shared-key: linux
+          save-if: false
 
       - name: Build the E2E app
         run: bun run e2e:build

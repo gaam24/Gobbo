@@ -2,20 +2,10 @@ import { expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { releaseVersion } from "./release-version";
 import { buildManifest, type Fragment, findUpdaterArchive, merge, stage, stageArchive } from "./updater-manifest";
 
-/// The version is owned by release.json; the updater fixtures read it once so a release bump does not rewrite a dozen
-/// names. `scripts/check-release-meta.ts` asserts the other copies match it.
-function releaseVersion(): string {
-	const meta: unknown = JSON.parse(readFileSync(join(import.meta.dir, "..", "release.json"), "utf8"));
-
-	if (typeof meta === "object" && meta !== null && "version" in meta && typeof meta.version === "string") {
-		return meta.version;
-	}
-
-	throw new Error("release.json has no version");
-}
-
+// The shared accessor reads release.json once, so a release bump does not rewrite a dozen fixture names.
 const VERSION = releaseVersion();
 
 function workspace() {

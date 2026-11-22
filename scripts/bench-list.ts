@@ -1,4 +1,4 @@
-import type { Status_Serialize } from "../src/bindings";
+import type { ModGroup, Status_Serialize } from "../src/bindings";
 import { listItems, matchesNeedle, statusItems, tableItems, toRows } from "../src/lib/mods";
 import { statusFixture } from "../src/test/fixtures/status";
 
@@ -78,6 +78,17 @@ measure("filter enabled+query", () => mods.filter((mod) => matchesNeedle(mod, "e
 measure("statusItems", () => statusItems(status));
 measure("listItems", () => listItems(mods, []));
 measure("tableItems", () => tableItems(statusItems(status)));
+// The plain fixture has no groups, which hides the per-group member lookup. Fifty groups over two thousand mods is a
+// realistic list with a few families each; every group has four visible parts.
+const groupedMods = Array.from({ length: 2000 }, (_, index) => makeMod(index));
+const groups: ModGroup[] = Array.from({ length: 50 }, (_, group) => ({
+	id: `group-${group}`,
+	name: `Group ${group}`,
+	kind: "bundle",
+	members: Array.from({ length: 4 }, (_unused, part) => `local:mod-${group * 40 + part * 10}`),
+}));
+const groupedStatus = statusFixture({ kind: "ready", enabled: 1, total: 1 }, { mods: groupedMods, separators: [] });
+measure("tableItems 50 groups", () => tableItems(statusItems(groupedStatus), new Set(), groups));
 measure("statusItems+toRows", () => toRows(statusItems(status)));
 const selection = mods.filter((_, index) => index % 3 === 0).map((mod) => mod.id);
 measure("batch selection", () => {

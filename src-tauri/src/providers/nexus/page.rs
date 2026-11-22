@@ -139,16 +139,16 @@ mod tests {
     #[test]
     fn a_mod_page_carries_version_author_and_category() {
         let page = parse_mod_page(
-            r#"{"data":{"id":"14315126033362","game_id":"3333","version":"2.5.0","name":"Remove Mods Menu",
-            "author":"","uploader":{"id":"70443253","name":"Q6xF6llIa"},
+            r#"{"data":{"id":"14315126033362","game_id":"3333","version":"2.5.0","name":"Example Cleanup Mod",
+            "author":"","uploader":{"id":"70443253","name":"example-uploader"},
             "category":{"id":"10","name":"Visuals and Graphics"}}}"#,
         )
         .unwrap();
         assert_eq!(page.uid.as_deref(), Some("14315126033362"));
         assert_eq!(page.game_id, Some(3333));
         assert_eq!(page.version, "2.5.0");
-        assert_eq!(page.name.as_deref(), Some("Remove Mods Menu"));
-        assert_eq!(page.author.as_deref(), Some("Q6xF6llIa"));
+        assert_eq!(page.name.as_deref(), Some("Example Cleanup Mod"));
+        assert_eq!(page.author.as_deref(), Some("example-uploader"));
         assert_eq!(page.category.as_deref(), Some("Visuals and Graphics"));
     }
 

@@ -6,7 +6,6 @@ mod requirements;
 mod workers;
 
 use crate::domain::source::{SourceMeta, SourceRequirement, SourceSync};
-use crate::error::AppError;
 use crate::providers::nexus::api::NexusClient;
 use crate::providers::nexus::{ModPage, meta_from_page};
 use crate::providers::{SourceUpdate, SourceUpdateRequest};
@@ -29,7 +28,7 @@ pub(super) fn check_updates(api_key: &str, requests: &[SourceUpdateRequest]) -> 
     for request in requests {
         match lookup::lookup(request) {
             Ok(lookup) => lookups.push(lookup),
-            Err(error) => results.push(error_result(request, error)),
+            Err(error) => results.push(SourceUpdate::error(request, error)),
         }
     }
 
@@ -52,11 +51,9 @@ pub(super) fn page_meta(
     checked_at: u32,
     picture: Option<String>,
 ) -> SourceMeta {
-    let mut meta = meta_from_page(page);
-    meta.picture = picture;
-    meta.merge_saved(old);
-    meta.checked_at = Some(checked_at);
-    meta
+    let mut fresh = meta_from_page(page);
+    fresh.picture = picture;
+    SourceMeta::checked(fresh, old, checked_at)
 }
 
 /// The generic requirements a read brought, with the sync that says where they came from.
@@ -81,10 +78,6 @@ fn requirements(
         ),
         None => (None, Vec::new(), None),
     }
-}
-
-fn error_result(request: &SourceUpdateRequest, error: AppError) -> SourceUpdate {
-    SourceUpdate::error(request, error)
 }
 
 #[cfg(test)]

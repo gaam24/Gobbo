@@ -26,6 +26,13 @@ The jobs run in parallel and a newer push cancels an older run. Rust caches are 
 failed run. There is no nightly run: E2E runs only from **Actions → CI → Run workflow**. The release does not run CI
 again; it waits for the CI run of the tagged commit to pass. Tests marked `#[ignore]` do not run in CI.
 
+## Merge gate
+
+`bun run lint` is the merge gate and runs six stages: Biome, oxlint, the TypeScript check (`tsc`), the E2E type check
+(`e2e:types`), the architecture guard (`guard`: layers, data boundary, production `unwrap`/`expect`/`panic`/`todo`/`dbg`,
+overlay invariants, generated bindings and permissions) and `bun run deadcode` (Knip: unused files, exports and
+dependencies). All six must pass to merge.
+
 ## Optional local reports
 
 These are measurements, not merge gates. A normal change does not need to run them; use them when the change touches
@@ -35,7 +42,6 @@ the area they measure.
   the gzip total, with no fixed budget to update.
 - `bun run docs:check` — relative links, anchors, image paths and alt text in Markdown. The weekly Security workflow
   also runs it as a report.
-- `bun run deadcode` — Knip: unused files, exports and dependencies.
 - `bun run ui:contrast` — contrast of the design tokens.
 - `bun run ui:check` — raw form controls and the generated `components/ui` rules.
 - `bun run icons:check` — the game icons (size, format and dimensions).

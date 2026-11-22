@@ -2,9 +2,12 @@
 
 use std::time::Instant;
 
-use crate::error::{AppError, ErrorKind, FileError};
+use crate::error::{AppError, ErrorKind, io_at};
 
-use super::helpers::{USER_AGENT, download_agent, request_url, trace_failure, trace_response};
+use super::helpers::{
+    DOWNLOAD_RETRY_CAP_SECS, USER_AGENT, download_agent, request_url, retry_after_seconds,
+    trace_failure, trace_response,
+};
 use super::retry::RateRetry;
 
 /// The suffix of a file that is still downloading. A finished download is renamed to its real name.
@@ -173,13 +176,15 @@ pub fn download_with_info(
     let content_disposition = header(&response, "content-disposition");
 
     if status == 429 {
-        let retry_after = response
-            .headers()
-            .get("retry-after")
-            .and_then(|value| value.to_str().ok())
-            .and_then(|value| value.trim().parse::<u64>().ok())
-            .unwrap_or(5)
-            .min(300);
+        let retry_after = retry_after_seconds(
+            response
+                .headers()
+                .get("retry-after")
+                .and_then(|value| value.to_str().ok()),
+            Some(5),
+            DOWNLOAD_RETRY_CAP_SECS,
+        )
+        .unwrap_or(5);
         trace_response("http", "GET", &url, status, None, started);
         return Err(AppError::new("http.rate_limited")
             .kind(ErrorKind::Retryable)
@@ -224,8 +229,7 @@ fn save_body(
     total: u64,
     progress: &mut dyn FnMut(u64, u64) -> bool,
 ) -> Result<(), AppError> {
-    let io_failed = |e: std::io::Error| crate::error::AppError::from(FileError::new(target, e));
-    let mut file = std::fs::File::create(target).map_err(io_failed)?;
+    let mut file = std::fs::File::create(target).map_err(io_at(target))?;
     let mut buffer = vec![0_u8; 256 * 1024];
     let mut done = 0_u64;
 
@@ -236,7 +240,7 @@ fn save_body(
             break;
         }
 
-        std::io::Write::write_all(&mut file, &buffer[..read]).map_err(io_failed)?;
+        std::io::Write::write_all(&mut file, &buffer[..read]).map_err(io_at(target))?;
         done += read as u64;
 
         if !progress(done, total) {
@@ -386,6 +390,25 @@ mod tests {
         server.join().unwrap();
         assert_eq!(error.code, "http.status");
         assert_eq!(error.kind, ErrorKind::Permanent);
+        assert!(!target.exists());
+    }
+
+    #[test]
+    fn a_long_retry_after_is_capped_for_a_download() {
+        let dir = scratch!("http-retry-cap");
+        let target = dir.join("file.zip");
+        let (url, server) = serve(response(
+            "429 Too Many Requests",
+            "Retry-After: 600\r\nContent-Length: 0\r\n",
+            b"",
+        ));
+        let error = download_with_info(&url, &target, &mut |_, _| true).unwrap_err();
+        server.join().unwrap();
+        assert_eq!(error.code, "http.rate_limited");
+        assert_eq!(
+            error.params.get("retry_after").map(String::as_str),
+            Some("300")
+        );
         assert!(!target.exists());
     }
 

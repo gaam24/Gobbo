@@ -66,10 +66,12 @@ pub fn matches_source(source: &str, entry: &str) -> bool {
     SourcePattern::new(source).matches(&normalize_path(entry))
 }
 
-/// Normalizes an archive entry the way FOMOD source patterns compare it: forward slashes, no `./` at the start,
-/// lowercase. This is an in-place matching form, not a safety check and not a comparison key: it keeps `..` and does
-/// not validate the path, so it stays separate from `crate::domain::naming::normalized_relative_path`
-/// (safe-relative-path validation) and `crate::domain::pathkey` (comparison keys).
+/// Normalizes an archive entry the way FOMOD source patterns compare it.
+///
+/// The form uses forward slashes, drops a leading `./` and lowercases the path. It is for matching, not a safety check
+/// and not a comparison key: it keeps `..` and does not validate the path, so it stays separate from
+/// `crate::domain::naming::normalized_relative_path` (safe-relative-path validation) and `crate::domain::pathkey`
+/// (comparison keys).
 pub fn normalize_path(path: &str) -> String {
     let mut normalized = String::with_capacity(path.len());
     normalize_path_into(path, &mut normalized);

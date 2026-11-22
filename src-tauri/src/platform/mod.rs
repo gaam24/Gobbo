@@ -18,6 +18,23 @@ pub const fn supports_overlay() -> bool {
     cfg!(any(target_os = "linux", windows))
 }
 
+/// Whether this build runs on Windows. The behavioral edges ask here instead of reading `cfg!` themselves, so both
+/// platform sides give the same answer and a new OS changes one function.
+pub const fn is_windows() -> bool {
+    cfg!(windows)
+}
+
+/// The key of the portable archive in the update manifest for this OS and architecture, such as
+/// `linux-x86_64-portable`. `None` where this build has no portable archive. The mapping is pure so both platform
+/// modules export the same name and a test can check every target on one machine.
+pub fn portable_target(os: &str, arch: &str) -> Option<&'static str> {
+    match (os, arch) {
+        ("windows", "x86_64") => Some("windows-x86_64-portable"),
+        ("linux", "x86_64") => Some("linux-x86_64-portable"),
+        _ => None,
+    }
+}
+
 #[cfg(all(not(windows), test))]
 pub use linux::overlay_session_pids;
 #[cfg(not(windows))]

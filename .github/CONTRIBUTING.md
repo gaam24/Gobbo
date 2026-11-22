@@ -26,17 +26,18 @@ bun run tauri dev
 
 ## Checks
 
-Run these before you open a pull request. CI runs the lint, unit, build and Rust gates on Linux and Windows, and the
-release workflow runs the same CI checks before it builds anything. E2E runs nightly and before a release.
+Run these before you open a pull request. CI runs the lint, unit, build and Rust gates on Linux and Windows; the
+release waits for that CI run instead of repeating it. E2E runs only on demand (Actions → CI → Run workflow), not
+nightly and not before a release.
 
-| Command              | What it checks                                                              |
-| -------------------- | --------------------------------------------------------------------------- |
-| `bun run lint`       | Biome, oxlint (type-aware), TypeScript and the architecture guard           |
-| `bun test`           | Frontend unit tests, including that `en.ts` and `pl.ts` have the same keys  |
-| `bun run build:web`  | TypeScript and the web bundle                                               |
-| `bun run check:rust` | `cargo fmt --check`, `cargo clippy`, `cargo test` and the allocation budget |
-| `bun run deadcode`   | Optional: Knip unused files, exports and dependencies                       |
-| `bun run docs:check` | Optional: relative links, anchors, image paths and alt text in Markdown     |
+| Command              | What it checks                                                                              |
+| -------------------- | ------------------------------------------------------------------------------------------- |
+| `bun run lint`       | Biome, oxlint (type-aware), TypeScript (app + E2E), architecture guard and Knip dead code   |
+| `bun test`           | Frontend unit tests, including that `en.ts` and `pl.ts` have the same keys                  |
+| `bun run build:web`  | Vite web bundle and the E2E-hook check                                                      |
+| `bun run check:rust` | `cargo fmt --check`, `cargo clippy`, `cargo test` and the allocation budget                 |
+| `bun run deadcode`   | Knip unused files, exports and dependencies (also part of `lint`)                           |
+| `bun run docs:check` | Optional: relative links, anchors, image paths and alt text in Markdown                     |
 
 The git hooks run part of this for you. The pre-commit hook formats staged files and runs oxlint on them. The pre-push
 hook runs lint, the unit tests and the Rust checks.

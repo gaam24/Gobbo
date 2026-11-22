@@ -165,14 +165,19 @@ impl SeparatorIds {
             return wanted.to_string();
         }
 
-        loop {
-            let id = format!("sep{}", self.next);
-            self.next += 1;
-
-            if !self.existing.contains(&id) && self.used.insert(id.clone()) {
-                return id;
-            }
-        }
+        // `first_free` starts at one; offset it past every id the profile had, so a removed id is not reused while a
+        // higher one exists. The predicate keeps both the ids on the list and the ones this save already claimed.
+        let first = self.next;
+        let mut claimed = first;
+        let id = crate::domain::naming::first_free(
+            |number| {
+                claimed = first + u64::from(number) - 1;
+                format!("sep{claimed}")
+            },
+            |id| !self.existing.contains(id) && self.used.insert(id.to_string()),
+        );
+        self.next = claimed + 1;
+        id
     }
 }
 
@@ -185,7 +190,7 @@ pub(super) fn separator(
 ) -> Result<Separator, AppError> {
     let name = name.trim();
 
-    if name.is_empty() || name.chars().count() > 60 {
+    if name.is_empty() || name.chars().count() > crate::domain::profiles::MAX_NAME_CHARS {
         return Err(AppError::user("profile.separator_name"));
     }
 
@@ -251,7 +256,7 @@ pub fn create_profile(
     let game = games::load(game_id)?;
     let data = root.game(game_id);
     let library = load_library(&data, &game)?;
-    let view = crate::library::LibraryView::new(&library);
+    let view = crate::domain::library::LibraryView::new(&library);
 
     if !copy_data {
         return crate::context::edit_profiles(root, game_id, |_, game, profiles| {

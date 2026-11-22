@@ -164,40 +164,78 @@ fn has_extension(name: &str, extension: &str) -> bool {
 }
 
 /// A folder where each mod gets a folder of its own, for example `Mods/<mod>/`. The game loads every folder itself.
-#[derive(Debug, Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[derive(Debug, Clone)]
 pub struct Slot {
     /// Relative to the deployment root. It also names the slot in the library index.
     pub dir: String,
     /// The start of the mod folder names in the game, for example `mod`.
-    #[serde(default)]
     pub prefix: String,
     /// A file or folder that marks a mod root in an archive, for example `ModInfo.xml` or `content`. A marker at the
     /// archive root makes the whole archive one mod, named after the archive.
-    #[serde(default)]
     pub marker: Option<String>,
     /// More mod roots, for a loader that accepts several layouts. A Lua mod marks `<Mod>/Scripts`, a C++ mod marks
     /// `<Mod>/dlls`; both are one slot. The roots are found like `marker`, and a root found twice is added once.
-    #[serde(default)]
     pub markers: Vec<String>,
     /// A file Gobbo writes into every mod folder in this slot, for a loader that loads only a folder that has it.
     /// for example `enabled.txt`. The file belongs to the library copy, so it is deployed and removed with the mod.
-    #[serde(default)]
     pub enable_file: Option<String>,
     /// Only these files go into the slot (lowercase, with the dot). Empty means all files.
-    #[serde(default)]
     pub extensions: Vec<String>,
     /// Files at the archive root with these extensions go into the slot too, for example a bare `.dll`.
-    #[serde(default)]
     pub root_extensions: Vec<String>,
     /// A folder at the archive root that holds a file with one of these extensions is a mod: `<Plugin>/<plugin>.dll`
     /// goes into the slot as `<dir>/<Plugin>/...`. A folder named as a game folder is never one. In a flat slot the
-    /// folder names the mod in the library, but its files deploy directly into `dir`.
-    #[serde(default)]
+    /// folder names the mod in the library, but its files deploy directly into `dir`. Omitted, it copies
+    /// `root_extensions`; an explicit empty list still disables the rule.
     pub root_folder_extensions: Vec<String>,
     /// The files go directly into `dir`, not into a folder per mod. For games that load loose `.pak` files.
-    #[serde(default)]
     pub flat: bool,
+}
+
+impl<'de> Deserialize<'de> for Slot {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct Fields {
+            dir: String,
+            #[serde(default)]
+            prefix: String,
+            #[serde(default)]
+            marker: Option<String>,
+            #[serde(default)]
+            markers: Vec<String>,
+            #[serde(default)]
+            enable_file: Option<String>,
+            #[serde(default)]
+            extensions: Vec<String>,
+            #[serde(default)]
+            root_extensions: Vec<String>,
+            #[serde(default)]
+            root_folder_extensions: Option<Vec<String>>,
+            #[serde(default)]
+            flat: bool,
+        }
+
+        let fields = Fields::deserialize(deserializer)?;
+        let root_folder_extensions = fields
+            .root_folder_extensions
+            .unwrap_or_else(|| fields.root_extensions.clone());
+
+        Ok(Self {
+            dir: fields.dir,
+            prefix: fields.prefix,
+            marker: fields.marker,
+            markers: fields.markers,
+            enable_file: fields.enable_file,
+            extensions: fields.extensions,
+            root_extensions: fields.root_extensions,
+            root_folder_extensions,
+            flat: fields.flat,
+        })
+    }
 }
 
 /// A game folder (or file) whose files keep their game paths, for example `archive/pc/mod` or `DLC`.

@@ -9,12 +9,13 @@ use tauri::{AppHandle, State};
 use crate::acquire;
 use crate::commands::run_task;
 use crate::context::Data;
+use crate::domain::library::ModInfoEdit;
 use crate::domain::source::{SourceRef, SourceRequirement};
 use crate::error::AppError;
 use crate::import::fomod;
 use crate::import::{ArchiveReport, ImportProgress, ImportView, ZipInspect};
 use crate::infra::tasks::{TaskFlags, TaskKey, kind};
-use crate::library::{ModInfoEdit, RelationKind, Relations};
+use crate::library::{RelationKind, Relations};
 use crate::sources::downloads::Downloads;
 use crate::status::details;
 use crate::status::views::{ModDetails, ModExtras, ModUsage, Status, VersionView};
@@ -39,9 +40,7 @@ fn fomod_answer(
     selection: Option<&[fomod::Choice]>,
 ) -> Result<fomod::FomodState, AppError> {
     match source {
-        FomodSource::Path { path } => {
-            crate::import::fomod_state(root, game, Path::new(path), selection)
-        }
+        FomodSource::Path { path } => crate::import::state_at(game, Path::new(path), selection),
         FomodSource::Folder { folder } => {
             crate::import::reinstall_fomod_state(root, game, folder, selection)
         }
@@ -73,12 +72,12 @@ crate::commands::game_commands! {
     query mod_versions(folder: String) -> Vec<VersionView> = |root, game| details::mod_versions(root, game, &folder);
 
     /// Preview of an archive: a plain zip, or a FOMOD installer with the steps for the wizard.
-    query inspect_zip(path: String) -> ZipInspect = |root, game| crate::import::inspect(root, game, Path::new(&path));
+    query inspect_zip(path: String) -> ZipInspect = |_root, game| crate::import::inspect_at(game, Path::new(&path));
 
     /// The FOMOD wizard's answer for an archive's installer under the user's picks: the visible steps, the group rules,
     /// the option kinds and the picks the import takes. `null` gives the default selection. Read like `inspect_zip`.
     query fomod_state(path: String, selection: Option<Vec<fomod::Choice>>) -> fomod::FomodState =
-        |root, game| crate::import::fomod_state(root, game, Path::new(&path), selection.as_deref());
+        |_root, game| crate::import::state_at(game, Path::new(&path), selection.as_deref());
 
     /// The same answer for a version's archive copy, for the "change installer options" wizard.
     query reinstall_fomod_state(folder: String, selection: Option<Vec<fomod::Choice>>) -> fomod::FomodState =
@@ -264,8 +263,8 @@ pub async fn import_zip(
                         acquire::Acquired::Existing { folder } => {
                             Err(crate::import::already_in_library(&folder))
                         }
-                        acquire::Acquired::NeedsChoice { path, .. } => {
-                            Err(acquire::needs_choice_error(&path))
+                        acquire::Acquired::NeedsChoice(needed) => {
+                            Err(acquire::needs_choice_error(&needed.path))
                         }
                     }
                 },

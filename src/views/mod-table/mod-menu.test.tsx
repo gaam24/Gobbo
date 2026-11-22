@@ -5,6 +5,7 @@ import { renderToString } from "react-dom/server";
 import type { Status_Serialize } from "@/bindings";
 import { applyLanguage } from "@/i18n";
 import type { Mod } from "@/lib/mods";
+import { modFixture } from "@/test/fixtures/mod";
 import { statusFixture } from "@/test/fixtures/status";
 import { type GroupMenuActions, menuGroupFor } from "@/views/mod-table/mod-list-props";
 
@@ -33,46 +34,8 @@ const nothing = () => {
 	// The menu's actions are not part of a structure check.
 };
 
-/// One installed mod, with the fields the menu reads. The fixture takes the serialized status shape.
-function mod(id: string, name: string): Status_Serialize["mods"][number] {
-	return {
-		id,
-		folder: name,
-		fomod_installer: false,
-		version_count: 1,
-		installed_at: 0,
-		slot: "Mods",
-		update: null,
-		enabled: true,
-		priority: 1,
-		load_priority: null,
-		files: 2,
-		size_kb: 10,
-		wins: 0,
-		loses: 0,
-		archive: null,
-		archive_file: null,
-		skipped: 0,
-		page_id: null,
-		page_name: null,
-		part_id: null,
-		part_name: null,
-		part_category: null,
-		info: { name, version: "1.0", author: null, description: null },
-		source: null,
-		sources: [],
-		tags: [],
-		instructions: "",
-		unmet_requirements: 0,
-		profiles: [],
-		collections: [],
-		requires_names: [],
-		requirement_groups: [],
-	};
-}
-
-const alpha = mod("alpha", "Alpha");
-const beta = mod("beta", "Beta");
+const alpha = modFixture({ id: "alpha", folder: "Alpha" });
+const beta = modFixture({ id: "beta", folder: "Beta" });
 
 const bundle: Status_Serialize["groups"] = [
 	{

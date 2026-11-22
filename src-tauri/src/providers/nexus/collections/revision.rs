@@ -86,7 +86,7 @@ fn parse_revision_response(
         .unwrap_or_else(|| u32::try_from(revision.mod_files.len()).unwrap_or(u32::MAX));
     let total_size_kb = revision.total_size.map_or(0, Id::kb);
     let info = CollectionInfo {
-        provider: "nexus".to_string(),
+        provider: crate::providers::nexus::ID.to_string(),
         game_key: link.game_key.clone(),
         slug: link.slug.clone(),
         revision: revision_number,
@@ -214,6 +214,10 @@ fn parse_revision_response(
         external,
         revisions,
         archive_link: revision.download_link,
+        unsupported_archive_paths: super::UNSUPPORTED_ARCHIVE_PATHS
+            .iter()
+            .map(|path| (*path).to_string())
+            .collect(),
         complete: false,
     })
 }

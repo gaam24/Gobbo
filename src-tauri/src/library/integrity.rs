@@ -2,10 +2,11 @@
 
 use serde::Serialize;
 
+use crate::context::library::{lock_index, not_in_library};
 use crate::context::{Data, load_library};
+use crate::domain::library::Integrity;
 use crate::domain::naming::is_plain_folder;
 use crate::error::{AppError, io_at};
-use crate::library::{Integrity, lock_index, not_in_library};
 
 /// What one verification found.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]

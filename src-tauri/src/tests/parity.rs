@@ -184,7 +184,7 @@ fn the_same_archive_imports_the_same_record_from_every_path() {
 #[test]
 fn a_curator_name_does_not_rename_the_imported_mod() {
     let f = fixture("parity-curator-nexus");
-    let archive = "Example Mod-35686-1-0-1584112564.zip";
+    let archive = "Example Mod-7001-1-0-1584112564.zip";
     let curator = "A Totally Different Curator Name";
     let zip = f.zip(archive, &[("Mods/modExample/content/x.ws", "x")]);
 

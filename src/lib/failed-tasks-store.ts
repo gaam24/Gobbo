@@ -33,17 +33,6 @@ export function clearFailedTask(id: string) {
 	store.set(next);
 }
 
-/// Drops every failed task. Tests use it; the window keeps the rows across a game switch.
-export function resetFailedTasks() {
-	store.set([]);
-}
-
-/// The pure list of all stored rows, for every game and for tasks with no game. The store never filters by game: a
-/// game switch only changes which game the activity hook draws, and a failure of another game keeps its retry action.
-export function failedTasks(): readonly FailedTask[] {
-	return store.get();
-}
-
 export function useFailedTasks(): readonly FailedTask[] {
 	return useStore(store);
 }

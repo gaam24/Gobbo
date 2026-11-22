@@ -15,9 +15,8 @@ use crate::launch::report::RunReport;
 crate::commands::game_commands! {
     /// Whether the game runs now, from Gobbo or from Steam. Deploying and launching wait while it does; editing does
     /// not.
-    query game_running() -> bool = crate::launch::start::game_running;
+    query game_running() -> bool = crate::context::running::game_running;
 
-    /// Stops every process of the game, also one started outside Gobbo. Returns `true` when a process was stopped.
     /// The last launch of a game: its steps and how the game ended. `None` before the first launch from Gobbo.
     query last_run() -> Option<RunReport> = |root, game| Ok(crate::launch::report::last_run(root, game));
 }
@@ -50,6 +49,9 @@ pub struct ToolExited {
 
 /// The event that carries [`ToolExited`].
 pub const TOOL_EXITED_EVENT: &str = "tool-exited";
+
+/// The event sent when a game ends, so the running check and the tray stop polling at once.
+pub const GAME_EXITED_EVENT: &str = "game-exited";
 
 /// The payload of a tool run that ended with this exit code and cancellation state. A cancelled run never carries a
 /// code, so a killed tool is not reported with the fake non-zero code its termination produced.
@@ -155,7 +157,12 @@ pub async fn install_tool_prerequisites(
         kind::INSTALL,
         move |root, game, cancel, _handle| {
             crate::infra::tasks::stop_if(Some(cancel.as_ref()), "tools.cancelled")?;
-            crate::launch::tools::install_prerequisites(root, game, &tool, &home_dir()?)
+            crate::launch::tools::prerequisites::install_prerequisites(
+                root,
+                game,
+                &tool,
+                &home_dir()?,
+            )
         },
     )
     .await
@@ -177,22 +184,22 @@ pub async fn launch_game(
     apply_draft: bool,
 ) -> Result<bool, crate::error::AppError> {
     let event_game = game.clone();
+    let notice_app = app.clone();
     let launch_app = app.clone();
     let launched = crate::commands::for_game(data, game, move |root, game| {
-        let app = launch_app;
-        crate::launch::start::launch_game(
+        crate::launch::launch_game_with_notice(
             root,
             game,
             executable.as_deref(),
             apply_draft,
             &home_dir()?,
-            Some(Box::new(move |_code| {
-                let _ = app.emit("game-exited", event_game);
-            })),
+            move |_code| {
+                let _ = notice_app.emit(GAME_EXITED_EVENT, event_game);
+            },
+            move || crate::tray::after_game_launch(&launch_app),
         )
     })
     .await?;
-    crate::tray::after_game_launch(&app);
     Ok(launched)
 }
 
@@ -204,13 +211,7 @@ pub async fn stop_game(
     game: String,
 ) -> Result<bool, crate::error::AppError> {
     crate::commands::for_game(data, game, |root, game| {
-        let stopped = crate::launch::start::stop_game(root, game)?;
-
-        if stopped {
-            super::report::mark_stopped(root, game);
-        }
-
-        Ok(stopped)
+        crate::launch::stop_game_with_notice(root, game, || {})
     })
     .await
 }

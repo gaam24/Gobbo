@@ -11,6 +11,16 @@ use crate::domain::resolver::DeployPlan;
 /// The template that means "the game folder". Used when a definition has no separate mod root.
 pub const GAME_TEMPLATE: &str = "{game}";
 
+/// The template for this install: `linux` when a native Linux build uses it and it is not empty, else `base`. A Windows
+/// or Proton install uses `base`, because its paths name the Windows build.
+pub(super) fn prefer_linux<'a>(base: &'a str, linux: Option<&'a str>, native: bool) -> &'a str {
+    native
+        .then_some(linux)
+        .flatten()
+        .filter(|template| !template.trim().is_empty())
+        .unwrap_or(base)
+}
+
 impl GameDef {
     /// Whether the game reads an order file that Gobbo writes. Then Gobbo needs the folder of that file.
     pub const fn has_load_order(&self) -> bool {
@@ -56,12 +66,11 @@ impl GameDef {
     /// The deployment root template for this platform: `root_linux` on a native Linux install, otherwise `root`.
     /// Falls back to `{game}`.
     pub fn root_template_for(&self, native: bool) -> &str {
-        let linux = native
-            .then_some(self.deploy.root_linux.as_deref())
-            .flatten();
-        linux
-            .or(self.deploy.root.as_deref())
-            .unwrap_or(GAME_TEMPLATE)
+        prefer_linux(
+            self.deploy.root.as_deref().unwrap_or(GAME_TEMPLATE),
+            self.deploy.root_linux.as_deref(),
+            native,
+        )
     }
 
     /// The first required file that neither the game folder nor the deployment plan provides. `placed` holds the path

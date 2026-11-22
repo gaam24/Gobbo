@@ -22,19 +22,18 @@ test("a typed identity gives every workflow the key its local and backend rows s
 	expect(dedupeKey({ PackLink: { game, link: "nxm://link" } }, "pack-link:game-a\nnxm://link")).toBe("pack-link:game-a:nxm://link");
 });
 
-test("a typed identity round-trips with the local and backend ids of the same operation", () => {
-	const game = "game-a";
+test("id-only rows fall back to the same group keys as typed identities", () => {
 	const pairs = [
-		["apply:game-a", { Apply: { game } }, "apply:game-a"],
-		["collection:game-a|main|x", { Collection: { game, profile: "main", collection: "x" } }, "collection:game-a\nmain\nx"],
-		["pack-import:game-a|recipe.zip", { Pack: { game, path: "recipe.zip" } }, "pack:game-a\nrecipe.zip"],
-		["pack-download:game-a|recipe.zip", { Pack: { game, path: "recipe.zip" } }, "pack-download:game-a\nrecipe.zip"],
-		["pack-link:game-a|nxm://link", { PackLink: { game, link: "nxm://link" } }, "pack-link:game-a\nnxm://link"],
+		["apply:game-a", "apply:game-a", "apply:game-a"],
+		["collection:game-a|main|x", "collection:game-a\nmain\nx", "collection:game-a:main:x"],
+		["pack-import:game-a|recipe.zip", "pack:game-a\nrecipe.zip", "pack:game-a:recipe.zip"],
+		["pack-download:game-a|recipe.zip", "pack-download:game-a\nrecipe.zip", "pack:game-a:recipe.zip"],
+		["pack-link:game-a|nxm://link", "pack-link:game-a\nnxm://link", "pack-link:game-a:nxm://link"],
 	] as const;
 
-	for (const [localId, dedupe, backendId] of pairs) {
-		expect(dedupeKey("Other", localId)).toBe(dedupeKey(dedupe, backendId));
-		expect(dedupeKey("Other", backendId, true, "backend")).toBe(dedupeKey(dedupe, backendId));
+	for (const [localId, backendId, key] of pairs) {
+		expect(dedupeKey("Other", localId)).toBe(key);
+		expect(dedupeKey("Other", backendId, true, "backend")).toBe(key);
 	}
 });
 

@@ -17,6 +17,7 @@ import type { FomodChoice } from "@/lib/fomod";
 import { messageOf, unwrap } from "@/lib/ipc";
 import { copyText, openPath } from "@/lib/open";
 import { setActiveGame } from "@/lib/progress-store";
+import { nameOfId } from "@/lib/records";
 import { loadWindow } from "@/lib/tauri";
 import { readPref, writePref } from "@/lib/ui-prefs";
 import { createStatusCache, useGameState } from "@/lib/use-game-state";
@@ -235,7 +236,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 		gameId: id ?? null,
 		status,
 		onStatus: setStatusFor,
-		nameOf: (target) => games.find((item) => item.id === target)?.name ?? target,
+		nameOf: (target) => nameOfId(games, target),
 		notify,
 		notifyError,
 	});
@@ -263,7 +264,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 		setManaged,
 		setGameId,
 		setSelection,
-		nameOf: (target) => games.find((item) => item.id === target)?.name ?? target,
+		nameOf: (target) => nameOfId(games, target),
 		onNoGames: () => navigate("games"),
 		onGameAdded: () => {
 			navigate("mods");

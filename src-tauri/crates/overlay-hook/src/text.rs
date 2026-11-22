@@ -1,8 +1,7 @@
 //! Strings between the program and Win32: the NUL-terminated UTF-16 text the calls take, and the text the trace shows.
 
-use std::ffi::{OsStr, OsString};
-use std::iter::once;
-use std::os::windows::ffi::{OsStrExt, OsStringExt};
+use std::ffi::OsString;
+use std::os::windows::ffi::OsStringExt;
 
 use gobbo_overlay_core::fold_unit;
 
@@ -36,20 +35,6 @@ pub(crate) unsafe fn text(ptr: *const u16) -> Option<String> {
 /// `name` must be a NUL-terminated UTF-16 string, or null.
 pub(crate) unsafe fn display_name(name: *const u16) -> String {
     unsafe { text(name) }.unwrap_or_else(|| "<none>".to_string())
-}
-
-/// A string as a NUL-terminated UTF-16 buffer, for Win32.
-pub(crate) fn wide(text: &OsStr) -> Vec<u16> {
-    text.encode_wide().chain(once(0)).collect()
-}
-
-/// ASCII case folding for one UTF-16 unit, for the syntax of a path: a drive letter, a keyword.
-pub(crate) const fn fold_ascii(unit: u16) -> u16 {
-    if unit >= 0x41 && unit <= 0x5A {
-        unit + 32
-    } else {
-        unit
-    }
 }
 
 /// The number of units before the terminator, or all of them when there is none.

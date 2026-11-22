@@ -116,8 +116,8 @@ fn download_and_import(
                 return false;
             }
 
-            if let Some(percent) = received.saturating_mul(100).checked_div(limit) {
-                progress(u32::try_from(percent).unwrap_or(100));
+            if let Some(percent) = crate::domain::progress::percent(received, limit) {
+                progress(percent);
             }
 
             !cancelled(Some(cancel))
@@ -159,12 +159,11 @@ fn family_of(data: &Data, game: &GameDef, folder: &str) -> Result<String, AppErr
         .ok_or_else(|| AppError::unexpected("the imported loader is not in the library"))
 }
 
-/// The archive's file name from its link, so the library names the mod after the release.
+/// The archive's file name from its link, so the library names the mod after the release. The link's query and fragment
+/// are not part of the name; a link without a file name gets a stable one for the download.
 fn file_name(url: &str) -> String {
-    url.split(['?', '#'])
-        .next()
-        .and_then(|url| url.rsplit('/').next())
-        .filter(|name| !name.is_empty())
+    let path = url.split(['?', '#']).next().unwrap_or(url);
+    crate::domain::naming::file_name_from_url(path)
         .unwrap_or("loader.zip")
         .to_string()
 }

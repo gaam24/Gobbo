@@ -1,9 +1,28 @@
 import { beforeEach, expect, test } from "bun:test";
+import { createElement } from "react";
+import { renderToString } from "react-dom/server";
 
-import { clearFailedTask, failedTasks, recordFailedTask, resetFailedTasks } from "@/lib/failed-tasks-store";
+import { localFailedTasks } from "@/app/hooks/use-activity";
+import { clearFailedTask, type FailedTask, recordFailedTask, useFailedTasks } from "@/lib/failed-tasks-store";
+import { groupedTasks } from "@/lib/tasks";
+
+function FailedTaskProbe({ observe }: { observe: (value: readonly FailedTask[]) => void }) {
+	observe(useFailedTasks());
+	return null;
+}
+
+/// Reads the failures through the production subscription, the same one the activity card uses.
+function failedTasks(): readonly FailedTask[] {
+	const seen: Array<readonly FailedTask[]> = [];
+	renderToString(createElement(FailedTaskProbe, { observe: (value) => seen.push(value) }));
+	const tasks = seen[0];
+	if (tasks === undefined) throw new Error("the failure hook did not render");
+	return tasks;
+}
 
 beforeEach(() => {
-	resetFailedTasks();
+	// Clear through the public removal command; the store has no test-only reset.
+	for (const task of failedTasks()) clearFailedTask(task.id);
 });
 
 test("a failed task replaces its earlier failure and stays first", () => {
@@ -45,22 +64,31 @@ test("clearing a task leaves the others and an unknown id changes nothing", () =
 	expect(failedTasks()).toEqual([{ id: "import:/a.zip", kind: "import", title: "Import failed" }]);
 });
 
-test("the store keeps every game's rows and tasks without a game; filtering is the activity hook's job", () => {
+test("a background game's failed row still appears in the activity view with its Retry action", () => {
+	let retried = false;
 	recordFailedTask({
-		id: "apply:a",
+		id: "apply:game-b",
 		kind: "apply",
-		game: "game-a",
-		title: "Apply A failed",
-	});
-	recordFailedTask({
-		id: "import:b",
-		kind: "import",
 		game: "game-b",
-		title: "Import B failed",
+		title: "Apply failed",
+		onRetry: () => {
+			retried = true;
+		},
 	});
-	recordFailedTask({ id: "global", kind: "update", title: "Global failure" });
 
-	// Listing all rows is pure and unfiltered, so switching the shown game never drops another game's retry action.
-	expect(failedTasks()).toHaveLength(3);
-	expect(failedTasks().map((task) => task.game)).toEqual([undefined, "game-b", "game-a"]);
+	// The window may be on another game: the activity view groups every failure and keeps each one's retry action.
+	const groups = groupedTasks(
+		localFailedTasks(failedTasks(), [
+			{ id: "game-a", name: "Game A" },
+			{ id: "game-b", name: "Game B" },
+		]),
+	);
+	const [background] = groups.flatMap((group) => group.tasks);
+
+	expect(groups.map((group) => group.game)).toEqual(["game-b"]);
+	expect(background?.state).toBe("failed");
+	expect(background?.gameName).toBe("Game B");
+	expect(background?.onRetry).toBeTypeOf("function");
+	background?.onRetry?.();
+	expect(retried).toBe(true);
 });

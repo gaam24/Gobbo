@@ -29,6 +29,8 @@ impl RateRetry {
         loop {
             match attempt() {
                 Err(error) if error.code == "http.rate_limited" && self.left > 0 => {
+                    // The download already normalized the server's answer, so this only reads the number it stored;
+                    // a value from another producer still gets the same five-second fallback.
                     let seconds = error
                         .params
                         .get("retry_after")

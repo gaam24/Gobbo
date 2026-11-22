@@ -15,7 +15,8 @@ default_variant = "pak"
 [deploy]
 # A cooked pak, its IoStore containers and its signature keep their names in one folder. UE mounts them from there;
 # the file names decide the order, so Gobbo does not rename them. The root-folder rule wraps an archive shaped as
-# `<Mod>/<Mod>.pak` without losing the mod name in the library.
+# `<Mod>/<Mod>.pak` without losing the mod name in the library. Deliberate differences: `.sig` is allowed for bare and
+# wrapped paks but not for a folder-only mod, and the LogicMods mirror also takes UE4SS `.lua` mods.
 [[deploy.slots]]
 dir = "Content/Paks/~mods"
 flat = true
@@ -46,6 +47,9 @@ LogicMods = "Content/Paks/LogicMods"
 # same zip onto the window does the same. Only Lua/C++ mods and Blueprint paks need it: a list of plain paks in `~mods`
 # does not ask for UE4SS.
 [variants."ue4ss-4"]
+# UE4SS keeps its enabled-mod list and per-mod flags with the mods, in this variant's own slot.
+config_mirror = "Binaries/Win64/ue4ss/Mods"
+
 [variants."ue4ss-4".install]
 name = "UE4SS"
 version = "4.0.0"
@@ -63,6 +67,9 @@ enable_file = "enabled.txt"
 
 # UE4SS 3.x and 2.x keep `Mods/` directly in the executable folder. The mod layout is otherwise the same.
 [variants."ue4ss-3"]
+# Its settings live in that same folder, so this variant names its own slot for community-profile configs.
+config_mirror = "Binaries/Win64/Mods"
+
 [variants."ue4ss-3".install]
 name = "UE4SS"
 version = "3.0.1"

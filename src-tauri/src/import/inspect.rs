@@ -1,7 +1,6 @@
 //! Reading a FOMOD installer out of an archive for the wizard.
 
 use super::model::{FomodCondition, FomodDependencies, FomodDependency, ZipInspect};
-use crate::context::Data;
 use crate::error::{AppError, ErrorKind};
 use crate::games;
 use crate::import::fomod;
@@ -46,8 +45,9 @@ fn dependencies_view(dependencies: &Dependencies) -> FomodDependencies {
     }
 }
 
-/// Loads the archive and recognizes a FOMOD installer. Reads only the list of entries and one XML file.
-pub fn inspect(_root: &Data, game_id: &str, zip: &std::path::Path) -> Result<ZipInspect, AppError> {
+/// Loads the archive and recognizes a FOMOD installer. The command boundary passes the game id and the archive; the
+/// reader needs only the list of entries and one XML file.
+pub fn inspect_at(game_id: &str, zip: &std::path::Path) -> Result<ZipInspect, AppError> {
     let _ = games::load(game_id)?;
     let reader = archive::Archive::open(zip)?;
     let Some(config_entry) = fomod_config_entry(&reader) else {
@@ -96,10 +96,9 @@ pub fn inspect(_root: &Data, game_id: &str, zip: &std::path::Path) -> Result<Zip
     })
 }
 
-/// The wizard's answer for the installer of an archive under a selection (`None` is the default selection). It reads
-/// the installer the way `inspect` does; a plain archive has no installer to answer for.
-pub fn fomod_state(
-    _root: &Data,
+/// The wizard's answer for the installer of an archive under a selection (`None` is the default selection). The command
+/// boundary passes the game id and the archive; the reader needs nothing else.
+pub fn state_at(
     game_id: &str,
     zip: &std::path::Path,
     selection: Option<&[fomod::Choice]>,

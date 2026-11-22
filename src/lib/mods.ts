@@ -128,13 +128,34 @@ function pageGroupOf(pageId: string, mods: Mod[]): PageGroup {
 /// The stored groups that still have at least two visible members. Parts follow the order of `mods`, not the order in
 /// which the group lists them, and a removed member is simply absent. A mod is in at most one group.
 export function userGroups(mods: readonly Mod[], groups: readonly ModGroup[]): UserGroup[] {
+	// One walk over the visible mods instead of one filter per stored group. The index keeps each group's parts in list
+	// order and the result in group order; a member that appears in two groups still lands in both.
+	const groupsByMember = new Map<string, number[]>();
+
+	groups.forEach((group, index) => {
+		for (const id of group.members) {
+			const owners = groupsByMember.get(id);
+
+			if (owners) owners.push(index);
+			else groupsByMember.set(id, [index]);
+		}
+	});
+	const partsByGroup: Mod[][] = groups.map(() => []);
+
+	for (const mod of mods) {
+		const owners = groupsByMember.get(mod.id);
+
+		if (owners) {
+			for (const index of owners) partsByGroup[index]?.push(mod);
+		}
+	}
+
 	const result: UserGroup[] = [];
 
-	for (const group of groups) {
-		const members = new Set(group.members);
-		const parts = mods.filter((mod) => members.has(mod.id));
+	groups.forEach((group, index) => {
+		const parts = partsByGroup[index];
 
-		if (parts.length < 2) continue;
+		if (!parts || parts.length < 2) return;
 		result.push({
 			source: "user",
 			id: groupRowId(group.id),
@@ -142,7 +163,7 @@ export function userGroups(mods: readonly Mod[], groups: readonly ModGroup[]): U
 			parts,
 			group,
 		});
-	}
+	});
 
 	return result;
 }
@@ -200,18 +221,6 @@ function groupsOf(items: readonly ListItem[], stored: readonly ModGroup[]): Map<
 	}
 
 	return byId;
-}
-
-/// The group named by a header row id, page or user, or `undefined` when that header is gone.
-function groupByRow(byId: ReadonlyMap<string, Group>, rowId: string): Group | undefined {
-	for (const group of byId.values()) if (group.id === rowId) return group;
-	return undefined;
-}
-
-/// The family ids under a group header, for a group-wide enable toggle. Works for both page and user group row ids.
-export function groupMemberIds(items: ListItem[], rowId: string, groups: readonly ModGroup[] = []): string[] {
-	const group = groupByRow(groupsOf(items, groups), rowId);
-	return group ? group.parts.map((part) => part.id) : [];
 }
 
 /// The table rows. Adjacent mods of one source page or a stored user group become one header and its parts; a group with

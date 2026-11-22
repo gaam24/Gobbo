@@ -8,10 +8,10 @@ use crate::context::profile::history::save_profiles;
 use crate::context::profile::lock_profiles;
 use crate::context::{Data, load_game, load_library, load_profiles};
 use crate::domain::collection::CollectionItem;
+use crate::domain::library::LibraryView;
 use crate::domain::profiles::{Entry as ProfileEntry, Profiles};
 use crate::error::AppError;
 use crate::games;
-use crate::library::LibraryView;
 use crate::library::waiting::find_version;
 
 /// The live status of one collection in one profile.
@@ -234,7 +234,7 @@ pub fn finish_with_manual(
 
     save_profiles(&data, &profiles)?;
     let profile = profiles.get(profile_id)?.clone();
-    let current = status::statuses(&plan, &library, &profile, Some(&origin));
+    let current = status::statuses_with_view(&plan, &library, &view, &profile, Some(&origin));
     Ok(session_view(profile_id.to_string(), origin, plan, current))
 }
 /// Marks a member done without a library source, for a manual or browse resource the user installed by hand.

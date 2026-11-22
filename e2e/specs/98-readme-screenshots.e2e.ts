@@ -4,8 +4,9 @@ import path from "node:path";
 import { browser } from "@wdio/globals";
 
 import { invoke, reloadWindow } from "../support/bridge";
-import { definitionsDir, root } from "../support/env";
+import { definitionsDir, GOBBO_E2E_OUT, root } from "../support/env";
 import { modZip, prepareGame } from "../support/fixtures";
+import { type ScreenshotMod, screenshotGame, screenshotMods } from "../support/screenshot-data";
 import { cleanupGame, createProfile, enableMods, importMods, saveSettings, statusOf } from "../support/seed";
 import {
 	activateMenuItem,
@@ -21,18 +22,19 @@ import {
 } from "../support/ui";
 
 /// The README needs a real window, but not the user's library. This spec builds a small demo game under `target/`,
-/// imports readable mod names, and saves the screenshots the README embeds. It is not part of the normal suite.
-const GAME_ID = "the-witcher-3-demo";
-const GAME_NAME = "The Witcher 3: Wild Hunt";
+/// imports readable mod names from `support/screenshot-data.ts`, and saves the screenshots the README embeds. It is not
+/// part of the normal suite.
+const GAME_ID = screenshotGame.id;
+const GAME_NAME = screenshotGame.name;
 const OUT = path.join(root, "target/readme-screenshots");
 
 /// A demo archive with the readable name and version an `info.json` supplies, so the screenshot does not show the
 /// archive's file name.
-function demoModZip(archive: string, folder: string, name: string, version: string, files: Record<string, string> = {}): string {
-	return modZip(archive, folder, {
-		"info.json": JSON.stringify({ modName: name, version }),
-		[`content/${folder}.ws`]: "x",
-		...files,
+function demoModZip(mod: ScreenshotMod): string {
+	return modZip(mod.archive, mod.folder, {
+		"info.json": JSON.stringify({ modName: mod.name, version: mod.version }),
+		[`content/${mod.folder}.ws`]: "x",
+		...mod.files,
 	});
 }
 
@@ -44,12 +46,12 @@ describe("README screenshots", () => {
 			name: GAME_NAME,
 			verified: true,
 		});
-		copyFileSync(path.join(root, "games/the-witcher-3-wild-hunt/icon.webp"), path.join(definitionsDir, GAME_ID, "icon.webp"));
+		copyFileSync(path.join(root, screenshotGame.icon), path.join(definitionsDir, GAME_ID, "icon.webp"));
 		await invoke("add_game", { game: GAME_ID, gameRoot: fixture.root });
 		await saveSettings(GAME_ID, {
 			settings_dir: "",
 			mods_root: "",
-			launch_env: `GOBBO_E2E_OUT=${fixture.out}`,
+			launch_env: `${GOBBO_E2E_OUT}=${fixture.out}`,
 			launch_args: "",
 			profile_data: [],
 		});
@@ -57,22 +59,7 @@ describe("README screenshots", () => {
 		await waitForGame(GAME_NAME);
 		await clickGame(GAME_NAME);
 
-		const archives = [
-			demoModZip("readme-community-patch.zip", "modCommunityPatch", "Community Patch", "4.2.1", {
-				"content/shared.ws": "community",
-			}),
-			demoModZip("readme-hd-reworked.zip", "modHDReworkedProject", "HD Reworked Project", "12.0"),
-			demoModZip("readme-friendly-hud.zip", "modFriendlyHUD", "Friendly HUD", "3.1"),
-			demoModZip("readme-no-time-for-gwent.zip", "modNoTimeForGwent", "No Time for Gwent", "2.0"),
-			demoModZip("readme-shared-utils.zip", "modSharedUtils", "Shared Utils", "1.4"),
-			demoModZip("readme-better-roach.zip", "modBetterRoachControls", "Better Roach Controls", "1.2", {
-				"content/shared.ws": "roach",
-			}),
-			demoModZip("readme-photo-mode.zip", "modPhotoModeUnlocked", "Photo Mode Unlocked", "1.0"),
-			demoModZip("readme-no-intro.zip", "modNoIntroVideos", "No Intro Videos", "2.2"),
-			demoModZip("readme-extra-tooltips.zip", "modExtraTooltips", "Extra Tooltips", "1.1"),
-			demoModZip("readme-debug-console.zip", "modDebugConsole", "Debug Console", "1.0"),
-		];
+		const archives = screenshotMods.map((mod) => demoModZip(mod));
 		await importMods(GAME_ID, archives);
 		const imported = await statusOf(GAME_ID);
 		await enableMods(
@@ -96,7 +83,9 @@ describe("README screenshots", () => {
 		await reloadWindow();
 		await waitForGame(GAME_NAME);
 		await clickGame(GAME_NAME);
+		// e2e-locale-exception: mod names from the screenshot fixture, not interface prose.
 		await waitForMod("Community Patch");
+		// e2e-locale-exception: mod names from the screenshot fixture, not interface prose.
 		await clickMod("HD Reworked Project");
 		await waitForText("Overview");
 		// The automatic width clips the last inspector tab in a 1440 px window; give the panel a little more room.

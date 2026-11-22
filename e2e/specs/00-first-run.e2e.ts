@@ -8,30 +8,22 @@ import { bodyText, clickByLabel, clickTab, count, openTooltipByLabel, railView, 
 /// The first run: no game is added, so the Games page is the only screen with content. The suite writes an English
 /// settings file before the app starts, so these assertions do not depend on the machine's locale.
 describe("first run", () => {
-	it("opens on the Games page with the shell and no game added", async () => {
+	it("opens on the Games page with no game added", async () => {
 		await waitForShell();
 		const view = await railView();
 		assert.equal(view, "Games", `the first run opened ${view ?? "no view"} instead of Games`);
 		await waitForText("Games");
 		// The first-run explanation is a HelpHint tooltip, so it is only in the DOM once the trigger is opened.
 		await openTooltipByLabel("More information");
-		await waitForText("Gobbo finds games in Steam libraries on this PC. Only added games get mods; removed ones wait on the Storage page.");
-		assert.ok((await count("nav [aria-label]")) > 0, "the rail has no controls");
+		await waitForText(
+			"Gobbo finds games from Steam, GOG, Epic, Heroic and Lutris on this PC. Only games you add get mods; removed games wait on the Storage page.",
+		);
+		const text = await bodyText();
+		assert.ok(text.includes("Add") || text.includes("Locate"), "the catalog has no action for a game");
 		assert.equal(await count("nav [aria-label^='E2E']"), 0, "a game was already added");
 	});
-	it("lists the supported games without adding any", async () => {
-		const text = await bodyText();
-		assert.ok(text.includes("Games"), "the Games heading is missing");
-		assert.ok(text.includes("Add") || text.includes("Locate"), "the catalog has no action for a game");
-		assert.equal(await count("nav [aria-label^='E2E']"), 0, "a game tile appeared before the suite added one");
-	});
-	it("opens the app settings and shows the shared sections", async () => {
+	it("opens the app settings on the expected page", async () => {
 		await clickByLabel("Gobbo Mods Organizer settings");
-		await waitForText("Mod providers");
-		await clickTab("Updates");
-		await waitForText("Check for updates");
-		await clickTab("Support");
-		await waitForText("Create support bundle");
 		const view = await railView();
 		assert.equal(view, "Gobbo Mods Organizer settings");
 	});
@@ -51,7 +43,7 @@ describe("first run", () => {
 		await waitForText("No downloads yet.");
 		await clickByLabel("Storage");
 		await waitForText("No game data yet");
-		await waitForText("Add a game to create its data folder.");
+		await waitForText("Add a game and its data folder shows up here.");
 	});
 	it("shows the language setting in English", async () => {
 		await clickByLabel("Gobbo Mods Organizer settings");

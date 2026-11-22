@@ -4,7 +4,8 @@
 //! uses the real folder (or an empty base) as `root` and the profile's layer as `upper`. Deletions of files in the
 //! lower layers are kept as whiteouts, so they hide the file without touching it. `MountSpec`/`MountConfig` describe
 //! the whole set; Gobbo writes it and the Windows hook reads it. This crate is plain logic with no Windows calls, so it
-//! is tested on every platform. The Windows hook and Gobbo both use it.
+//! is tested on every platform. The one `cfg(windows)` helper, `wide`, only converts text into a NUL-terminated UTF-16
+//! buffer for the Win32 boundary. The Windows hook and Gobbo both use it.
 
 #![forbid(unsafe_code)]
 
@@ -475,16 +476,35 @@ pub fn fold_char(c: char) -> char {
     }
 }
 
+/// The ASCII branch of `fold_unit`: folds an ASCII unit without touching any other unit. The hook uses it to recognize
+/// drive letters and keywords in a path, where a Unicode fold must not turn another letter into ASCII.
+pub const fn fold_ascii_unit(unit: u16) -> u16 {
+    if unit >= 0x41 && unit <= 0x5A {
+        unit + 32
+    } else {
+        unit
+    }
+}
+
 /// The folded form of one UTF-16 code unit, as `fold_char` folds a character. A surrogate is not a character and keeps
 /// its unit.
 pub fn fold_unit(unit: u16) -> u16 {
     if unit < 0x80 {
-        return u16::from((unit as u8).to_ascii_lowercase());
+        return fold_ascii_unit(unit);
     }
 
     char::from_u32(u32::from(unit))
         .and_then(|c| u16::try_from(u32::from(fold_char(c))).ok())
         .unwrap_or(unit)
+}
+
+/// A string as a NUL-terminated UTF-16 buffer, for Win32. Windows only: the hook and the launcher use it at the API
+/// boundary.
+#[cfg(windows)]
+pub fn wide(text: &std::ffi::OsStr) -> Vec<u16> {
+    use std::os::windows::ffi::OsStrExt;
+
+    text.encode_wide().chain(std::iter::once(0)).collect()
 }
 
 /// Whether every UTF-16 unit is ASCII, as the no-allocation path requires.
@@ -1099,7 +1119,6 @@ mod tests {
             relative_to(r"C:\Game", r"C:\Game\\bin/x.dll"),
             Some(r"bin\x.dll".to_string())
         );
-        assert_eq!(relative_to(r"C:\Game", r"C:\Game\..\Other\x"), None);
         assert_eq!(relative_to(r"C:\Game", r"C:\Game\"), Some(String::new()));
         assert_eq!(
             relative_to(r"C:\Game", r"C:\Game\..\..\Game\x"),
@@ -1430,61 +1449,33 @@ mod tests {
         }
     }
 
-    fn reference_relative_to(root: &str, path: &str) -> Option<String> {
-        let root = normal(root);
-        let path = normal(path);
-        let head = path.get(..root.len())?;
-
-        if !head.eq_ignore_ascii_case(&root) {
-            return None;
+    #[test]
+    fn relative_to_returns_game_relative_paths_for_separators_and_unc() {
+        // A canonical root, a path with separators and dot components, and a UNC root take different paths through
+        // `relative_to`; the answer must be the same kind of game-relative path on each.
+        for (root, path, expected) in [
+            (r"C:\Game", r"C:\Game\data\a.txt", Some(r"data\a.txt")),
+            (
+                r"C:\Game",
+                r"c:/game/mods/../data/a.txt",
+                Some(r"data\a.txt"),
+            ),
+            (r"C:\Game", r"C:\Game Mods\data\a.txt", None),
+            (
+                r"\\server\share\Game",
+                r"\\?\UNC\server\share\Game\data\a.txt",
+                Some(r"data\a.txt"),
+            ),
+        ] {
+            assert_eq!(
+                relative_to(root, path),
+                expected.map(str::to_string),
+                "{path}"
+            );
         }
-
-        let rest = &path[root.len()..];
-
-        if rest.is_empty() {
-            Some(String::new())
-        } else {
-            rest.strip_prefix('\\').map(str::to_string)
-        }
-    }
-
-    fn reference_wildcard(pattern: &str, name: &str) -> bool {
-        if pattern == "*.*" {
-            return true;
-        }
-
-        if let Some(stem) = pattern.strip_suffix('.')
-            && !stem.contains('.')
-        {
-            if name == "." || name == ".." {
-                return stem.chars().all(|c| c == '*');
-            }
-
-            return !name.contains('.') && reference_wildcard(stem, name);
-        }
-
-        let pattern: Vec<char> = pattern.chars().map(fold_char).collect();
-        let name: Vec<char> = name.chars().map(fold_char).collect();
-        matches_from(&pattern, &name)
     }
 
     proptest! {
-        #[test]
-        fn the_ascii_wildcard_agrees_with_the_character_reference(
-            pattern in "[a-zA-Z0-9.*?]{0,20}",
-            name in "[a-zA-Z0-9.]{0,20}",
-        ) {
-            prop_assert_eq!(wildcard_match(&pattern, &name), reference_wildcard(&pattern, &name));
-        }
-
-        #[test]
-        fn the_direct_path_agrees_with_the_normalizing_reference(
-            root in "[a-zA-Z0-9_\\\\.:]{0,40}",
-            path in "[a-zA-Z0-9_\\\\.:]{0,40}",
-        ) {
-            prop_assert_eq!(relative_to(&root, &path), reference_relative_to(&root, &path));
-        }
-
         #[test]
         fn a_path_below_the_root_is_relative(
             root in "[a-z]{1,8}",

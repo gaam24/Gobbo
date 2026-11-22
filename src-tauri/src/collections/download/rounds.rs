@@ -2,7 +2,7 @@ use std::path::Path;
 use std::sync::atomic::AtomicBool;
 
 use super::import::{import_member, install_one};
-use super::loaded::{ItemOutcome, load};
+use super::loaded::{ItemOutcome, LoadedCollection, load};
 use super::prefetch::{may_download_in_parallel, prefetch_archives, provider_needs_page};
 use super::provider_source;
 use crate::acquire;
@@ -13,6 +13,7 @@ use crate::collections::model::{
 use crate::collections::session;
 use crate::context::Data;
 use crate::domain::collection::{CollectionItem, CollectionItemStatus, CollectionSource};
+use crate::domain::library::LibraryView;
 use crate::error::{AppError, Message};
 use crate::infra::tasks::cancelled;
 use crate::providers::{self, PAYMENT_REQUIRED};
@@ -29,7 +30,9 @@ pub fn install_automatic(
     cancel: Option<&AtomicBool>,
 ) -> Result<CollectionInstallView, AppError> {
     let loaded = load(root, game_id, profile_id, collection_key)?;
-    let statuses = loaded.statuses();
+    // One view for the whole operation: the member statuses and the exact-file checks share its indexes.
+    let view = LibraryView::new(&loaded.library);
+    let statuses = loaded.statuses(&view);
     let selected: Vec<&CollectionItem> = loaded
         .plan
         .ordered()
@@ -67,7 +70,7 @@ pub fn install_automatic(
             }
         }
 
-        prefetch_archives(&loaded, &selected, &statuses, cancel)
+        prefetch_archives(&loaded, &selected, &statuses, &view, cancel)
     } else {
         (0..selected.len()).map(|_| None).collect()
     };
@@ -222,7 +225,8 @@ pub fn prepare_item(
         .plan
         .item(item_key)
         .ok_or_else(|| AppError::user("collection.item_missing").with("item", item_key))?;
-    let statuses = loaded.statuses();
+    let view = LibraryView::new(&loaded.library);
+    let statuses = loaded.statuses(&view);
     let status = statuses.statuses.get(item_key);
 
     if status.is_some_and(CollectionItemStatus::is_done) {
@@ -237,7 +241,8 @@ pub fn prepare_item(
     // The exact file is already in the library. Opening its page would ask the user to download a copy the import
     // could only refuse; let the window say so and leave the member for the user to enable from the mod list.
     if matches!(item.source, CollectionSource::Provider { .. })
-        && provider_source(item).is_some_and(|source| loaded.has_library_file(&source))
+        && provider_source(item)
+            .is_some_and(|source| LoadedCollection::has_library_file(&view, &source))
     {
         return Ok(CollectionItemAction::AlreadyInLibrary {
             name: item.name.clone(),
@@ -296,9 +301,9 @@ pub fn prepare_item(
                     name: item.name.clone(),
                 }),
                 ItemOutcome::NeedsChoice(choice) => Ok(CollectionItemAction::NeedsChoice {
-                    path: choice.path,
-                    module_name: choice.module_name,
-                    steps: choice.steps,
+                    path: choice.choice.path.display().to_string(),
+                    module_name: choice.choice.module_name,
+                    steps: choice.choice.steps,
                 }),
                 ItemOutcome::NeedsUser => Ok(CollectionItemAction::NeedsUser {
                     url: None,

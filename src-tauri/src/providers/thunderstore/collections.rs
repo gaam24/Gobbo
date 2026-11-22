@@ -218,6 +218,7 @@ fn revision_of(
         external: Vec::new(),
         revisions: Vec::new(),
         archive_link: None,
+        unsupported_archive_paths: Vec::new(),
         complete: true,
     }
 }

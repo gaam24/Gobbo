@@ -5,6 +5,7 @@ use super::source::provider_source;
 use crate::collections::COLLECTION_CANCELLED;
 use crate::collections::status;
 use crate::domain::collection::{CollectionItem, CollectionItemStatus, CollectionSource};
+use crate::domain::library::LibraryView;
 use crate::domain::source::DownloadRoute;
 use crate::error::AppError;
 use crate::infra::tasks::cancelled;
@@ -68,6 +69,7 @@ pub(super) fn prefetch_archives(
     loaded: &LoadedCollection,
     selected: &[&CollectionItem],
     statuses: &status::StatusSet,
+    view: &LibraryView<'_>,
     cancel: Option<&AtomicBool>,
 ) -> Vec<Option<PreparedDownload>> {
     let mut ready: Vec<Option<PreparedDownload>> = (0..selected.len()).map(|_| None).collect();
@@ -75,7 +77,8 @@ pub(super) fn prefetch_archives(
         .filter(|&index| {
             let item = selected[index];
             matches!(item.source, CollectionSource::Provider { .. })
-                && provider_source(item).is_some_and(|source| !loaded.has_library_file(&source))
+                && provider_source(item)
+                    .is_some_and(|source| !LoadedCollection::has_library_file(view, &source))
                 && !statuses
                     .statuses
                     .get(&item.key)

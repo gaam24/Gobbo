@@ -1,7 +1,7 @@
 import { copyFileSync, existsSync } from "node:fs";
 import path from "node:path";
 
-import { definitionsDir, fixturesDir, homeDir, loadersDir, outDir, rootsDir } from "./env";
+import { definitionsDir, fixturesDir, GOBBO_E2E_OUT, homeDir, loadersDir, outDir, rootsDir } from "./env";
 import { makeDir, removeTree, writeFile, writeZip } from "./files";
 
 export interface GameFixture {
@@ -16,7 +16,7 @@ export interface GameFixture {
 export interface GameOptions {
 	id: string;
 	name: string;
-	/// The deployment layout. A slot is the mirror of `games/e2e`; the others exercise one rule each.
+	/// The deployment layout. A slot mirrors the generated definition under `target/e2e-data`; the others exercise one rule each.
 	layout?: "slot" | "mirror" | "flat" | "protected" | "loader";
 	slotDir?: string;
 	slotMarker?: string;
@@ -60,7 +60,7 @@ function array(values: readonly string[]): string {
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: one flat builder of optional TOML sections is clearer than five partial builders.
 export function gameToml(options: GameOptions): string {
 	const layout = options.layout ?? "slot";
-	const slotDir = options.slotDir ?? (layout === "loader" ? "BepInEx/plugins" : "Mods");
+	const slotDir = options.slotDir ?? (layout === "loader" ? "e2e-loader/plugins" : "Mods");
 	const slotMarker = options.slotMarker ?? (layout === "loader" ? undefined : "content");
 	const slotPrefix = options.slotPrefix ?? "mod";
 	let providers = "providers = {}";
@@ -125,7 +125,7 @@ export function gameToml(options: GameOptions): string {
 		if (options.protected || layout === "protected") lines.push(`protected = ${array(["bin/config"])}`);
 
 		if (options.aliases || layout === "loader") {
-			lines.push("[deploy.aliases]", 'plugins = "BepInEx/plugins"');
+			lines.push("[deploy.aliases]", 'plugins = "e2e-loader/plugins"');
 		}
 
 		lines.push(
@@ -200,7 +200,7 @@ export function gameToml(options: GameOptions): string {
 
 const GAME_SCRIPT = `#!/bin/sh
 set -eu
-out="\${GOBBO_E2E_OUT:-}"
+out="\${${GOBBO_E2E_OUT}:-}"
 if [ -z "$out" ]; then exit 0; fi
 mkdir -p "$out"
 printf '%s\\n' "$@" > "$out/args.txt"
@@ -213,25 +213,25 @@ printf 'gobbo e2e game\\n'
 `;
 
 const SLEEP_SCRIPT = `#!/bin/sh
-out="\${GOBBO_E2E_OUT:-}"
+out="\${${GOBBO_E2E_OUT}:-}"
 if [ -n "$out" ]; then printf 'sleeping\\n' > "$out/sleep.txt"; fi
 sleep 30
 `;
 
 const CRASH_SCRIPT = `#!/bin/sh
-out="\${GOBBO_E2E_OUT:-}"
+out="\${${GOBBO_E2E_OUT}:-}"
 if [ -n "$out" ]; then printf 'crash\\n' > "$out/crash.txt"; fi
 printf 'crash on purpose\\n' >&2
 exit 3
 `;
 
 const SECOND_SCRIPT = `#!/bin/sh
-out="\${GOBBO_E2E_OUT:-}"
+out="\${${GOBBO_E2E_OUT}:-}"
 if [ -n "$out" ]; then printf 'second\\n' > "$out/second.txt"; fi
 `;
 
 const STEP_SCRIPT = `#!/bin/sh
-out="\${GOBBO_E2E_OUT:-}"
+out="\${${GOBBO_E2E_OUT}:-}"
 if [ -z "$out" ]; then exit 0; fi
 mkdir -p "$out"
 printf 'step %s\\n' "$*" >> "$out/steps.log"
@@ -268,15 +268,19 @@ export function writeGameRoot(options: GameOptions, root = path.join(rootsDir, o
 	if (options.loadOrder) makeDir(path.join(root, "settings"));
 
 	if (options.layout === "loader") {
-		writeFile(path.join(root, "BepInEx/core/E2E2.dll"), "loader");
+		writeFile(path.join(root, "e2e-loader/core/E2E-loader.dll"), "loader");
 		writeFile(path.join(root, "winhttp.dll"), "proxy");
 	}
 
-	if (options.userData) makeDir(path.join(homeDir, "e2e-user", options.id, "saves"));
+	if (options.userData) {
+		makeDir(path.join(homeDir, "e2e-user", options.id, "saves"));
+		writeFile(path.join(homeDir, "e2e-user", options.id, "saves", "real.dat"), "real");
+	}
 
-	if (options.profileData) makeDir(path.join(homeDir, "e2e-profile", options.id));
-	writeFile(path.join(homeDir, "e2e-user", options.id, "saves", "real.dat"), "real");
-	writeFile(path.join(homeDir, "e2e-profile", options.id, "settings.ini"), "real=1\n");
+	if (options.profileData) {
+		makeDir(path.join(homeDir, "e2e-profile", options.id));
+		writeFile(path.join(homeDir, "e2e-profile", options.id, "settings.ini"), "real=1\n");
+	}
 	makeDir(path.join(outDir, options.id));
 	return root;
 }

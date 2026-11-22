@@ -5,12 +5,12 @@ use std::sync::atomic::AtomicBool;
 
 use crate::context::Data;
 use crate::context::size_kb;
-use crate::error::AppError;
+use crate::error::{AppError, DOWNLOAD_CANCELLED};
 use crate::providers;
 use crate::providers::fetch::{Fetch as FetchRequest, fetch_with_progress};
 
 use super::super::model::{DownloadState, DownloadView};
-use super::super::progress::{CANCELLED, Meter};
+use super::super::progress::Meter;
 use super::game::game_for_link;
 use super::{DownloadEvent, Downloads, archive_name};
 
@@ -39,7 +39,7 @@ impl Downloads {
                     self.import_download(root, id, changed);
                 }
             }
-            Err(error) if error.code == CANCELLED => {
+            Err(error) if error.code == DOWNLOAD_CANCELLED => {
                 self.lock().retain(|queued| queued.view.id != id);
             }
             Err(error) => {

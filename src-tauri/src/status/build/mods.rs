@@ -3,8 +3,7 @@ use crate::domain::profiles::entry::ProfileMod;
 use crate::error::AppError;
 use crate::games::GameDef;
 use crate::library::relations::UnmetRequirements;
-use crate::library::{Library, LibraryView};
-use crate::status::mod_views::mod_view;
+use crate::status::mod_views::{LibraryContext, mod_view};
 
 use super::PlanOutcome;
 
@@ -13,8 +12,7 @@ use super::PlanOutcome;
 pub(super) fn mod_views(
     listed: &[ProfileMod],
     game: &GameDef,
-    library: &Library,
-    view: &LibraryView<'_>,
+    context: &LibraryContext<'_>,
     profiles: &ProfilesView<'_>,
     plan: &PlanOutcome,
     requirements: &UnmetRequirements<'_>,
@@ -28,16 +26,7 @@ pub(super) fn mod_views(
             .iter()
             .enumerate()
             .map(|(index, entry)| {
-                mod_view(
-                    index,
-                    entry,
-                    game,
-                    library,
-                    view,
-                    profiles,
-                    plan,
-                    requirements,
-                )
+                mod_view(index, entry, game, context, profiles, plan, requirements)
             })
             .collect());
     }
@@ -59,8 +48,7 @@ pub(super) fn mod_views(
                                 start + offset,
                                 entry,
                                 game,
-                                library,
-                                view,
+                                context,
                                 profiles,
                                 plan,
                                 requirements,

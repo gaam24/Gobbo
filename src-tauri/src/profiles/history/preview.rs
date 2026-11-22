@@ -5,6 +5,7 @@ use crate::context::Data;
 use crate::context::Loaded;
 use crate::context::load_game;
 use crate::context::profile::history::{read_index, read_state};
+use crate::domain::library::Library;
 use crate::domain::profiles::Entry;
 use crate::domain::profiles::diff::diff;
 use crate::domain::profiles::history::separator_changes;
@@ -12,7 +13,6 @@ use crate::domain::profiles::history::waiting_changes;
 use crate::domain::profiles::history::winner_changes;
 use crate::error::AppError;
 use crate::games;
-use crate::library::Library;
 use rustc_hash::FxHashSet;
 use serde::Serialize;
 

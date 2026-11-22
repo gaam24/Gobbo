@@ -5,11 +5,9 @@ use std::ffi::OsStr;
 use std::os::windows::ffi::OsStrExt;
 use std::path::Path;
 
-use gobbo_overlay_core::join;
+use gobbo_overlay_core::{join, wide};
 use windows_sys::Win32::Foundation::{ERROR_FILE_NOT_FOUND, ERROR_PATH_NOT_FOUND, GetLastError};
 use windows_sys::Win32::Storage::FileSystem::{GetFileAttributesW, INVALID_FILE_ATTRIBUTES};
-
-use crate::text::wide;
 
 /// Why a path has no file: the file is missing in a folder that exists, or a folder in the path is missing.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

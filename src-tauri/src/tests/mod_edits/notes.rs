@@ -1,11 +1,11 @@
 //! The notes a user types on a mod: the environment line and the instructions.
 
 use super::*;
+use crate::context::Settings;
 use crate::library::set_mod_instructions;
 use crate::packs::export::export_pack;
 use crate::packs::import::import_pack;
 use crate::packs::model::PackArchives;
-use crate::settings::config::Settings;
 use crate::status::sync_profiles as status;
 
 #[test]

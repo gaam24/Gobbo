@@ -4,8 +4,5 @@
 pub mod prerequisites;
 pub mod running;
 
-pub use prerequisites::install_prerequisites;
-pub use running::run_game;
-
 #[cfg(test)]
 mod tests;

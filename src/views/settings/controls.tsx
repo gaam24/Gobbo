@@ -2,6 +2,7 @@ import { cn } from "cn";
 import type { KeyboardEvent, ReactNode } from "react";
 import { HelpHint } from "@/components/app/help-hint";
 import { Field, FieldContent, FieldDescription, FieldLabel } from "@/components/ui/field";
+import { Switch } from "@/components/ui/switch";
 
 /// Settings row: title and hint on the left, the control on the right. Rows are separated by a line, not cards.
 export function SettingRow({
@@ -39,6 +40,30 @@ export function SettingRow({
 				<div className="min-w-0 @md/field-group:flex-1">{children}</div>
 			</Field>
 		</div>
+	);
+}
+
+/// A row whose only control is a switch. `hint` is also the switch's accessible name, so the sentence that says what
+/// the switch does is written once.
+export function ToggleSetting({
+	title,
+	htmlFor,
+	hint,
+	help,
+	on,
+	onChange,
+}: {
+	title: string;
+	htmlFor: string;
+	hint: string;
+	help?: string;
+	on: boolean;
+	onChange: (on: boolean) => void | Promise<void>;
+}) {
+	return (
+		<SettingRow title={title} htmlFor={htmlFor} hint={hint} help={help}>
+			<Switch id={htmlFor} aria-label={hint} checked={on} onCheckedChange={(checked) => void onChange(checked)} />
+		</SettingRow>
 	);
 }
 

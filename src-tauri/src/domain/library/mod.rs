@@ -12,8 +12,8 @@ use serde::{Deserialize, Serialize};
 use crate::domain::resolver::LayoutProfile;
 
 pub use model::{
-    Archive, ArchiveLabel, Family, Integrity, ModInfo, ModInfoEdit, ModVersion, SkipReason,
-    SkippedFile,
+    AdoptPolicy, Archive, ArchiveLabel, Family, Integrity, ModInfo, ModInfoEdit, ModVersion,
+    SkipReason, SkippedFile, adopt_fields,
 };
 pub use view::LibraryView;
 

@@ -81,8 +81,9 @@ These rules apply to every change, whichever game or platform started it.
 
 ### Checks and reports
 
-`bun run lint` is the merge gate: Biome, oxlint, the TypeScript checks and the architecture guard (layers, data
-boundary, production `unwrap`/`expect`/`panic`/`todo`/`dbg`, overlay invariants, generated bindings and permissions).
+`bun run lint` is the merge gate: Biome, oxlint, the TypeScript check (`tsc`), the E2E type check (`e2e:types`), the
+architecture guard (`guard`: layers, data boundary, production `unwrap`/`expect`/`panic`/`todo`/`dbg`, overlay
+invariants, generated bindings and permissions) and the dead-code check (`deadcode`).
 The full E2E suite runs only on demand, not as a release gate; the `Security` workflow runs `cargo deny` and
 `bun audit` weekly and on pull requests that change dependencies. CI (`.github/workflows/ci.yml`) runs the web gate, Linux clippy and tests, and a Windows job (clippy and tests), each only
 when the diff needs it.

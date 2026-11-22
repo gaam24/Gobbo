@@ -181,7 +181,7 @@ pub fn prepare_with_progress(
     check(&session)?;
     // The layer mirrors the deployment root. A root inside the game folder (`{game}/Data`) is a folder inside the
     // layer; a root outside it (`{appdata}/Game`) is the layer itself.
-    let inner = target.root_in_game().unwrap_or_default();
+    let inner = crate::deploy::root_in_game(&target.root, &target.game_root).unwrap_or_default();
     let base = session.mods.join(&inner);
 
     // The layer from the previous session of this profile stays when it matches the plan. Otherwise we build it again.

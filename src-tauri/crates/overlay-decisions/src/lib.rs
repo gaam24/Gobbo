@@ -44,6 +44,29 @@ pub const ENV_DUMPER32: &str = "GOBBO_OVERLAY_DUMPER32";
 /// The environment variable that names the in-process `DbgHelp` dump. Gobbo passes it to the game; the hook reads it.
 pub const ENV_IN_PROCESS_DUMP: &str = "GOBBO_OVERLAY_DUMP";
 
+/// The environment variable that names the hook's trace file.
+pub const ENV_LOG: &str = "GOBBO_OVERLAY_LOG";
+/// The environment variable that names the hook's call-count report.
+pub const ENV_DIAG: &str = "GOBBO_OVERLAY_DIAG";
+/// The environment variable that names the hook's crash report.
+pub const ENV_CRASH: &str = "GOBBO_OVERLAY_CRASH";
+/// The environment variable that names the hook's session report.
+pub const ENV_SESSION: &str = "GOBBO_OVERLAY_SESSION";
+/// The environment variable naming the detours the hook leaves off.
+pub const ENV_DISABLE: &str = "GOBBO_OVERLAY_DISABLE";
+/// The environment variable that turns on first-chance exception reports.
+pub const ENV_CRASH_FIRST: &str = "GOBBO_OVERLAY_CRASH_FIRST";
+/// The environment variable that turns on per-call tracing and counting.
+pub const ENV_CALLS: &str = "GOBBO_OVERLAY_CALLS";
+/// The environment variable that traces writes, deletes and renames outside the layers.
+pub const ENV_PASS: &str = "GOBBO_OVERLAY_PASS";
+/// The environment variable that makes every hook call pass through.
+pub const ENV_TEST_PASSTHROUGH: &str = "GOBBO_OVERLAY_TEST_PASSTHROUGH";
+/// The environment variable that allows a child that could not be hooked to run.
+pub const ENV_ALLOW_UNHOOKED_CHILDREN: &str = "GOBBO_OVERLAY_ALLOW_UNHOOKED_CHILDREN";
+/// The environment variable that restores thread counting in the enable transaction.
+pub const ENV_SAFE_THREADS: &str = "GOBBO_OVERLAY_SAFE_THREADS";
+
 /// The magic and version at the start of the header. `Ring::open` recreates a file carrying other bytes, so a changed
 /// layout is never read with the old record offsets.
 const MAGIC: &[u8; 8] = b"GBODEC01";
@@ -108,6 +131,9 @@ enum_code!(Kind,
 );
 
 /// The layer a decision resolved to.
+///
+/// `None` is a record-only value: a refusal or a pass-through has no layer. The hook translates its `overlay-core` layer
+/// into this enum, so the two enumerations must stay in step.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum Layer {
@@ -202,7 +228,7 @@ impl Ring {
         let slot = (seq % u64::from(CAPACITY)) as usize;
         let mut record = [0u8; RECORD];
         record[..8].copy_from_slice(&seq.to_le_bytes());
-        record[8..16].copy_from_slice(&time_ms().to_le_bytes());
+        record[8..16].copy_from_slice(&now_millis().to_le_bytes());
         record[16..20].copy_from_slice(&thread.to_le_bytes());
         record[20..24].copy_from_slice(&self.pid.to_le_bytes());
         record[24] = kind as u8;
@@ -469,13 +495,33 @@ fn header(write: u64) -> [u8; HEADER] {
     header
 }
 
-/// The current wall-clock time in milliseconds, for correlating the ring with the trace.
-fn time_ms() -> u64 {
+/// The current wall-clock time in milliseconds, for the ring's records and for file names the writer shares.
+pub fn now_millis() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |elapsed| {
             u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX)
         })
+}
+
+/// A value paired with its modification time, for pruning.
+type Dated<T> = (T, SystemTime);
+
+/// Splits `files` into the `keep` newest and the rest.
+///
+/// An equal modification time is broken by path, greater first, so every consumer prunes the same files. Any further
+/// rule, such as an age limit, is applied by the caller to the returned kept files.
+pub fn split_newest<T: Ord>(
+    mut files: Vec<Dated<T>>,
+    keep: usize,
+) -> (Vec<Dated<T>>, Vec<Dated<T>>) {
+    files.sort_by(|(left_path, left_time), (right_path, right_time)| {
+        right_time
+            .cmp(left_time)
+            .then_with(|| right_path.cmp(left_path))
+    });
+    let removed = files.split_off(keep.min(files.len()));
+    (files, removed)
 }
 
 #[cfg(test)]

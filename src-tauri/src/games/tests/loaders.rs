@@ -470,6 +470,10 @@ fn the_unreal_preset_has_the_pak_and_ue4ss_layouts() {
         .expect("the UE4SS 4 slot");
     assert_eq!(slot.markers, ["Scripts", "dlls"]);
     assert_eq!(slot.enable_file.as_deref(), Some("enabled.txt"));
+    assert_eq!(
+        four.config_mirror.as_deref(),
+        Some("Binaries/Win64/ue4ss/Mods")
+    );
 
     let three = loader.rules(Some("ue4ss-3")).unwrap();
     let slot = three
@@ -480,6 +484,7 @@ fn the_unreal_preset_has_the_pak_and_ue4ss_layouts() {
         .expect("the UE4SS 3 slot");
     assert_eq!(slot.markers, ["Scripts", "dlls"]);
     assert_eq!(slot.enable_file.as_deref(), Some("enabled.txt"));
+    assert_eq!(three.config_mirror.as_deref(), Some("Binaries/Win64/Mods"));
 }
 
 #[test]
@@ -878,4 +883,96 @@ fn a_release_without_its_configuration_file_is_still_the_loader() {
         .check
         .push("Binaries/Win64/ue4ss/Layout.ini".into());
     assert!(game.is_loader_archive(["dwmapi.dll", "ue4ss/UE4SS.dll"]));
+}
+
+/// A preset whose config folder is both a mirror and an alias target, and a variant that adds its own config folder.
+const CONFIG_LOADER: &str = r#"
+schema = 1
+id = "config-loader"
+name = "Config Loader"
+config_mirror = "Config"
+default_variant = "plain"
+
+[deploy]
+[[deploy.slots]]
+dir = "Mods"
+
+[deploy.aliases]
+config = "Config"
+
+[[deploy.mirror]]
+dir = "Config"
+
+[variants.plain]
+
+[variants.variant]
+config_mirror = "ExtraConfig"
+
+[[variants.variant.deploy.mirror]]
+dir = "ExtraConfig"
+"#;
+
+#[test]
+fn config_mirror_must_be_a_relative_folder_declared_by_the_preset() {
+    let problems = presets::LoaderDef::parse(CONFIG_LOADER).unwrap().validate();
+    assert!(problems.is_empty(), "{problems:?}");
+
+    for bad in ["/Config", "../Config", "Unrelated/Config"] {
+        let text = CONFIG_LOADER.replacen(
+            "config_mirror = \"Config\"",
+            &format!("config_mirror = \"{bad}\""),
+            1,
+        );
+        let problems = presets::LoaderDef::parse(&text).unwrap().validate();
+        assert!(
+            problems
+                .iter()
+                .any(|problem| problem.contains("config_mirror")),
+            "{bad}: {problems:?}"
+        );
+    }
+
+    let text = CONFIG_LOADER.replacen(
+        "config_mirror = \"ExtraConfig\"",
+        "config_mirror = \"../ExtraConfig\"",
+        1,
+    );
+    let problems = presets::LoaderDef::parse(&text).unwrap().validate();
+    assert!(
+        problems
+            .iter()
+            .any(|problem| problem.contains("config_mirror")),
+        "{problems:?}"
+    );
+}
+
+#[test]
+fn a_variant_config_mirror_replaces_the_presets_value() {
+    let loader = presets::LoaderDef::parse(CONFIG_LOADER).unwrap();
+    assert_eq!(
+        loader.rules(None).unwrap().config_mirror.as_deref(),
+        Some("Config")
+    );
+    assert_eq!(
+        loader
+            .rules(Some("variant"))
+            .unwrap()
+            .config_mirror
+            .as_deref(),
+        Some("ExtraConfig")
+    );
+}
+
+#[test]
+fn the_chosen_variants_config_mirror_reaches_the_resolved_loader() {
+    let dir = scratch!("variant-config-mirror");
+    write(&dir.join("config-loader.toml"), CONFIG_LOADER);
+    let mut game = GameDef::parse(&minimal_game_with_loader(
+        "loader = { id = \"config-loader\", variant = \"variant\" }",
+    ))
+    .unwrap();
+    presets::apply(&mut game, std::slice::from_ref(&dir)).unwrap();
+
+    let resolved = game.resolved_loader.expect("the game names a loader");
+    assert_eq!(resolved.config_mirror.as_deref(), Some("ExtraConfig"));
 }

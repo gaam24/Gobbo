@@ -7,6 +7,7 @@ use super::{Listed, page_meta, requirements};
 use crate::domain::version::update_state;
 use crate::infra::clock::now_seconds;
 use crate::providers::SourceUpdate;
+use crate::providers::nexus::ID;
 use crate::providers::nexus::api::NexusClient;
 use crate::providers::nexus::files::{ModFile, file_version, newest_part_file, part_files};
 use crate::providers::nexus::{ModPage, mod_details};
@@ -64,7 +65,7 @@ pub(super) fn look_up_all(
                 let picture = page.as_ref().and_then(|page| {
                     save_picture(
                         &item.pictures_dir,
-                        &stem("nexus", &item.nexus_id.to_string()),
+                        &stem(ID, &item.nexus_id.to_string()),
                         page.picture_url.as_deref()?,
                         item.picture_url.as_deref(),
                     )

@@ -7,13 +7,14 @@ use std::os::windows::ffi::OsStrExt;
 use std::path::Path;
 use std::ptr::null;
 
-use gobbo_overlay_core::join;
+use gobbo_overlay_core::{join, wide};
 use windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE;
 use windows_sys::Win32::Storage::FileSystem::{
     FindClose, FindExInfoStandard, FindExSearchNameMatch, FindFirstFileExW, WIN32_FIND_DATAW,
 };
 
-use crate::text::{nul_length, same_folded_wide, wide};
+use crate::text::same_folded_wide;
+use crate::win32::find_data_name;
 
 /// The entry `name` of the folder `rel` under `base`, as the disk spells it. `None` when the folder has no such entry, or
 /// the name is not the one found (the search matches the name under the folding rule, so this only guards the match).
@@ -40,12 +41,7 @@ pub(crate) fn find_exact(base: &Path, rel: &str, name: &[u16]) -> Option<WIN32_F
     }
     // SAFETY: the handle came from the search above and is closed once.
     unsafe { FindClose(handle) };
-    same_folded_wide(name_of(&data), name).then_some(data)
-}
-
-/// The name of one `WIN32_FIND_DATAW` entry, up to its terminator.
-fn name_of(data: &WIN32_FIND_DATAW) -> &[u16] {
-    &data.cFileName[..nul_length(&data.cFileName)]
+    same_folded_wide(find_data_name(&data), name).then_some(data)
 }
 
 /// Calls `call` with the search pattern `base\rel\mask`. The common pattern is assembled on the stack; a pattern too long

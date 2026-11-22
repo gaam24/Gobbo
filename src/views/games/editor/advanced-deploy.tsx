@@ -196,7 +196,6 @@ export function AdvancedDeploy({
 			>
 				{mirrors.map((mirror, index) => (
 					<RepeatRow
-						// biome-ignore lint/suspicious/noArrayIndexKey: Form rows have no stable id; the index is their identity.
 						key={`mirror-${index}`} // eslint-disable-line react/no-array-index-key -- same reason
 						title={mirror.dir || t("editor.deploy.mirror")}
 						onRemove={() => update({ mirror: mirrors.filter((_, at) => at !== index) })}
@@ -239,7 +238,6 @@ export function AdvancedDeploy({
 			>
 				{moves.map((entry, index) => (
 					<RepeatRow
-						// biome-ignore lint/suspicious/noArrayIndexKey: Form rows have no stable id; the index is their identity.
 						key={`move-${index}`} // eslint-disable-line react/no-array-index-key -- same reason
 						title={entry.to || t("editor.deploy.move")}
 						onRemove={() => update({ move: moves.filter((_, at) => at !== index) })}
@@ -275,7 +273,6 @@ export function AdvancedDeploy({
 			>
 				{shared.map((entry, index) => (
 					<RepeatRow
-						// biome-ignore lint/suspicious/noArrayIndexKey: Form rows have no stable id; the index is their identity.
 						key={`shared-${index}`} // eslint-disable-line react/no-array-index-key -- same reason
 						title={entry.dir?.trim() ? entry.dir : t("editor.deploy.shared")}
 						onRemove={() => update({ shared: shared.filter((_, at) => at !== index) })}

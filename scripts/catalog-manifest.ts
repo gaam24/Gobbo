@@ -172,16 +172,8 @@ function main(argv: string[]): void {
 			const catalog = buildCatalog(root);
 			writeFileSync(join(root, "catalog.json"), serializeCatalog(catalog));
 			process.stdout.write(`Wrote catalog.json (${catalog.games.length} games, ${catalog.loaders.length} loaders)\n`);
-		} else if (flag === "--check" && rest.length === 0) {
-			const file = join(root, "catalog.json");
-			const expected = serializeCatalog(buildCatalog(root));
-
-			if (!existsSync(file) || readFileSync(file, "utf8") !== expected) {
-				fail("catalog.json is stale; run `bun run catalog`");
-			}
-			process.stdout.write("catalog.json is current.\n");
 		} else {
-			fail("usage: catalog-manifest.ts [--check]");
+			fail("usage: catalog-manifest.ts");
 		}
 	} catch (error) {
 		fail(error instanceof Error ? error.message : String(error));

@@ -4,26 +4,21 @@
 
 use std::ffi::c_void;
 use std::path::PathBuf;
-use std::ptr::null;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use gobbo_overlay_core::{Layer, join_rel, relative_to};
+use gobbo_overlay_decisions::ENV_ALLOW_UNHOOKED_CHILDREN;
+use gobbo_overlay_launch::ReadyEvent;
 
 use windows_sys::Win32::Foundation::{
-    CloseHandle, ERROR_DLL_INIT_FAILED, ERROR_INVALID_FUNCTION, FALSE, TRUE, WAIT_OBJECT_0,
+    CloseHandle, ERROR_DLL_INIT_FAILED, ERROR_INVALID_FUNCTION, FALSE,
 };
-use windows_sys::Win32::System::Threading::{
-    CREATE_SUSPENDED, CreateEventW, ResumeThread, TerminateProcess, WaitForSingleObject,
-};
+use windows_sys::Win32::System::Threading::{CREATE_SUSPENDED, ResumeThread, TerminateProcess};
 
 use crate::text::display_name;
 use crate::trace::log;
 use crate::win32::PreserveLastError;
-
-/// How long a resumed child may take to report that its hooks are installed. The child runs no game code before that
-/// report, so a timeout means the hook is not working and the child must not continue unhooked.
-const CHILD_READY_TIMEOUT_MS: u32 = 20_000;
 
 /// The hook DLLs of this installation: the native one and the 32-bit one for WOW64 children.
 struct HookPaths {
@@ -273,7 +268,16 @@ unsafe fn start_child(
     // A child that the caller leaves suspended gets its stub now and installs the hook when the caller resumes it.
     // A child that is about to run has an event the hook signals after installation, so this function can verify it.
     let ready = (!wants_suspended)
-        .then(|| ChildReady::create(child.process_id))
+        .then(|| match ReadyEvent::create(child.process_id) {
+            Ok(ready) => Some(ready),
+            Err(error) => {
+                log(&format!(
+                    "could not create the readiness event of child process {}: {error}",
+                    child.process_id
+                ));
+                None
+            }
+        })
         .flatten();
     let hooked = HOOK_PATHS
         .get()
@@ -281,8 +285,8 @@ unsafe fn start_child(
     if !hooked {
         if !crate::diag::settings().allow_unhooked_children {
             log(&format!(
-                "child process {} could not be hooked; stopping it (set GOBBO_OVERLAY_ALLOW_UNHOOKED_CHILDREN=1 to allow it)",
-                child.process_id
+                "child process {} could not be hooked; stopping it (set {}=1 to allow it)",
+                child.process_id, ENV_ALLOW_UNHOOKED_CHILDREN
             ));
             drop(_last_error);
             return stop_unhooked(child);
@@ -300,7 +304,7 @@ unsafe fn start_child(
 
         if hooked
             && let Some(ready) = &ready
-            && !ready.wait()
+            && ready.wait(None).is_err()
         {
             log(&format!(
                 "child process {} did not report its hook ready",
@@ -343,44 +347,6 @@ unsafe fn start_child_or_call(
         start_child(application, command, flags, information, |flags, _| {
             call(flags)
         })
-    }
-}
-
-/// The readiness event of a child process. The hook opens it by name and signals it after its hooks are installed.
-struct ChildReady(windows_sys::Win32::Foundation::HANDLE);
-
-impl ChildReady {
-    /// Creates the event for `pid`, or `None` when Windows refuses. A missing event only means the parent cannot
-    /// verify the child; the child's hook still runs.
-    fn create(pid: u32) -> Option<Self> {
-        let name = gobbo_overlay_launch::ready_event_name(pid);
-        // SAFETY: `name` is a NUL-terminated name; the event is owned by this value and closed in `Drop`.
-        let event = unsafe { CreateEventW(null(), TRUE, FALSE, name.as_ptr()) };
-
-        if event.is_null() {
-            log(&format!(
-                "could not create the readiness event of child process {pid}: {}",
-                std::io::Error::last_os_error()
-            ));
-            return None;
-        }
-        // A stale event with a reused pid may be signalled; the new child must start unsignalled.
-        // SAFETY: `event` is an event handle opened above.
-        unsafe { windows_sys::Win32::System::Threading::ResetEvent(event) };
-        Some(Self(event))
-    }
-
-    /// Waits until the child's hook reports ready.
-    fn wait(&self) -> bool {
-        // SAFETY: `self.0` is an event handle that lives until this value is dropped.
-        unsafe { WaitForSingleObject(self.0, CHILD_READY_TIMEOUT_MS) == WAIT_OBJECT_0 }
-    }
-}
-
-impl Drop for ChildReady {
-    fn drop(&mut self) {
-        // SAFETY: the handle was created by `create` and is closed only here.
-        unsafe { CloseHandle(self.0) };
     }
 }
 

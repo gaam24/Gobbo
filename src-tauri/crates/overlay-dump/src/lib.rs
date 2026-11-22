@@ -12,13 +12,13 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::thread::{self, JoinHandle};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::SystemTime;
 
 use minidumper::{LoopAction, MinidumpBinary, Server, ServerHandler, SocketName};
 
-// The dump markers are owned by the decisions crate, the shared vocabulary of the session files. This crate writes
-// them; the app and the hook import them from there too.
-use gobbo_overlay_decisions::{CRASH_DUMP_FILE, LAST_DUMP_FILE};
+// The dump markers, the clock and the pruning rule are owned by the decisions crate, the shared vocabulary of the
+// session files. This crate writes them; the app and the hook import them from there too.
+use gobbo_overlay_decisions::{CRASH_DUMP_FILE, LAST_DUMP_FILE, now_millis, split_newest};
 
 /// The file the 32-bit helper writes once its socket is bound. The app's spawner and the helper use this name instead
 /// of each spelling it.
@@ -215,28 +215,18 @@ fn prune(dir: &Path) {
     let Ok(entries) = fs::read_dir(dir) else {
         return;
     };
-    let mut dumps: Vec<(SystemTime, PathBuf)> = entries
+    let dumps: Vec<(PathBuf, SystemTime)> = entries
         .flatten()
         .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "dmp"))
         .filter_map(|entry| {
             let modified = entry.metadata().ok()?.modified().ok()?;
-            Some((modified, entry.path()))
+            Some((entry.path(), modified))
         })
         .collect();
-    dumps.sort_by_key(|(modified, _)| *modified);
 
-    for (_, path) in dumps.iter().take(dumps.len().saturating_sub(KEEP_DUMPS)) {
+    for (path, _) in split_newest(dumps, KEEP_DUMPS).1 {
         let _ = fs::remove_file(path);
     }
-}
-
-/// The wall-clock time in milliseconds, for a dump name.
-fn now_millis() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |elapsed| {
-            u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX)
-        })
 }
 
 #[cfg(test)]
@@ -286,15 +276,38 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
 
+        let now = SystemTime::now();
         for number in 0..KEEP_DUMPS + 3 {
             let path = dir.join(format!("crash-{number}.dmp"));
-            fs::write(&path, b"x").unwrap();
-            std::thread::sleep(Duration::from_millis(2));
+            let file = fs::File::create(&path).unwrap();
+            let age = Duration::from_secs((KEEP_DUMPS + 3 - number) as u64);
+            file.set_modified(now - age).unwrap();
         }
 
         prune(&dir);
         assert_eq!(fs::read_dir(&dir).unwrap().count(), KEEP_DUMPS);
         assert!(!dir.join("crash-0.dmp").exists());
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn prune_breaks_an_mtime_tie_by_path() {
+        let dir = std::env::temp_dir().join(format!("gobbo-dumps-tie-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+
+        let modified = SystemTime::now() - Duration::from_secs(1);
+        for number in 0..=KEEP_DUMPS {
+            let path = dir.join(format!("crash-{number:02}.dmp"));
+            let file = fs::File::create(&path).unwrap();
+            file.set_modified(modified).unwrap();
+        }
+
+        prune(&dir);
+        assert_eq!(fs::read_dir(&dir).unwrap().count(), KEEP_DUMPS);
+        // Equal times keep the greater path, so the smallest one is pruned.
+        assert!(!dir.join("crash-00.dmp").exists());
+        assert!(dir.join(format!("crash-{KEEP_DUMPS:02}.dmp")).exists());
         let _ = fs::remove_dir_all(dir);
     }
 }

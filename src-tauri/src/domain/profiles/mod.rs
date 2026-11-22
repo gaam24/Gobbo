@@ -14,10 +14,10 @@ mod set;
 pub use group::{GroupKind, ModGroup};
 pub use profile::{Entry, ListState, PackOrigin, Profile, Row, Separator};
 #[cfg(test)]
-use set::{DEFAULT_NAME, MAX_NAME_CHARS};
+use set::DEFAULT_NAME;
 pub use set::{
-    MoveSide, PageKeys, Profiles, add_group, move_block, next_group_id, normalize_groups,
-    remove_group, set_block_enabled, set_mod_group, set_separator,
+    MAX_NAME_CHARS, MoveSide, PageKeys, Profiles, add_group, move_block, next_group_id,
+    normalize_groups, remove_group, set_block_enabled, set_mod_group, set_separator,
 };
 pub use view::ProfilesView;
 

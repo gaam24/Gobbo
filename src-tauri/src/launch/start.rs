@@ -2,6 +2,7 @@ use crate::context::Data;
 use crate::context::Settings;
 use crate::context::data::JOURNAL_FILE;
 use crate::context::load_settings;
+use crate::context::running::game_running_at;
 use crate::deploy::journal::Journal;
 use crate::deploy::overlay;
 use crate::deploy::overlay::Session;
@@ -16,8 +17,6 @@ use crate::infra::clock::now_seconds;
 use crate::launch::executable::launch_args;
 use crate::launch::executable::pick_executable;
 use crate::launch::executable::{check_start, executable_missing};
-#[cfg(not(windows))]
-use crate::launch::proton::owned_proton_command;
 #[cfg(not(windows))]
 use crate::launch::proton::proton_command;
 use crate::launch::report;
@@ -137,9 +136,6 @@ impl Running {
     }
 }
 
-/// The running checks live in `context` so deployment, launch and profiles share one live table.
-pub use crate::context::running::{game_running, game_running_at};
-
 /// Stops every process of the game, also one started outside Gobbo, and returns whether a process was stopped. The
 /// process list is searched by the same rule as `game_running`, so a game that is stuck before its window appears can
 /// be stopped from Gobbo.
@@ -203,23 +199,15 @@ fn start_recorded(
     let (launch, with_mods, spawn_error) =
         launch_command_with_settings(game, root, game_id, executable, home, settings)?;
     let outcome = super::pipeline::run(
-        super::pipeline::RunOptions {
-            data: &data,
-            state_root: root.dir.clone(),
+        super::pipeline::RunOptions::for_game(
+            &data,
+            root.dir.clone(),
             game,
             settings,
             home,
-            game_id: Some(game_id),
-            steps: true,
-            live: true,
-            background: true,
-            watch: true,
-            report: true,
-            begin_report: false,
-            with_output: true,
-            finish: true,
+            game_id,
             on_exit,
-        },
+        ),
         launch,
         with_mods,
         spawn_error,
@@ -291,14 +279,13 @@ pub(super) fn program_launch(
     // The install decides the runtime: a Windows program of a Steam install goes through Steam's Proton, and one from
     // another store through Proton in its own prefix. A native build, and anything on Windows, starts directly.
     #[cfg(not(windows))]
+    let runtime = crate::context::target::runtime(game, settings);
+    #[cfg(not(windows))]
     {
-        match crate::context::target::runtime(game, settings) {
-            Runtime::SteamProton => {
-                return proton_command(game, data, settings, &game_root, exe, home, with_mods);
-            }
-            Runtime::OwnedProton => {
-                return owned_proton_command(
-                    game, data, settings, &game_root, exe, home, with_mods,
+        match runtime {
+            Runtime::SteamProton | Runtime::OwnedProton => {
+                return proton_command(
+                    game, data, settings, &game_root, exe, home, with_mods, runtime,
                 );
             }
             Runtime::Native => {}
@@ -466,7 +453,7 @@ mod tests {
         let folder_a = base.join("a");
         fs::create_dir_all(folder_a.join("bin/x64")).unwrap();
         fs::write(folder_a.join("bin/x64/game.exe"), "").unwrap();
-        crate::settings::config::save_settings(
+        crate::context::save_settings(
             &root,
             test_games::MIRROR_ID,
             Settings {
@@ -491,7 +478,7 @@ mod tests {
         let folder_b = base.join("b");
         fs::create_dir_all(folder_b.join("bin/x64")).unwrap();
         fs::write(folder_b.join("bin/x64/game.exe"), "").unwrap();
-        crate::settings::config::save_settings(
+        crate::context::save_settings(
             &root,
             test_games::MIRROR_ID,
             Settings {

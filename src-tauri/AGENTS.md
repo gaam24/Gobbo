@@ -40,12 +40,12 @@ there; a new use case goes into the module that owns it.
 | Remove a mod that may be deployed                                                                   | `library/delete.rs`, `deploy/remove.rs`                                                                                                                                                                                           |
 | Change the games the user added (folder, add, remove, restore, storage)                             | `settings/managed.rs`, `context/managed.rs`                                                                                                                                                                                       |
 | Change how old data moves to the current layout                                                     | `migrations/mod.rs`, `migrations/game_ids.rs`, `migrations/games_list.rs`                                                                                                                                                         |
-| Change how a game starts, stops or runs a tool                                                      | `launch/commands.rs`, `launch/start.rs`                                                                                                                                                                                           |
+| Change how a game starts, stops or runs a tool                                                      | `launch/commands.rs` (`GAME_EXITED_EVENT`), `launch/mod.rs`, `launch/start.rs`                                                                                                                                                     |
 | Change how a loader package is shown or installed                                                   | `setup/`, `status/preflight.rs`, `games/definition/install.rs`                                                                                                                                                                    |
 | Change how a mod archive gets into the library (link, collection, update, requirement, picked file) | `acquire/mod.rs`                                                                                                                                                                                                                  |
 | Change importing or FOMOD                                                                           | `import/flow/` (`import_batch`, the production entry point every import takes; `import_archive` is the single-import wrapper used by tests and benches, and `ImportRequest` the request type), `import/install/`, `import/fomod/` |
 | Change which library mod a pack mod, waiting entry or collection member is                          | `domain/library/view/find.rs` (`LibraryView::find`), `domain/pack.rs` (`PackMod::is_same_mod`)                                                                                                                                    |
-| Change how a known provider file is downloaded                                                      | `providers/fetch.rs` (`fetch` and `fetch_with_progress`, shared by collections, packs, updates, requirements and the deep-link download queue)                                                                                    |
+| Change how a known provider file is downloaded                                                      | `providers/fetch.rs` (`fetch` and `fetch_with_progress`, shared by collections, packs, updates, requirements and the deep-link download queue), `providers/download.rs` (archive target and body-error rules the adapters share)  |
 | Change launch, Proton or tools                                                                      | `launch/start.rs`, `launch/proton.rs`, `launch/tools.rs`                                                                                                                                                                          |
 | Add a provider or change Nexus                                                                      | `providers/mod.rs`, `providers/nexus/mod.rs`, `providers/testing.rs`                                                                                                                                                              |
 | Change Thunderstore or its `ror2mm://` links                                                        | `providers/thunderstore/mod.rs`, `providers/thunderstore/link.rs`                                                                                                                                                                 |
@@ -55,7 +55,7 @@ there; a new use case goes into the module that owns it.
 | Change per-profile data (copy list, user-data sets, switching, history, lock)                       | `context/profile/state.rs`, `context/profile/user_data.rs`, `context/profile/history.rs`, `context/profile/lock.rs`                                                                                                               |
 | Change update checks                                                                                | `sources/update/check.rs`, `install.rs`, `providers/nexus/update/`                                                                                                                                                                |
 | Change collection install, a collection source or its profile state                                 | `collections/`, `domain/collection/`, `providers/nexus/collections/`                                                                                                                                                              |
-| Change what the window sees                                                                         | `status/views.rs`, `status/mod.rs`                                                                                                                                                                                                |
+| Change what the window sees                                                                         | `status/views/` (`mod.rs`, `source.rs`, `version.rs`), `status/mod.rs`                                                                                                                                                              |
 | Change the game stage or the next action                                                            | `status/stage.rs`                                                                                                                                                                                                                 |
 | Change the system tray's status, menu or actions                                                    | `tray/view.rs`, `tray/menu.rs`, `tray/actions.rs`                                                                                                                                                                                 |
 | Change the setup checklist or a preflight check                                                     | `status/preflight.rs`, `infra/disk.rs`                                                                                                                                                                                            |
@@ -80,13 +80,16 @@ The module map moved to [docs/module-map.md](docs/module-map.md). Read the entry
   for the exact file, fetches, picks the FOMOD choices, imports and cleans up the download; underneath, every import
   goes through `import::import_batch` (`import::import_archive` is its single-archive wrapper for tests and benches);
   every match of a wanted mod against
-  the library goes through `LibraryView::find` (a collection member becomes a `PackMod` with
-  `CollectionItem::wanted`); every download of a known provider file goes through `providers::fetch` (`fetch`, or
-  `fetch_with_progress` when the caller keeps its own byte meter). A
+  the library goes through `LibraryView::find` — or `find_with` with a `FindQuery` from
+  `domain::library::view::find`, whose `MatchPolicy` covers the strict, folded and key rules (a collection member
+  becomes a `PackMod` with `CollectionItem::wanted`); every download of a known provider file goes through
+  `providers::fetch` (`fetch`, or `fetch_with_progress` when the caller keeps its own byte meter). A
   feature adds its own steps around these calls, never its own copy of them. The same holds for the small rules: a
   free name is `domain::naming::first_free`, a percentage is `domain::progress::percent`, a stop check is
   `infra::tasks::stop_if` and a stop result is `AppError::is_cancelled`, a long command for one game is
-  `commands::run_task`, and a recipe's new profile is `Profiles::create_unique`.
+  `commands::run_task`, a recipe's new profile is `Profiles::create_unique`, a launch that lets the caller report the
+  exit is `launch::launch_game_with_notice` (the command emits `GAME_EXITED_EVENT`), and a stop that records a user
+  stop is `launch::stop_game_with_notice`.
 - A lower layer does not call up for a value. When it needs something only a higher one knows, the caller passes it in:
   `context::open` takes the archive reader (`providers::archive_name_from`) to name the archives of the libraries at
   startup; the index never parses a file name itself.
@@ -146,7 +149,7 @@ thread or process gets `state.busy` instead of waiting behind a long apply.
 ### Files and functions
 
 - A module that grows past about 400 lines of production code becomes a folder: `mod.rs` keeps the public entry points
-  and the submodules, and each submodule holds one part (see `sources/update/lookup/` and
+  and the submodules, and each submodule holds one part (see `collections/session/` and
   `deploy/overlay/windows/`).
 - Tests live next to the code: an inline `#[cfg(test)] mod tests` for small modules, or `tests.rs` with a `tests/`
   folder for large ones. Shared helpers go in `test_support.rs`. Fixtures go in `tests/fixtures/`.
@@ -233,11 +236,12 @@ cargo test --workspace --features bench --locked
 A focused data-format change can be checked first with `cargo test --lib migrations` in `src-tauri`; the full workspace
 run above covers it before you finish.
 
-`bun run lint` from the repository root also runs the architecture guard (`scripts/check-layers.ts`,
-`scripts/check-agent-policy.ts`, `scripts/check-data-boundary.ts`, `scripts/check-overlay-invariants.ts` and
-`scripts/check-generated.ts`). The check reads the production code only; test fixtures may cross layers. The full E2E
-suite runs only on demand, not as a release gate; the `Security` workflow runs `cargo deny` and `bun audit`
-weekly and on pull requests that change dependencies.
+`bun run lint` from the repository root is the six-stage merge gate: Biome, oxlint, the TypeScript check (`tsc`), the
+E2E type check (`e2e:types`), the architecture guard (`guard`) and the dead-code check (`deadcode`), all of which must
+pass to merge. The guard runs `scripts/check-layers.ts`, `scripts/check-agent-policy.ts`,
+`scripts/check-data-boundary.ts`, `scripts/check-overlay-invariants.ts` and `scripts/check-generated.ts`; it reads the
+production code only, so test fixtures may cross layers. The full E2E suite runs only on demand, not as a release gate;
+the `Security` workflow runs `cargo deny` and `bun audit` weekly and on pull requests that change dependencies.
 
 Coverage and mutation reports are optional local tools, not CI gates. Run `cargo llvm-cov` or `cargo mutants` when a
 change needs the extra signal; the E2E suite and its isolation are described in

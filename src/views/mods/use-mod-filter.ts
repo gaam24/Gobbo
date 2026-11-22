@@ -1,8 +1,8 @@
 import { useDeferredValue, useMemo, useState } from "react";
 import type { Status, UpdateReport } from "@/bindings";
-import { useTranslation } from "@/i18n";
 import { foldText } from "@/lib/fold-text";
-import { type Filter, matchesNeedle, passesFilter, tagsOf } from "@/lib/mods";
+import { type Filter, matchesNeedle, passesFilter } from "@/lib/mods";
+import { useModTags } from "@/views/mods/use-mod-tags";
 
 /// The search, the status filter and the tag filter of the mod list, with the counts the filter buttons show. The hidden
 /// mods leave the list and its counts; the Hidden filter shows them alone.
@@ -15,15 +15,13 @@ export function useModFilter({
 	updates: Record<string, UpdateReport>;
 	hidden: ReadonlySet<string>;
 }) {
-	const { i18n } = useTranslation();
-	const language = i18n.language;
 	const [filter, setFilter] = useState<Filter>("all");
 	const [query, setQuery] = useState("");
 	const [tagFilter, setTagFilter] = useState<string | null>(null);
 
-	/// Tag list, filter results, and filter counts come from the whole profile. Memoized, because they
-	/// walk every mod and the search field re-renders this view on each keystroke.
-	const allTags = useMemo(() => tagsOf(mods, language), [mods, language]);
+	/// Tag list, filter results, and filter counts come from the whole profile. The tag list is memoized where it is
+	/// computed, because it walks every mod and the search field re-renders this view on each keystroke.
+	const allTags = useModTags(mods);
 	const filtering = filter !== "all" || query.trim() !== "" || tagFilter !== null;
 	/// The field shows every keystroke at once; the list catches up in a lower-priority render, so typing stays smooth
 	/// even when the filter has to walk 2 000 mods.

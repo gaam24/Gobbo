@@ -12,7 +12,7 @@ loader = { id = "bepinex", variant = "6" }      # a named variant
 
 The game keeps its own `detect`, `executables`, `providers`, `user_data`, `tools`, `steps`, `load_order` and
 `deploy.root`: those belong to the game, not to the loader. A preset can only add `requires`, `requirements`,
-`install` and `[deploy]` rules.
+`install` and `[deploy]` rules; it may also set `config_mirror` on the preset or on a variant.
 
 ## File shape
 
@@ -20,6 +20,7 @@ The game keeps its own `detect`, `executables`, `providers`, `user_data`, `tools
 schema = 1
 id = "bepinex"
 name = "BepInEx"
+config_mirror = "BepInEx/config"
 min_gobbo = "0.1.1"
 default_variant = "5"
 
@@ -76,6 +77,13 @@ first form keeps its path.
 The file name must match `id`. The id is a slug: lowercase letters, digits and `-`. `name` is the display name the
 interface shows, for example `BepInEx`. A variant name is lowercase letters, digits, `-`, `_` or `.`.
 
+`config_mirror` names the game-relative folder where an unpacked community profile keeps this loader's config files,
+when it has one. The community-profile import checks it together with the bare `config` folder that any unpacked profile
+may use. A variant may name its own folder, which replaces the preset's value for that variant. The path must stay inside
+the game and name a folder the preset declares as a slot, a mirror or an alias target; a typo then fails when the preset
+loads instead of silently missing the profile's config files. A preset without config files leaves the field out; no
+loader id is named in code.
+
 `min_gobbo = "0.1.1"` names the oldest Gobbo release that serves the preset correctly, as in `game.toml`; every game
 that names the preset inherits it.
 
@@ -109,6 +117,7 @@ loader base  ->  loader variant  ->  game.toml
 | `deploy.shared`             | Appended: loader entries first, then the game's.                                                                                |
 | `deploy.moves`              | Appended: loader entries first, then the game's.                                                                                |
 | `deploy.root`, `root_linux` | Only the game. A loader that sets them is invalid.                                                                              |
+| `config_mirror`             | A variant's value replaces the preset's; one that is absent keeps the preset's. Never merged from the game.                     |
 
 A requirement implies its file: a file in `requirements` is required without a matching `requires` entry. Use `requires`
 only for a file with no name or download page to show. A game's own requirements are implied the same way.

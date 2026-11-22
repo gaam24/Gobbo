@@ -1,5 +1,5 @@
 import { Download as DownloadIcon, Link2Off, RotateCw, X } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { GameView } from "@/bindings";
 import { ListRow, PageEmpty } from "@/components/app/page-layout";
 import { StatusBadge, type StatusTone } from "@/components/app/status-badge";
@@ -13,7 +13,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { useTranslation } from "@/i18n";
 import { errorText } from "@/lib/ipc";
 import { formatDuration, formatSize } from "@/lib/mods";
-import type { Download } from "@/nexus/use-downloads";
+import type { Download } from "@/sources/downloads";
 
 interface DownloadsViewProps {
 	downloads: Download[];
@@ -51,6 +51,9 @@ export function DownloadsView({
 	onOpenSettings,
 }: DownloadsViewProps) {
 	const { t } = useTranslation();
+	// A progress event re-renders every row; resolve the game name and the managed flag once, not once per row.
+	const gameNames = useMemo(() => new Map(games.map((game) => [game.id, game.name])), [games]);
+	const managed = useMemo(() => new Set(managedIds), [managedIds]);
 	const finished = downloads.some((download) => download.state === "installed" || download.state === "failed");
 	const newestFirst = downloads.toReversed();
 
@@ -97,8 +100,8 @@ export function DownloadsView({
 						<DownloadRow
 							key={download.id}
 							download={download}
-							gameName={games.find((game) => game.id === download.game)?.name ?? ""}
-							showMods={managedIds.includes(download.game)}
+							gameName={gameNames.get(download.game) ?? ""}
+							showMods={managed.has(download.game)}
 							locale={locale}
 							onInstall={onInstall}
 							onRemove={onRemove}

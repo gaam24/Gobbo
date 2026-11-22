@@ -6,7 +6,9 @@ use std::path::PathBuf;
 use std::sync::OnceLock;
 
 use gobbo_overlay_decisions::{
-    BASE_STEM, CRASH_DUMP_FILE, ENV_DUMPER, ENV_DUMPER32, ENV_IN_PROCESS_DUMP, ENV_RING,
+    BASE_STEM, CRASH_DUMP_FILE, ENV_ALLOW_UNHOOKED_CHILDREN, ENV_CALLS, ENV_CRASH, ENV_CRASH_FIRST,
+    ENV_DIAG, ENV_DISABLE, ENV_DUMPER, ENV_DUMPER32, ENV_IN_PROCESS_DUMP, ENV_LOG, ENV_PASS,
+    ENV_RING, ENV_SAFE_THREADS, ENV_SESSION, ENV_TEST_PASSTHROUGH,
 };
 
 /// The switches, read once.
@@ -58,26 +60,26 @@ impl Settings {
 pub(crate) fn settings() -> &'static Settings {
     static SETTINGS: OnceLock<Settings> = OnceLock::new();
     SETTINGS.get_or_init(|| Settings {
-        log: switch("GOBBO_OVERLAY_LOG", "trace.log"),
-        diag: switch("GOBBO_OVERLAY_DIAG", "counts.txt"),
-        crash: switch("GOBBO_OVERLAY_CRASH", "crash.txt"),
+        log: switch(ENV_LOG, "trace.log"),
+        diag: switch(ENV_DIAG, "counts.txt"),
+        crash: switch(ENV_CRASH, "crash.txt"),
         dump: dump_switch(),
         dumper: dumper_switch(),
         ring: ring_switch(),
-        session: switch("GOBBO_OVERLAY_SESSION", "session.json"),
-        disabled: std::env::var("GOBBO_OVERLAY_DISABLE")
+        session: switch(ENV_SESSION, "session.json"),
+        disabled: std::env::var(ENV_DISABLE)
             .unwrap_or_default()
             .split(',')
             .map(str::trim)
             .filter(|item| !item.is_empty())
             .map(str::to_string)
             .collect(),
-        crash_first: flag("GOBBO_OVERLAY_CRASH_FIRST"),
-        calls: flag("GOBBO_OVERLAY_CALLS"),
-        pass_writes: flag("GOBBO_OVERLAY_PASS"),
-        passthrough: flag("GOBBO_OVERLAY_TEST_PASSTHROUGH"),
-        allow_unhooked_children: flag("GOBBO_OVERLAY_ALLOW_UNHOOKED_CHILDREN"),
-        safe_threads: flag("GOBBO_OVERLAY_SAFE_THREADS"),
+        crash_first: flag(ENV_CRASH_FIRST),
+        calls: flag(ENV_CALLS),
+        pass_writes: flag(ENV_PASS),
+        passthrough: flag(ENV_TEST_PASSTHROUGH),
+        allow_unhooked_children: flag(ENV_ALLOW_UNHOOKED_CHILDREN),
+        safe_threads: flag(ENV_SAFE_THREADS),
     })
 }
 

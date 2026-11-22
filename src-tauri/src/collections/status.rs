@@ -42,12 +42,25 @@ pub fn statuses(
     origin: Option<&CollectionOrigin>,
 ) -> StatusSet {
     let view = LibraryView::new(library);
+    statuses_with_view(plan, library, &view, profile, origin)
+}
+
+/// The same statuses with a view the caller already built. A collection operation checks the library for several
+/// things (member statuses and exact files), so it can build the view once and share it instead of sorting the
+/// library again for each question.
+pub fn statuses_with_view(
+    plan: &CollectionPlan,
+    library: &Library,
+    view: &LibraryView<'_>,
+    profile: &Profile,
+    origin: Option<&CollectionOrigin>,
+) -> StatusSet {
     let mut statuses = BTreeMap::new();
 
     for item in &plan.items {
         statuses.insert(
             item.key.clone(),
-            status(item, library, &view, profile, origin),
+            status(item, library, view, profile, origin),
         );
     }
 

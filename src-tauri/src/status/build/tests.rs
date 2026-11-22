@@ -1,9 +1,9 @@
 //! Tests of the game status: the queries the window reads, against a library on disk.
 
 use super::*;
-use crate::library::Archive;
-use crate::library::ModInfo;
-use crate::library::ModVersion;
+use crate::domain::library::Archive;
+use crate::domain::library::ModInfo;
+use crate::domain::library::ModVersion;
 use crate::status::mod_views::version_view;
 use crate::test_support::scratch;
 use crate::test_support::write;
@@ -115,7 +115,7 @@ fn a_profile_mod_is_missing_only_when_neither_the_index_nor_the_disk_has_it() {
 
 #[test]
 fn a_version_is_named_by_its_archive_only_when_the_info_has_no_name_of_its_own() {
-    let archive = "Remove Mods Menu 35686 1.2.0 2026-10-23T17-21Z Q6xF6llIa.zip";
+    let archive = "Example Cleanup Mod 7001 1.2.0 2026-10-23T17-21Z example-uploader.zip";
     let label = crate::providers::archive_name_from(&[], archive).unwrap();
     let archive_name = label.name.clone().unwrap();
     let mut library = Library::default();

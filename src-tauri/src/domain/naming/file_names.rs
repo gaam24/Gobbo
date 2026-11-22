@@ -5,6 +5,12 @@ use super::hashes::short_hash;
 /// The longest name Gobbo writes for a file or a library folder. The extension is kept when a name is shortened.
 pub const FILE_NAME_LIMIT: usize = 150;
 
+/// The file name at the end of a URL's path. The query and the fragment are not part of it; a caller whose links carry
+/// them in the file name strips them before calling. `None` when the URL ends in a slash or is empty.
+pub fn file_name_from_url(url: &str) -> Option<&str> {
+    url.rsplit('/').next().filter(|name| !name.is_empty())
+}
+
 /// A name that Windows accepts, shortened to [`FILE_NAME_LIMIT`] with the extension kept.
 pub fn safe_limited_file_name(name: &str) -> String {
     bounded_file_name(&safe_file_name(name), FILE_NAME_LIMIT)
@@ -210,7 +216,9 @@ mod tests {
         fn safe_file_name_meets_the_windows_rules(name in name_strategy()) {
             let safe = safe_file_name(&name);
             prop_assert!(!safe.is_empty());
-            prop_assert_eq!(safe.as_str(), safe.trim());
+            // Windows trims ASCII spaces and dots; Rust's `trim()` also strips Unicode whitespace such as NBSP, which
+            // is a valid file-name character. Only the leading edge and the Windows-specific trailing rule apply.
+            prop_assert_eq!(safe.as_str(), safe.trim_start());
             prop_assert!(!safe.ends_with(['.', ' ']));
             prop_assert!(!safe.chars().any(is_invalid_name_char));
             prop_assert!(!is_reserved_file_name(&safe));
@@ -222,7 +230,7 @@ mod tests {
         fn safe_limited_file_name_meets_the_windows_rules_and_the_limit(name in name_strategy()) {
             let limited = safe_limited_file_name(&name);
             prop_assert!(!limited.is_empty());
-            prop_assert_eq!(limited.as_str(), limited.trim());
+            prop_assert_eq!(limited.as_str(), limited.trim_start());
             prop_assert!(!limited.ends_with(['.', ' ']));
             prop_assert!(!limited.chars().any(is_invalid_name_char));
             prop_assert!(!is_reserved_file_name(&limited));

@@ -1,5 +1,5 @@
+import { TextCell } from "@/components/app/text-cell";
 import { useTranslation } from "@/i18n";
-import { TextCell } from "@/views/mod-table/cells";
 
 /// The statuses a provider gives a page, each with its words in the interface. Any other status is shown as the provider
 /// names it.

@@ -10,7 +10,8 @@ use gobbo_overlay_core::Layers;
 
 use crate::{Check, REPORT_FLAG, Report};
 
-/// The Win32 refusal the hook returns when a hard link would change the game folder.
+/// The Win32 refusal the hook returns when a hard link would change the game folder. The value is `ERROR_ACCESS_DENIED`
+/// from `winerror.h`; it is written out rather than imported so this crate stays plain std on Linux.
 const ERROR_ACCESS_DENIED: i32 = 5;
 
 /// Runs the probe and prints/writes its JSON report.

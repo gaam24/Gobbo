@@ -1,8 +1,8 @@
 //! The installed versions of a mod, for the picker and the details view.
 
 use crate::context::size_kb;
+use crate::domain::library::{ArchiveLabel, Library, LibraryView, ModVersion};
 use crate::domain::profiles::ProfilesView;
-use crate::library::{ArchiveLabel, Library, LibraryView, ModVersion};
 use crate::status::views::VersionView;
 
 /// Every installed version of a family, newest first, for the picker and the mod details.
@@ -85,8 +85,8 @@ fn version_view_with(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::library::{Archive, ModInfo};
     use crate::domain::source::ProviderId;
-    use crate::library::{Archive, ModInfo};
     use std::collections::BTreeMap;
 
     #[test]

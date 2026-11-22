@@ -1,11 +1,8 @@
 import { strict as assert } from "node:assert";
-import path from "node:path";
 import { browser } from "@wdio/globals";
 import { reloadWindow } from "../support/bridge";
-import { definitionsDir } from "../support/env";
-import { removeTree } from "../support/files";
 import { modZip } from "../support/fixtures";
-import { cleanupGame, enableMods, importMods, seedGame, statusOf, uniqueId } from "../support/seed";
+import { cleanupFixture, enableMods, importMods, seedGame, statusOf, uniqueId } from "../support/seed";
 import { clickByLabel, waitForMod, waitForSelector } from "../support/ui";
 
 const MODS = 20;
@@ -94,9 +91,7 @@ describe("drag in a virtualized mod list", () => {
 			assert.notEqual(before.join(","), after.join(","), "the row was not reordered");
 			assert.ok(after.indexOf(moved) > 1, "the row did not move towards the drop target");
 		} finally {
-			await cleanupGame(id);
-			removeTree(path.join(definitionsDir, id));
-			removeTree(fixture.root);
+			await cleanupFixture(id, fixture.root);
 		}
 	});
 
@@ -115,9 +110,7 @@ describe("drag in a virtualized mod list", () => {
 			assert.notEqual(before.join(","), after.join(","), "the card was not reordered");
 			assert.ok(after.indexOf(moved) > 1, "the card did not move towards the drop target");
 		} finally {
-			await cleanupGame(id);
-			removeTree(path.join(definitionsDir, id));
-			removeTree(fixture.root);
+			await cleanupFixture(id, fixture.root);
 		}
 	});
 
@@ -159,9 +152,7 @@ describe("drag in a virtualized mod list", () => {
 			assert.notEqual(before.join(","), after.join(","), "auto-scroll cancelled the drag");
 			assert.ok(after.indexOf(moved) > 0, "the dragged row stayed at the top");
 		} finally {
-			await cleanupGame(id);
-			removeTree(path.join(definitionsDir, id));
-			removeTree(fixture.root);
+			await cleanupFixture(id, fixture.root);
 		}
 	});
 });

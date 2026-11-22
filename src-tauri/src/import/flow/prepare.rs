@@ -12,6 +12,7 @@ use super::super::model::ImportStage;
 use super::super::wizard::fomod_allowed;
 use super::working::{Claim, WORKING_PREFIX, Working, remove_stale_working, working_copy_name};
 use crate::context::Data;
+use crate::domain::library::Library;
 use crate::domain::source::SourceRef;
 use crate::error::{AppError, io_at};
 use crate::games::GameDef;
@@ -22,7 +23,6 @@ use crate::infra::archive;
 use crate::infra::io::{hash_and_copy, hash_and_copy_cancellable};
 use crate::infra::store;
 use crate::infra::tasks::cancelled;
-use crate::library::Library;
 
 /// An archive copied to a working folder and hashed, before its archive name is reserved.
 pub(super) struct Copy {

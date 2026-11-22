@@ -3,15 +3,16 @@
 use crate::context::Data;
 use crate::context::Loaded;
 use crate::context::load_game;
+use crate::context::running::game_running;
 use crate::deploy::target::build_plan_with_mode;
 use crate::deploy::target::is_ready;
+use crate::domain::library::{Family, LibraryView};
 use crate::domain::pathkey::path_key;
 use crate::domain::profiles::ProfilesView;
 use crate::domain::resolver::{Conflict, PlanMode};
+use crate::domain::source::{DownloadRoute, ProviderId};
 use crate::error::AppError;
 use crate::error::Message;
-use crate::launch::start::game_running;
-use crate::library::LibraryView;
 use crate::library::active_mods;
 use crate::library::relations::SourceLookup;
 use crate::status::steps::step_choices;
@@ -22,7 +23,31 @@ use crate::status::views::ModDetails;
 use crate::status::views::ModExtras;
 use crate::status::views::ModUsage;
 use crate::status::views::ModUsageProfile;
-use std::collections::BTreeMap;
+use rustc_hash::FxHashMap;
+use std::collections::{BTreeMap, BTreeSet};
+
+/// The routes of the providers the fetched families' requirements actually name. Reading a saved key is an OS keyring
+/// access, so a batch asks once per named provider instead of once per requirement per row, and a call with no
+/// requirements reads no key at all. An id this build does not know gets the owner's `Browser` fallback.
+fn download_routes<'a>(
+    families: impl IntoIterator<Item = Option<&'a Family>>,
+) -> FxHashMap<ProviderId, DownloadRoute> {
+    let mut ids = BTreeSet::new();
+    for family in families.into_iter().flatten() {
+        for requirement in &family.requirements {
+            ids.insert(requirement.source.provider.as_str());
+        }
+    }
+
+    ids.into_iter()
+        .map(|id| {
+            (
+                ProviderId::new(id),
+                crate::providers::download_route_for_id(id),
+            )
+        })
+        .collect()
+}
 
 /// The profiles that list a mod and, among them, the ones whose prepared deployment contains it.
 pub fn mod_usage(root: &Data, game_id: &str, id: &str) -> Result<ModUsage, AppError> {
@@ -116,6 +141,12 @@ pub fn mod_details(root: &Data, game_id: &str, folder: &str) -> Result<ModDetail
     let view = LibraryView::new(&library);
     let lookup = SourceLookup::new(&view, &listed);
     let mod_steps = crate::launch::steps::load_mod_steps(&data)?;
+    let routes = download_routes([library.families.get(&family)]);
+    let context = super::mod_views::ExtrasContext {
+        lookup: &lookup,
+        mod_steps: &mod_steps,
+        routes: &routes,
+    };
 
     let deploy_plan = if is_ready(
         &data,
@@ -142,7 +173,6 @@ pub fn mod_details(root: &Data, game_id: &str, folder: &str) -> Result<ModDetail
         .flat_map(|plan| plan.conflicts.iter())
         .map(|conflict| (path_key(&conflict.path), conflict))
         .collect();
-    let name_of = |id: &str| crate::library::relations::family_name(library.as_ref(), id);
     let conflicts = deploy_plan
         .iter()
         .flat_map(|plan| plan.conflicts.iter())
@@ -170,7 +200,7 @@ pub fn mod_details(root: &Data, game_id: &str, folder: &str) -> Result<ModDetail
                             conflict
                                 .losers
                                 .iter()
-                                .map(|loser| name_of(loser))
+                                .map(|loser| lookup.family_name(loser))
                                 .collect::<Vec<_>>()
                                 .join(", "),
                         ),
@@ -178,7 +208,7 @@ pub fn mod_details(root: &Data, game_id: &str, folder: &str) -> Result<ModDetail
                     Some(conflict) => (
                         FileState::Lose,
                         Message::new("file.overridden_by")
-                            .with("winner", name_of(&conflict.winner)),
+                            .with("winner", lookup.family_name(&conflict.winner)),
                     ),
                     None if !enabled => (FileState::Disabled, Message::new("file.mod_disabled")),
                     None => (FileState::None, Message::new("file.no_conflict")),
@@ -205,9 +235,7 @@ pub fn mod_details(root: &Data, game_id: &str, folder: &str) -> Result<ModDetail
         library.families.get(&family),
         Some(record),
         &game,
-        &library,
-        &lookup,
-        &mod_steps,
+        &context,
     );
     Ok(ModDetails {
         folder: folder.to_string(),
@@ -245,6 +273,17 @@ pub fn mod_extras(
     let view = LibraryView::new(&library);
     let lookup = SourceLookup::new(&view, &listed);
     let mod_steps = crate::launch::steps::load_mod_steps(&data)?;
+    let routes = download_routes(
+        folders
+            .iter()
+            .filter_map(|folder| library.versions.get(folder))
+            .map(|record| library.families.get(&record.family)),
+    );
+    let context = super::mod_views::ExtrasContext {
+        lookup: &lookup,
+        mod_steps: &mod_steps,
+        routes: &routes,
+    };
     let mut extras = Vec::with_capacity(folders.len());
 
     for folder in folders {
@@ -256,9 +295,7 @@ pub fn mod_extras(
             library.families.get(&record.family),
             Some(record),
             &game,
-            &library,
-            &lookup,
-            &mod_steps,
+            &context,
         ));
     }
 

@@ -3,6 +3,7 @@ import type { RunReport } from "@/bindings";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader } from "@/components/ui/empty";
 import { useTranslation } from "@/i18n";
+import { useCopyLines } from "@/lib/use-copy-lines";
 
 /// The newest decisions of the overlay hook, oldest first: writes, copy-ups, whiteouts, missing files, refusals and
 /// pass-through writes. A decision names the layer and the path, so a game that fails to find or write a file shows why.
@@ -29,20 +30,14 @@ export function OverlayDecisions({ report }: { report: RunReport }) {
 		staging: t("console.decisionLayer.staging"),
 		root: t("console.decisionLayer.root"),
 	};
+	const { copyLines } = useCopyLines();
 	const copy = async () => {
-		const text = decisions
-			.map((decision) => {
-				const error = decision.error === 0 ? "" : ` 0x${decision.error.toString(16).toUpperCase()}`;
-				const at = new Date(decision.time * 1000).toISOString();
-				return `${at} ${decision.kind} ${decision.layer} ${decision.path}${error}`;
-			})
-			.join("\n");
-		try {
-			await navigator.clipboard.writeText(text);
-			setCopiedKey(newestKey);
-		} catch {
-			// The clipboard needs a secure context; the list stays on screen for a manual copy.
-		}
+		const lines = decisions.map((decision) => {
+			const error = decision.error === 0 ? "" : ` 0x${decision.error.toString(16).toUpperCase()}`;
+			const at = new Date(decision.time * 1000).toISOString();
+			return `${at} ${decision.kind} ${decision.layer} ${decision.path}${error}`;
+		});
+		await copyLines(lines, () => setCopiedKey(newestKey));
 	};
 
 	return (

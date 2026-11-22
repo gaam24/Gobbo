@@ -16,6 +16,9 @@ export const outDir = path.join(dataDir, "out");
 export const definitionsDir = path.join(dataDir, "definitions/games");
 export const loadersDir = path.join(dataDir, "definitions/loaders");
 
+/// The variable the fixture game scripts write their output to. Both the app process and the scripts must use this name.
+export const GOBBO_E2E_OUT = "GOBBO_E2E_OUT";
+
 /// The app's environment. The suite sets the same values on the app process and on the Node side, so a path built by a
 /// fixture is the path the app sees.
 export function appEnvironment(): Record<string, string> {

@@ -69,6 +69,22 @@ pub struct ManualUpdateView {
     pub current: Option<ManualPageRequest>,
 }
 
+impl ManualUpdateView {
+    /// The idle view of a game with no browser run.
+    pub fn inactive(game: &str) -> Self {
+        Self {
+            game: game.to_string(),
+            active: false,
+            targets: Vec::new(),
+            index: 0,
+            steps: BTreeMap::new(),
+            errors: BTreeMap::new(),
+            percent: 0,
+            current: None,
+        }
+    }
+}
+
 /// What a finished browser run hands back for the single undo: the versions it selected and the failures it kept.
 #[derive(Debug, Clone, Serialize, Type)]
 pub struct ManualUpdateFinish {
@@ -244,19 +260,9 @@ impl ManualUpdateSessions {
 
     /// The current view, or an inactive one when the game has no run.
     pub fn view(&self, game: &str) -> ManualUpdateView {
-        self.lock().get(game).map_or_else(
-            || ManualUpdateView {
-                game: game.to_string(),
-                active: false,
-                targets: Vec::new(),
-                index: 0,
-                steps: BTreeMap::new(),
-                errors: BTreeMap::new(),
-                percent: 0,
-                current: None,
-            },
-            ManualSession::view,
-        )
+        self.lock()
+            .get(game)
+            .map_or_else(|| ManualUpdateView::inactive(game), ManualSession::view)
     }
 
     /// Records a transient step for a target that has not settled yet.

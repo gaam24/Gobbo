@@ -139,12 +139,14 @@ pub(super) fn item_from_manifest(
         }
     }
 
-    if matches!(item.source, CollectionSource::Provider { .. }) && api_mod.is_none() {
+    if api_mod.is_none()
+        && let CollectionSource::Provider { provider, .. } = &item.source
+    {
         issues.push(issue(
             CollectionIssueSeverity::Warning,
             Some(item.key.clone()),
-            "collection.not_on_nexus",
-            [("name", item.name.clone())],
+            "collection.not_on_provider",
+            [("name", item.name.clone()), ("provider", provider.clone())],
         ));
     }
 
@@ -185,26 +187,33 @@ pub(super) fn item_from_api(key: String, provider: &str, module: &CollectionMod)
     reason = "the three values of a source stay together in one place"
 )]
 fn source_of(source: &Source, name: &str) -> (CollectionSource, String, bool) {
-    match source.kind.as_str() {
-        "nexus" => match (source.mod_id, source.file_id) {
+    // Any registered provider can appear as a manifest source. The provider owns its id and its key prefixes; an
+    // unrecognised kind stays unsupported with the kind as written in the manifest.
+    if let Some(provider) = crate::providers::provider(&source.kind) {
+        let id = provider.id();
+        let id = id.as_str();
+        return match (source.mod_id, source.file_id) {
             (Some(mod_id), Some(file_id)) if mod_id > 0 && file_id > 0 => (
                 CollectionSource::Provider {
-                    provider: "nexus".to_string(),
+                    provider: id.to_string(),
                     mod_id: mod_id.to_string(),
                     file_id: file_id.to_string(),
                     part_id: None,
                 },
-                format!("nexus:{mod_id}"),
+                format!("{id}:{mod_id}"),
                 false,
             ),
             _ => (
                 CollectionSource::Unsupported {
-                    source_kind: "nexus".to_string(),
+                    source_kind: id.to_string(),
                 },
-                format!("unsupported:nexus:{name}"),
+                format!("unsupported:{id}:{name}"),
                 true,
             ),
-        },
+        };
+    }
+
+    match source.kind.as_str() {
         "bundle" => match source
             .file_expression
             .as_deref()
@@ -368,4 +377,43 @@ fn patches(patches: BTreeMap<String, String>) -> (BTreeMap<String, String>, Vec<
     }
 
     (out, issues)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_registered_provider_kind_uses_the_providers_id_and_key_prefix() {
+        let _provider =
+            crate::providers::testing::install_fake(crate::providers::testing::FakeConfig {
+                id: "example-provider",
+                ..Default::default()
+            });
+        let source: Source =
+            serde_json::from_str(r#"{"type":"example-provider","modId":42,"fileId":7}"#).unwrap();
+        let (source, key, unsupported) = source_of(&source, "Example");
+        assert_eq!(
+            source,
+            CollectionSource::Provider {
+                provider: "example-provider".to_string(),
+                mod_id: "42".to_string(),
+                file_id: "7".to_string(),
+                part_id: None,
+            }
+        );
+        assert_eq!(key, "example-provider:42");
+        assert!(!unsupported);
+
+        let incomplete: Source = serde_json::from_str(r#"{"type":"example-provider"}"#).unwrap();
+        let (source, key, unsupported) = source_of(&incomplete, "Example");
+        assert_eq!(
+            source,
+            CollectionSource::Unsupported {
+                source_kind: "example-provider".to_string(),
+            }
+        );
+        assert_eq!(key, "unsupported:example-provider:Example");
+        assert!(unsupported);
+    }
 }

@@ -675,17 +675,24 @@ export function useGameActions({
 		if (loaderInstalls.current.has(gameId)) return false;
 		loaderInstalls.current.add(gameId);
 
+		// The one-install-per-game lock is released however the install ends. No `finally`: React Compiler would
+		// skip the whole component.
+		let installed: boolean;
+
 		try {
-			const installed = await attempt(async () => {
+			installed = await attempt(async () => {
 				const view = await unwrap(commands.installLoader(gameId, choice));
 				notify(t("notice.loaderInstalled", { name: view.name }));
 			});
 
 			if (installed) await reloadAfter(gameId);
-			return installed;
-		} finally {
+		} catch (failure) {
 			loaderInstalls.current.delete(gameId);
+			throw failure;
 		}
+
+		loaderInstalls.current.delete(gameId);
+		return installed;
 	};
 
 	/// Installs the whole requirement closure of one mod. The backend saves the profile list once, so the result is one

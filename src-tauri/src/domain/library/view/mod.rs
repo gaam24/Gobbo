@@ -8,12 +8,14 @@ use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use super::Library;
 use super::model::ModVersion;
+use crate::domain::naming::match_key;
+use crate::domain::pathkey::fold_case;
 use crate::domain::source::ProviderId;
 use crate::domain::version;
 
 mod find;
 
-pub use find::FoundBy;
+pub use find::{FindQuery, FoundBy, MatchPolicy};
 
 /// The versions of each family with the key they are sorted by.
 type VersionsByFamily<'a> =
@@ -77,6 +79,10 @@ pub struct LibraryView<'a> {
     /// iterator depends on the view alone.
     by_page: OnceLock<FxHashMap<&'a str, FxHashMap<&'a str, PageFamilies<'a>>>>,
     by_name: OnceLock<FxHashMap<&'a str, &'a str>>,
+    /// Provider ids folded with the app's case rule, for community profile slugs.
+    by_source_folded: OnceLock<FxHashMap<(&'a str, String), &'a str>>,
+    /// Letter-and-digit folder keys, for Mod Organizer 2 lists.
+    by_key: OnceLock<FxHashMap<String, &'a ModVersion>>,
     /// Built on the first archive lookup. The status never asks for it, so it must not cost one `Vec` per archive.
     by_archive: OnceLock<FxHashMap<&'a str, Vec<&'a ModVersion>>>,
 }
@@ -127,6 +133,8 @@ impl<'a> LibraryView<'a> {
             by_part: OnceLock::new(),
             by_page: OnceLock::new(),
             by_name: OnceLock::new(),
+            by_source_folded: OnceLock::new(),
+            by_key: OnceLock::new(),
             by_archive: OnceLock::new(),
         }
     }
@@ -292,6 +300,43 @@ impl<'a> LibraryView<'a> {
         self.by_source().get(&(provider.as_str(), mod_id)).copied()
     }
 
+    /// The family whose provider id matches after the app's case fold. Only the families' own sources count: a
+    /// community profile names a package by its id, never by a display name or a version's parsed source.
+    pub(crate) fn family_of_source_folded(
+        &self,
+        provider: &ProviderId,
+        mod_id: &str,
+    ) -> Option<&'a str> {
+        self.by_source_folded
+            .get_or_init(|| {
+                let mut map = FxHashMap::default();
+                for (id, known) in &self.library.families {
+                    for (provider, source) in &known.sources {
+                        map.entry((provider.as_str(), fold_case(&source.mod_id)))
+                            .or_insert(id.as_str());
+                    }
+                }
+                map
+            })
+            .get(&(provider.as_str(), fold_case(mod_id)))
+            .copied()
+    }
+
+    /// The first version whose folder has this letter-and-digit key, in folder order: the rule a Mod Organizer 2 list
+    /// uses, where the first folder of a key wins.
+    pub(crate) fn version_by_key(&self, key: &str) -> Option<&'a ModVersion> {
+        self.by_key
+            .get_or_init(|| {
+                let mut map = FxHashMap::default();
+                for version in self.library.versions.values() {
+                    map.entry(match_key(&version.folder)).or_insert(version);
+                }
+                map
+            })
+            .get(key)
+            .copied()
+    }
+
     /// The family of one part of a page, when the library has it.
     pub fn family_of_part(
         &self,
@@ -429,7 +474,7 @@ mod tests {
         library.archives.insert(
             "sha".into(),
             Archive {
-                original_name: "Archived 35686 1.2.0 2026-10-23T17-21Z x.zip".into(),
+                original_name: "Example Mod 12345 1.2.0 2026-01-01T00-00Z x.zip".into(),
                 file: "x.zip".into(),
                 source_files: std::collections::BTreeMap::new(),
                 source_parts: std::collections::BTreeMap::new(),

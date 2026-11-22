@@ -74,7 +74,7 @@ function write(key: string, next: ActivityProgress) {
 	if (key === keyOf()) store.set(next);
 }
 
-/// Chooses the game whose progress `useProgress` and `progressSnapshot` read. The workspace calls it when the shown
+/// Chooses the game whose progress `useProgress` reads. The workspace calls it when the shown
 /// game changes. Setters still take an explicit game id for work that outlives a switch; this only selects the view.
 export function setActiveGame(gameId: string | undefined) {
 	if (activeGame === gameId) return;
@@ -129,24 +129,8 @@ export function setImportProgress(key: string, state: ImportState | null, gameId
 	write(slotKey, { ...current, importing: next });
 }
 
-/// Clears one game's progress. With no id it is deliberately a no-op: dropping the previous game's rows on a switch is
-/// what made long-running work disappear. An action clears its own slot when it starts and when it ends.
-export function resetProgress(gameId?: string) {
-	if (gameId === undefined) return;
-
-	if (!byGame.delete(gameId)) return;
-
-	if (gameId === keyOf()) store.set(slotOf(gameId));
-}
-
 /// The single subscription point for progress. Screens do not read it, so a percent event re-renders the activity card
 /// and nothing else. It shows the visible game's slot; a background game's progress is kept in `byGame` until selected.
 export function useProgress(): ActivityProgress {
 	return useStore(store);
-}
-
-/// The current snapshot of the visible game, for a development or test reader that has no component to render. Pass a
-/// game id to the setters (or call `setActiveGame`) before reading it.
-export function progressSnapshot(): ActivityProgress {
-	return store.get();
 }

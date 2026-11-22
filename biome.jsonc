@@ -154,7 +154,8 @@
 						"filenameCases": ["kebab-case"]
 					}
 				},
-				"noNonNullAssertion": "error",
+				// Enforced by oxlint typescript/no-non-null-assertion (error); each rule has one source.
+				"noNonNullAssertion": "off",
 				"noParameterAssign": "error",
 				"useThrowOnlyError": "error",
 				"useThrowNewError": "error",
@@ -171,7 +172,8 @@
 				"useNamingConvention": "off",
 				"useSelfClosingElements": "error",
 				"useSingleVarDeclarator": "error",
-				"useConst": "error",
+				// Enforced by oxlint eslint/prefer-const (error); each rule has one source.
+				"useConst": "off",
 				"useDefaultSwitchClause": "warn",
 				"useNumberNamespace": "error",
 				"useTemplate": "error",
@@ -195,19 +197,16 @@
 				"noDeprecatedImports": "error",
 				// Enforced by oxlint typescript/no-explicit-any (error); each rule has one source.
 				"noExplicitAny": "off",
-				"noConsole": {
-					"level": "warn",
-					"options": {
-						"allow": ["warn", "error"]
-					}
-				},
+				// Enforced by oxlint eslint/no-console (warn); each rule has one source.
+				"noConsole": "off",
 				"noConstantBinaryExpressions": "error",
 				"noDoubleEquals": "error",
 				"noConfusingVoidType": "error",
 				"noReactForwardRef": "error",
 				"noDuplicatedSpreadProps": "error",
 				"noUnknownAttribute": "error",
-				"noArrayIndexKey": "warn",
+				// Enforced by oxlint react/no-array-index-key (warn); each rule has one source.
+				"noArrayIndexKey": "off",
 				"noAssignInExpressions": "error",
 				"noAsyncPromiseExecutor": "error",
 				"noCatchAssign": "error",
@@ -239,7 +238,8 @@
 				"useGetterReturn": "error",
 				"useNamespaceKeyword": "error",
 				"useNumberToFixedDigitsArgument": "error",
-				"noVar": "error",
+				// Enforced by oxlint eslint/no-var (error); each rule has one source.
+				"noVar": "off",
 				"noWith": "error",
 				"noOctalEscape": "error",
 				"noLoopFunc": "error",
@@ -319,7 +319,7 @@
 		},
 		{
 			// Vite and tool configs export a default function; that is their interface.
-			"includes": ["vite.config.ts", "**/*.config.ts", "knip.json"],
+			"includes": ["vite.config.ts", "**/*.config.ts"],
 			"linter": {
 				"rules": {
 					"style": {

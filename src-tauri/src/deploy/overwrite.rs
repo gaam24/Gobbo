@@ -3,6 +3,7 @@
 //! the game wrote), or clear them.
 
 use crate::context::Data;
+use crate::context::library::{family_id_from, scan_mod};
 use crate::context::load_library;
 use crate::context::load_profiles;
 use crate::context::load_stopped;
@@ -12,12 +13,12 @@ use crate::context::running::game_running;
 use crate::context::size_kb;
 use crate::deploy::overlay::Session;
 use crate::deploy::target::deployment_root;
+use crate::domain::library::Family;
 use crate::domain::profiles::Entry as ProfileEntry;
 use crate::error::AppError;
 use crate::error::game_running as game_is_running_error;
 use crate::error::io_at;
 use crate::games;
-use crate::library;
 use serde::Serialize;
 use std::fs;
 use std::path::Path;
@@ -80,7 +81,7 @@ pub fn overwrite_files(root: &Data, game_id: &str) -> Result<OverwriteView, AppE
 /// under that root move, relative to it.
 pub fn overwrite_to_mod(root: &Data, game_id: &str, name: &str) -> Result<(), AppError> {
     let _state = crate::context::lock_state(&root.dir)?;
-    let _index = crate::library::lock_index();
+    let _index = crate::context::library::lock_index();
     let _profiles = lock_profiles();
     let (game, data, settings) = load_stopped(root, game_id)?;
     let name = name.trim();
@@ -126,12 +127,12 @@ pub fn overwrite_to_mod(root: &Data, game_id: &str, name: &str) -> Result<(), Ap
     remove_empty_dirs(&overwrite_dir(&data));
 
     let mut library = load_library(&data, &game)?;
-    let mut version = library::scan_mod(&library_dir, &folder, &game)?;
+    let mut version = scan_mod(&library_dir, &folder, &game)?;
     // The files have game paths, so the mod has no slot of its own.
     version.slot = String::new();
     version.info.name = name.to_string();
-    version.family = library::family_id_from(None, name);
-    let family = library::Family::of(&version);
+    version.family = family_id_from(None, name);
+    let family = Family::of(&version);
     library.families.entry(family.id.clone()).or_insert(family);
     let id = version.family.clone();
     library.versions.insert(folder.clone(), version);

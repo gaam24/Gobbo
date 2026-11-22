@@ -8,7 +8,7 @@
       "loader": "bepinex",
       "verified": false,
       "file": "games/content-warning/game.toml",
-      "sha256": "e682d51b2671a2dbca03f8294b84e8f74bdc6f297d3a374a1d34ba4e165fea3a",
+      "sha256": "2df49d9a37a0dc86b6c633c7b5ed57ee2c8c395872720484fa3b173085e8b574",
       "icon": "games/content-warning/icon.webp",
       "iconSha256": "b332c753710b7a94d45152ce80f8ad77f87e20d19ca81d90baf373d24db67493"
     },
@@ -29,7 +29,7 @@
       "loader": "bepinex",
       "verified": false,
       "file": "games/lethal-company/game.toml",
-      "sha256": "cbda26330ea1d993a6f6ca72d7c6150a9fad26b2b33c86d7c700afbcc163df76",
+      "sha256": "274c03c8e2273cf9ecec133e9875cde062e2f7be3c57aa89fb67843f4fd0d7e5",
       "icon": "games/lethal-company/icon.webp",
       "iconSha256": "ec658ad0d2133a001c5d362969284a2abddbb67081481ee62c1bb97ca0a0366a"
     },
@@ -52,7 +52,7 @@
       "loader": "bepinex",
       "verified": false,
       "file": "games/repo/game.toml",
-      "sha256": "2db4ea6d686d860fdd53e1a87d3309bd309c28174ec37793db6c2e5c0a282b58",
+      "sha256": "819c311acbbc7e029e8900d92487b4b8359b7e9e6131a83a5eddbeb1cb16269b",
       "icon": "games/repo/icon.webp",
       "iconSha256": "ace288869f231f7f4bf50188e5bcb7d58e1c5f0c1e5490a1d57d9718d4e25329"
     },
@@ -74,7 +74,7 @@
       "loader": "bepinex",
       "verified": false,
       "file": "games/tcg-card-shop-simulator/game.toml",
-      "sha256": "894d44511bd66b067d20efa8bba1e996097f4c4fc91b618f269989ef52b1ab61",
+      "sha256": "9c6048fffc46197c31e50c6e231aa42cc5fc273eba33a9a5630f7d3d390cd236",
       "icon": "games/tcg-card-shop-simulator/icon.webp",
       "iconSha256": "f6dd831c4da52c4a4394ac1050a8d8d8fa8b3f62715a7365a1d62b4cf98680af"
     },
@@ -94,7 +94,7 @@
       "schema": 1,
       "verified": false,
       "file": "games/the-witcher-enhanced-edition/game.toml",
-      "sha256": "c1174079048928d77294f2a0afa74b3df888a5a640205d3837d654d18d29bec6",
+      "sha256": "32c4a0854bd1f033dd012ab315ef05f73a93cac45086c0ecc91b71984ec1d7cb",
       "icon": "games/the-witcher-enhanced-edition/icon.webp",
       "iconSha256": "780bab81281077a2f5dd23ae3b6adaa45f07b9dcc6140f58604f4650f679efc8"
     },
@@ -105,7 +105,7 @@
       "loader": "bepinex",
       "verified": false,
       "file": "games/valheim/game.toml",
-      "sha256": "3e5b7043b08898057347746493ec4a04a5d6f85073397be67468a4d3e388cca3",
+      "sha256": "f3ec354152b45c7d64df75e811aad34e868ff33597fc3e4ba54756e63a556aff",
       "icon": "games/valheim/icon.webp",
       "iconSha256": "7a640498dd2dde2dabf452c1ade02afdf7630cbded3086aa800b6d227fcaf1ab"
     }
@@ -116,7 +116,7 @@
       "name": "BepInEx",
       "schema": 1,
       "file": "loaders/bepinex.toml",
-      "sha256": "0f7f82397f58385f31ada20d4c4fdeb2ac1c48c5352d257667c56e28c852e165",
+      "sha256": "e41c5ec710764ef57e45a407559b12ad47f15abafe66d01a9ac088ddd8d43375",
       "minGobbo": "0.1.1"
     },
     {
@@ -124,7 +124,7 @@
       "name": "Unreal Engine",
       "schema": 1,
       "file": "loaders/unreal.toml",
-      "sha256": "fc8f608267c57059dcf31e66e4e457f96594b2334d89ce5f0e7853512d4de12c",
+      "sha256": "79c99e592687554ca92111ebf8dcff472a19a8ae70034902131c543a826708cc",
       "minGobbo": "0.1.1"
     }
   ]

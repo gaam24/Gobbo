@@ -43,11 +43,11 @@ export function createCheckRegistry() {
 	};
 }
 
-/// Update checks against Nexus. The state each mod shows is the result of its last saved check, read from the status:
+/// Update checks against the provider. The state each mod shows is the result of its last saved check, read from the status:
 /// the library keeps it, so a restart, a game switch or a new install shows it again. Only a failed check lives in this
 /// session, and it is kept per game so switching games no longer drops another game's failures. Checks of different
-/// games run side by side; only a duplicate check of the same game is refused. Apart from the mod a Nexus download has
-/// just installed, a check is never started automatically; the Nexus budget is the user's.
+/// games run side by side; only a duplicate check of the same game is refused. Apart from the mod a download has
+/// just installed, a check is never started automatically; the provider budget is the user's.
 export function useModUpdates({ gameId, status, onStatus, nameOf, notify, notifyError }: UseModUpdatesOptions) {
 	const { t } = useTranslation();
 	/// Failed checks of this session, keyed by game then mod id. A check that works again removes its failure.
@@ -132,7 +132,7 @@ export function useModUpdates({ gameId, status, onStatus, nameOf, notify, notify
 		}
 	};
 
-	/// Checks every mod of the active profile that has a Nexus ID. Only the user asks for it, never at startup. A
+	/// Checks every mod of the active profile that has a provider file id. Only the user asks for it, never at startup. A
 	/// check of another game is independent: only a second check of the same game is refused.
 	const checkUpdates = async () => {
 		if (!gameId) return;
@@ -164,16 +164,13 @@ export function useModUpdates({ gameId, status, onStatus, nameOf, notify, notify
 				}
 			}
 
-			const available = reports.filter((report) => report.has_update).length;
+			const count = reports.filter((report) => report.has_update).length;
 			const ignored = reports.filter((report) => report.state === "ignored").length;
 			const broken = reports.filter((report) => report.error).length;
-			let base = t("updates.allCurrent", { count: reports.length });
-
-			if (available > 0) base = t("updates.found", { count: available, total: reports.length });
-			else if (ignored > 0) base = t("updates.noNewVersions", { count: reports.length });
-			const ignoredText = ignored > 0 ? ` ${t("updates.ignored", { count: ignored })}` : "";
-			const brokenText = broken > 0 ? ` ${t("updates.broken", { count: broken })}` : "";
-			const summary = `${base}${ignoredText}${brokenText}`;
+			const summary =
+				count === 0 && ignored === 0 && broken === 0
+					? t("updates.allCurrent", { count: reports.length })
+					: t("updates.summary", { count, total: reports.length, ignored, broken });
 			notify(switched ? t("updates.finishedFor", { game: nameOf(requestedGame), summary }) : summary);
 		} catch (failure) {
 			finish();
@@ -181,7 +178,7 @@ export function useModUpdates({ gameId, status, onStatus, nameOf, notify, notify
 		}
 	};
 
-	/// A changed Nexus ID or version: the failure of this session is about the old state, so it is dropped. The saved
+	/// A changed provider file id or version: the failure of this session is about the old state, so it is dropped. The saved
 	/// check follows the library, and the status shows it again with the version the profile now selects. The optional
 	/// game id lets a background action forget its own failure while another game is shown.
 	const forget = (modId: string, forgetGame: string = gameId ?? "") => {

@@ -4,7 +4,7 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::domain::rate::AccountTier;
+use crate::domain::rate::{AccountTier, DownloadPolicy};
 use crate::domain::source::SourceRef;
 use crate::error::AppError;
 use crate::infra::http::{self, BodyProblem, DownloadInfo, PartError};
@@ -12,9 +12,10 @@ use crate::infra::sidecar;
 
 /// What one provider adds to an archive download.
 pub struct ArchiveRules<'a> {
-    /// The provider whose CDN serves the file, and the tier the download is made with. Together they pick the pacing
-    /// rule; they are data on the rule, never a global delay.
-    pub provider: &'a str,
+    /// The pacing rule the provider chose for this account tier. It is data on the rule, never a global delay.
+    pub policy: DownloadPolicy,
+    /// The key that keeps this provider's pacing clock apart from another provider's.
+    pub pacer_key: &'a str,
     pub tier: AccountTier,
     /// The sidecar written next to the finished file. It names the source the file came from. `None` is for an archive
     /// that is a recipe, such as a collection, not a mod version.
@@ -37,8 +38,8 @@ pub fn fetch_archive(
     progress: &mut dyn FnMut(u64, u64) -> bool,
 ) -> Result<PathBuf, AppError> {
     let mut last_error = None;
-    let policy = super::download_policy(rules.provider, rules.tier);
-    let clock = http::pacer(&format!("{}:{}", rules.provider, rules.tier as u8));
+    let policy = rules.policy;
+    let clock = http::pacer(&format!("{}:{}", rules.pacer_key, rules.tier as u8));
     // One 429 budget for the whole operation, shared by every CDN link. The pacing is per provider and tier and runs
     // before every try: an unlimited policy returns at once, so no user waits for another provider's ceiling.
     let mut rate = http::RateRetry::default();
@@ -95,6 +96,49 @@ pub fn target_name(info: &DownloadInfo, url: &str, requested: &str, fallback: &s
     }
 
     format!("{fallback}.{extension}")
+}
+
+/// The name one answer gives an archive. The CDN's name, the URL, the requested name and `fallback` are tried in that
+/// order; `default_ext` is appended only when the chosen name has none. `None` keeps the picked name as it is, for
+/// callers whose fallback rule always supplies an extension.
+pub fn archive_name(
+    info: &DownloadInfo,
+    url: &str,
+    requested: &str,
+    fallback: &str,
+    default_ext: Option<&str>,
+) -> String {
+    let name = target_name(info, url, requested, fallback);
+    match default_ext {
+        Some(extension) if crate::domain::archive::extension_of(&name).is_none() => {
+            format!("{name}.{extension}")
+        }
+        _ => name,
+    }
+}
+
+/// A free path for an archive in `dir`, from the same name rule as [`archive_name`]. `source` decides when an existing
+/// file is the same download arriving again; `None` numbers any collision.
+pub fn archive_target(
+    dir: &Path,
+    info: &DownloadInfo,
+    url: &str,
+    requested: &str,
+    fallback: &str,
+    default_ext: Option<&str>,
+    source: Option<&SourceRef>,
+) -> PathBuf {
+    let name = archive_name(info, url, requested, fallback, default_ext);
+    free_download_name(dir, &name, source)
+}
+
+/// The mapping from a non-archive answer to an error, built from the adapter's two errors. Every adapter keeps its own
+/// codes and details as data; the match on the answer's kind lives here.
+pub fn body_error(empty: AppError, html: AppError) -> impl Fn(BodyProblem) -> AppError {
+    move |problem| match problem {
+        BodyProblem::Empty => empty.clone(),
+        BodyProblem::Html => html.clone(),
+    }
 }
 
 /// The archive name at the end of a signed CDN URL. New Nexus uploads use a UUID path, so this is only a fallback.
@@ -186,16 +230,16 @@ mod tests {
         let info = DownloadInfo {
             bytes: 1,
             content_type: Some("application/zip".into()),
-            content_disposition: Some("attachment; filename=\"CET 1.38.1-107-1-38-1.zip\"".into()),
+            content_disposition: Some("attachment; filename=\"example-mod-1.0.zip\"".into()),
         };
         assert_eq!(
             target_name(
                 &info,
-                "https://cf-files.nexusmods.com/a.zip",
+                "https://cdn.example.invalid/a.zip",
                 "fallback.zip",
-                "nexus-107-168615"
+                "example-provider-1"
             ),
-            "CET 1.38.1-107-1-38-1.zip"
+            "example-mod-1.0.zip"
         );
     }
 
@@ -220,9 +264,9 @@ mod tests {
         assert_eq!(
             target_name(
                 &info,
-                "https://cf-files.nexusmods.com/8e/4b/39/uuid",
+                "https://cdn.example.invalid/8e/4b/39/uuid",
                 "fallback",
-                "nexus-107-168615"
+                "example-provider-1"
             ),
             "fallback.zip"
         );
@@ -264,11 +308,11 @@ mod tests {
         assert_eq!(
             target_name(
                 &info,
-                "https://cf-files.nexusmods.com/8e/4b/39/uuid",
-                "CET 1.38.1",
-                "nexus-107-168615"
+                "https://cdn.example.invalid/8e/4b/39/uuid",
+                "example-mod-1.0",
+                "example-provider-1"
             ),
-            "CET 1.38.1.7z"
+            "example-mod-1.0.7z"
         );
     }
 }

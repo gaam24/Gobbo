@@ -144,9 +144,6 @@ function keyFromId(id: string, backend: boolean, backendKind?: string): string {
 	}
 }
 
-/// The order of the activity card: what needs a decision first, then what is in progress.
-export const TASK_STATE_ORDER: readonly TaskState[] = ["failed", "waiting", "running"];
-
 /// The one label per state, shared by the header badges, the group headers and the live region.
 export const TASK_GROUP_LABEL = {
 	failed: "tasks.group.failed",

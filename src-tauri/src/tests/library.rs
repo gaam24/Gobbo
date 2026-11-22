@@ -438,15 +438,15 @@ fn deleting_unused_versions_keeps_the_selected_one() {
 
     for (name, text) in [
         (
-            "Remove Mods Menu 35686 1.2.0 2026-10-23T17-21Z Q6xF6llIa.zip",
+            "Example Cleanup Mod 7001 1.2.0 2026-10-23T17-21Z example-uploader.zip",
             "old",
         ),
         (
-            "Remove Mods Menu 35686 1.2.1 2026-11-01T09-00Z Abc123xyz.zip",
+            "Example Cleanup Mod 7001 1.2.1 2026-11-01T09-00Z Abc123xyz.zip",
             "new",
         ),
     ] {
-        let zip = f.zip(name, &[("r6/scripts/RemoveModsMenu/a.reds", text)]);
+        let zip = f.zip(name, &[("r6/scripts/ExampleCleanupMod/a.reds", text)]);
         import(&f.data, MIRROR_GAME, &zip, None, &mut |_, _| {}).unwrap();
     }
 

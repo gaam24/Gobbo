@@ -7,6 +7,9 @@
 use crate::error::AppError;
 use crate::providers::link::split_link;
 
+/// The URL scheme of the provider's install deep links.
+pub(super) const SCHEME: &str = "ror2mm";
+
 /// The protocol version in the host of an install link. Only `v1` is known.
 const PROTOCOL: &str = "v1";
 /// The one Thunderstore server Gobbo downloads from.
@@ -25,7 +28,7 @@ pub struct PackageVersion {
 /// any other shape is `thunderstore.bad_link`.
 pub fn parse_ror2mm(url: &str) -> Result<PackageVersion, AppError> {
     let bad = || AppError::user("thunderstore.bad_link").with("url", url);
-    let link = split_link(url, "ror2mm").ok_or_else(bad)?;
+    let link = split_link(url, SCHEME).ok_or_else(bad)?;
     // A non-special scheme keeps the host's case, so the protocol version is compared without it.
     if !link.host().eq_ignore_ascii_case(PROTOCOL) {
         return Err(bad());

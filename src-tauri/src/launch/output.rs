@@ -14,6 +14,11 @@ const OUTPUT_FILE: &str = "last_output.log";
 /// The output is copied to the file up to this size. Past it the pipe is still drained, so the game never blocks on it.
 const MAX_BYTES: u64 = 64 * 1024 * 1024;
 
+/// The line written when the cap is reached, in whole megabytes like the cap itself.
+fn stopped_marker() -> String {
+    format!("\n[output stopped at {} MB]\n", MAX_BYTES / (1024 * 1024))
+}
+
 /// How many lines at the end of the file the console shows.
 const TAIL_LINES: usize = 500;
 
@@ -67,7 +72,7 @@ fn copy(mut reader: PipeReader, mut file: File) {
 
         if written >= MAX_BYTES {
             full = true;
-            let _ = file.write_all(b"\n[output stopped at 64 MB]\n");
+            let _ = file.write_all(stopped_marker().as_bytes());
         }
     }
 }
@@ -247,7 +252,8 @@ mod tests {
         let lines = wait_for(&path, |lines| {
             lines.iter().any(|line| line.contains("output stopped"))
         });
-        assert!(lines.iter().any(|line| line == "[output stopped at 64 MB]"));
+        let marker = stopped_marker().trim().to_string();
+        assert!(lines.iter().any(|line| line == &marker));
         let size = std::fs::metadata(&path).unwrap().len();
         assert!(size <= MAX_BYTES + 64 * 1024, "{size}");
     }

@@ -8,9 +8,9 @@ use crate::context::load_game;
 use crate::context::load_profiles;
 use crate::context::profile::history::save_profiles;
 use crate::context::profile::lock_profiles;
+use crate::domain::library::Library;
 use crate::domain::profiles::Entry as ProfileEntry;
 use crate::error::AppError;
-use crate::library::Library;
 use serde::Serialize;
 use std::cmp::Reverse;
 use std::collections::BTreeMap;
@@ -233,7 +233,7 @@ pub fn sorted_by_rules(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::library::Family;
+    use crate::domain::library::Family;
 
     fn entry(id: &str) -> ProfileEntry {
         ProfileEntry {

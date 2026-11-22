@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/i18n";
 import { formatTime } from "@/lib/mods";
 import { fileName } from "@/lib/paths";
+import { useCopyLines } from "@/lib/use-copy-lines";
 
 /// What the list and the detail pane share. The key is stable across report refreshes, so a selected log stays
 /// selected when the game writes another line.
@@ -67,7 +68,7 @@ function LogGroup({
 export function GameLogs({ report }: { report: RunReport }) {
 	const { t, i18n } = useTranslation();
 	const [selectedKey, setSelectedKey] = useState<string | null>(null);
-	const [copied, setCopied] = useState(false);
+	const { copied, copyLines, resetCopied } = useCopyLines();
 	const kindText: Record<string, string> = {
 		script: t("console.logKind.script"),
 		loader: t("console.logKind.loader"),
@@ -114,17 +115,11 @@ export function GameLogs({ report }: { report: RunReport }) {
 	const selected = entries.find((entry) => entry.key === selectedKey) ?? entries[0];
 	const select = (key: string) => {
 		setSelectedKey(key);
-		setCopied(false);
+		resetCopied();
 	};
 	const copy = async () => {
 		if (!selected) return;
-
-		try {
-			await navigator.clipboard.writeText(selected.lines.join("\n"));
-			setCopied(true);
-		} catch {
-			// The clipboard needs a secure context; the lines stay selectable on screen.
-		}
+		await copyLines(selected.lines);
 	};
 
 	if (entries.length === 0) {

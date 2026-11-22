@@ -73,8 +73,8 @@ export function usePaletteItems(): () => PaletteItem[] {
 		const presentation = gamePresentation(gameStatus, { gameRunning, busy });
 		const launchLabel = presentation.canApply
 			? t(presentation.primary.labelKey, presentation.primary.params)
-			: t(gameStatus.deployed ? "header.launch" : "header.playWithoutMods");
-		const applyLabel = gameStatus.stage.kind === "applied" ? t("header.applyAgain") : t("header.deployWithoutLaunch");
+			: t(presentation.launchLabelKey);
+		const applyLabel = t(presentation.applyLabelKey);
 		const labels = {
 			enabled: t("mods.state.enabled"),
 			disabled: t("mods.state.disabled"),

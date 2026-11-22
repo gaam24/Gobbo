@@ -8,6 +8,10 @@ use crate::providers::link::is_slug;
 use crate::providers::nexus::ID;
 use crate::providers::{CollectionLink, CollectionRevision, CollectionSource};
 
+/// Archive paths this provider puts in collections for resources Gobbo cannot apply. The generic manifest reader
+/// reports any entry under one of them instead of naming a provider's folder itself.
+pub(super) const UNSUPPORTED_ARCHIVE_PATHS: &[&str] = &["INI Tweaks/"];
+
 mod download;
 mod link;
 mod revision;

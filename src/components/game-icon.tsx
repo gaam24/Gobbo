@@ -6,6 +6,8 @@ import { useLoad } from "@/lib/use-load";
 /// Icon cache at module level: one IPC request per game for the whole time the app runs.
 const cache = new Map<string, Promise<string | null>>();
 
+/// A leaf component owning one command: `gameIcon` stays here instead of moving to a feature hook. Callers only give an
+/// id and a name, and the module-level cache keeps this to one request per game.
 function iconOf(id: string): Promise<string | null> {
 	let icon = cache.get(id);
 

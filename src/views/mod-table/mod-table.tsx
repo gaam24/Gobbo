@@ -26,7 +26,7 @@ import {
 	orderedColumns,
 	stepColumn,
 } from "@/lib/mod-columns";
-import { type Group, type TableItem, tableItems } from "@/lib/mods";
+import { type Group, type Mod, type TableItem, tableItems } from "@/lib/mods";
 import { useModExtras } from "@/lib/use-mod-extras";
 import { useScrollMargin } from "@/lib/use-scroll-margin";
 import { useVirtualWindow } from "@/lib/use-virtual-window";
@@ -49,6 +49,34 @@ import { ModRow } from "@/views/mod-table/mod-row";
 import { NoMatch } from "@/views/mod-table/no-match";
 import { PageRow } from "@/views/mod-table/page-row";
 import { SeparatorRow } from "@/views/mod-table/separator-row";
+
+/// The row-specific values a page header's actions read when they run. They live in a holder so the callbacks can keep
+/// their identity while the values follow the newest render.
+interface PageCallbackData {
+	source: Mod["sources"][number] | undefined;
+	pageId: string | undefined;
+	storedId: string | null;
+}
+
+interface PageRowCallbacks {
+	onToggle: (enabled: boolean) => void;
+	onFold: () => void;
+	onOpenSource: () => void;
+	onDeletePage: () => void;
+	onRenameGroup: () => void;
+	onUngroup: () => void;
+	onSetTranslationWinner: () => void;
+}
+
+type PageHandlers = Pick<
+	ModListProps,
+	"onSetEnabled" | "onTogglePage" | "onDeletePage" | "onRenameGroup" | "onUngroup" | "onSetTranslationWinner" | "onOpenSource"
+>;
+interface PageCallbackEntry {
+	holder: { data: PageCallbackData; handlers: PageHandlers };
+	callbacks: PageRowCallbacks;
+}
+const pageCallbackCaches = new WeakMap<object, Map<string, PageCallbackEntry>>();
 
 /// Mod list as a table: a row per mod, a header that is not sticky, and rows with a grip, a toggle and a name button.
 /// The edge of each header cell resizes its column. The Columns menu shows and hides columns. The grip is for the mouse;
@@ -133,10 +161,41 @@ export function ModTable({
 	const squeezed = chosen.filter((column) => !columns.includes(column));
 	const needed = neededWidth(columns, layout.widths);
 	const table = useMemo(() => tableItems(rows, foldedPages, groups), [foldedPages, groups, rows]);
+	/// Page rows carry page details, not a `Group`. Wrap them once per table so a memoized PageRow keeps the same header
+	/// across renders; a fresh literal here would defeat its memo on every status answer.
+	const headers = useMemo(() => {
+		const wrapped = new Map<string, Group>();
+
+		for (const row of table) {
+			if (row.kind === "page") {
+				wrapped.set(row.id, {
+					source: "page",
+					id: row.id,
+					name: row.page.name,
+					parts: row.page.mods,
+					page: row.page,
+				});
+			} else if (row.kind === "group") {
+				wrapped.set(row.id, row.group);
+			}
+		}
+
+		return wrapped;
+	}, [table]);
 	const columnIds = useMemo(() => columns.map((column) => column.id), [columns]);
 	const rowIds = useMemo(() => table.map((row) => row.id), [table]);
-	const focusedIndex =
-		selection.length === 0 ? 0 : table.findIndex((row) => row.kind === "mod" && row.id === selection[selection.length - 1]);
+	/// Three positions from one pass over the table. `firstModRow` only reads `table`; the other two also read the
+	/// selection, which is why the memo carries both.
+	const focus = useMemo(() => {
+		const focused = selection[selection.length - 1] ?? null;
+		return {
+			focusedIndex: selection.length === 0 ? 0 : table.findIndex((row) => row.kind === "mod" && row.id === selection[selection.length - 1]),
+			focused,
+			focusedVisible: focused !== null && table.some((row) => row.kind === "mod" && row.id === focused),
+			firstModRow: table.find((row) => row.kind === "mod")?.id,
+		};
+	}, [selection, table]);
+	const { focusedIndex, focused, focusedVisible, firstModRow } = focus;
 	/// Every row has one of two fixed heights, matching the classes in the row components.
 	const heights = useMemo(() => table.map((row) => (row.kind === "separator" ? 40 : 56)), [table]);
 	const [showAllRows, setShowAllRows] = useState(false);
@@ -198,9 +257,70 @@ export function ModTable({
 	const template = trackList(columns, layout.widths);
 	/// Position in the whole profile, by family: one pass instead of a `findIndex` per row.
 	const selectionSet = new Set(selection);
-	const focused = selection[selection.length - 1] ?? null;
 	/// The mouse only: a drag starts after a few pixels, so a click on the grip still does nothing.
 	const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+	/// PageRow is memoized, so its handlers must keep their identity across a re-render that leaves the table unchanged.
+	/// The cache is keyed by a stable token and kept outside a ref: the callbacks are created while rendering, and the
+	/// compiler rejects a ref read there. The holder carries the newest row data and handlers to the stable callbacks.
+	const handlers = {
+		onSetEnabled,
+		onTogglePage,
+		onDeletePage,
+		onRenameGroup,
+		onUngroup,
+		onSetTranslationWinner,
+		onOpenSource,
+	};
+	const [cacheKey] = useState(() => ({}));
+	let pageCallbacks = pageCallbackCaches.get(cacheKey);
+	if (!pageCallbacks) {
+		pageCallbacks = new Map();
+		pageCallbackCaches.set(cacheKey, pageCallbacks);
+	}
+	/// A filter or a deleted group removes rows for good; keeping their callbacks would grow the map for the mount's
+	/// lifetime. Only ids in the current table are worth a stable handler.
+	const livePageRows = useMemo(() => new Set(rowIds), [rowIds]);
+
+	for (const id of pageCallbacks.keys()) {
+		if (!livePageRows.has(id)) pageCallbacks.delete(id);
+	}
+
+	const callbacksOf = (id: string, data: PageCallbackData): PageRowCallbacks => {
+		let entry = pageCallbacks.get(id);
+
+		if (!entry) {
+			const holder = { data, handlers };
+			const callbacks: PageRowCallbacks = {
+				onToggle: (enabled) => void holder.handlers.onSetEnabled(id, enabled),
+				onFold: () => holder.handlers.onTogglePage(id),
+				onOpenSource: () => {
+					const source = holder.data.source;
+					if (source) holder.handlers.onOpenSource(source.provider, source.mod_id, "files");
+				},
+				onDeletePage: () => {
+					const pageId = holder.data.pageId;
+					if (pageId) holder.handlers.onDeletePage(pageId);
+				},
+				onRenameGroup: () => {
+					const groupId = holder.data.storedId;
+					if (groupId !== null) holder.handlers.onRenameGroup(groupId);
+				},
+				onUngroup: () => {
+					const groupId = holder.data.storedId;
+					if (groupId !== null) holder.handlers.onUngroup(groupId);
+				},
+				onSetTranslationWinner: () => {
+					const groupId = holder.data.storedId;
+					if (groupId !== null) holder.handlers.onSetTranslationWinner(groupId);
+				},
+			};
+			entry = { holder, callbacks };
+			pageCallbacks.set(id, entry);
+		}
+		entry.holder.data = data;
+		entry.holder.handlers = handlers;
+		return entry.callbacks;
+	};
 
 	/// The side of a drop is only the drag direction; the backend resolves page and user-group blocks from the two ids.
 	const dropped = (event: DragEndEvent) => {
@@ -361,9 +481,6 @@ export function ModTable({
 		</DropdownMenu>
 	);
 
-	/// A selected row carries the Tab stop; when it is filtered or scrolled away, the first mounted mod row does.
-	const focusedVisible = focused !== null && table.some((row) => row.kind === "mod" && row.id === focused);
-	const firstModRow = table.find((row) => row.kind === "mod")?.id;
 	const renderRow = (row: TableItem, index: number) => {
 		if (row.kind === "separator") {
 			return (
@@ -387,19 +504,17 @@ export function ModTable({
 		}
 
 		if (row.kind === "page" || row.kind === "group") {
-			// `tableItems` keeps the page details on a page row, so wrap them in the same `Group` a user row already is.
-			const header: Group =
-				row.kind === "page"
-					? {
-							source: "page",
-							id: row.id,
-							name: row.page.name,
-							parts: row.page.mods,
-							page: row.page,
-						}
-					: row.group;
+			// The wrapper was built with the table, so a memoized PageRow sees the same group on the next status answer.
+			const header = headers.get(row.id);
+
+			if (header === undefined) return null;
 			const storedId = row.kind === "group" ? (row.group.group?.id ?? row.id) : null;
 			const source = header.parts.find((mod) => mod.sources.length > 0)?.sources[0];
+			const callbacks = callbacksOf(row.id, {
+				source,
+				pageId: row.kind === "page" ? row.page.pageId : undefined,
+				storedId,
+			});
 			return (
 				<PageRow
 					key={row.id}
@@ -412,23 +527,7 @@ export function ModTable({
 					updates={updates}
 					extras={extras}
 					locale={locale}
-					onToggle={(enabled) => void onSetEnabled(row.id, enabled)}
-					onFold={() => onTogglePage(row.id)}
-					onOpenSource={() => {
-						if (source) onOpenSource(source.provider, source.mod_id, "files");
-					}}
-					onDeletePage={() => {
-						if (row.kind === "page") onDeletePage(row.page.pageId);
-					}}
-					onRenameGroup={() => {
-						if (storedId !== null) onRenameGroup(storedId);
-					}}
-					onUngroup={() => {
-						if (storedId !== null) onUngroup(storedId);
-					}}
-					onSetTranslationWinner={() => {
-						if (storedId !== null) onSetTranslationWinner(storedId);
-					}}
+					{...callbacks}
 				/>
 			);
 		}

@@ -1,4 +1,8 @@
 //! The shared agent, tracing and address rules the request client and the download path both use.
+//!
+//! Each agent names its TLS provider: `SChannel` through the Windows certificate store on Windows, the bundled rustls
+//! elsewhere. ureq defaults to rustls even when it is built with native-tls, so an agent that names no provider panics
+//! on its first `https` request.
 
 use std::borrow::Cow;
 use std::sync::OnceLock;
@@ -15,9 +19,29 @@ pub const USER_AGENT: &str = concat!(
 /// Without a timeout a hung connection would block an update check forever.
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(15);
 
-/// The TLS provider the platform dependency enables: `SChannel` through the Windows certificate store, or the bundled
-/// rustls elsewhere. ureq defaults to rustls even when it is built with native-tls, so an agent that names no provider
-/// panics on its first `https` request.
+/// Cap for API requests: a check makes only a few attempts, so a wait beyond 30 s no longer keeps the window
+/// responsive and the answer is clamped instead.
+pub(super) const API_RETRY_CAP_SECS: u64 = 30;
+/// Cap for downloads: a large transfer can be held back by a CDN's rate limit for minutes, so its worker waits up to
+/// 300 s while an API request would already have failed.
+pub(super) const DOWNLOAD_RETRY_CAP_SECS: u64 = 300;
+
+/// One `Retry-After` answer in seconds, normalized the same way on every request path: a missing or malformed value
+/// uses `default`, and the result cannot exceed `cap`. The cap belongs to the caller: the API client passes
+/// [`API_RETRY_CAP_SECS`] and a download passes [`DOWNLOAD_RETRY_CAP_SECS`], so neither path can change the other's
+/// wait by editing the shared rule. The client passes no default so it can fall back to its own backoff; the download
+/// passes its five-second fallback and the retry budget reads the number it stored.
+pub(super) fn retry_after_seconds(
+    text: Option<&str>,
+    default: Option<u64>,
+    cap: u64,
+) -> Option<u64> {
+    text.and_then(|text| text.trim().parse::<u64>().ok())
+        .or(default)
+        .map(|seconds| seconds.min(cap))
+}
+
+/// The Windows TLS provider, named for the reason at the top of this module.
 #[cfg(windows)]
 fn tls_config() -> ureq::tls::TlsConfig {
     ureq::tls::TlsConfig::builder()
@@ -26,9 +50,7 @@ fn tls_config() -> ureq::tls::TlsConfig {
         .build()
 }
 
-/// The TLS provider the platform dependency enables: `SChannel` through the Windows certificate store, or the bundled
-/// rustls elsewhere. ureq defaults to rustls even when it is built with native-tls, so an agent that names no provider
-/// panics on its first `https` request.
+/// The rustls provider off Windows, named for the reason at the top of this module.
 #[cfg(not(windows))]
 fn tls_config() -> ureq::tls::TlsConfig {
     ureq::tls::TlsConfig::builder()
@@ -200,19 +222,19 @@ mod tests {
 
     #[test]
     fn a_link_with_a_space_is_escaped_before_the_request() {
-        // An older Nexus file keeps its name in the CDN address, and Nexus leaves the spaces unescaped.
-        let raw = "https://cf-files.nexusmods.com/cdn/3333/13429/Nova City - Night Vision-13429-1-0-0nv-1715479909.zip?md5=x&expires=1";
+        // A CDN can keep the archive's name in the address and leave its spaces unescaped.
+        let raw = "https://cdn.example.invalid/cdn/3333/13429/Example Mod - Extra Text-1.0.zip?md5=x&expires=1";
         let url = request_url(raw).unwrap();
         assert_eq!(
             &*url,
-            "https://cf-files.nexusmods.com/cdn/3333/13429/Nova%20City%20-%20Night%20Vision-13429-1-0-0nv-1715479909.zip?md5=x&expires=1"
+            "https://cdn.example.invalid/cdn/3333/13429/Example%20Mod%20-%20Extra%20Text-1.0.zip?md5=x&expires=1"
         );
         assert!(url.parse::<ureq::http::Uri>().is_ok());
     }
 
     #[test]
     fn an_escaped_link_is_left_as_it_is() {
-        let raw = "https://cf-files.nexusmods.com/a/CET%201.38.1-107.zip?md5=a-b_c&expires=1";
+        let raw = "https://cdn.example.invalid/a/example%20mod-1.0.zip?md5=a-b_c&expires=1";
         assert_eq!(&*request_url(raw).unwrap(), raw);
     }
 

@@ -6,6 +6,7 @@ use tauri::{AppHandle, Manager};
 use crate::context::Data;
 use crate::context::managed::managed_games;
 use crate::error::AppError;
+use crate::infra::tasks::state::{FAILED, RUNNING, WAITING};
 use crate::infra::tasks::{TaskFlags, TaskView};
 use crate::status::stage::{GameStage, NextAction};
 
@@ -132,7 +133,7 @@ fn game_of(data: &Data, id: &str) -> Result<Game, AppError> {
         .find(|profile| profile.active)
         .map(|profile| profile.name.clone())
         .unwrap_or_default();
-    let running = crate::launch::start::game_running(data, id)?;
+    let running = crate::context::running::game_running(data, id)?;
     Ok(Game {
         id: id.to_owned(),
         name: status.game_name,
@@ -209,7 +210,7 @@ fn status_line(snapshot: &Snapshot, labels: &TrayLabels) -> String {
 }
 
 fn needs_attention(task: &TaskView) -> bool {
-    task.state == "waiting" || task.state == "failed"
+    task.state == WAITING || task.state == FAILED
 }
 
 fn attention_count(snapshot: &Snapshot) -> usize {
@@ -226,7 +227,7 @@ fn task_label(task: &TaskView, labels: &TrayLabels) -> String {
     let base = format!("{state} — {kind}");
 
     match task.percent {
-        Some(percent) if task.state == "running" => format!(
+        Some(percent) if task.state == RUNNING => format!(
             "{base}, {}",
             fill(&labels.percent, "percent", &percent.to_string())
         ),
@@ -239,7 +240,7 @@ pub fn render(snapshot: &Snapshot, labels: &TrayLabels) -> Rendered {
     let line = status_line(snapshot, labels);
     let attention = attention_count(snapshot);
     let busy = snapshot.busy.is_some();
-    let any_running = snapshot.tasks.iter().any(|task| task.state == "running");
+    let any_running = snapshot.tasks.iter().any(|task| task.state == RUNNING);
     let icon = if attention > 0 {
         IconState::Attention
     } else if busy || any_running {

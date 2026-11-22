@@ -11,7 +11,10 @@ use std::path::PathBuf;
 use std::fs;
 use std::path::Path;
 
-use super::*;
+use crate::context::library::{family_id_from, mod_info};
+use crate::domain::library::{
+    Archive, ArchiveLabel, Library, LibraryView, ModInfo, ModInfoEdit, ModVersion,
+};
 use crate::domain::profiles::entry::ProfileMod;
 use crate::games::GameDef;
 use crate::providers::nexus::NexusMeta;

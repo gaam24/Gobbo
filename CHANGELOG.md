@@ -36,3 +36,6 @@ All notable changes to this project are documented in this file. The format foll
 ### Fixed
 
 - **Mods reach a game whose mod folder is inside the game folder.** The game now sees them, and a mod loader among them, at the paths it reads them from.
+- **The same community profile folder can be imported twice.** The second import gets its own profile name instead of failing.
+- **Community profiles from Unreal games keep their UE4SS config.** The import now finds the loader's own config folder as well as the plain one.
+- **The download button no longer names one mod site.** It invites you to get mods online from any supported source.

@@ -4,10 +4,9 @@ import { PathText } from "@/components/app/path-text";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
-import { Switch } from "@/components/ui/switch";
 import { useTranslation } from "@/i18n";
 import { usePlatform } from "@/lib/platform";
-import { Section, SettingRow, SettingsGroup } from "@/views/settings/controls";
+import { Section, SettingRow, SettingsGroup, ToggleSetting } from "@/views/settings/controls";
 import { PROTON_STEAM, protonAutomaticLabel, protonChoices } from "@/views/settings/game/proton-choices";
 import { PROTON_FPS_LIMITS, PROTON_OPTION_GROUPS, type ProtonOption } from "@/views/settings/game/proton-options";
 
@@ -150,20 +149,15 @@ export function ProtonSection({
 			{groups.map((group, index) => (
 				<SettingsGroup key={group.id} title={t(`settings.protonOptions.groups.${group.id}`)} className={index === 0 ? undefined : "mt-10"}>
 					{group.options.map((option) => (
-						<SettingRow
+						<ToggleSetting
 							key={option}
 							title={t(`settings.protonOptions.items.${option}.title`)}
 							htmlFor={`proton-${option}`}
 							hint={t(`settings.protonOptions.items.${option}.hint`)}
 							help={t(`settings.protonOptions.items.${option}.help`)}
-						>
-							<Switch
-								id={`proton-${option}`}
-								aria-label={t(`settings.protonOptions.items.${option}.title`)}
-								checked={chosen.includes(option)}
-								onCheckedChange={(on) => void onSwitch(option, on)}
-							/>
-						</SettingRow>
+							on={chosen.includes(option)}
+							onChange={(on) => onSwitch(option, on)}
+						/>
 					))}
 				</SettingsGroup>
 			))}

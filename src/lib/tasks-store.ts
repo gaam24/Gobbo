@@ -73,16 +73,6 @@ export function removeTask(id: string): void {
 	store.set(next);
 }
 
-/// Drops every registered task. Tests use it; the window keeps the rows across a game switch.
-export function resetRegisteredTasks(): void {
-	store.set([]);
-}
-
-/// The current snapshot, for the activity hook and for a test reader without a component.
-export function registeredTasks(): RegisteredTask[] {
-	return store.get();
-}
-
 export function useRegisteredTasks(): RegisteredTask[] {
 	return useStore(store);
 }

@@ -3,10 +3,10 @@ import path from "node:path";
 import { browser } from "@wdio/globals";
 import type { ModExtras_Serialize as ModExtras } from "../../src/bindings";
 import { CommandFailure, invoke, invokeWithChannel, reloadWindow } from "../support/bridge";
-import { dataDir, definitionsDir } from "../support/env";
-import { expectFile, expectNoFile, removeTree } from "../support/files";
+import { dataDir } from "../support/env";
+import { expectFile, expectNoFile } from "../support/files";
 import { fomodZip } from "../support/fixtures";
-import { cleanupGame, seedGame, statusOf, uniqueId, waitForStatus } from "../support/seed";
+import { cleanupFixture, seedGame, statusOf, uniqueId, waitForStatus } from "../support/seed";
 import { clickByText, clickMenuItem, openModMenu, waitForDialog, waitForMod, waitForNoSelector, waitForText } from "../support/ui";
 
 interface FomodGame {
@@ -30,12 +30,6 @@ async function start(prefix: string): Promise<FomodGame> {
 	const prepared = game(prefix);
 	const { fixture } = await seedGame({ id: prepared.id, name: prepared.name });
 	return { ...prepared, fixture };
-}
-
-async function cleanup(prepared: FomodGame): Promise<void> {
-	await cleanupGame(prepared.id);
-	removeTree(path.join(definitionsDir, prepared.id));
-	removeTree(prepared.fixture.root);
 }
 
 async function importWithChoices(prepared: FomodGame, option: string): Promise<void> {
@@ -84,6 +78,7 @@ describe("fomod installer", () => {
 		await clickByText("Import archive", "button");
 		await waitForDialog("E2E FOMOD");
 		await waitForText("Step 1 of 1");
+		// e2e-locale-exception: a choice name from the FOMOD fixture XML, not interface prose.
 		await waitForText("Quality");
 		// A SelectExactlyOne group with no recommended option now starts with its first usable option picked, so the
 		// wizard is valid before the user clicks anything. The group rule is enforced by the default, not by an error.
@@ -93,6 +88,7 @@ describe("fomod installer", () => {
 				?.getAttribute("aria-checked"),
 		);
 		assert.equal(defaultChecked, "true", "the exactly-one group did not start with a pick");
+		// e2e-locale-exception: a choice name from the FOMOD fixture XML, not interface prose.
 		await clickByText("High", "[role='radio']", "[role='dialog']");
 		// The pick is answered by a command; install only after the wizard shows the new answer.
 		await browser.waitUntil(
@@ -124,7 +120,7 @@ describe("fomod installer", () => {
 			extras?.fomod.map((choice) => choice.option),
 			["High"],
 		);
-		await cleanup(prepared);
+		await cleanupFixture(prepared.id, prepared.fixture.root);
 	});
 	it("asks before closing a changed wizard and skips the archive", async () => {
 		const prepared = await start("fomod-skip");
@@ -134,6 +130,7 @@ describe("fomod installer", () => {
 		// The toolbar's labelled Import button was replaced by the Import button in the empty library.
 		await clickByText("Import archive", "button");
 		await waitForDialog("E2E FOMOD");
+		// e2e-locale-exception: a choice name from the FOMOD fixture XML, not interface prose.
 		await clickByText("High", "[role='radio']", "[role='dialog']");
 		await clickByText("Skip archive", "button", "[role='dialog']");
 		await waitForText("Close without installing?");
@@ -141,7 +138,7 @@ describe("fomod installer", () => {
 		await waitForNoSelector("[role='dialog']");
 		const status = await statusOf(prepared.id);
 		assert.equal(status.mods.length, 0, "the skipped archive was imported");
-		await cleanup(prepared);
+		await cleanupFixture(prepared.id, prepared.fixture.root);
 	});
 	it("refuses a choice that the installer does not define", async () => {
 		const prepared = await start("fomod-bad-choice");
@@ -160,7 +157,7 @@ describe("fomod installer", () => {
 		}
 
 		assert.equal((await statusOf(prepared.id)).mods.length, 0);
-		await cleanup(prepared);
+		await cleanupFixture(prepared.id, prepared.fixture.root);
 	});
 	it("changes the installer options of an installed mod and replaces its files", async () => {
 		const prepared = await start("fomod-reinstall");
@@ -181,12 +178,13 @@ describe("fomod installer", () => {
 				?.getAttribute("aria-checked"),
 		);
 		assert.equal(highChecked, "true", "the saved answer did not start checked");
+		// e2e-locale-exception: a choice name from the FOMOD fixture XML, not interface prose.
 		await clickByText("Low", "[role='radio']", "[role='dialog']");
 		await clickByText("Install selected", "button", "[role='dialog']");
 		await waitForNoSelector("[role='dialog']");
 		await waitForInstalledOption(prepared, mod.folder, "Low");
 		expectFile(path.join(library, "content/textures/low.ws"));
 		expectNoFile(path.join(library, "content/textures/high.ws"));
-		await cleanup(prepared);
+		await cleanupFixture(prepared.id, prepared.fixture.root);
 	});
 });

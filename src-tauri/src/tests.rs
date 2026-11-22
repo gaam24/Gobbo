@@ -1,6 +1,8 @@
 //! Tests for the service layer. The fixtures build a full library on disk through the public
 //! functions, the same way the UI drives them.
 
+use crate::context::Settings;
+use crate::context::save_settings;
 #[cfg(target_os = "linux")]
 use crate::deploy::ops::apply_deployment;
 use crate::domain::pathkey::path_key;
@@ -15,13 +17,12 @@ use crate::packs::model::PackOptions;
 use crate::profiles::actions::create_profile;
 use crate::profiles::actions::save_profile;
 use crate::providers::nexus::NexusRequirement;
-use crate::settings::config::Settings;
-use crate::settings::config::save_settings;
 use crate::status::sync_profiles as status;
 use crate::test_support::import;
 
 mod acquire;
 mod catalog;
+mod command_contracts;
 mod community;
 mod deploy;
 mod downloads;
@@ -52,8 +53,9 @@ use std::path::{Path, PathBuf};
 
 use crate::context::{Data, load_library, load_profiles};
 
+use crate::domain::library::Family;
 use crate::error::AppError;
-use crate::library::{Family, set_mod_source};
+use crate::library::set_mod_source;
 use crate::providers::picture::read_picture;
 use crate::settings::guard::may_open;
 use crate::sources::downloads::{DownloadEvent, DownloadState, Downloads};
@@ -194,11 +196,11 @@ fn apply_nexus_page(
 /// Two versions of a Nexus mod, 1.2.0 and 1.2.1, as zips in the fixture's folder.
 fn two_mod_versions(f: &Fixture) -> (PathBuf, PathBuf) {
     let old = f.zip(
-        "Test Mod 35686 1.2.0 2026-10-23T17-21Z Q6xF6llIa.zip",
+        "Test Mod 7001 1.2.0 2026-10-23T17-21Z example-uploader.zip",
         &[("r6/scripts/TestMod/a.reds", "old")],
     );
     let new = f.zip(
-        "Test Mod 35686 1.2.1 2026-11-01T09-00Z Abc123xyz.zip",
+        "Test Mod 7001 1.2.1 2026-11-01T09-00Z Abc123xyz.zip",
         &[("r6/scripts/TestMod/a.reds", "new")],
     );
     (old, new)

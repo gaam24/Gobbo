@@ -67,9 +67,34 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_core_layer_maps_to_the_record_layer() {
-        assert_eq!(layer(gobbo_overlay_core::Layer::Upper), Layer::Upper);
-        assert_eq!(layer(gobbo_overlay_core::Layer::Staging), Layer::Staging);
-        assert_eq!(layer(gobbo_overlay_core::Layer::Root), Layer::Root);
+    fn a_core_layer_maps_to_the_same_decision_layer() {
+        assert_eq!(
+            layer(gobbo_overlay_core::Layer::Upper),
+            gobbo_overlay_decisions::Layer::Upper
+        );
+        assert_eq!(
+            layer(gobbo_overlay_core::Layer::Staging),
+            gobbo_overlay_decisions::Layer::Staging
+        );
+        assert_eq!(
+            layer(gobbo_overlay_core::Layer::Root),
+            gobbo_overlay_decisions::Layer::Root
+        );
+    }
+
+    #[test]
+    fn a_record_layer_survives_the_ring() {
+        let dir = std::env::temp_dir().join(format!("gobbo-ring-layer-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("ring");
+        let mut ring = Ring::open(&path).unwrap();
+        ring.record(Kind::Write, Layer::Staging, 0, r"data\a.txt", 1)
+            .unwrap();
+        let (decisions, _) = gobbo_overlay_decisions::read_last(&path, 1).unwrap();
+        assert_eq!(decisions[0].kind, Kind::Write);
+        assert_eq!(decisions[0].layer, Layer::Staging);
+        assert_eq!(decisions[0].path, r"data\a.txt");
+        let _ = std::fs::remove_dir_all(dir);
     }
 }

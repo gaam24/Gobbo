@@ -16,7 +16,7 @@ use crate::domain::fomod::Choice;
 use crate::domain::library::LibraryView;
 use crate::domain::source::SourceRef;
 use crate::error::AppError;
-use crate::import::model::{FomodStepView, ImportStage, ImportView, ZipInspect};
+use crate::import::model::{ChoiceNeeded, ImportStage, ImportView, ZipInspect};
 use crate::import::{ALREADY_IN_LIBRARY, ImportRequest, import_batch};
 use crate::infra::sidecar::delete_download;
 use crate::infra::tasks::cancelled;
@@ -72,11 +72,7 @@ pub enum Acquired {
     /// The library already had this exact provider file or archive, in `folder`. Nothing was fetched or imported again.
     Existing { folder: String },
     /// The archive has a FOMOD installer and no choices: the window shows the wizard for the file at `path`.
-    NeedsChoice {
-        path: PathBuf,
-        module_name: String,
-        steps: Vec<FomodStepView>,
-    },
+    NeedsChoice(ChoiceNeeded),
 }
 
 /// The FOMOD answers a caller should import a local archive with.
@@ -84,11 +80,7 @@ pub enum ResolvedChoices {
     /// Import with these answers. `None` means a plain archive, or a caller that cannot show a wizard.
     Chosen(Option<Vec<Choice>>),
     /// The installer needs answers the caller did not give; the window shows the wizard for `path`.
-    NeedsChoice {
-        path: PathBuf,
-        module_name: String,
-        steps: Vec<FomodStepView>,
-    },
+    NeedsChoice(ChoiceNeeded),
 }
 
 /// Which part of the work a progress percentage belongs to.
@@ -111,7 +103,6 @@ pub fn existing_file(view: &LibraryView<'_>, source: &SourceRef) -> Option<Strin
 /// `Ask` always asks. A plain archive needs no answer and comes back as `Chosen(None)`. A reinstall, which cannot show
 /// a wizard, treats `NeedsChoice` as "unpack the whole archive".
 pub fn resolve_choices(
-    root: &Data,
     game_id: &str,
     path: &Path,
     choices: Choices,
@@ -123,15 +114,15 @@ pub fn resolve_choices(
     };
     let selected = match given {
         Some(choices) => Some(choices),
-        None => match crate::import::inspect(root, game_id, path)? {
+        None => match crate::import::inspect_at(game_id, path)? {
             ZipInspect::Plain => None,
             ZipInspect::Fomod { .. } if !kept.is_empty() => Some(kept),
             ZipInspect::Fomod { module_name, steps } => {
-                return Ok(ResolvedChoices::NeedsChoice {
+                return Ok(ResolvedChoices::NeedsChoice(ChoiceNeeded {
                     path: path.to_path_buf(),
                     module_name,
                     steps,
-                });
+                }));
             }
         },
     };
@@ -169,6 +160,15 @@ pub fn acquire(
         .unwrap_or_else(|| Err(AppError::unexpected("an acquire produced no result")))
 }
 
+/// One archive waiting for the shared import batch, with the slot it answers and the cleanup it may need.
+struct Pending {
+    slot: usize,
+    request: ImportRequest,
+    removable: bool,
+    path: PathBuf,
+    stored: bool,
+}
+
 /// Brings a batch of archives into the library through the same rules as [`acquire`], with one import batch underneath.
 /// Returns one outcome per request, in order; one archive's failure stays in its own slot while the rest import. A flag
 /// stops the work between groups, and the groups already committed stay.
@@ -183,7 +183,7 @@ pub fn acquire_batch(
     let library = load_library_shared(&root.game(game_id), &game)?;
     let view = LibraryView::new(&library);
     let mut slots: Vec<Option<Result<Acquired, AppError>>> = Vec::with_capacity(requests.len());
-    let mut pending: Vec<(usize, ImportRequest, bool, PathBuf, bool)> = Vec::new();
+    let mut pending: Vec<Pending> = Vec::new();
 
     for request in requests {
         let BatchRequest {
@@ -225,18 +225,10 @@ pub fn acquire_batch(
                 (downloaded.path, Some(downloaded.source), true)
             }
         };
-        let chosen = match resolve_choices(root, game_id, &path, choices) {
+        let chosen = match resolve_choices(game_id, &path, choices) {
             Ok(ResolvedChoices::Chosen(chosen)) => chosen,
-            Ok(ResolvedChoices::NeedsChoice {
-                path,
-                module_name,
-                steps,
-            }) => {
-                slots.push(Some(Ok(Acquired::NeedsChoice {
-                    path,
-                    module_name,
-                    steps,
-                })));
+            Ok(ResolvedChoices::NeedsChoice(needed)) => {
+                slots.push(Some(Ok(Acquired::NeedsChoice(needed))));
                 continue;
             }
             Err(error) => {
@@ -251,14 +243,20 @@ pub fn acquire_batch(
             import = import.staged(digest);
         }
 
-        pending.push((slots.len(), import, removable, path, stored));
+        pending.push(Pending {
+            slot: slots.len(),
+            request: import,
+            removable,
+            path,
+            stored,
+        });
         slots.push(None);
     }
 
     if !pending.is_empty() {
         let requests: Vec<ImportRequest> = pending
             .iter()
-            .map(|(_, request, ..)| request.clone())
+            .map(|pending| pending.request.clone())
             .collect();
         let results = match import_batch(
             root,
@@ -270,9 +268,9 @@ pub fn acquire_batch(
             Ok(results) => results,
             Err(error) => {
                 if cancelled(cancel) {
-                    for (_, _, removable, path, _) in &pending {
-                        if *removable {
-                            let _ = delete_download(path);
+                    for pending in &pending {
+                        if pending.removable {
+                            let _ = delete_download(&pending.path);
                         }
                     }
                 }
@@ -281,20 +279,22 @@ pub fn acquire_batch(
             }
         };
 
-        for (result, (slot, _, removable, path, stored)) in results.into_iter().zip(pending) {
+        for (result, pending) in results.into_iter().zip(pending) {
             let acquired = match result {
                 Ok(view) => Ok(Acquired::Imported(view)),
                 Err(error) if error.code == ALREADY_IN_LIBRARY => Ok(Acquired::Existing {
                     folder: error.params.get("folder").cloned().unwrap_or_default(),
                 }),
                 // Choices a recipe kept may not fit this archive: the user answers the wizard instead.
-                Err(error) if stored && error.code.starts_with("fomod.") => {
-                    match crate::import::inspect(root, game_id, &path) {
-                        Ok(ZipInspect::Fomod { module_name, steps }) => Ok(Acquired::NeedsChoice {
-                            path: path.clone(),
-                            module_name,
-                            steps,
-                        }),
+                Err(error) if pending.stored && error.code.starts_with("fomod.") => {
+                    match crate::import::inspect_at(game_id, &pending.path) {
+                        Ok(ZipInspect::Fomod { module_name, steps }) => {
+                            Ok(Acquired::NeedsChoice(ChoiceNeeded {
+                                path: pending.path.clone(),
+                                module_name,
+                                steps,
+                            }))
+                        }
                         _ => Err(error),
                     }
                 }
@@ -305,11 +305,11 @@ pub fn acquire_batch(
             let duplicate = matches!(acquired, Ok(Acquired::Existing { .. }));
             let stopped = acquired.as_ref().is_err_and(|_| cancelled(cancel));
 
-            if removable && (duplicate || stopped) {
-                let _ = delete_download(&path);
+            if pending.removable && (duplicate || stopped) {
+                let _ = delete_download(&pending.path);
             }
 
-            slots[slot] = Some(acquired);
+            slots[pending.slot] = Some(acquired);
         }
     }
 

@@ -9,10 +9,10 @@ use crate::context::Loaded;
 use crate::context::load_game;
 use crate::deploy::target::build_plan_with_mode;
 use crate::deploy::target::is_ready;
+use crate::domain::library::LibraryView;
 use crate::domain::resolver::PlanMode;
 use crate::error::AppError;
 use crate::error::Message;
-use crate::library::LibraryView;
 use crate::library::relations::relation_warnings;
 
 /// What stands in the way of sharing the chosen profiles, before the pack is written.

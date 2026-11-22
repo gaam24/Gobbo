@@ -4,7 +4,7 @@
 use std::path::Path;
 
 use crate::domain::profiles::Profiles;
-use crate::error::{AppError, ErrorKind, FileError};
+use crate::error::{AppError, ErrorKind, io_at};
 use crate::infra::json::{self, ReadError};
 
 impl Profiles {
@@ -19,7 +19,7 @@ impl Profiles {
                     .with("detail", error)
                     .kind(ErrorKind::Permanent))
             }
-            Err(ReadError::Io(error)) => Err(AppError::from(FileError::new(path, error))),
+            Err(ReadError::Io(error)) => Err(io_at(path)(error)),
         }
     }
 

@@ -14,7 +14,7 @@ fn a_checked_page_writes_author_category_and_time_into_the_record() {
     };
     let page = nexus::ModPage {
         version: "2.0".into(),
-        name: Some("Sort Everything".into()),
+        name: Some("Example Sort Mod".into()),
         author: Some("TestAuthor".into()),
         category: Some("Models & Textures".into()),
         summary: Some("Sorts it all".into()),
@@ -50,7 +50,7 @@ fn a_checked_page_writes_author_category_and_time_into_the_record() {
         .source("nexus")
         .and_then(|source| source.meta.as_ref())
         .expect("the page writes the metadata");
-    assert_eq!(meta.name.as_deref(), Some("Sort Everything"));
+    assert_eq!(meta.name.as_deref(), Some("Example Sort Mod"));
     assert_eq!(meta.author.as_deref(), Some("TestAuthor"));
     assert_eq!(meta.category.as_deref(), Some("Models & Textures"));
     assert_eq!(meta.checked_at, Some(1_730_000_000));

@@ -2,19 +2,18 @@
 
 use crate::context::Data;
 use crate::context::Loaded;
+use crate::context::library::{mod_info, not_in_library};
 use crate::context::load_game;
 use crate::context::load_profiles;
 use crate::context::profile::history::save_profiles;
 use crate::context::profile::lock_profiles;
 use crate::context::{edit_family, edit_library};
 use crate::domain::library::Family;
+use crate::domain::library::ModInfoEdit;
+use crate::domain::library::{Library, LibraryView};
 use crate::domain::naming::requirement_label;
 use crate::domain::source::{SourceRef, SourceRequirement};
 use crate::error::AppError;
-use crate::library;
-use crate::library::ModInfoEdit;
-use crate::library::not_in_library;
-use crate::library::{Library, LibraryView};
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -47,7 +46,7 @@ pub fn set_mod_info(
     edit_library(root, game_id, |data, _, library| {
         let version = library.version_of_family_mut(folder, id)?;
         let edit = edit.cleaned();
-        let mut info = library::mod_info(&data.library().join(folder), folder);
+        let mut info = mod_info(&data.library().join(folder), folder);
         edit.apply(&mut info);
         version.info = info;
         version.edit = edit;

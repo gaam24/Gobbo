@@ -71,14 +71,22 @@ export function usePackActions({
 	const openFromTask = (gameId: string, path: string) => openForGame(gameId, { kind: "pack-import", path });
 
 	const packImported = (result: PackImportView) => {
-		const done = t("notice.packImported", {
-			archives: result.imported,
-			created: result.profiles_created,
-			updated: result.profiles_updated,
-		});
-		const failed = result.failed.length > 0 ? ` ${t("notice.packFailed", { list: result.failed.join(", ") })}` : "";
 		const missing = missingList(result.missing);
-		notify(`${done}${failed}${missing ? ` ${t("notice.packMissing", { list: missing })}` : ""}`);
+		notify(
+			result.failed.length === 0 && missing === ""
+				? t("notice.packImported", {
+						archives: result.imported,
+						created: result.profiles_created,
+						updated: result.profiles_updated,
+					})
+				: t("notice.packImportedSummary", {
+						archives: result.imported,
+						created: result.profiles_created,
+						updated: result.profiles_updated,
+						failed: result.failed.join(", "),
+						missing,
+					}),
+		);
 	};
 
 	const exportPack = (options: PackOptions) =>

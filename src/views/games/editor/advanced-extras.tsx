@@ -23,7 +23,7 @@ export function AdvancedExtras({ draft, onChange }: { draft: GameDraft; onChange
 		setProviders(next);
 	};
 	const addProvider = () => {
-		let id = "nexus";
+		let id = "provider";
 		let suffix = 2;
 
 		while (id in (draft.providers ?? {})) {
@@ -76,7 +76,7 @@ export function AdvancedExtras({ draft, onChange }: { draft: GameDraft; onChange
 								id={`editor-provider-id-${index}`}
 								value={id}
 								onChange={(next) => setProvider(index, next, entry.key ?? "")}
-								placeholder="nexus"
+								placeholder="provider-id"
 							/>
 						</EditorField>
 						<EditorField
@@ -88,7 +88,7 @@ export function AdvancedExtras({ draft, onChange }: { draft: GameDraft; onChange
 								id={`editor-provider-key-${index}`}
 								value={entry.key ?? ""}
 								onChange={(key) => setProvider(index, id, key)}
-								placeholder="witcher3"
+								placeholder="game-id"
 							/>
 						</EditorField>
 						<Button
@@ -116,7 +116,6 @@ export function AdvancedExtras({ draft, onChange }: { draft: GameDraft; onChange
 			>
 				{requirements.map((requirement, index) => (
 					<RepeatRow
-						// biome-ignore lint/suspicious/noArrayIndexKey: Form rows have no stable id; the index is their identity.
 						key={`requirement-${index}`} // eslint-disable-line react/no-array-index-key -- same reason
 						title={requirement.name || requirement.path || t("editor.extras.requirement")}
 						onRemove={() => setRequirements(requirements.filter((_, at) => at !== index))}
@@ -221,7 +220,6 @@ export function AdvancedExtras({ draft, onChange }: { draft: GameDraft; onChange
 				>
 					{logs.map((log, index) => (
 						<RepeatRow
-							// biome-ignore lint/suspicious/noArrayIndexKey: Form rows have no stable id; the index is their identity.
 							key={`log-${index}`} // eslint-disable-line react/no-array-index-key -- same reason
 							title={log.path || t("editor.extras.log")}
 							onRemove={() => setLogs(logs.filter((_, at) => at !== index))}

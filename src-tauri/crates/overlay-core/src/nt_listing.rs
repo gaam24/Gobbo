@@ -113,7 +113,7 @@ pub fn fill<'a>(
 }
 
 /// The offsets of the fields of one structure. `None` means the structure has no such field.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct Layout {
     /// Where the name starts.
     name: usize,
@@ -128,33 +128,42 @@ struct Layout {
     file_id: Option<usize>,
 }
 
-/// The layout of `class`. The offsets are the ones of the Windows structures, which are the same on x86 and x64.
-fn layout(class: u32) -> Option<Layout> {
-    let common = Layout {
-        name: 64,
-        name_length: 60,
-        metadata: true,
-        ea: None,
-        short_name: None,
-        short_name_length: None,
-        file_id: None,
-    };
+/// The layout the metadata-carrying structures share.
+const COMMON_LAYOUT: Layout = Layout {
+    name: 64,
+    name_length: 60,
+    metadata: true,
+    ea: None,
+    short_name: None,
+    short_name_length: None,
+    file_id: None,
+};
 
-    match class {
-        DIRECTORY => Some(common),
-        FULL_DIRECTORY => Some(Layout {
+/// The layout of every class this module writes. The offsets are the ones of the Windows structures, which are the same
+/// on x86 and x64.
+const LAYOUTS: [(u32, Layout); 6] = [
+    (DIRECTORY, COMMON_LAYOUT),
+    (
+        FULL_DIRECTORY,
+        Layout {
             name: 68,
             ea: Some(64),
-            ..common
-        }),
-        BOTH_DIRECTORY => Some(Layout {
+            ..COMMON_LAYOUT
+        },
+    ),
+    (
+        BOTH_DIRECTORY,
+        Layout {
             name: 94,
             ea: Some(64),
             short_name: Some(70),
             short_name_length: Some(68),
-            ..common
-        }),
-        NAMES => Some(Layout {
+            ..COMMON_LAYOUT
+        },
+    ),
+    (
+        NAMES,
+        Layout {
             name: 12,
             name_length: 8,
             metadata: false,
@@ -162,23 +171,36 @@ fn layout(class: u32) -> Option<Layout> {
             short_name: None,
             short_name_length: None,
             file_id: None,
-        }),
-        ID_FULL_DIRECTORY => Some(Layout {
+        },
+    ),
+    (
+        ID_FULL_DIRECTORY,
+        Layout {
             name: 80,
             ea: Some(64),
             file_id: Some(72),
-            ..common
-        }),
-        ID_BOTH_DIRECTORY => Some(Layout {
+            ..COMMON_LAYOUT
+        },
+    ),
+    (
+        ID_BOTH_DIRECTORY,
+        Layout {
             name: 104,
             ea: Some(64),
             short_name: Some(70),
             short_name_length: Some(68),
             file_id: Some(96),
-            ..common
-        }),
-        _ => None,
-    }
+            ..COMMON_LAYOUT
+        },
+    ),
+];
+
+/// The layout of `class`, or `None` when this module does not write it.
+fn layout(class: u32) -> Option<Layout> {
+    LAYOUTS
+        .iter()
+        .find(|(known, _)| *known == class)
+        .map(|(_, layout)| *layout)
 }
 
 /// Writes one entry. `out` is exactly the entry's size; its next-entry offset is zero until the caller writes another
@@ -447,6 +469,7 @@ mod tests {
                 "class {class}"
             );
         }
+        assert_eq!(layout(0), None);
     }
 
     #[test]

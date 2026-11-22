@@ -4,6 +4,7 @@ use crate::error::{AppError, ErrorKind, MOD_MISSING};
 
 use super::super::group::{GroupKind, ModGroup};
 use super::super::profile::{Entry, Profile, Separator};
+use super::MAX_NAME_CHARS;
 use super::next_separator_id;
 
 /// A family id that is not on the list. The domain cannot reach the library helper, so it builds the same permanent
@@ -280,7 +281,7 @@ pub fn set_separator(
 ) -> Result<(), AppError> {
     let name = name.trim();
 
-    if name.is_empty() || name.chars().count() > 60 {
+    if name.is_empty() || name.chars().count() > MAX_NAME_CHARS {
         return Err(AppError::user("profile.separator_name"));
     }
 

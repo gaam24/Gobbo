@@ -15,13 +15,13 @@ fn rescan_keeps_the_nexus_page_data_and_the_typed_id() {
     record.sources.insert(
         ProviderId::new("nexus"),
         SourceMod {
-            mod_id: "35686".to_string(),
+            mod_id: "7001".to_string(),
             part_id: None,
             part_name: None,
             part_category: None,
             meta: Some(SourceMeta::from(NexusMeta {
-                name: Some("Remove Mods Menu".to_string()),
-                author: Some("Q6xF6llIa".to_string()),
+                name: Some("Example Cleanup Mod".to_string()),
+                author: Some("example-uploader".to_string()),
                 category: Some("Interface".to_string()),
                 checked_at: Some(1_730_000_000),
                 ..NexusMeta::default()
@@ -37,14 +37,14 @@ fn rescan_keeps_the_nexus_page_data_and_the_typed_id() {
         record
             .source("nexus")
             .and_then(|source| source.mod_id.parse::<u32>().ok()),
-        Some(35686)
+        Some(7001)
     );
     assert_eq!(
         record
             .source("nexus")
             .and_then(|source| source.meta.as_ref())
             .and_then(|meta| meta.author.as_deref()),
-        Some("Q6xF6llIa")
+        Some("example-uploader")
     );
 }
 
@@ -84,11 +84,11 @@ fn a_nexus_archive_name_wins_over_info_json_and_a_stored_version_survives_a_resc
     let library_dir = base.join("library");
     write(
         &library_dir.join("modA/info.json"),
-        r#"{"modName": "_cookscriptsmeal", "version": "1.0"}"#,
+        r#"{"modName": "example-cook-name", "version": "1.0"}"#,
     );
     write(&library_dir.join("modA/content/x.ws"), "a");
     let mut library = Library::load(&base.join(INDEX_FILE), &library_dir, &game()).unwrap();
-    let archive = "(Remastered) No Duplicate Relics 3014 5.01.2 2026-10-20T15-06Z lPL5EVlMD.zip";
+    let archive = "(Remastered) Example Mod 7002 5.01.2 2026-10-20T15-06Z example-uploader-2.zip";
     library.archives.insert(
         "sha-a".to_string(),
         Archive {
@@ -104,11 +104,11 @@ fn a_nexus_archive_name_wins_over_info_json_and_a_stored_version_survives_a_resc
     let version = library.versions.get_mut("modA").unwrap();
     version.archive = Some("sha-a".to_string());
     version.parsed_sources =
-        std::collections::BTreeMap::from([(ProviderId::new("nexus"), "3014".to_string())]);
+        std::collections::BTreeMap::from([(ProviderId::new("nexus"), "7002".to_string())]);
 
     library.rescan(&library_dir, &game()).unwrap();
     let info = &library.versions["modA"].info;
-    assert_eq!(info.name, "(Remastered) No Duplicate Relics");
+    assert_eq!(info.name, "(Remastered) Example Mod");
     // The label names the mod, but a version already stored is kept: a rescan only fills a missing one. Here the
     // record came from `info.json`, so that is the version the rescan preserves.
     assert_eq!(info.version.as_deref(), Some("1.0"));
@@ -121,6 +121,6 @@ fn a_nexus_archive_name_wins_over_info_json_and_a_stored_version_survives_a_resc
     };
     library.rescan(&library_dir, &game()).unwrap();
     let info = &library.versions["modA"].info;
-    assert_eq!(info.name, "(Remastered) No Duplicate Relics");
+    assert_eq!(info.name, "(Remastered) Example Mod");
     assert_eq!(info.version.as_deref(), Some("5.01.2-mine"));
 }

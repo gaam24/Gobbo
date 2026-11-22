@@ -3,11 +3,11 @@
 use std::collections::BTreeSet;
 
 use crate::context::Data;
+use crate::domain::library::{Family, Library};
 use crate::domain::source::{ProviderId, SourceMeta, SourceMod, SourceRef};
 use crate::error::AppError;
 use crate::games::GameDef;
 use crate::infra::clock::now_seconds;
-use crate::library::{Family, Library};
 use crate::providers::SourceUpdate;
 
 /// Stores what the providers returned and saves the index only when something changed. The requests take a while, so
@@ -17,7 +17,7 @@ pub(super) fn store_updates(
     game: &GameDef,
     updates: &[SourceUpdate],
 ) -> Result<std::sync::Arc<Library>, AppError> {
-    let _index = crate::library::lock_index();
+    let _index = crate::context::library::lock_index();
     let mut library = crate::context::load_library(data, game)?;
     let mut changed = false;
     let checked_at = now_seconds();
@@ -55,10 +55,13 @@ pub(super) fn store_updates(
             changed = true;
         }
 
-        if let Some(read) = &update.meta
-            && apply_meta(family, &update.source, read, checked_at)
-        {
-            changed = true;
+        if let Some(read) = &update.meta {
+            // The store's time is the authoritative "last checked": the provider may have stamped the page earlier,
+            // but the check ends when the library is written. The same helper stamps it everywhere.
+            let read = SourceMeta::checked(read.clone(), None, checked_at);
+            if apply_meta(family, &update.source, &read) {
+                changed = true;
+            }
         }
 
         if apply_latest(family, update) {
@@ -120,17 +123,10 @@ fn set_archive_id(
     true
 }
 
-/// Saves the page a provider returned for one source of a family. Reading the page is the check, so the page carries the
-/// time of this run whatever the provider stamped; the list shows that time as "last checked". Used by the update check
-/// and by a metadata refresh, so both write a page the same way.
-pub fn apply_meta(
-    family: &mut Family,
-    source: &SourceRef,
-    read: &SourceMeta,
-    checked_at: u32,
-) -> bool {
-    let mut meta = read.clone();
-    meta.checked_at = Some(checked_at);
+/// Saves the page a provider returned for one source of a family. The provider stamps the page with the check's time;
+/// this only stores it, so the list shows that time as "last checked". Used by the update check and by a metadata
+/// refresh, so both write a page the same way.
+pub fn apply_meta(family: &mut Family, source: &SourceRef, read: &SourceMeta) -> bool {
     let entry = family
         .sources
         .entry(source.provider.clone())
@@ -150,8 +146,8 @@ pub fn apply_meta(
         source.part_category.as_deref(),
     );
 
-    if entry.meta.as_ref() != Some(&meta) {
-        entry.meta = Some(meta);
+    if entry.meta.as_ref() != Some(read) {
+        entry.meta = Some(read.clone());
         changed = true;
     }
 
@@ -279,9 +275,9 @@ fn apply_requirements(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::library::Family;
     use crate::domain::source::{ProviderId, SourceMeta, SourceRequirement, SourceSync};
     use crate::domain::version::{IgnoredVersion, UpdateState};
-    use crate::library::Family;
 
     fn nexus() -> ProviderId {
         ProviderId::new("nexus")
@@ -355,6 +351,11 @@ mod tests {
     #[test]
     fn page_data_creates_the_source_entry() {
         let mut family = Family::default();
+        let read = SourceMeta {
+            name: Some("Example".into()),
+            checked_at: Some(1_730_000_000),
+            ..SourceMeta::default()
+        };
         let update = SourceUpdate {
             family: "nexus:1".into(),
             source: crate::domain::source::SourceRef::new("nexus", "1"),
@@ -363,10 +364,7 @@ mod tests {
             latest_file_id: None,
             state: UpdateState::Unknown,
             error: None,
-            meta: Some(SourceMeta {
-                name: Some("Example".into()),
-                ..SourceMeta::default()
-            }),
+            meta: Some(read),
             requirements: None,
             dlcs: Vec::new(),
             sync: None,
@@ -374,21 +372,20 @@ mod tests {
             matched_part: None,
         };
         let read = update.meta.as_ref().expect("the update carries a page");
-        assert!(apply_meta(&mut family, &update.source, read, 1_730_000_000));
+        assert!(apply_meta(&mut family, &update.source, read));
         let meta = family
             .source("nexus")
             .and_then(|source| source.meta.as_ref())
             .expect("the page is saved");
         assert_eq!(meta.name.as_deref(), Some("Example"));
         assert_eq!(meta.checked_at, Some(1_730_000_000));
-        assert!(!apply_meta(
-            &mut family,
-            &update.source,
-            read,
-            1_730_000_000
-        ));
+        assert!(!apply_meta(&mut family, &update.source, read));
         // A later read is a later check, even when the page did not change.
-        assert!(apply_meta(&mut family, &update.source, read, 1_731_000_000));
+        let later = SourceMeta {
+            checked_at: Some(1_731_000_000),
+            ..read.clone()
+        };
+        assert!(apply_meta(&mut family, &update.source, &later));
     }
 
     fn check(

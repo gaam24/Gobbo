@@ -1,6 +1,6 @@
 //! The library index: reading and writing `library.json`, scanning the folders and keeping the families up to date.
 
-use crate::error::{AppError, ErrorKind, FileError};
+use crate::error::{AppError, ErrorKind, io_at};
 use std::collections::{BTreeSet, HashSet};
 use std::path::Path;
 
@@ -32,7 +32,7 @@ impl Library {
         let mut library: Self = match json::read_json(index) {
             Ok(Some(library)) => library,
             Ok(None) => return Self::rebuild(index, library_dir, game),
-            Err(json::ReadError::Io(e)) => return Err(AppError::from(FileError::new(index, e))),
+            Err(json::ReadError::Io(e)) => return Err(io_at(index)(e)),
             Err(json::ReadError::Parse(error)) => {
                 json::keep_broken(index, &error);
                 return Self::rebuild(index, library_dir, game);

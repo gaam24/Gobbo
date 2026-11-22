@@ -1,5 +1,5 @@
 import type { Mod } from "@/lib/mods";
-import type { Download } from "@/nexus/use-downloads";
+import type { Download } from "@/sources/downloads";
 
 /// One mod the last check found an update for, with the exact provider file a manual update has to download.
 export interface UpdateTarget {

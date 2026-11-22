@@ -9,7 +9,9 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use gobbo_overlay_core::Layers;
-use gobbo_overlay_decisions::ENV_IN_PROCESS_DUMP;
+use gobbo_overlay_decisions::{
+    ENV_CALLS, ENV_CRASH, ENV_DIAG, ENV_IN_PROCESS_DUMP, ENV_LOG, ENV_RING, ENV_SESSION,
+};
 use gobbo_overlay_launch::{Launch, spawn_hooked};
 
 /// The number of copy-up operations. Each one needs a file in the lower layer.
@@ -73,13 +75,13 @@ mod layout {
 
 /// The switches that must stay off in the benchmark: they add file I/O or allocations unrelated to the hook path.
 const OFF_SWITCHES: [&str; 7] = [
-    "GOBBO_OVERLAY_LOG",
-    "GOBBO_OVERLAY_DIAG",
-    "GOBBO_OVERLAY_CRASH",
+    ENV_LOG,
+    ENV_DIAG,
+    ENV_CRASH,
     ENV_IN_PROCESS_DUMP,
-    "GOBBO_OVERLAY_RING",
-    "GOBBO_OVERLAY_SESSION",
-    "GOBBO_OVERLAY_CALLS",
+    ENV_RING,
+    ENV_SESSION,
+    ENV_CALLS,
 ];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

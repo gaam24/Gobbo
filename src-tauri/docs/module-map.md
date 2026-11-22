@@ -14,8 +14,10 @@
   `collect_commands![...]` invocation `builder()` includes and the command permissions. Every command module lives in
   the module it serves; this layer is only the registration point.
 - Modules: each folder owns its commands, use cases and engine. `games/` (the definition model in `definition/`, the
-  loader presets in `loaders.rs`, validation, the scan in `detect.rs`, one adapter per store in `stores/` (Steam's
-  libraries and Proton data in `stores/steam.rs`; where each store keeps its files comes from `platform::store_folders`),
+  loader presets in `loaders.rs`, validation, the scan in `detect.rs`, one adapter per store in `stores/`
+  (`Store::display_name` and `Store::from_name` are read by `status/build.rs` for the store shown in the window;
+  Steam's libraries and Proton data in `stores/steam.rs`; where each store keeps its files comes from
+  `platform::store_folders`),
   how an install starts in `runtime.rs`, paths, the catalog
   in `catalog.rs`, the official catalog downloaded from GitHub in `remote/` (the manifest fetch, the schema gate and
   the checksummed install), the catalog commands and the definition editor in `editor/`; the import dry run is
@@ -30,9 +32,11 @@
   the game root, the profile's layer folders and the settings file before undo changes anything),
   preview, target, overwrite, `remove.rs` for removing a mod that may be deployed; `overlay/` for the layer and the
   hardlink helper that builds it), `acquire/` (the one path that brings a mod archive into the library for every feature: exact-file check, fetch,
-  FOMOD choices, import, download cleanup), `import/` (the install plan and its `apply.rs`, FOMOD parser, tool unpack, wizard,
-  reinstall, `report.rs` for the archive-versus-installed-folder report, and `flow/` with the archive lifecycle: working
-  folder, preparation and commit), `launch/` (start, Proton, tools, steps, changes,
+  FOMOD choices, import, download cleanup), `import/` (`model.rs` with `ChoiceNeeded`, the archive and FOMOD answers
+  needed before an import can finish, the install plan and its `apply.rs`, `install/roots.rs` with `base_roots` for the
+  game's top-level folders, FOMOD parser, tool unpack, wizard, reinstall, `report.rs` for the
+  archive-versus-installed-folder report, `skipped.rs` for the capped record of files no rule took, and `flow/` with the
+  archive lifecycle: working folder, preparation and commit), `launch/` (start, Proton, tools, steps, changes,
   report, output, watch, and `commands.rs` for starting, stopping and running a game), `infra/disk.rs` (free space for
   the setup check), `profiles/` (`actions/`, with the list and lifecycle in `mod.rs` and the user-data move in
   `user_data.rs`, bisect
@@ -92,8 +96,10 @@
   (the `Deploy`, `Slot`, `Mirror` and `Shared` rules a `game.toml` is parsed into, and the questions `resolver` asks
   about them), `deployment.rs` (the `deployment.json` record and the schema version this build trusts),
   `library/` (the pure `Library`, `Family`, `ModVersion`, `Archive`, `ModInfo` and `LibraryView`, whose `view/find.rs` is the one rule that
-  matches a wanted mod to the library; the disk lives in `context::library`), `source/`
+  matches a wanted mod to the library through `find`, `find_with` and its `FindQuery`/`MatchPolicy` for the strict,
+  folded and key comparisons; the disk lives in `context::library`), `source/`
   (provider-neutral `ProviderId`, `SourceRef`, `SourceMod`, `SourceMeta`, `SourceRequirement`, `SourceSync`;
+  `SourceMeta::checked` in `page.rs` is the one merge-and-stamp rule for a page a check stored;
   `SourceRef.part_id` names a provider's persistent installable file group, such as a Nexus `mod_file_id`, so two parts
   of one page stay separate; the library, profiles and packs store this model, and each provider maps its own records
   to it), `resolver/` (the deployment plan: `planner.rs` with `PlanMode`, `model.rs`, `shared.rs`), `profiles/`
@@ -120,13 +126,19 @@
   folders, the keys and display names in `compatibilitytool.vdf`, and the library fallback), `windows.rs`, and
   `mount_table.rs` (the Linux mount-table parser the overlay session check reads). The Linux process list owns the
   overlay session check, so the platform layer never imports `deploy`.
-- `providers/`: the external mod services behind one port. `mod.rs` holds `SourceProvider`, `SourceCapabilities`, the
-  download/update request and result types, the `CollectionSource` port and the registry. `providers/testing.rs` is the contract every adapter must
+- `providers/`: the external mod services behind one port. `mod.rs` holds `SourceProvider` (whose `download_policy`
+  defaults to `DownloadPolicy::Unlimited` for an `AccountTier`), `SourceCapabilities`, the download/update request
+  and result types, the `CollectionSource` port and the registry. `providers/testing.rs` is the contract every adapter must
   pass: it checks the id, the registry, the capabilities, the link schemes, the page URL, the sample deep link and the
-  sample archive name, and fails when a registered provider has no case. `sources/downloads/` is the provider-neutral
-  queue: links, state, progress, sidecar and auto-install; a provider only fetches the file. `providers/workers.rs` is
-  the indexed worker runner both update checks share: one index per worker, answers in request order, a panicking worker
-  reported instead of unwinding. `providers/thunderstore/`
+  sample archive name, and fails when a registered provider has no case. `providers/download.rs` is the archive-download
+  rule the adapters share (not Thunderstore's `download.rs`): it picks the archive's name and free target from the CDN
+  header, the URL, the requested name and the reply type (`target_name`, `archive_name`, `archive_target`,
+  `free_download_name`), maps an empty or HTML answer to the adapter's own error (`body_error`), and runs the links
+  through `fetch_archive` with `ArchiveRules` carrying the provider's `download_policy`, pacer key and tier. Nexus file
+  downloads, Thunderstore, Nexus collections, collection external links and pack links call it.
+  `sources/downloads/` is the provider-neutral queue: links, state, progress, sidecar and auto-install; a provider only
+  fetches the file. `providers/workers.rs` is the indexed worker runner both update checks share: one index per worker,
+  answers in request order, a panicking worker reported instead of unwinding. `providers/thunderstore/`
   owns the Thunderstore adapter: `mod.rs`
   (the port: owner-name ids, the `ror2mm` scheme, the package's communities for a link that names no game), `link.rs` (the
   `ror2mm://v1/install/thunderstore.io/<owner>/<name>/<version>/` links and the name rules), `api.rs` (the experimental

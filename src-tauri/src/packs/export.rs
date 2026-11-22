@@ -17,11 +17,11 @@ use crate::context::load_game;
 use crate::domain::pack::{PackArchive, PackMod};
 use crate::domain::profiles::Profile;
 
+use crate::domain::library::Library;
 use crate::error::AppError;
 use crate::error::io_at;
 use crate::launch::steps::load_mod_steps;
 use crate::library::FamilyFields;
-use crate::library::Library;
 use std::collections::BTreeMap;
 use std::fs;
 use std::io;

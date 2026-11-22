@@ -14,10 +14,28 @@ pub mod user_data;
 
 use crate::context::Data;
 use crate::context::Settings;
+use crate::domain::profiles::Profiles;
 use crate::error::AppError;
 use crate::games::GameDef;
+use std::path::PathBuf;
 
 pub use lock::lock_profiles;
+
+/// The folder that holds every profile's state layers. The diagnostics walk it to find layers left behind by a removed
+/// profile or a set the game no longer defines; callers do not need to know the on-disk name.
+pub fn state_root(data: &Data) -> PathBuf {
+    data.dir.join("state")
+}
+
+/// Whether a state folder has no profile in the current set, so its layers are orphaned.
+pub fn is_orphan_profile(profile: &str, profiles: &Profiles) -> bool {
+    !profiles.profiles.iter().any(|known| known.id == profile)
+}
+
+/// Whether a user-data set folder is not defined by the game, so its layer is orphaned.
+pub fn is_orphan_set(id: &str, game: &GameDef) -> bool {
+    !game.user_data.iter().any(|set| set.id == id)
+}
 
 /// Restores both profile stores into the real folders when `profile` owns them. A redirected set is already live in its
 /// upper layer; a profile that does not own the data sees the restore on its next switch. The owner check belongs here

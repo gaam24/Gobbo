@@ -9,11 +9,13 @@ use crate::context::load_settings;
 use crate::context::profile::data as profile_data;
 use crate::context::profile::history::history_state;
 use crate::context::profile::lock_profiles;
+use crate::context::profile::state as profile_state;
 use crate::context::profile::user_data;
 use crate::deploy::overwrite::has_overwrite_for;
 use crate::deploy::target::build_plan_with_mode;
 use crate::deploy::target::folder_readiness;
 use crate::deploy::target::is_ready;
+use crate::domain::library::{Library, LibraryView};
 use crate::domain::profiles::entry::ProfileMod;
 use crate::domain::profiles::{Profiles, ProfilesView};
 use crate::domain::resolver::PlanMode;
@@ -22,10 +24,10 @@ use crate::error::Message;
 use crate::error::io_at;
 use crate::games::GameDef;
 use crate::games::prefix::effective_source;
+use crate::games::stores::Store;
 use crate::library::active_mods;
 use crate::library::relations::{SourceLookup, UnmetRequirements, relation_warnings_with};
 use crate::library::sync::sync_profiles as sync_profile_lists;
-use crate::library::{Library, LibraryView};
 use crate::status::bisect::bisect_view;
 use crate::status::stage::{StageInput, game_stage};
 use crate::status::views::{DeployedRow, ExecutableView, ProfileView, Status, UserDataView};
@@ -68,13 +70,10 @@ fn subtitle_for(source: &str, steam_app_ids: &[u32]) -> String {
             .unwrap_or_default()
     };
     match effective_source(source, steam_app_ids) {
-        "gog" => "GOG".to_string(),
-        "epic" => "Epic".to_string(),
-        "heroic" => "Heroic".to_string(),
-        "legendary" => "Legendary".to_string(),
-        "lutris" => "Lutris".to_string(),
         "manual" => "Manual".to_string(),
-        _ => steam(),
+        other => {
+            Store::from_name(other).map_or_else(steam, |store| store.display_name().to_string())
+        }
     }
 }
 
@@ -119,11 +118,15 @@ pub(super) fn status_inner(
 
     let lookup = SourceLookup::new(&view, &listed);
     let requirements = UnmetRequirements::of(&library, &lookup, &listed);
+    let library_context = super::mod_views::LibraryContext {
+        library: &library,
+        view: &view,
+        lookup: &lookup,
+    };
     let mods = mod_views(
         &listed,
         &game,
-        &library,
-        &view,
+        &library_context,
         &profiles_view,
         &plan,
         &requirements,
@@ -141,7 +144,7 @@ pub(super) fn status_inner(
             enabled_count: u32::try_from(profile.enabled_count()).unwrap_or(u32::MAX),
             active: profile.id == profiles.active,
             deployed: prepared.contains_key(&profile.id),
-            has_user_data: data.profile_state(&profile.id).join("userdata").exists(),
+            has_user_data: user_data::state_dir(&data.profile_state(&profile.id)).exists(),
             collections: profile
                 .collections
                 .iter()
@@ -252,7 +255,9 @@ pub(super) fn status_inner(
         profile_dir: active_state
             .is_dir()
             .then(|| active_state.display().to_string()),
-        overwrite_dir: active_state.join("overwrite").display().to_string(),
+        overwrite_dir: profile_state::overwrite(&active_state)
+            .display()
+            .to_string(),
         game_profile_data,
         user_data: user_data_views,
         launch_hint,

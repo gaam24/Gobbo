@@ -8,8 +8,8 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
 
+use gobbo_overlay_core::wide;
 use hdrhistogram::Histogram;
-use std::os::windows::ffi::OsStrExt;
 
 use std::os::windows::io::AsRawHandle;
 
@@ -682,11 +682,7 @@ fn nt_count(
 /// Opens a folder for a directory query. The handle needs `FILE_LIST_DIRECTORY`, unlike `open_folder`'s attribute-only
 /// handle.
 fn open_directory(folder: &Path) -> Result<*mut std::ffi::c_void, Box<dyn Error>> {
-    let name: Vec<u16> = folder
-        .as_os_str()
-        .encode_wide()
-        .chain(std::iter::once(0))
-        .collect();
+    let name = wide(folder.as_os_str());
     // SAFETY: `name` is NUL-terminated and the call only opens the folder for reading its entries.
     let handle = unsafe {
         CreateFileW(
@@ -714,11 +710,7 @@ const FILE_NAMES_INFORMATION: u32 = 12;
 
 /// Opens a folder as a directory handle, for a relative open. `None` is returned as null; the benchmark stops on it.
 fn open_folder(folder: &Path) -> *mut std::ffi::c_void {
-    let name: Vec<u16> = folder
-        .as_os_str()
-        .encode_wide()
-        .chain(std::iter::once(0))
-        .collect();
+    let name = wide(folder.as_os_str());
     // SAFETY: `name` is NUL-terminated and the call only opens the folder for reading its attributes.
     unsafe {
         CreateFileW(

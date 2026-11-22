@@ -10,7 +10,7 @@ is an isolated game definition and a game folder under `target/`, so the suite n
 ```bash
 bun run e2e:build   # build dist/ and target/debug/gobbo with the e2e feature
 bun run e2e         # run every spec
-bun run e2e:smoke   # the pull-request subset
+bun run e2e:smoke   # a quick local subset
 bun run e2e:types   # type-check the config, support files and specs
 ```
 
@@ -45,9 +45,9 @@ English app settings. A full run is independent of the previous one.
 | `target/e2e-artifacts` | screenshot, DOM, local storage, browser log, `gobbo.log` and the error of every failed test |
 
 The fake Steam library, the Proton builds and the game folders are built by `e2e/support/fixtures.ts`. Each spec gets a
-unique game id (`seedGame` / `uniqueId`), so specs do not share state and can run alone. `cleanupGame` removes the game,
-its definitions, its roots and its output; it also restores the write bit on folders an overlay apply may leave at mode
-`000` before deleting them.
+unique game id (`seedGame` / `uniqueId`), so specs do not share state and can run alone. `cleanupFixture` removes the game,
+its definition and its fixture roots, including the user-data and per-profile folders under the fake home; it also
+restores the write bit on folders an overlay apply may leave at mode `000` before deleting them.
 
 ## Specs
 
@@ -55,9 +55,11 @@ its definitions, its roots and its output; it also restores the write bit on fol
 | --------------------- | -------------------------------------------------------------------------------------------------------------------------- |
 | `00-first-run`        | empty app, first-run Games page, shared settings, custom data folder                                                       |
 | `10-games`            | locate/add, Steam scan, remove/restore/delete, broken definitions, verified badges, deployed-game guard                    |
-| `15-commands`         | stable `AppError` codes, recovery actions, stale mod/profile state, optional reads                                         |
+| `15-commands`         | recovery action for a missing game/settings folder, optional reads; command codes are in the Rust command-contract tests   |
 | `20-import`           | UI import, several archives, wrapper/multi-mod shape, invalid/traversal archives, source, versions                         |
 | `30-mods-list`        | search/filter, selection and Space, table/grid, columns and reload, tags/note, delete                                      |
+| `35-scroll-stability` | the virtual list keeps its scroll step when the window changes                                                             |
+| `36-drag-virtual-list` | dragging table rows and grid cards onto rows inside the window, including auto-scroll                                      |
 | `40-profiles`         | create/duplicate, rename/switch/delete, undo/redo, bisect, compare, reload                                                 |
 | `50-deploy`           | overlay apply and undo, conflict winner, load-order file, a game file the overlay covers                                   |
 | `60-launch`           | launch and report, arguments/environment, stop while running, crash prompt, console                                        |
@@ -100,8 +102,8 @@ committed. The suite asserts the same labels a user reads, not test-only markup.
    text or a selector instead of sleeping. A controlled input needs `typeInto`; a WebDriver key that the list handles
    can use `pressKeyOn` or `pressKeyOnMod`.
 5. Assert the disk effects with `expectFile`, `expectNoFile`, `isSymlink`, `linkCount`, `readText` and `zipNames`.
-6. Always end with `cleanupGame`, `removeTree(definitionsDir/<id>)` and `removeTree(fixture.root)`; a failing assertion
-   in the middle is allowed to leave its game for the artifact, but a passing test must not leak one.
+6. Always end with `cleanupFixture(id, fixture.root)`; it removes the game, its definition and its fixture roots. A
+   failing assertion in the middle may leave its game for the artifact, but a passing test must not leak one.
 7. Keep the wait timeout at the helpers' defaults. A test that needs more than the 180 s Mocha timeout is usually
    waiting on the wrong condition.
 
@@ -111,7 +113,8 @@ when the driver exposes one, the app log when it exists, the data paths and `err
 ## README screenshots
 
 `98-readme-screenshots.e2e.ts` builds a small demo game under `target/`, imports readable mod names and saves the images
-the README embeds. It is not part of the normal suite and never opens the real library:
+the README embeds. The intentionally realistic game, icon and mod names live in `e2e/support/screenshot-data.ts`, so no
+other spec depends on them. It is not part of the normal suite and never opens the real library:
 
 ```bash
 E2E_SPECS=./specs/98-readme-screenshots.e2e.ts E2E_NODE=/usr/bin/node bun run e2e

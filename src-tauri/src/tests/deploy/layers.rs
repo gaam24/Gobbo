@@ -2,6 +2,8 @@
 
 use super::*;
 use crate::context::data::JOURNAL_FILE;
+#[cfg(target_os = "linux")]
+use crate::context::running::game_running;
 use crate::deploy::journal::{Entry, Journal};
 #[cfg(target_os = "linux")]
 use crate::deploy::ops::{
@@ -13,8 +15,7 @@ use crate::deploy::remove::delete_mod;
 #[cfg(target_os = "linux")]
 use crate::deploy::remove::reinstall_mod;
 use crate::domain::deployment::DeploymentRecord;
-#[cfg(target_os = "linux")]
-use crate::launch::start::{game_running, overlay_session_state};
+use crate::launch::start::overlay_session_state;
 #[cfg(target_os = "linux")]
 use crate::profiles::actions::switch_profile;
 

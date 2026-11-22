@@ -3,6 +3,9 @@
 use crate::error::AppError;
 use crate::providers::link::{LinkParts, is_slug, split_link};
 
+/// The URL scheme of the provider's mod-file deep links.
+pub(super) const SCHEME: &str = "nxm";
+
 /// A link from the "Mod Manager Download" button on Nexus:
 /// `nxm://<game>/mods/<mod>/files/<file>?key=<key>&expires=<time>&user_id=<id>`. The key and its expiry let an account
 /// without premium download that one file.
@@ -43,7 +46,7 @@ impl NxmError {
 /// and a host that is a Nexus game domain. `None` for anything else, which both readers refuse as a bad link. The
 /// path segments are read with `LinkParts::segments`.
 pub(super) fn split_nxm(url: &str) -> Option<LinkParts> {
-    let link = split_link(url, "nxm")?;
+    let link = split_link(url, SCHEME)?;
     is_slug(link.host(), false).then_some(link)
 }
 

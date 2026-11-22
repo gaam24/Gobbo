@@ -16,6 +16,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::thread;
 use std::time::Duration;
 
+use gobbo_overlay_core::wide;
 use windows_sys::Win32::System::Diagnostics::Debug::SetUnhandledExceptionFilter;
 use windows_sys::Win32::System::Diagnostics::Debug::{
     AddVectoredExceptionHandler, EXCEPTION_CONTINUE_SEARCH, EXCEPTION_POINTERS,
@@ -25,8 +26,6 @@ use windows_sys::Win32::System::LibraryLoader::{
     GetProcAddress, LOAD_LIBRARY_SEARCH_SYSTEM32, LoadLibraryExW,
 };
 use windows_sys::Win32::System::Threading::{GetCurrentProcess, GetCurrentProcessId};
-
-use crate::text::wide;
 
 use super::module::locate_cached;
 use super::settings::settings;
@@ -293,11 +292,6 @@ fn arm_filter() {
     }
 }
 
-/// Whether the out-of-process dump path is armed, so the in-process fallback must stay quiet.
-fn dumper_armed() -> bool {
-    DUMPER_ATTACHED.load(Ordering::Acquire)
-}
-
 /// The last-chance filter: Windows calls it when no handler took the exception. It sends the context to Gobbo and lets
 /// the process terminate as it would have.
 ///
@@ -332,8 +326,9 @@ unsafe extern "system" fn on_unhandled(pointers: *const EXCEPTION_POINTERS) -> i
     EXCEPTION_CONTINUE_SEARCH
 }
 
-/// Whether the out-of-process minidumper of this process is connected. The session report names it. The client alone is
-/// not enough: a failed handler attach leaves the in-process path in charge, so that must report disconnected.
+/// Whether the out-of-process minidumper of this process is connected. The session report names it, and the in-process
+/// fallback stays quiet while it is armed. The client alone is not enough: a failed handler attach leaves the in-process
+/// path in charge, so that must report disconnected.
 pub(super) fn dumper_connected() -> bool {
     DUMPER_ATTACHED.load(Ordering::Acquire)
 }
@@ -410,7 +405,7 @@ fn report_panic(info: &std::panic::PanicHookInfo<'_>) {
 /// Writes a minidump when `GOBBO_OVERLAY_DUMP` names a file. This is an in-process dump (DbgHelp), kept as a development
 /// aid; an out-of-process `minidumper` is the robust production path. The exception pointers may be null for a panic.
 fn write_dump(pointers: *mut EXCEPTION_POINTERS) {
-    if dumper_armed() {
+    if dumper_connected() {
         return;
     }
 

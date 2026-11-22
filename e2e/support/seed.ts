@@ -8,7 +8,7 @@ import type {
 	Status_Serialize as Status,
 } from "../../src/bindings";
 import { invoke, invokeWithChannel, reloadWindow } from "./bridge";
-import { dataDir, definitionsDir, outDir, rootsDir } from "./env";
+import { definitionsDir, GOBBO_E2E_OUT, homeDir, outDir, rootsDir } from "./env";
 import { removeTree } from "./files";
 import { type GameFixture, type GameOptions, prepareGame } from "./fixtures";
 import { clickGame, waitForGame, waitForText } from "./ui";
@@ -44,7 +44,7 @@ export async function seedGame(options: GameOptions, settings: Partial<Settings>
 	const status = await saveSettings(options.id, {
 		settings_dir: options.loadOrder ? path.join(fixture.root, "settings") : "",
 		mods_root: "",
-		launch_env: `GOBBO_E2E_OUT=${fixture.out}`,
+		launch_env: `${GOBBO_E2E_OUT}=${fixture.out}`,
 		launch_args: "",
 		profile_data: [],
 		...settings,
@@ -199,7 +199,16 @@ export async function cleanupGame(game: string): Promise<void> {
 
 	removeTree(path.join(definitionsDir, game));
 	removeTree(path.join(rootsDir, game));
-	removeTree(path.join(dataDir, "e2e-user", game));
-	removeTree(path.join(dataDir, "e2e-profile", game));
+	// The fixtures write user data and per-profile files under the fake home, not under the data folder.
+	removeTree(path.join(homeDir, "e2e-user", game));
+	removeTree(path.join(homeDir, "e2e-profile", game));
 	removeTree(path.join(outDir, game));
+}
+
+/// Removes everything a passing test created for one or more games. Every spec uses this instead of repeating the
+/// removes, so a change to the fixture roots cannot leave cleanup behind. A spec with two games passes both ids and
+/// both roots; each id still gets its own best-effort game removal first.
+export async function cleanupFixture(id: string | readonly string[], root: string | readonly string[]): Promise<void> {
+	for (const game of Array.isArray(id) ? id : [id]) await cleanupGame(game);
+	for (const fixtureRoot of Array.isArray(root) ? root : [root]) removeTree(fixtureRoot);
 }

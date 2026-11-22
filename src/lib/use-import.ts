@@ -20,7 +20,7 @@ import { createGameQueues, setImportProgress } from "@/lib/progress-store";
 import { withoutKey } from "@/lib/records";
 import { dedupeKey } from "@/lib/tasks";
 import { newProgressChannel, pickFiles } from "@/lib/tauri";
-import type { DownloadImported } from "@/nexus/use-downloads";
+import type { DownloadImported } from "@/sources/downloads";
 
 /// Where archives come from when it is not the selected game and its file picker: a download for a game.
 interface ImportSource {

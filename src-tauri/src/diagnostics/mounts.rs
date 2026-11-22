@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+use crate::context::profile as profile_data;
 use crate::context::profile::user_data;
 use crate::context::{Data, load_profiles, load_settings, lock_state};
 use crate::deploy::overlay;
@@ -152,10 +153,9 @@ fn orphans(
     profiles: &crate::domain::profiles::Profiles,
 ) -> Vec<OrphanLayerView> {
     let mut found = Vec::new();
-    let Ok(entries) = fs::read_dir(data.dir.join("state")) else {
+    let Ok(entries) = fs::read_dir(profile_data::state_root(data)) else {
         return found;
     };
-    let defined: BTreeSet<&str> = game.user_data.iter().map(|set| set.id.as_str()).collect();
 
     for entry in entries.flatten() {
         let path = entry.path();
@@ -166,16 +166,12 @@ fn orphans(
 
         let profile_id = entry.file_name().to_string_lossy().into_owned();
 
-        if !profiles
-            .profiles
-            .iter()
-            .any(|profile| profile.id == profile_id)
-        {
+        if profile_data::is_orphan_profile(&profile_id, profiles) {
             push(&mut found, &path, "profile");
             continue;
         }
 
-        let Ok(sets) = fs::read_dir(path.join("userdata")) else {
+        let Ok(sets) = fs::read_dir(user_data::state_dir(&path)) else {
             continue;
         };
 
@@ -188,7 +184,7 @@ fn orphans(
 
             let id = set.file_name().to_string_lossy().into_owned();
 
-            if !defined.contains(id.as_str()) {
+            if profile_data::is_orphan_set(&id, game) {
                 push(&mut found, &set_path, "set");
                 continue;
             }
@@ -197,7 +193,7 @@ fn orphans(
             for child in fs::read_dir(&set_path).into_iter().flatten().flatten() {
                 let name = child.file_name().to_string_lossy().into_owned();
 
-                if name.starts_with("upper.moved-") || name == "removed" {
+                if user_data::is_recovery(&name) {
                     push(&mut found, &child.path(), "recovery");
                 }
             }
@@ -228,12 +224,8 @@ mod tests {
         let base = scratch!("mount-diagnostics");
         let root = Data::new(base.join("data"));
         let data = root.game(test_games::USER_DATA_ID);
-        crate::settings::config::save_settings(
-            &data,
-            test_games::USER_DATA_ID,
-            Settings::default(),
-        )
-        .unwrap();
+        crate::context::save_settings(&data, test_games::USER_DATA_ID, Settings::default())
+            .unwrap();
         let live_state = data.profile_state("p1");
         write(
             &live_state.join("userdata/documents/upper/file.txt"),
@@ -302,12 +294,8 @@ mod tests {
         let base = scratch!("mount-cleanup-running");
         let root = Data::new(base.join("data"));
         let data = root.game(test_games::USER_DATA_COPY_ID);
-        crate::settings::config::save_settings(
-            &data,
-            test_games::USER_DATA_COPY_ID,
-            Settings::default(),
-        )
-        .unwrap();
+        crate::context::save_settings(&data, test_games::USER_DATA_COPY_ID, Settings::default())
+            .unwrap();
         let gone = data.profile_state("gone");
         write(&gone.join("userdata/documents/upper/file.txt"), "x");
         let orphan = diagnose(&root, test_games::USER_DATA_COPY_ID)

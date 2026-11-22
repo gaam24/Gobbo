@@ -5,6 +5,7 @@ use crate::context::edit_library;
 use crate::context::load_library;
 use crate::context::load_profiles;
 use crate::context::profile::lock_profiles;
+use crate::domain::library::Library;
 use crate::domain::profiles::Profiles;
 use crate::error::AppError;
 use crate::error::ErrorKind;
@@ -13,7 +14,6 @@ use crate::games;
 use crate::import::install::Naming;
 use crate::import::model::ZipInspect;
 use crate::infra::archive;
-use crate::library::Library;
 
 use super::archive_base_name;
 use super::wizard::fomod_allowed;
@@ -58,7 +58,7 @@ pub fn reinstall_mod_with(
             },
             |choices| crate::acquire::Choices::Given(choices.to_vec()),
         );
-        let selection = match crate::acquire::resolve_choices(root, game_id, &zip, answers)? {
+        let selection = match crate::acquire::resolve_choices(game_id, &zip, answers)? {
             crate::acquire::ResolvedChoices::Chosen(Some(choices)) => {
                 Some(fomod_allowed(&archive::Archive::open(&zip)?, &choices)?)
             }
@@ -94,11 +94,7 @@ pub fn reinstall_mod_with(
             std::fs::rename(&target, &set_aside).map_err(io_at(&target))?;
         }
 
-        let settings = crate::context::load_settings(data);
-        let roots = crate::context::target::deployment_root(data, game, &settings)
-            .ok()
-            .map(|root| crate::import::install::top_level_folders(&root))
-            .unwrap_or_default();
+        let roots = crate::import::install::base_roots(data, game);
         let result = crate::import::install::install_zip_named_with_roots(
             &zip,
             &library_dir,
@@ -112,21 +108,10 @@ pub fn reinstall_mod_with(
         .map_err(AppError::from)
         .and_then(|installed| {
             if let Some(record) = library.archives.get_mut(&digest) {
-                record.skipped = installed
-                    .skipped_files
-                    .iter()
-                    .filter(|file| file.reason == crate::domain::library::SkipReason::NoRule)
-                    .take(1000)
-                    .cloned()
-                    .collect();
-                record.skipped_total = u32::try_from(
-                    installed
-                        .skipped_files
-                        .iter()
-                        .filter(|file| file.reason == crate::domain::library::SkipReason::NoRule)
-                        .count(),
-                )
-                .unwrap_or(u32::MAX);
+                let (skipped, skipped_total) =
+                    crate::import::skipped::archive_skipped(&installed.skipped_files);
+                record.skipped = skipped;
+                record.skipped_total = skipped_total;
             }
 
             library.rescan_version(&library_dir, game, folder)
@@ -165,7 +150,7 @@ pub fn reinstall_inspect(root: &Data, game_id: &str, folder: &str) -> Result<Zip
     let data = root.game(game_id);
     let library = load_library(&data, &game)?;
     let (_, zip, _) = archive_for(&data, &library, folder)?;
-    crate::import::inspect(root, game_id, &zip)
+    crate::import::inspect_at(game_id, &zip)
 }
 
 /// The wizard's answer for the installer of a version's archive copy under a selection, for the "change installer
@@ -180,7 +165,7 @@ pub fn reinstall_fomod_state(
     let data = root.game(game_id);
     let library = load_library(&data, &game)?;
     let (_, zip, _) = archive_for(&data, &library, folder)?;
-    crate::import::fomod_state(root, game_id, &zip, selection)
+    crate::import::state_at(game_id, &zip, selection)
 }
 
 /// The index record and archive copy of one version: the record for its installer choices, the zip for the new unpack.

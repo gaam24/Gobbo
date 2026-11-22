@@ -10,6 +10,7 @@ import type {
 import type { StatusTone } from "@/components/app/status-badge";
 import type { TranslationKey } from "@/i18n";
 import { foldText } from "@/lib/fold-text";
+import { sourceNameOf } from "@/sources/source-name";
 
 /// The key the IPC and the profile badge use for one collection.
 export function collectionKey(origin: Pick<CollectionOrigin_Serialize, "provider" | "game_key" | "slug">): string {
@@ -78,7 +79,7 @@ export function sourceLabelKey(source: CollectionSource_Serialize): TranslationK
 
 /// The display name of a provider id, from the providers the backend reports. An unknown id shows as it is.
 export function providerName(providers: readonly SourceProviderInfo[], id: string): string {
-	return providers.find((provider) => provider.id === id)?.name ?? id;
+	return sourceNameOf(providers, id);
 }
 
 const STATUS_LABELS: Record<CollectionItemStatus["kind"], TranslationKey> = {

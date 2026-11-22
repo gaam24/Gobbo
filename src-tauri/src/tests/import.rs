@@ -227,12 +227,12 @@ fn a_thunderstore_archive_shows_its_info_json_name_and_its_archive_version_after
 fn an_older_nexus_archive_shows_its_name_and_id_and_keeps_its_folder() {
     let status = imported_status(
         "nexus-old-status",
-        "Sort Everything-1234-1-1-1584112564.zip",
-        "r6/scripts/SortEverything/a.reds",
+        "Example Sort Mod-1234-1-1-1584112564.zip",
+        "r6/scripts/ExampleSortMod/a.reds",
     );
     let listed = &status.mods[0];
-    assert_eq!(listed.folder, "Sort Everything-1234-1-1-1584112564");
-    assert_eq!(listed.info.name, "Sort Everything");
+    assert_eq!(listed.folder, "Example Sort Mod-1234-1-1-1584112564");
+    assert_eq!(listed.info.name, "Example Sort Mod");
     assert_eq!(listed.info.version.as_deref(), Some("1.1"));
     assert_eq!(
         listed
@@ -248,15 +248,15 @@ fn an_older_nexus_archive_shows_its_name_and_id_and_keeps_its_folder() {
 fn a_nexus_archive_shows_its_name_version_and_id() {
     let status = imported_status(
         "nexus-status",
-        "Remove Mods Menu 35686 1.2.0 2026-10-23T17-21Z Q6xF6llIa.zip",
-        "r6/scripts/RemoveModsMenu/RemoveModsMenu.reds",
+        "Example Cleanup Mod 7001 1.2.0 2026-10-23T17-21Z example-uploader.zip",
+        "r6/scripts/ExampleCleanupMod/ExampleCleanupMod.reds",
     );
     let listed = &status.mods[0];
     assert_eq!(
         listed.folder,
-        "Remove Mods Menu 35686 1.2.0 2026-10-23T17-21Z Q6xF6llIa"
+        "Example Cleanup Mod 7001 1.2.0 2026-10-23T17-21Z example-uploader"
     );
-    assert_eq!(listed.info.name, "Remove Mods Menu");
+    assert_eq!(listed.info.name, "Example Cleanup Mod");
     assert_eq!(listed.info.version.as_deref(), Some("1.2.0"));
     assert_eq!(
         listed
@@ -264,7 +264,7 @@ fn a_nexus_archive_shows_its_name_version_and_id() {
             .iter()
             .find(|source| source.provider == "nexus")
             .map(|source| source.mod_id.as_str()),
-        Some("35686")
+        Some("7001")
     );
 }
 

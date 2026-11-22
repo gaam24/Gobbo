@@ -5,8 +5,6 @@ use crate::error::AppError;
 use crate::infra::json;
 use serde::{Deserialize, Deserializer, Serialize};
 
-pub use crate::context::{Settings, save_settings};
-
 /// The task outcomes that can become a system notification. Each task kind gets one switch per outcome, so the code of
 /// one notification is `<task kind>.<outcome>` (see [`task_notification`]). The values are the task state codes.
 pub const NOTIFICATION_OUTCOMES: &[&str] = &[

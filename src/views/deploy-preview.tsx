@@ -11,6 +11,9 @@ import { useTranslation } from "@/i18n";
 import { messageOf, translate, unwrap } from "@/lib/ipc";
 import { useLoad } from "@/lib/use-load";
 
+/// The change lists a preview draws, in their displayed order. The pack dialog uses the same three.
+export const PREVIEW_KEYS = ["added", "removed", "updated"] as const;
+
 /// What a deployment will do, before it does it: the mods it adds, removes and changes, the files it places, and what
 /// would stop it. Nothing is written until the user confirms.
 export function DeployPreviewDialog({
@@ -64,11 +67,7 @@ export function DeployPreviewDialog({
 
 function PreviewBody({ preview }: { preview: DeployPreview }) {
 	const { t } = useTranslation();
-	const lists = [
-		{ key: "added", names: preview.added },
-		{ key: "removed", names: preview.removed },
-		{ key: "updated", names: preview.updated },
-	] as const;
+	const lists = PREVIEW_KEYS.map((key) => ({ key, names: preview[key] }));
 
 	return (
 		<>

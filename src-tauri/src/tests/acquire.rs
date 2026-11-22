@@ -204,7 +204,7 @@ fn an_installer_without_choices_asks_for_them_and_imports_nothing() {
     .unwrap();
 
     match acquired {
-        Acquired::NeedsChoice { path, .. } => assert_eq!(path, zip),
+        Acquired::NeedsChoice(needed) => assert_eq!(needed.path, zip),
         _ => panic!("an installer with no choices must ask for them"),
     }
 
@@ -230,7 +230,7 @@ fn an_installer_download_that_asks_for_choices_is_kept_for_the_wizard() {
     .unwrap();
 
     match acquired {
-        Acquired::NeedsChoice { path, .. } => assert_eq!(path, copy),
+        Acquired::NeedsChoice(needed) => assert_eq!(needed.path, copy),
         _ => panic!("an installer with no choices must ask for them"),
     }
 
@@ -485,7 +485,10 @@ fn a_fetched_provider_file_is_imported_with_the_providers_version() {
     let f = fixture("acquire-fetch");
     let source = SourceRef::new("nexus", "1001").with_file("2002");
     let _provider =
-        crate::providers::testing::install_fake(crate::providers::testing::FakeConfig::default());
+        crate::providers::testing::install_fake(crate::providers::testing::FakeConfig {
+            id: "nexus",
+            ..Default::default()
+        });
 
     let acquired = acquire(
         &f.data,

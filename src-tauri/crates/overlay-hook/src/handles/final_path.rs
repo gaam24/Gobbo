@@ -56,6 +56,8 @@ pub(crate) unsafe extern "system" fn final_path(
                     VOLUME_NAME_NONE => {
                         without_volume_units(&actual[..length], &mut mapped).map(|n| &mapped[..n])
                     }
+                    VOLUME_NAME_NT => original_path_units(handle, VOLUME_NAME_NT, &mut mapped)
+                        .map(|n| &mapped[..n]),
                     _ => None,
                 };
 
@@ -118,18 +120,7 @@ fn translate(handle: *mut c_void, actual: &str, flags: u32) -> Option<String> {
 /// terminator, or the size needed when the buffer is too small.
 fn write_path(buffer: *mut u16, size: u32, path: &str) -> u32 {
     let units: Vec<u16> = path.encode_utf16().collect();
-    let needed = units.len() as u32 + 1;
-
-    if size < needed {
-        return needed;
-    }
-    // SAFETY: the caller's buffer holds `size` units, and `needed <= size` covers the text and its terminator.
-    unsafe {
-        std::ptr::copy_nonoverlapping(units.as_ptr(), buffer, units.len());
-        *buffer.add(units.len()) = 0;
-    }
-
-    units.len() as u32
+    write_units(buffer, size, &units)
 }
 
 #[cfg(test)]

@@ -24,7 +24,7 @@ use crate::platform::Process;
 use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use crate::infra::tasks::TaskHandle;
 
@@ -61,26 +61,17 @@ pub fn run_game(
         inherited.as_deref(),
     )?;
     let launch =
-        super::super::start::Launch::new(program.to_string(), args.to_vec(), env, Some(session));
+        crate::launch::start::Launch::new(program.to_string(), args.to_vec(), env, Some(session));
     let home = crate::games::paths::home_dir()?;
-    let outcome = super::super::pipeline::run(
-        super::super::pipeline::RunOptions {
-            data: &data,
-            state_root: root.dir.clone(),
-            game: &game,
-            settings: &settings,
-            home: &home,
-            game_id: Some(game_id),
-            steps: true,
-            live: false,
-            background: false,
-            watch: false,
-            report: true,
-            begin_report: true,
-            with_output: true,
-            finish: true,
-            on_exit: None,
-        },
+    let outcome = crate::launch::pipeline::run(
+        crate::launch::pipeline::RunOptions::for_run_command(
+            &data,
+            root.dir.clone(),
+            &game,
+            &settings,
+            &home,
+            game_id,
+        ),
         launch,
         true,
         "launch.native_failed",
@@ -100,7 +91,7 @@ pub fn run_tool(
     home: &Path,
     cancel: Arc<AtomicBool>,
     _handle: TaskHandle,
-    on_exit: Option<super::super::pipeline::ExitNotice>,
+    on_exit: Option<crate::launch::pipeline::ExitNotice>,
 ) -> Result<(), AppError> {
     crate::infra::tasks::stop_if(Some(cancel.as_ref()), "tools.cancelled")?;
     let (game, data, settings) = load_stopped(root, game_id)?;
@@ -136,55 +127,34 @@ pub fn run_tool(
         || Path::new(settings.game_root.trim()).join(program),
         |(_, path)| path,
     );
-    let _outcome = super::super::pipeline::run(
-        super::super::pipeline::RunOptions {
-            data: &data,
-            state_root: root.dir.clone(),
-            game: &game,
-            settings: &settings,
+    // A watcher makes Stop take effect while the tool runs; without it the cancel flag would only be seen at the next
+    // safe boundary, after the program had already finished. The pipeline hands it the process it just started, so the
+    // watcher does not have to wait for the program to appear in the process list. The pipeline still reports the exit,
+    // and the notice turns a cancelled flag into a null code and the `cancelled` task state.
+    let watcher = Box::new(move |process: crate::platform::Process| {
+        std::thread::spawn(move || watch_tool_cancel(cancel, process));
+    });
+    let _outcome = crate::launch::pipeline::run(
+        crate::launch::pipeline::RunOptions::for_tool(
+            &data,
+            root.dir.clone(),
+            &game,
+            &settings,
             home,
-            game_id: None,
-            steps: false,
-            live: false,
-            background: true,
-            watch: false,
-            report: false,
-            begin_report: false,
-            with_output: false,
-            finish: false,
             on_exit,
-        },
+            Some((launched, watcher)),
+        ),
         launch,
         with_mods,
         spawn_error,
     )?;
-    // The wait is detached now. A watcher makes Stop take effect while the tool runs; without it the cancel flag would
-    // only be seen at the next safe boundary, after the program had already finished. The pipeline still reports the
-    // exit, and the notice turns a cancelled flag into a null code and the `cancelled` task state.
-    std::thread::spawn(move || watch_tool_cancel(cancel, launched));
     Ok(())
 }
 
 /// Polls a tool's cancel flag while its process runs and stops the process as soon as the user asks. The watcher gives
-/// up when the process is gone, or shortly after a Stop when the program could not be found. It never reports an exit:
-/// the pipeline's wait thread owns that, so a tool that ended just before Stop is reported once, with its real code.
-fn watch_tool_cancel(cancel: Arc<AtomicBool>, program: std::path::PathBuf) {
-    // A program may need a moment to appear in the process list after it was spawned.
-    let deadline = Instant::now() + Duration::from_secs(2);
-    let mut process = None;
-
-    while process.is_none() && Instant::now() < deadline {
-        process = Process::by_program(&program);
-
-        if process.is_none() {
-            std::thread::sleep(Duration::from_millis(25));
-        }
-    }
-
-    let Some(process) = process else {
-        return;
-    };
-
+/// up when the process is gone. It never reports an exit: the pipeline's wait thread owns that, so a tool that ended
+/// just before Stop is reported once, with its real code.
+fn watch_tool_cancel(cancel: Arc<AtomicBool>, process: Process) {
     loop {
         if !process.exists() {
             return;

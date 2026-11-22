@@ -72,7 +72,7 @@ pub fn compact_component(text: &str) -> String {
     }
 }
 
-/// The folder under a slot, for example `modRemoveModsMenu`. A name that already has the prefix keeps it.
+/// The folder under a slot, for example `modExampleMod`. A name that already has the prefix keeps it.
 pub fn deploy_name(prefix: &str, display_name: &str, folder: &str) -> String {
     let base = if display_name.trim().is_empty() {
         folder
@@ -93,10 +93,7 @@ mod tests {
 
     #[test]
     fn deploy_names_take_the_prefix_once() {
-        assert_eq!(
-            deploy_name("mod", "Remove Mods Menu", "x"),
-            "modRemoveModsMenu"
-        );
+        assert_eq!(deploy_name("mod", "Example Mod", "x"), "modExampleMod");
         assert_eq!(deploy_name("mod", "modHoods", "x"), "modHoods");
         assert_eq!(deploy_name("", "Some Modlet", "folder"), "SomeModlet");
         assert_eq!(deploy_name("mod", "", "Archive Name"), "modArchiveName");

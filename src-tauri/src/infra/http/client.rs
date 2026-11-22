@@ -6,11 +6,12 @@
 use std::fmt;
 use std::time::{Duration, Instant};
 
+use super::helpers::{API_RETRY_CAP_SECS, retry_after_seconds};
 use super::{RateLimit, Trace, USER_AGENT, agent, trace, trace_failure, trace_response};
 use std::time::UNIX_EPOCH;
 
-/// The longest wait a `Retry-After` may ask for. A longer answer fails and the caller reports it.
-const MAX_RETRY_DELAY: Duration = Duration::from_secs(30);
+/// The longest wait an API request makes. A longer `Retry-After` is clamped to the same cap.
+const MAX_RETRY_DELAY: Duration = Duration::from_secs(API_RETRY_CAP_SECS);
 /// How many times a request is tried unless the caller says otherwise.
 const MAX_ATTEMPTS: u32 = 3;
 /// The first backoff step; each later attempt doubles it.
@@ -206,16 +207,11 @@ impl Client {
     }
 }
 
-/// The `Retry-After` header in seconds, capped so a check does not sleep for minutes.
+/// The `Retry-After` header in seconds, capped so a check does not sleep for minutes. A header we cannot read leaves
+/// the wait to [`backoff`].
 fn retry_after(headers: &ureq::http::HeaderMap) -> Option<Duration> {
-    let seconds = headers
-        .get("retry-after")?
-        .to_str()
-        .ok()?
-        .trim()
-        .parse::<u64>()
-        .ok()?;
-    Some(Duration::from_secs(seconds).min(MAX_RETRY_DELAY))
+    let text = headers.get("retry-after")?.to_str().ok()?;
+    retry_after_seconds(Some(text), None, MAX_RETRY_DELAY.as_secs()).map(Duration::from_secs)
 }
 
 /// Whether a status may pass on another try.
@@ -243,7 +239,7 @@ mod tests {
     #[test]
     fn a_retry_after_is_read_in_seconds_and_capped() {
         assert_eq!(retry_after(&headers("7")), Some(Duration::from_secs(7)));
-        assert_eq!(retry_after(&headers("600")), Some(MAX_RETRY_DELAY));
+        assert_eq!(retry_after(&headers("600")), Some(Duration::from_secs(30)));
         assert_eq!(retry_after(&headers("soon")), None);
         assert_eq!(retry_after(&ureq::http::HeaderMap::new()), None);
     }

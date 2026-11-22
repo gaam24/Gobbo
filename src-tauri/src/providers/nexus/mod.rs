@@ -32,7 +32,7 @@ pub use requirements::{ModRequirement, file_requirements};
 
 use self::api::NexusClient;
 use crate::domain::library::ArchiveLabel;
-use crate::domain::rate::AccountTier;
+use crate::domain::rate::{AccountTier, DownloadPolicy};
 use crate::domain::source::{
     ProviderId, SourceAccount, SourceAuthKind, SourceCapabilities, SourceLink, SourceMeta,
     SourceRef, SourceStats,
@@ -40,6 +40,7 @@ use crate::domain::source::{
 use crate::error::AppError;
 use std::collections::BTreeMap;
 use std::sync::{Mutex, PoisonError};
+use std::time::Duration;
 
 use crate::providers::link::is_slug;
 use crate::providers::{
@@ -55,6 +56,11 @@ static NEXUS_COLLECTIONS: collections::NexusCollections = collections::NexusColl
 
 /// The provider id, shared by the download rules and the adapter below.
 pub const ID: &str = "nexus";
+
+/// More than 200 downloads in five minutes can get a free account's IP suspended for ten minutes. The number comes
+/// from the community downloaders that pace whole collections; it is deliberately a ceiling, not a target.
+const FREE_MAX: u32 = 200;
+const FREE_WINDOW: Duration = Duration::from_mins(5);
 
 /// Validated account tiers, keyed by API key. A validation is one network call, so its answer is kept for the life
 /// of the process; a failed check is remembered as free, which is the conservative pacing rule.
@@ -135,13 +141,24 @@ impl SourceProvider for NexusProvider {
         required_key().is_ok_and(|key| account_tier(&key) == AccountTier::Premium)
     }
 
+    fn download_policy(&self, tier: AccountTier) -> DownloadPolicy {
+        if tier == AccountTier::Free {
+            DownloadPolicy::WindowBudget {
+                max: FREE_MAX,
+                window: FREE_WINDOW,
+            }
+        } else {
+            DownloadPolicy::Unlimited
+        }
+    }
+
     fn known_direct_download(&self, key: &str) -> Option<bool> {
         // A direct download is a premium one: a free account reads the files but downloads them in the browser.
         cached_tier(key).map(|tier| tier == AccountTier::Premium)
     }
 
     fn schemes(&self) -> &'static [&'static str] {
-        &["nxm"]
+        &[link::SCHEME]
     }
 
     fn page_url(&self, game_key: &str, mod_id: &str, tab: Option<&str>) -> Option<String> {
@@ -176,8 +193,7 @@ impl SourceProvider for NexusProvider {
             None => (None, None),
         };
         Ok(SourceLink {
-            source: SourceRef::new("nexus", link.mod_id.to_string())
-                .with_file(link.file_id.to_string()),
+            source: SourceRef::new(ID, link.mod_id.to_string()).with_file(link.file_id.to_string()),
             game_key: Some(link.domain),
             download_key,
             expires,
@@ -198,7 +214,7 @@ impl SourceProvider for NexusProvider {
 
     fn source_from_archive_name(&self, file_name: &str) -> Option<SourceRef> {
         let archive = archive_name::parse(file_name)?;
-        Some(SourceRef::new("nexus", archive.mod_id.to_string()))
+        Some(SourceRef::new(ID, archive.mod_id.to_string()))
     }
 
     fn archive_name(&self, file_name: &str) -> Option<ArchiveLabel> {
@@ -218,10 +234,8 @@ impl SourceProvider for NexusProvider {
         request: SourceDownloadRequest<'_>,
         progress: &mut dyn FnMut(u64, u64) -> bool,
     ) -> Result<SourceDownloaded, AppError> {
-        let nexus = request
-            .source
-            .as_nexus_source()
-            .ok_or_else(|| bad_id(&request.source.mod_id))?;
+        let nexus =
+            types::source_of(&request.source).ok_or_else(|| bad_id(&request.source.mod_id))?;
         let download_key = request
             .download_key
             .map(|(key, expires)| (key.to_string(), expires));
@@ -329,6 +343,23 @@ pub(super) fn meta_from_page(page: &ModPage) -> SourceMeta {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_the_free_tier_has_a_download_ceiling() {
+        assert_eq!(
+            NexusProvider.download_policy(AccountTier::Free),
+            DownloadPolicy::WindowBudget {
+                max: 200,
+                window: Duration::from_mins(5)
+            }
+        );
+        for tier in [AccountTier::Anonymous, AccountTier::Premium] {
+            assert_eq!(
+                NexusProvider.download_policy(tier),
+                DownloadPolicy::Unlimited
+            );
+        }
+    }
 
     #[test]
     fn only_a_premium_account_downloads_directly() {

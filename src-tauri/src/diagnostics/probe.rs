@@ -7,10 +7,10 @@ use std::path::{Path, PathBuf};
 use gobbo_overlay_probe::{REPORT_FLAG, Report};
 use serde::{Deserialize, Serialize};
 
+use crate::context::running::game_running;
 use crate::context::{Data, load_game};
 use crate::deploy::overlay::{self, Session};
 use crate::error::AppError;
-use crate::launch::start::game_running;
 use crate::launch::start::overlay_session_state;
 
 /// The result of one probe binary (x64 or x86).

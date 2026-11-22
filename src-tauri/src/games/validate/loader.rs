@@ -60,12 +60,26 @@ impl LoaderDef {
         problems.0.extend(duplicate_problems(&self.deploy));
         problems.relative("required file", &self.requires);
         problems.requirements("loader", &self.requirements);
+        check_config_mirror(
+            self.config_mirror.as_ref(),
+            "loader",
+            &self.deploy,
+            None,
+            &mut problems,
+        );
         if let Some(install) = &self.install {
             check_install("loader install", install, &mut problems);
         }
 
         for (name, variant) in &self.variants {
             let what = format!("variant {name}");
+            check_config_mirror(
+                variant.config_mirror.as_ref(),
+                &what,
+                &self.deploy,
+                Some(&variant.deploy),
+                &mut problems,
+            );
             check_loader_root(&variant.deploy, &what, &mut problems);
             problems.0.extend(duplicate_problems(&variant.deploy));
             problems.relative(&format!("{what} required file"), &variant.requires);
@@ -109,6 +123,39 @@ pub(in crate::games) fn duplicate_problems(deploy: &Deploy) -> Vec<String> {
     }
 
     problems.0
+}
+
+/// `config_mirror` names a real folder of this preset: a relative game path that the base rules declare (or, for a
+/// variant, that the base rules or the variant's own rules declare). A slot counts as well as a mirror or alias target:
+/// a loader such as UE4SS keeps its config in the folder its mods use.
+fn check_config_mirror(
+    mirror: Option<&String>,
+    what: &str,
+    base: &Deploy,
+    variant: Option<&Deploy>,
+    problems: &mut Problems,
+) {
+    let Some(folder) = mirror else {
+        return;
+    };
+
+    problems.relative(&format!("{what} config_mirror"), std::iter::once(folder));
+
+    let mut declared: Vec<&str> = Vec::new();
+
+    for deploy in std::iter::once(base).chain(variant) {
+        declared.extend(deploy.slots.iter().map(|slot| slot.dir.as_str()));
+        declared.extend(deploy.mirror.iter().map(|mirror| mirror.dir.as_str()));
+        declared.extend(deploy.aliases.values().map(String::as_str));
+    }
+
+    let key = pathkey::path_key(folder);
+
+    if !declared.iter().any(|dir| pathkey::path_key(dir) == key) {
+        problems.push(format!(
+            "{what} config_mirror {folder:?} is not a slot, mirror or alias target of the preset"
+        ));
+    }
 }
 
 /// A loader never chooses the deployment root; the game does, because only it knows where its mods live.

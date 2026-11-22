@@ -24,6 +24,20 @@ const OWNER: OwnerFile = OwnerFile {
     journal: "profile-switch-user-data.json",
 };
 const DATA_DIR: &str = "userdata";
+/// The old upper layer kept aside when a redirect's data is moved back to the real folder.
+const MOVED_UPPER_PREFIX: &str = "upper.moved-";
+/// The files moved out of the upper layer by a completed move-back, so they can be recovered once.
+const REMOVED_DIR: &str = "removed";
+
+/// The folder of a profile's user-data sets inside its state folder.
+pub fn state_dir(state: &Path) -> PathBuf {
+    state.join(DATA_DIR)
+}
+
+/// Whether a folder next to a user-data set is a recovery copy from a completed move-back, not a live layer.
+pub fn is_recovery(name: &str) -> bool {
+    name.starts_with(MOVED_UPPER_PREFIX) || name == REMOVED_DIR
+}
 
 /// The whiteout snapshot next to a redirect's upper layer. It names paths the game deleted from the lower layers.
 pub fn whiteouts(upper: &Path) -> PathBuf {

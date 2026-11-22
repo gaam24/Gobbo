@@ -4,9 +4,6 @@ use super::PROGRESS_EVERY;
 use crate::context::size_kb;
 use std::time::Instant;
 
-/// The error of a download the user stopped.
-pub(super) const CANCELLED: &str = crate::error::DOWNLOAD_CANCELLED;
-
 /// Bytes per second since the last report, reported every `PROGRESS_EVERY`.
 pub(super) struct Meter {
     pub(super) at: Instant,

@@ -7,7 +7,6 @@ pub mod download;
 pub mod fetch;
 mod link;
 pub mod nexus;
-mod pacing;
 pub mod picture;
 #[cfg(test)]
 pub mod testing;
@@ -21,8 +20,6 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 /// request budget; a library of many mods just does not wait for one round trip at a time.
 pub const UPDATE_WORKERS: usize = 4;
 
-pub use pacing::download_policy;
-
 /// The next index of `len` for a worker. `None` when every index was already handed out. The counter is shared, so each
 /// index reaches exactly one worker.
 pub fn take_index(next: &AtomicUsize, len: usize) -> Option<usize> {
@@ -31,6 +28,7 @@ pub fn take_index(next: &AtomicUsize, len: usize) -> Option<usize> {
 }
 
 use crate::domain::library::ArchiveLabel;
+use crate::domain::rate::{AccountTier, DownloadPolicy};
 use crate::domain::source::{
     DownloadRoute, ProviderId, SourceAccount, SourceCapabilities, SourceLink, SourceMeta,
     SourceProviderInfo, SourceRef, SourceRequirement, SourceSync,
@@ -158,6 +156,12 @@ pub trait SourceProvider: Send + Sync {
     /// gains nothing from parallel transfers; only an account without such a cap says yes.
     fn parallel_downloads(&self) -> bool {
         false
+    }
+
+    /// How this provider's downloads are paced for one account tier. Anything without a documented limit stays
+    /// unlimited: slowing those downloads down would only make the user wait for no reason.
+    fn download_policy(&self, _tier: AccountTier) -> DownloadPolicy {
+        DownloadPolicy::Unlimited
     }
 
     /// The URL schemes the provider owns, for example `nxm`.
@@ -306,7 +310,7 @@ pub struct CollectionMod {
     pub size_kb: u32,
 }
 
-/// A resource of a collection that is not a Nexus file.
+/// A resource of a collection that is not one of the provider's files.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CollectionExternal {
     pub name: String,
@@ -336,6 +340,9 @@ pub struct CollectionRevision {
     pub revisions: Vec<CollectionRevisionSummary>,
     /// The opaque API path of the collection archive.
     pub archive_link: Option<String>,
+    /// Archive paths this provider's collections use for resources Gobbo cannot apply. The manifest reader reports
+    /// them; the provider owns the names instead of the generic reader.
+    pub unsupported_archive_paths: Vec<String>,
     /// The API already describes the whole recipe (a Thunderstore modpack is its dependency list), so there is no
     /// archive to read and the plan is not limited.
     pub complete: bool,
@@ -446,6 +453,18 @@ pub fn download_route(provider: &dyn SourceProvider) -> DownloadRoute {
         Err(_) => (false, None),
     };
     route_from(provider.capabilities().direct_download, key_missing, known)
+}
+
+/// The download route of the provider with this id, or `Browser` when this build does not know the id. An unknown
+/// provider has no direct downloads, exactly like a known one whose account is not entitled.
+pub fn download_route_for_id(id: &str) -> DownloadRoute {
+    route_or_browser(provider(id).map(download_route))
+}
+
+/// The route a batch of rows uses when its one-time route map has no entry for a provider. This is the same `Browser`
+/// fallback as [`download_route_for_id`], so every map reader and an unknown id agree on one rule.
+pub fn route_or_browser(route: Option<DownloadRoute>) -> DownloadRoute {
+    route.unwrap_or(DownloadRoute::Browser)
 }
 
 /// The routing rule over the facts it reads: the provider's download capability, whether a needed key is missing, and
@@ -731,6 +750,30 @@ mod tests {
     }
 
     #[test]
+    fn a_provider_without_a_documented_ceiling_does_not_pace() {
+        let thunderstore = provider("thunderstore").expect("thunderstore must be registered");
+        for tier in [
+            AccountTier::Anonymous,
+            AccountTier::Free,
+            AccountTier::Premium,
+        ] {
+            assert_eq!(
+                thunderstore.download_policy(tier),
+                DownloadPolicy::Unlimited
+            );
+            assert_eq!(
+                TierProvider {
+                    direct: true,
+                    known: None
+                }
+                .download_policy(tier),
+                DownloadPolicy::Unlimited,
+                "a provider without a documented limit must not slow downloads down"
+            );
+        }
+    }
+
+    #[test]
     fn a_provider_without_direct_download_keeps_its_unsupported_error() {
         let no_download = TierProvider {
             direct: false,
@@ -739,5 +782,18 @@ mod tests {
         assert_eq!(download_route(&no_download), DownloadRoute::Browser);
         let error = browser_route_error(&no_download).expect("a browser route has an error");
         assert_eq!(error.code, "source.unsupported");
+    }
+
+    #[test]
+    fn an_unknown_provider_id_and_a_missing_map_entry_route_to_the_browser() {
+        assert_eq!(
+            download_route_for_id("not_registered"),
+            DownloadRoute::Browser
+        );
+        assert_eq!(route_or_browser(None), DownloadRoute::Browser);
+        assert_eq!(
+            route_or_browser(Some(DownloadRoute::Direct)),
+            DownloadRoute::Direct
+        );
     }
 }

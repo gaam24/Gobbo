@@ -1,9 +1,9 @@
 //! Selecting an installed version that a provider download brought, without a direct download.
 
 use crate::context::Data;
+use crate::domain::library::LibraryView;
 use crate::domain::source::ProviderId;
 use crate::error::AppError;
-use crate::library::LibraryView;
 
 /// Selects the installed version of `id` that matches the newest file of `provider`. The window calls it after a user
 /// downloaded an update by hand, so that update also becomes the selected version in the active profile.
@@ -48,8 +48,8 @@ pub fn select_installed_update(
 
 #[cfg(test)]
 mod tests {
+    use crate::domain::library::{Archive, Library, LibraryView, ModVersion};
     use crate::domain::source::ProviderId;
-    use crate::library::{Archive, Library, LibraryView, ModVersion};
     use crate::test_support::mod_version;
     use std::collections::BTreeMap;
 

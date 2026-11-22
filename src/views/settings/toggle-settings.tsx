@@ -3,7 +3,7 @@ import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useTranslation } from "@/i18n";
 import { taskNotification } from "@/lib/notifications";
-import { SettingRow } from "@/views/settings/controls";
+import { SettingRow, ToggleSetting } from "@/views/settings/controls";
 
 /// Whether Gobbo takes the download links of one provider (for example `nxm://` for Nexus Mods). Each provider has its
 /// own switch, off until the user turns it on, because only one program on the computer can take the links. The switch
@@ -19,30 +19,33 @@ export function ProviderLinkSetting({
 }) {
 	const { t } = useTranslation();
 	const id = `${provider.id}-links`;
-	const toggle = t("providers.links.toggle", { name: provider.name });
 	return (
-		<SettingRow
+		<ToggleSetting
 			title={t("providers.links.title")}
 			htmlFor={id}
-			hint={toggle}
+			hint={t("providers.links.toggle", { name: provider.name })}
 			help={t("providers.links.hint", {
 				name: provider.name,
 				scheme: provider.schemes.join(", "),
 			})}
-		>
-			<Switch id={id} aria-label={toggle} checked={on} onCheckedChange={(checked) => void onChange(checked)} />
-		</SettingRow>
+			on={on}
+			onChange={onChange}
+		/>
 	);
 }
 
 /// Whether the main window opens where it was closed. It is on from the start; a change is read at the next start.
 export function RememberWindowSetting({ on, onChange }: { on: boolean; onChange: (on: boolean) => void | Promise<void> }) {
 	const { t } = useTranslation();
-	const toggle = t("settings.window.toggle");
 	return (
-		<SettingRow title={t("settings.window.title")} htmlFor="remember-window" hint={toggle} help={t("settings.window.hint")}>
-			<Switch id="remember-window" aria-label={toggle} checked={on} onCheckedChange={(checked) => void onChange(checked)} />
-		</SettingRow>
+		<ToggleSetting
+			title={t("settings.window.title")}
+			htmlFor="remember-window"
+			hint={t("settings.window.toggle")}
+			help={t("settings.window.hint")}
+			on={on}
+			onChange={onChange}
+		/>
 	);
 }
 
@@ -50,16 +53,15 @@ export function RememberWindowSetting({ on, onChange }: { on: boolean; onChange:
 /// the provider that owns it; the manual check in the collection menu works either way.
 export function CheckCollectionsSetting({ on, onChange }: { on: boolean; onChange: (on: boolean) => void | Promise<void> }) {
 	const { t } = useTranslation();
-	const toggle = t("settings.collections.toggle");
 	return (
-		<SettingRow
+		<ToggleSetting
 			title={t("settings.collections.title")}
 			htmlFor="check-collections-on-launch"
-			hint={toggle}
+			hint={t("settings.collections.toggle")}
 			help={t("settings.collections.hint")}
-		>
-			<Switch id="check-collections-on-launch" aria-label={toggle} checked={on} onCheckedChange={(checked) => void onChange(checked)} />
-		</SettingRow>
+			on={on}
+			onChange={onChange}
+		/>
 	);
 }
 
@@ -67,27 +69,30 @@ export function CheckCollectionsSetting({ on, onChange }: { on: boolean; onChang
 /// either way.
 export function CheckCatalogSetting({ on, onChange }: { on: boolean; onChange: (on: boolean) => void | Promise<void> }) {
 	const { t } = useTranslation();
-	const toggle = t("settings.catalog.toggle");
 	return (
-		<SettingRow title={t("settings.catalog.title")} htmlFor="check-catalog-on-launch" hint={toggle} help={t("settings.catalog.hint")}>
-			<Switch id="check-catalog-on-launch" aria-label={toggle} checked={on} onCheckedChange={(checked) => void onChange(checked)} />
-		</SettingRow>
+		<ToggleSetting
+			title={t("settings.catalog.title")}
+			htmlFor="check-catalog-on-launch"
+			hint={t("settings.catalog.toggle")}
+			help={t("settings.catalog.hint")}
+			on={on}
+			onChange={onChange}
+		/>
 	);
 }
 
 /// Whether a game launch takes the window to the tray. Off by default: starting a game never hides Gobbo by surprise.
 export function HideWhenGameLaunchesSetting({ on, onChange }: { on: boolean; onChange: (on: boolean) => void | Promise<void> }) {
 	const { t } = useTranslation();
-	const toggle = t("settings.hideWhenGameLaunches.toggle");
 	return (
-		<SettingRow
+		<ToggleSetting
 			title={t("settings.hideWhenGameLaunches.title")}
 			htmlFor="hide-when-game-launches"
-			hint={toggle}
+			hint={t("settings.hideWhenGameLaunches.toggle")}
 			help={t("settings.hideWhenGameLaunches.hint")}
-		>
-			<Switch id="hide-when-game-launches" aria-label={toggle} checked={on} onCheckedChange={(checked) => void onChange(checked)} />
-		</SettingRow>
+			on={on}
+			onChange={onChange}
+		/>
 	);
 }
 
@@ -106,17 +111,16 @@ export function SystemNotificationsSetting({
 	onNotification: (code: string, on: boolean) => void | Promise<void>;
 }) {
 	const { t } = useTranslation();
-	const toggle = t("settings.notifications.toggle");
 	return (
 		<>
-			<SettingRow
+			<ToggleSetting
 				title={t("settings.notifications.title")}
 				htmlFor="system-notifications"
-				hint={toggle}
+				hint={t("settings.notifications.toggle")}
 				help={t("settings.notifications.hint")}
-			>
-				<Switch id="system-notifications" aria-label={toggle} checked={on} onCheckedChange={(checked) => void onChange(checked)} />
-			</SettingRow>
+				on={on}
+				onChange={onChange}
+			/>
 			{on && (
 				<SettingRow title={t("settings.notifications.eventsTitle")} hint={t("settings.notifications.eventsHint")}>
 					<Table>

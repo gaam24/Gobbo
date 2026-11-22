@@ -1,13 +1,11 @@
-import { useState } from "react";
-import { useNoticeActions } from "@/app/contexts/notices-context";
-import { commands, type MountDiagnostics } from "@/bindings";
+import type { MountDiagnostics } from "@/bindings";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { type TranslationKey, useTranslation } from "@/i18n";
-import { messageOf, translate, unwrap } from "@/lib/ipc";
+import { translate } from "@/lib/ipc";
 import { formatSize } from "@/lib/mods";
-import { useLoad } from "@/lib/use-load";
+import { useMountsPanel } from "@/views/console/use-mounts-panel";
 
 const REASON: Record<string, TranslationKey> = {
 	profile: "console.mountsReasonProfile",
@@ -112,38 +110,7 @@ export function MountsView({
 /// Loads the diagnostics for one game and asks for an explicit confirmation before any folder is deleted.
 export function MountsPanel({ gameId }: { gameId: string }) {
 	const { t } = useTranslation();
-	const { notify, attempt } = useNoticeActions();
-	const [reloadKey, setReloadKey] = useState(0);
-	const [failure, setFailure] = useState<string | null>(null);
-	const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
-	const [confirming, setConfirming] = useState(false);
-	const view = useLoad(`mounts-${gameId}`, () => unwrap(commands.mountDiagnostics(gameId)), {
-		reloadKey,
-		onError: (error) => setFailure(messageOf(error)),
-	});
-
-	const toggle = (path: string, checked: boolean) => {
-		const next = new Set(selected);
-
-		if (checked) next.add(path);
-		else next.delete(path);
-		setSelected(next);
-	};
-
-	const clean = async () => {
-		setConfirming(false);
-		const paths = [...selected];
-
-		if (paths.length === 0) return;
-		const ok = await attempt(async () => {
-			await unwrap(commands.cleanOrphanLayers(gameId, paths));
-			notify(t("console.mountsCleanDone"));
-		});
-
-		if (!ok) return;
-		setSelected(new Set());
-		setReloadKey((key) => key + 1);
-	};
+	const { failure, view, selected, confirming, setConfirming, toggle, clean } = useMountsPanel(gameId);
 
 	return (
 		<div className="grid gap-3">

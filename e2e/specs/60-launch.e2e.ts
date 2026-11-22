@@ -2,10 +2,10 @@ import { strict as assert } from "node:assert";
 import path from "node:path";
 import type { RunReport_Serialize as RunReport } from "../../src/bindings";
 import { CommandFailure, invoke, invokeWithChannel, reloadWindow } from "../support/bridge";
-import { definitionsDir } from "../support/env";
-import { expectFile, readText, removeTree } from "../support/files";
+import { GOBBO_E2E_OUT } from "../support/env";
+import { expectFile, readText } from "../support/files";
 import { modZip } from "../support/fixtures";
-import { cleanupGame, enableMods, importMods, saveSettings, seedGame, uniqueId } from "../support/seed";
+import { cleanupFixture, enableMods, importMods, saveSettings, seedGame, uniqueId } from "../support/seed";
 import { clickByLabel, clickByText, clickTab, waitForText } from "../support/ui";
 
 async function waitForRunning(game: string, wanted: boolean, timeout = 15_000): Promise<boolean> {
@@ -76,9 +76,7 @@ describe("launch and console", () => {
 		expectFile(path.join(fixture.out, "args.txt"));
 		const cwd = readText(path.join(fixture.out, "cwd.txt")).trim();
 		assert.ok([fixture.root, path.join(fixture.root, "bin")].includes(cwd), `the game started in an unexpected folder: ${cwd}`);
-		await cleanupGame(id);
-		removeTree(path.join(definitionsDir, id));
-		removeTree(fixture.root);
+		await cleanupFixture(id, fixture.root);
 	});
 	it("applies the draft and launches the game with the deployed mod", async () => {
 		const id = uniqueId("launch-mod");
@@ -89,9 +87,7 @@ describe("launch and console", () => {
 		const started = await launchWithDraft(id);
 
 		if (started === null) {
-			await cleanupGame(id);
-			removeTree(path.join(definitionsDir, id));
-			removeTree(fixture.root);
+			await cleanupFixture(id, fixture.root);
 			return;
 		}
 
@@ -100,9 +96,7 @@ describe("launch and console", () => {
 		assert.equal(report.game_exit_code, 0);
 		expectFile(path.join(fixture.out, "mod.ws"));
 		assert.equal(readText(path.join(fixture.out, "mod.ws")), "x");
-		await cleanupGame(id);
-		removeTree(path.join(definitionsDir, id));
-		removeTree(fixture.root);
+		await cleanupFixture(id, fixture.root);
 	});
 	it("passes the settings arguments and environment to the game", async () => {
 		const id = uniqueId("launch-env");
@@ -110,7 +104,7 @@ describe("launch and console", () => {
 		const { fixture } = await seedGame({ id, name });
 		await saveSettings(id, {
 			launch_args: "-one -two",
-			launch_env: `GOBBO_E2E_OUT=${fixture.out}\nE2E_EXTRA=hello`,
+			launch_env: `${GOBBO_E2E_OUT}=${fixture.out}\nE2E_EXTRA=hello`,
 		});
 		await invoke<boolean>("launch_game", {
 			game: id,
@@ -120,9 +114,7 @@ describe("launch and console", () => {
 		await waitForExit(id);
 		assert.deepEqual(readText(path.join(fixture.out, "args.txt")).trim().split("\n"), ["-one", "-two"]);
 		assert.ok(readText(path.join(fixture.out, "env.txt")).includes("E2E_EXTRA=hello"));
-		await cleanupGame(id);
-		removeTree(path.join(definitionsDir, id));
-		removeTree(fixture.root);
+		await cleanupFixture(id, fixture.root);
 	});
 	it("stops a sleeping game and blocks an apply while it runs", async () => {
 		const id = uniqueId("launch-stop");
@@ -137,9 +129,7 @@ describe("launch and console", () => {
 		const started = await launchWithDraft(id);
 
 		if (started === null) {
-			await cleanupGame(id);
-			removeTree(path.join(definitionsDir, id));
-			removeTree(fixture.root);
+			await cleanupFixture(id, fixture.root);
 			return;
 		}
 
@@ -161,9 +151,7 @@ describe("launch and console", () => {
 		await waitForRunning(id, false);
 		const report = await waitForExit(id);
 		assert.equal(report.stopped_by_user, true);
-		await cleanupGame(id);
-		removeTree(path.join(definitionsDir, id));
-		removeTree(fixture.root);
+		await cleanupFixture(id, fixture.root);
 	});
 	it("shows the crash prompt after a nonzero exit", async () => {
 		const id = uniqueId("launch-crash");
@@ -180,9 +168,7 @@ describe("launch and console", () => {
 		await waitForText("The game exited unexpectedly");
 		await waitForText("Find the mod");
 		await clickByText("Not now", "button");
-		await cleanupGame(id);
-		removeTree(path.join(definitionsDir, id));
-		removeTree(fixture.root);
+		await cleanupFixture(id, fixture.root);
 	});
 	it("opens the console and shows the game output", async () => {
 		const id = uniqueId("launch-console");
@@ -200,8 +186,6 @@ describe("launch and console", () => {
 		await clickTab("Output");
 		await waitForText("gobbo e2e game");
 		await clickByLabel("Close console");
-		await cleanupGame(id);
-		removeTree(path.join(definitionsDir, id));
-		removeTree(fixture.root);
+		await cleanupFixture(id, fixture.root);
 	});
 });

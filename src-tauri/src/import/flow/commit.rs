@@ -5,13 +5,13 @@ use std::path::Path;
 
 use super::prepare::{Copy, Prepared};
 use crate::context::Data;
+use crate::domain::library::{Archive, Family, Library, ModVersion};
 use crate::domain::naming;
 use crate::domain::source::SourceRef;
 use crate::error::{AppError, io_at};
 use crate::games::GameDef;
 use crate::import::ALREADY_IN_LIBRARY;
 use crate::import::install::{self, Naming};
-use crate::library::{Archive, Family, Library, ModVersion};
 
 /// What a committed import added, for the view and for the rollback of a failed save.
 pub(super) struct Committed {
@@ -50,7 +50,7 @@ pub(super) fn commit_prepared(
         .map(|mod_installed| {
             let paths = mod_installed.paths;
             let integrity = mod_installed.integrity;
-            let mut record = crate::library::version_from_import(
+            let mut record = crate::context::library::version_from_import(
                 &library_dir.join(&mod_installed.folder),
                 &mod_installed.folder,
                 &mod_installed.slot,
@@ -138,7 +138,7 @@ fn add_records(
         record.info.name = name;
         record.info.version = version;
         record.family = family_source.as_ref().map_or_else(
-            || crate::library::family_id_from(None, &record.info.name),
+            || crate::context::library::family_id_from(None, &record.info.name),
             |source| library.family_for_source(source, &record.info.name),
         );
         let mut family = Family::of(&record);
@@ -182,6 +182,7 @@ fn add_records(
         library.layouts.insert(folder, layout);
     }
 
+    let (skipped_files, skipped_total) = crate::import::skipped::archive_skipped(skipped);
     library.archives.insert(
         prepared.copy.digest.clone(),
         Archive {
@@ -190,34 +191,11 @@ fn add_records(
             named,
             source_files: one_source(source.as_ref(), |source| source.file_id.clone()),
             source_parts: one_source(source.as_ref(), |source| source.part_id.clone()),
-            skipped: archive_skipped(skipped),
-            skipped_total: skipped_no_rule(skipped),
+            skipped: skipped_files,
+            skipped_total,
         },
     );
     imported
-}
-
-/// The entries no rule took, kept for the archive report after the import. The list is capped so a bad archive cannot
-/// grow `library.json` without limit; `skipped_total` keeps the full count.
-fn archive_skipped(
-    skipped: &[crate::domain::library::SkippedFile],
-) -> Vec<crate::domain::library::SkippedFile> {
-    skipped
-        .iter()
-        .filter(|file| file.reason == crate::domain::library::SkipReason::NoRule)
-        .take(1000)
-        .cloned()
-        .collect()
-}
-
-fn skipped_no_rule(skipped: &[crate::domain::library::SkippedFile]) -> u32 {
-    u32::try_from(
-        skipped
-            .iter()
-            .filter(|file| file.reason == crate::domain::library::SkipReason::NoRule)
-            .count(),
-    )
-    .unwrap_or(u32::MAX)
 }
 
 pub(super) fn forget_download(data: &Data, copy: &Copy) {

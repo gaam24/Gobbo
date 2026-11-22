@@ -82,7 +82,7 @@ fn receive_links(app: &AppHandle, urls: impl IntoIterator<Item = String>) {
     }
 }
 
-/// Downloads every `nxm://` link that reaches the app, from its start or from a second start. The queue lives in the
+/// Downloads every provider deep link that reaches the app, from its start or from a second start. The queue lives in the
 /// app, so a link that comes before the window, or during a reload of it, is not lost.
 pub fn watch_links(app: &App) {
     app.manage(Downloads::load(&app.state::<Data>()));

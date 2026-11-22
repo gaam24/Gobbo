@@ -2,13 +2,13 @@
 
 use crate::context::Data;
 use crate::context::Loaded;
+use crate::context::library::not_in_library;
 use crate::context::load_game;
 use crate::context::load_profiles;
 use crate::context::profile::history::save_profiles;
 use crate::context::profile::lock_profiles;
 use crate::domain::pathkey::path_key;
 use crate::error::AppError;
-use crate::library::not_in_library;
 
 /// Chooses `family` as the winner for every path, keyed the way the conflict list names it. All paths are written in
 /// one save, so they are one undo. Duplicate paths collapse onto the same key. An empty list still saves, which

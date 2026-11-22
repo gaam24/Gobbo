@@ -1,13 +1,13 @@
 //! Tests of the row views: the saved check and the description preview.
 
-use super::rows::{mod_view, update_report};
+use super::rows::{LibraryContext, mod_view, update_report};
 use super::versions::archive_names;
+use crate::domain::library::{Archive, Family, Library, LibraryView, ModVersion};
 use crate::domain::profiles::ProfilesView;
 use crate::domain::profiles::entry::ProfileMod;
 use crate::domain::source::{ProviderId, SourceMeta, SourceMod};
 use crate::domain::version::{IgnoredVersion, UpdateState};
 use crate::library::relations::{SourceLookup, UnmetRequirements};
-use crate::library::{Archive, Family, Library, LibraryView, ModVersion};
 use crate::status::PlanOutcome;
 use crate::status::views::{UpdateReport, description_preview};
 use std::collections::BTreeMap;
@@ -251,12 +251,16 @@ fn a_row_takes_its_page_from_the_same_source_as_its_preview() {
     let profiles_view = ProfilesView::new(&profiles);
     let lookup = SourceLookup::new(&view, std::slice::from_ref(&entry));
     let unmet = UnmetRequirements::of(&library, &lookup, std::slice::from_ref(&entry));
+    let context = LibraryContext {
+        library: &library,
+        view: &view,
+        lookup: &lookup,
+    };
     let row = mod_view(
         0,
         &entry,
         &crate::test_support::games::slot(),
-        &library,
-        &view,
+        &context,
         &profiles_view,
         &PlanOutcome::default(),
         &unmet,
@@ -275,12 +279,13 @@ fn the_archive_label_is_used_only_when_info_json_has_no_real_name_or_version() {
     library.archives.insert(
         "sha".into(),
         Archive {
-            original_name: "Remove Mods Menu 35686 1.2.0 2026-10-23T17-21Z Q6xF6llIa.zip".into(),
+            original_name: "Example Cleanup Mod 7001 1.2.0 2026-10-23T17-21Z example-uploader.zip"
+                .into(),
             file: "archive.zip".into(),
             source_files: BTreeMap::new(),
             source_parts: BTreeMap::new(),
-            named: Some(crate::library::ArchiveLabel {
-                name: Some("Remove Mods Menu".into()),
+            named: Some(crate::domain::library::ArchiveLabel {
+                name: Some("Example Cleanup Mod".into()),
                 version: "1.2.0".into(),
             }),
             skipped: Vec::new(),
@@ -293,7 +298,7 @@ fn the_archive_label_is_used_only_when_info_json_has_no_real_name_or_version() {
         .versions
         .insert(version.folder.clone(), version.clone());
 
-    let archive = "Remove Mods Menu 35686 1.2.0 2026-10-23T17-21Z Q6xF6llIa.zip";
+    let archive = "Example Cleanup Mod 7001 1.2.0 2026-10-23T17-21Z example-uploader.zip";
     let (archive_name, parsed) = archive_names(&library, &version);
     assert_eq!(archive_name, Some(archive));
     assert!(parsed.is_some());

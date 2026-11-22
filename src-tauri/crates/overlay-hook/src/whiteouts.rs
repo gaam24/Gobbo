@@ -46,22 +46,27 @@ impl Journal {
         Ok(())
     }
 
-    /// Writes the whole snapshot and truncates the journal. The snapshot goes to a temporary file first, so a crash
-    /// leaves either the old snapshot or the new one, never a partial file.
+    /// Writes the whole snapshot and truncates the journal.
     fn compact(&mut self, whiteouts: &Whiteouts) -> io::Result<()> {
-        let temporary = self.snapshot.with_extension("whiteouts.tmp");
-        let result = fs::write(&temporary, whiteouts.to_text())
-            .and_then(|()| fs::rename(&temporary, &self.snapshot));
-        if result.is_err() {
-            let _ = fs::remove_file(&temporary);
-            return result;
-        }
+        write_snapshot(&self.snapshot, whiteouts)?;
         // The append handle has `FILE_APPEND_DATA` but not necessarily `FILE_WRITE_DATA`, and `set_len` wants the
         // latter. Reopen the journal for truncation instead of changing the open append handle.
         File::create(&self.path)?;
         self.lines = 0;
         Ok(())
     }
+}
+
+/// Writes `whiteouts` to `snapshot` through a temporary file, so a crash leaves either the old snapshot or the new one,
+/// never a partial file.
+fn write_snapshot(snapshot: &Path, whiteouts: &Whiteouts) -> io::Result<()> {
+    let temporary = snapshot.with_extension("whiteouts.tmp");
+    let result =
+        fs::write(&temporary, whiteouts.to_text()).and_then(|()| fs::rename(&temporary, snapshot));
+    if result.is_err() {
+        let _ = fs::remove_file(&temporary);
+    }
+    result
 }
 
 /// The journal of each mount, keyed by the mount id. `None` inside means the journal could not be opened or failed;
@@ -109,7 +114,7 @@ pub(crate) fn load(id: &str, layers: &Layers) -> Whiteouts {
     };
 
     if replayed > 0 {
-        match save(layers, &whiteouts) {
+        match write_snapshot(&layers.whiteouts_file(), &whiteouts) {
             Ok(()) => truncate(&journal_path),
             Err(error) => log(&format!("could not fold the whiteout journal: {error}")),
         }
@@ -188,19 +193,6 @@ fn open_journal(layers: &Layers) -> Option<Journal> {
             None
         }
     }
-}
-
-/// Writes the snapshot. The text goes to a file of its own first and then replaces the saved one.
-fn save(layers: &Layers, whiteouts: &Whiteouts) -> io::Result<()> {
-    let file = layers.whiteouts_file();
-    let temporary = file.with_extension("whiteouts.tmp");
-    let result =
-        fs::write(&temporary, whiteouts.to_text()).and_then(|()| fs::rename(&temporary, &file));
-    if result.is_err() {
-        let _ = fs::remove_file(&temporary);
-    }
-
-    result
 }
 
 /// Empties the journal after a successful fold. A failure is logged; the old lines are replayed again next time, which

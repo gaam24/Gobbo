@@ -3,7 +3,7 @@
 
 use std::path::PathBuf;
 
-use gobbo_overlay_core::Layer;
+use gobbo_overlay_core::{Layer, wide};
 use windows_sys::Win32::Foundation::{
     ERROR_ACCESS_DENIED, ERROR_DIR_NOT_EMPTY, ERROR_DIRECTORY, ERROR_FILE_NOT_FOUND,
     ERROR_INVALID_FUNCTION,
@@ -15,7 +15,6 @@ use crate::guard::Guard;
 use crate::paths::{in_lower, missing, place, shown, unsafe_name};
 use crate::search::has_visible_entries;
 use crate::state::Mount;
-use crate::text::wide;
 use crate::trace::{trace, trace_call};
 use crate::whiteouts::hide;
 

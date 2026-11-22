@@ -2,10 +2,10 @@ import { strict as assert } from "node:assert";
 import path from "node:path";
 import type { Status_Serialize as Status } from "../../src/bindings";
 import { invoke, reloadWindow, waitForShell } from "../support/bridge";
-import { dataDir, definitionsDir } from "../support/env";
+import { dataDir } from "../support/env";
 import { exists, expectNoFile, expectText, removeTree, writeFile } from "../support/files";
 import { modZip } from "../support/fixtures";
-import { apply, cleanupGame, enableMods, importMods, seedGame, statusOf, uniqueId, waitForStage } from "../support/seed";
+import { apply, cleanupFixture, enableMods, importMods, seedGame, statusOf, uniqueId, waitForStage } from "../support/seed";
 import { clickByLabel, clickByText, count, setThrow, waitForHeading, waitForNoText, waitForText } from "../support/ui";
 
 describe("recovery", () => {
@@ -25,9 +25,7 @@ describe("recovery", () => {
 		await clickByText("Try again", "button", "[role='alert']");
 		await waitForHeading(name);
 		await waitForNoText("Something went wrong");
-		await cleanupGame(id);
-		removeTree(path.join(definitionsDir, id));
-		removeTree(fixture.root);
+		await cleanupFixture(id, fixture.root);
 	});
 	it("shows the whole-window fallback when the shell itself fails and recovers on reload", async () => {
 		await setThrow("shell");
@@ -56,9 +54,7 @@ describe("recovery", () => {
 		assert.ok(exists(path.join(gameDir, "config.json.broken")), "the broken settings file was not kept");
 		assert.ok(exists(path.join(gameDir, "profiles.json.broken")), "the broken profiles file was not kept");
 		await waitForText("Set the game folder");
-		await cleanupGame(id);
-		removeTree(path.join(definitionsDir, id));
-		removeTree(fixture.root);
+		await cleanupFixture(id, fixture.root);
 	});
 	it("undoes an interrupted apply and cleans its journal", async () => {
 		const id = uniqueId("recover-interrupted");
@@ -83,9 +79,7 @@ describe("recovery", () => {
 		expectNoFile(gameFile);
 		await waitForStage(id, "ready");
 		assert.ok(!exists(path.join(state, "journal.jsonl")), "the undo left the journal behind");
-		await cleanupGame(id);
-		removeTree(path.join(definitionsDir, id));
-		removeTree(fixture.root);
+		await cleanupFixture(id, fixture.root);
 	});
 	it("starts over when the game folder moved away", async () => {
 		const id = uniqueId("recover-folder");
@@ -96,7 +90,6 @@ describe("recovery", () => {
 		const status = await statusOf(id);
 		assert.equal(status.game_ready, false, "the missing game folder still counts as ready");
 		await waitForText("Set the game folder");
-		await cleanupGame(id);
-		removeTree(path.join(definitionsDir, id));
+		await cleanupFixture(id, fixture.root);
 	});
 });

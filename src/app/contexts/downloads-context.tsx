@@ -5,7 +5,8 @@ import { useTranslation } from "@/i18n";
 import { errorText, unwrap } from "@/lib/ipc";
 import { registerTask, removeTask } from "@/lib/tasks-store";
 import type { useImport } from "@/lib/use-import";
-import { type Download, type DownloadImported, downloadSummary, useDownloads } from "@/nexus/use-downloads";
+import { type Download, type DownloadImported, downloadSummary } from "@/sources/downloads";
+import { useDownloads } from "@/sources/use-downloads";
 
 interface Downloads {
 	downloads: Download[];
@@ -95,11 +96,21 @@ export function DownloadsProvider({
 	/// The backend keeps the wizard wait with the queue, so a restart still finds it. Mirror each pending archive into
 	/// the global Working panel as a waiting row with an Open action; the queue answer is the only source of truth.
 	const wizardTasks = useRef<Set<string>>(new Set());
+	const wizardSignature = useRef<string | null>(null);
 	useEffect(() => {
+		const ready = downloads.filter((download) => download.state === "ready" && download.auto_install);
+		/// Progress ticks replace the whole queue. The registered rows only depend on these fields, so a tick with the
+		/// same waiting archives must not re-register tasks and re-render every activity-card subscriber.
+		const signature = ready
+			.map((download) => `${download.id}|${download.game}|${t("tasks.waitingInstall", { name: download.name })}|${t("downloads.install")}`)
+			.toSorted()
+			.join("~");
+
+		if (wizardSignature.current === signature) return;
+		wizardSignature.current = signature;
 		const live = new Set<string>();
 
-		for (const download of downloads) {
-			if (download.state !== "ready" || !download.auto_install) continue;
+		for (const download of ready) {
 			const id = `download-wizard:${download.id}`;
 			live.add(id);
 			registerTask({

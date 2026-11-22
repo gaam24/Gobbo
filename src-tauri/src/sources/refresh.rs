@@ -14,10 +14,7 @@ use crate::sources::update::apply_meta;
 /// bring (or a picture this read did not save) keeps its saved value, exactly as the update check keeps it. The check
 /// time is this refresh's.
 fn refreshed_meta(fresh: SourceMeta, saved: Option<&SourceMeta>, checked_at: u32) -> SourceMeta {
-    let mut meta = fresh;
-    meta.merge_saved(saved);
-    meta.checked_at = Some(checked_at);
-    meta
+    SourceMeta::checked(fresh, saved, checked_at)
 }
 
 /// Reads a mod's page from its provider and saves the common metadata with the family that holds the mod.
@@ -57,12 +54,7 @@ pub fn refresh_source_meta(
             })?;
         let meta = refreshed_meta(fresh, saved.as_ref(), checked_at);
         let family = library.family_mut(&family_id)?;
-        apply_meta(
-            family,
-            &SourceRef::new(provider_id, mod_id),
-            &meta,
-            checked_at,
-        );
+        apply_meta(family, &SourceRef::new(provider_id, mod_id), &meta);
         Ok(meta)
     })
 }

@@ -5,6 +5,7 @@ import { renderToString } from "react-dom/server";
 import type { ModGroup, UpdateReport } from "@/bindings";
 import { applyLanguage } from "@/i18n";
 import { groupRowId, type ListItem, type Mod, pageRowId } from "@/lib/mods";
+import { modFixture } from "@/test/fixtures/mod";
 import type { GroupMenuActions, ModListProps } from "@/views/mod-table/mod-list-props";
 
 // A menu draws its items in a portal, which has no container without a browser. These checks read the page menu, so the
@@ -48,45 +49,12 @@ const groupMenu: GroupMenuActions = {
 	onGroupSelected: nothing,
 };
 
-function listed(overrides: Partial<Mod> = {}): Mod {
-	return {
-		id: "local:cool-mod",
-		folder: "Cool Mod",
-		fomod_installer: false,
-		version_count: 1,
-		installed_at: 0,
-		slot: "Mods",
-		update: null,
-		enabled: true,
-		priority: 1,
-		load_priority: null,
-		files: 2,
-		size_kb: 10,
-		wins: 0,
-		loses: 0,
-		archive: null,
-		archive_file: null,
-		skipped: 0,
-		info: { name: "Cool Mod", version: "1.0", author: null, description: null },
-		source: null,
-		sources: [],
-		tags: [],
-		instructions: "",
-		unmet_requirements: 0,
-		profiles: [],
-		collections: [],
-		requires_names: [],
-		requirement_groups: [],
-		...overrides,
-	};
-}
-
-const alpha = listed({
+const alpha = modFixture({
 	id: "alpha",
 	folder: "Alpha",
 	info: { name: "Alpha", version: null, author: null, description: null },
 });
-const beta = listed({
+const beta = modFixture({
 	id: "beta",
 	folder: "Beta",
 	enabled: false,
@@ -100,25 +68,32 @@ const rows: ListItem[] = [
 	{ kind: "mod", id: beta.id, mod: beta },
 ];
 
-/// One installed part of a source page, with the fields the compact header and the cards read.
-function pagePart(id: string, name: string, enabled = true): Mod {
-	return listed({
-		id,
-		folder: name,
-		enabled,
-		page_id: "nexus:225",
-		page_name: "AudioXL",
-		part_id: id,
-		part_name: name,
-		info: { name, version: "1.0", author: "DigitalVixen", description: null },
-	});
-}
-
 function rowsOf(mods: Mod[]): ListItem[] {
 	return mods.map((mod) => ({ kind: "mod", id: mod.id, mod }));
 }
 
-const pageRows = rowsOf([pagePart("nexus:225", "Base"), pagePart("nexus:225#200", "Addon", false)]);
+const pageRows = rowsOf([
+	modFixture({
+		id: "nexus:225",
+		folder: "Base",
+		enabled: true,
+		page_id: "nexus:225",
+		page_name: "Example Page",
+		part_id: "nexus:225",
+		part_name: "Base",
+		info: { author: "Example Author" },
+	}),
+	modFixture({
+		id: "nexus:225#200",
+		folder: "Addon",
+		enabled: false,
+		page_id: "nexus:225",
+		page_name: "Example Page",
+		part_id: "nexus:225#200",
+		part_name: "Addon",
+		info: { author: "Example Author" },
+	}),
+]);
 
 function gridProps(overrides: Partial<ModListProps> = {}): ModListProps {
 	return {
@@ -220,10 +195,10 @@ test("an empty result says so and offers to clear the filters", () => {
 
 test("two adjacent parts of one page get one compact header with its count and menu", () => {
 	const html = renderToString(<ModGrid {...gridProps({ rows: pageRows })} />);
-	expect(html).toContain("AudioXL");
+	expect(html).toContain("Example Page");
 	expect(html).toContain("2 parts");
 	expect(html).toContain('aria-label="Turn every part of this page on or off"');
-	expect(html).toContain('aria-label="Actions for AudioXL"');
+	expect(html).toContain('aria-label="Actions for Example Page"');
 	expect(html).toContain("Delete page…");
 	expect(html).toContain('data-mod="nexus:225"');
 	expect(html).toContain('data-mod="nexus:225#200"');
@@ -235,7 +210,28 @@ test("the page header tri-state follows its parts", () => {
 	const all = renderToString(
 		<ModGrid
 			{...gridProps({
-				rows: rowsOf([pagePart("nexus:225", "Base"), pagePart("nexus:225#200", "Addon")]),
+				rows: rowsOf([
+					modFixture({
+						id: "nexus:225",
+						folder: "Base",
+						enabled: true,
+						page_id: "nexus:225",
+						page_name: "Example Page",
+						part_id: "nexus:225",
+						part_name: "Base",
+						info: { author: "Example Author" },
+					}),
+					modFixture({
+						id: "nexus:225#200",
+						folder: "Addon",
+						enabled: true,
+						page_id: "nexus:225",
+						page_name: "Example Page",
+						part_id: "nexus:225#200",
+						part_name: "Addon",
+						info: { author: "Example Author" },
+					}),
+				]),
 			})}
 		/>,
 	);
@@ -251,14 +247,31 @@ test("a folded page keeps its header and hides its cards", () => {
 			})}
 		/>,
 	);
-	expect(html).toContain("AudioXL");
+	expect(html).toContain("Example Page");
 	expect(html).toContain('aria-expanded="false"');
 	expect(html).not.toContain('data-mod="nexus:225"');
 	expect(html).not.toContain('data-mod="nexus:225#200"');
 });
 
 test("a page with one visible part stays a plain card", () => {
-	const html = renderToString(<ModGrid {...gridProps({ rows: rowsOf([pagePart("nexus:225", "Base")]) })} />);
+	const html = renderToString(
+		<ModGrid
+			{...gridProps({
+				rows: rowsOf([
+					modFixture({
+						id: "nexus:225",
+						folder: "Base",
+						enabled: true,
+						page_id: "nexus:225",
+						page_name: "Example Page",
+						part_id: "nexus:225",
+						part_name: "Base",
+						info: { author: "Example Author" },
+					}),
+				]),
+			})}
+		/>,
+	);
 	expect(html).not.toContain('aria-label="Turn every part of this page on or off"');
 	expect(html).toContain('data-mod="nexus:225"');
 });

@@ -6,6 +6,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
+use super::ID;
 use crate::domain::source::{
     ProviderId, SourceMeta, SourceRef, SourceRequirement, SourceStats, SourceSync,
 };
@@ -88,35 +89,32 @@ pub struct NexusRequiresSync {
     pub older_version: Option<String>,
 }
 
-impl SourceRef {
-    /// The same reference as a Nexus source, when the provider is Nexus and the ids are numbers.
-    pub fn as_nexus_source(&self) -> Option<NexusSource> {
-        if self.provider.as_str() != "nexus" {
-            return None;
-        }
-
-        Some(NexusSource {
-            mod_id: self.mod_id.parse().ok()?,
-            file_id: self.file_id.as_deref().and_then(|id| id.parse().ok()),
-            part_id: self.part_id.as_deref().and_then(|id| id.parse().ok()),
-        })
+/// The same reference as a Nexus source, when the provider is Nexus and the ids are numbers. The mapping belongs to
+/// this adapter, not to the provider-neutral `SourceRef`.
+pub(super) fn source_of(source: &SourceRef) -> Option<NexusSource> {
+    if source.provider.as_str() != ID {
+        return None;
     }
+
+    Some(NexusSource {
+        mod_id: source.mod_id.parse().ok()?,
+        file_id: source.file_id.as_deref().and_then(|id| id.parse().ok()),
+        part_id: source.part_id.as_deref().and_then(|id| id.parse().ok()),
+    })
 }
 
 impl TryFrom<SourceRef> for NexusSource {
     type Error = AppError;
 
     fn try_from(source: SourceRef) -> Result<Self, Self::Error> {
-        source
-            .as_nexus_source()
-            .ok_or_else(|| AppError::unexpected("the source is not a Nexus mod"))
+        source_of(&source).ok_or_else(|| AppError::unexpected("the source is not a Nexus mod"))
     }
 }
 
 impl From<NexusSource> for SourceRef {
     fn from(source: NexusSource) -> Self {
         Self {
-            provider: ProviderId::new("nexus"),
+            provider: ProviderId::new(ID),
             mod_id: source.mod_id.to_string(),
             file_id: source.file_id.map(|id| id.to_string()),
             part_id: source.part_id.map(|id| id.to_string()),
@@ -187,7 +185,7 @@ impl From<NexusMeta> for SourceMeta {
 impl From<NexusRequirement> for SourceRequirement {
     fn from(requirement: NexusRequirement) -> Self {
         Self {
-            source: SourceRef::new("nexus", requirement.mod_id.to_string()),
+            source: SourceRef::new(ID, requirement.mod_id.to_string()),
             name: requirement.name,
             from_source: requirement.from_nexus,
             group: requirement.group,
@@ -205,7 +203,7 @@ impl TryFrom<SourceRequirement> for NexusRequirement {
             .mod_id
             .parse()
             .map_err(|_| AppError::unexpected("the requirement is not a Nexus mod"))?;
-        if requirement.source.provider.as_str() != "nexus" {
+        if requirement.source.provider.as_str() != ID {
             return Err(AppError::unexpected("the requirement is not a Nexus mod"));
         }
 
@@ -226,13 +224,13 @@ mod tests {
     #[test]
     fn a_nexus_source_round_trips_through_the_generic_reference() {
         let nexus = NexusSource {
-            mod_id: 35686,
+            mod_id: 7001,
             file_id: Some(42),
             part_id: Some(7),
         };
         let source = SourceRef::from(nexus);
         assert_eq!(source.provider.as_str(), "nexus");
-        assert_eq!(source.mod_id, "35686");
+        assert_eq!(source.mod_id, "7001");
         assert_eq!(source.file_id.as_deref(), Some("42"));
         assert_eq!(source.part_id.as_deref(), Some("7"));
         assert_eq!(NexusSource::try_from(source).unwrap(), nexus);

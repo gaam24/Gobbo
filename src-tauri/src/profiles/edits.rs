@@ -7,12 +7,12 @@ use crate::context::load_library_shared;
 use crate::context::load_profiles;
 use crate::context::profile::history::save_profiles;
 use crate::context::profile::lock_profiles;
+use crate::domain::library::Library;
 use crate::domain::profiles::{
     MoveSide, PageKeys, add_group, move_block, next_group_id, remove_group, set_block_enabled,
     set_mod_group as set_mod_group_rule, set_separator as set_separator_rule,
 };
 use crate::error::AppError;
-use crate::library::Library;
 
 /// The game's data folder and the page key of every family in its library. The page keys are read before the profile
 /// lock is taken, so a change never holds the index while it changes profiles.

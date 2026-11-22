@@ -1,11 +1,8 @@
 import { strict as assert } from "node:assert";
-import path from "node:path";
 import { browser } from "@wdio/globals";
 import type { DownloadView } from "../../src/bindings";
 import { invoke } from "../support/bridge";
-import { definitionsDir } from "../support/env";
-import { removeTree } from "../support/files";
-import { cleanupGame, seedGame, uniqueId } from "../support/seed";
+import { cleanupFixture, seedGame, uniqueId } from "../support/seed";
 
 /// On desktop a deep link arrives as a command-line argument of a second app process. The single-instance plugin
 /// forwards that argument to the running app, which emits `deep-link://new-url`; the e2e build deliberately has no
@@ -37,9 +34,7 @@ describe("desktop deep links", () => {
 			assert.ok(queued.name.includes("4242"), `the queue does not name the link: ${queued.name}`);
 			// The suite has no key or network, so the fetch fails. The entry stays in the queue for a later retry.
 		} finally {
-			await cleanupGame(id);
-			removeTree(path.join(definitionsDir, id));
-			removeTree(fixture.root);
+			await cleanupFixture(id, fixture.root);
 		}
 	});
 });
