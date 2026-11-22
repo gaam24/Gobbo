@@ -16,7 +16,7 @@ pub struct Install {
     #[serde(default)]
     pub version: String,
     /// The deployment-root-relative folder the release's root stands for: the folder of the program that loads the
-    /// proxy DLL, for example `bin/x64`.
+    /// proxy DLL, for example `bin/x64`. Empty means the deployment root itself.
     #[serde(default)]
     pub to: String,
     /// Files that prove the loader is there, relative to the deployment root. While the package is needed, mods are not

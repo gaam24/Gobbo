@@ -17,7 +17,6 @@ impl crate::games::definition::GameDef {
             ("name", &install.name),
             ("version", &install.version),
             ("url", &install.url),
-            ("to", &install.to),
         ] {
             if value.trim().is_empty() {
                 problems.push(format!("{label}: {field} is empty"));

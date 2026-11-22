@@ -91,3 +91,32 @@ fn assert_one_mod(import: &Import, folder: &str, files: usize) {
     assert_eq!(import.mods[0].slot, "Mods");
     assert_eq!(import.mods[0].files, files);
 }
+
+#[test]
+fn a_loader_release_for_the_deployment_root_keeps_its_paths_below_its_wrapper() {
+    let install = crate::games::Install {
+        name: "Loader".into(),
+        version: "1.0".into(),
+        to: String::new(),
+        check: vec!["proxy.dll".into(), "Loader/core.dll".into()],
+        ..crate::games::Install::default()
+    };
+    let names = [
+        "Pack/proxy.dll",
+        "Pack/Loader/core.dll",
+        "Pack/runtime/lib.dll",
+        "manifest.json",
+    ];
+    let files: Vec<(usize, Vec<&str>)> = names
+        .iter()
+        .enumerate()
+        .map(|(index, name)| (index, name.split('/').collect()))
+        .collect();
+    let mut skipped = Vec::new();
+    let placed =
+        loader_layout(&install, &files, "Pack", &mut skipped).expect("the release is there");
+    let paths: Vec<&str> = placed.iter().map(|item| item.rel.as_str()).collect();
+    assert_eq!(paths, ["proxy.dll", "Loader/core.dll", "runtime/lib.dll"]);
+    assert!(placed.iter().all(|item| item.slot.is_empty()));
+    assert_eq!(skipped.len(), 1);
+}

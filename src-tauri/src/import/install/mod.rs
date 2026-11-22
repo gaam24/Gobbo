@@ -104,10 +104,14 @@ fn loader_layout(
     base_name: &str,
     skipped_files: &mut Vec<SkippedFile>,
 ) -> Option<Vec<Placed>> {
-    let to = path_key(&install.to);
+    let to = path_key(install.to.trim_end_matches('/'));
     let program = install.check.iter().find_map(|check| {
         let key = path_key(check);
-        let rel = key.strip_prefix(&format!("{to}/"))?.to_string();
+        let rel = if to.is_empty() {
+            key
+        } else {
+            key.strip_prefix(&format!("{to}/"))?.to_string()
+        };
         std::path::Path::new(&rel)
             .extension()
             .is_some_and(|extension| {
@@ -132,11 +136,16 @@ fn loader_layout(
                 .all(|(part, root)| part.eq_ignore_ascii_case(root));
 
         if inside {
+            let rest = parts[root.len()..].join("/");
             placed.push(Placed {
                 index: *index,
                 group: base_name.to_string(),
                 slot: String::new(),
-                rel: format!("{folder}/{}", parts[root.len()..].join("/")),
+                rel: if folder.is_empty() {
+                    rest
+                } else {
+                    format!("{folder}/{rest}")
+                },
             });
         } else {
             skipped_files.push(SkippedFile {
@@ -147,6 +156,16 @@ fn loader_layout(
     }
 
     Some(placed)
+}
+
+/// Whether the game's own rules put every check file of the loader package at its game path.
+fn places_every_check(install: &crate::games::Install, placed: &[Placed]) -> bool {
+    install.check.iter().all(|check| {
+        let check = path_key(check);
+        placed
+            .iter()
+            .any(|item| item.slot.is_empty() && path_key(&item.rel) == check)
+    })
 }
 
 /// The entries of an archive and the mod each one belongs to. Nothing is written yet.
@@ -291,21 +310,14 @@ pub fn plan_with_roots<'a>(
         files.push((index, split_name(layout_name)?));
     }
 
-    // The loader's own release is one mod whose files keep their game paths, wherever the archive keeps the release.
+    // A loader release keeps the game's own rules when they already put every check file at its game path, as a
+    // `BepInEx` pack with plugins does: its plugins still go to their slot. Otherwise the release is one mod whose files
+    // keep their game paths, wherever the archive keeps the release (UE4SS below the game's program folder).
+    let loader = game.install.as_ref().filter(|_| {
+        game.is_loader_archive(archive.entries().iter().map(|entry| entry.name.as_str()))
+    });
+    let loader_files = loader.map(|_| files.clone());
     let before = skipped_files.len();
-
-    if let Some(install) = &game.install
-        && game.is_loader_archive(archive.entries().iter().map(|entry| entry.name.as_str()))
-        && let Some(placed) = loader_layout(install, &files, base_name, &mut skipped_files)
-    {
-        let skipped = skipped_files.len() - before;
-        return Ok(Plan {
-            placed,
-            enable_files: BTreeMap::new(),
-            skipped,
-            skipped_files,
-        });
-    }
 
     let layout = LayoutPlan::new(deploy, base_roots);
     let wrapper = layout.wrapper_depth(&files);
@@ -335,6 +347,23 @@ pub fn plan_with_roots<'a>(
             skipped_files.push(SkippedFile {
                 path: archive.entries()[*index].name.clone(),
                 reason: SkipReason::NoRule,
+            });
+        }
+    }
+
+    if let (Some(install), Some(loader_files)) = (loader, loader_files)
+        && !places_every_check(install, &placed)
+    {
+        let mut loader_skipped = skipped_files[..before].to_vec();
+
+        if let Some(placed) = loader_layout(install, &loader_files, base_name, &mut loader_skipped)
+        {
+            let skipped = loader_skipped.len() - before;
+            return Ok(Plan {
+                placed,
+                enable_files: BTreeMap::new(),
+                skipped,
+                skipped_files: loader_skipped,
             });
         }
     }
