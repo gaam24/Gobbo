@@ -685,8 +685,14 @@ fn a_windows_program_from_a_plain_folder_starts_in_the_owned_prefix() {
     let (f, out) = owned_fixture("launch-owned");
     let mut game = test_games::mirror();
     game.detect.steam_app_ids.clear();
+    let compatdata = f.data.game(MIRROR_GAME).dir.join("compatdata");
+    assert!(!compatdata.exists());
     let (launch, with_mods, spawn_error) =
         launch_command(&game, &f.data, MIRROR_GAME, None, &f.base).unwrap();
+    assert!(
+        compatdata.is_dir(),
+        "Proton writes its lock file into the data folder, so it must exist before the first start"
+    );
     assert!(!with_mods);
     assert_eq!(spawn_error, "launch.proton_failed");
     let Launch::Plain(mut command) = launch else {

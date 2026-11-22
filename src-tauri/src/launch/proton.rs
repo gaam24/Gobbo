@@ -224,7 +224,7 @@ fn steam_setup(
 }
 
 /// Proton's data folder for a non-Steam install and the Proton that runs it. There is no prefix requirement: the first
-/// launch creates it.
+/// launch creates it. Proton only fills the data folder (its lock file and `pfx`), so the folder itself is made here.
 #[cfg(not(windows))]
 fn owned_setup(
     data: &Data,
@@ -238,6 +238,7 @@ fn owned_setup(
     let libraries = crate::games::stores::steam::libraries_in(&installs);
     let builds = crate::platform::installed_protons(&installs, &libraries);
     let proton = owned_proton_for(settings, &builds)?;
+    std::fs::create_dir_all(&compatdata).map_err(crate::error::io_at(&compatdata))?;
     let steam = crate::platform::steam_installs(home)
         .into_iter()
         .find(|dir| dir.is_dir());

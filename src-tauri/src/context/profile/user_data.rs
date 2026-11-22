@@ -53,7 +53,20 @@ pub fn sets(
         return Ok(Vec::new());
     }
 
-    let context = path_context(data, game, settings);
+    let mut context = path_context(data, game, settings);
+    // A manual Windows install owns a prefix whose path is known before the first launch creates it. Resolve a shared
+    // user-data set against that path so a missing prefix does not turn into a blocking mods problem; an isolated set
+    // still fails in `prepare` with a clear message until the first launch.
+    if context.prefix.is_none()
+        && crate::context::target::runtime(game, settings)
+            == crate::games::runtime::Runtime::OwnedProton
+    {
+        context.prefix = Some(crate::games::prefix::other_prefix(
+            data,
+            &game.id,
+            &settings.prefix_dir,
+        ));
+    }
     let mut sets = Vec::with_capacity(game.user_data.len());
 
     for definition in game.user_data_sets() {
@@ -449,6 +462,31 @@ mod tests {
         assert_eq!(sets.len(), 1);
         assert!(sets[0].redirects());
         assert_eq!(sets[0].kind, Kind::Saves);
+    }
+
+    #[test]
+    fn a_shared_set_uses_the_known_owned_prefix_before_the_first_launch() {
+        let (data, mut game, settings, _) = fixture("user-data-owned-prefix");
+        game.user_data[0].path = "{local_appdata}/Example".into();
+        let settings = Settings {
+            source: "manual".into(),
+            ..settings
+        };
+        let sets = sets(
+            &data,
+            &game,
+            &settings,
+            &profile(false),
+            &data.profile_state("p1"),
+        )
+        .unwrap();
+        assert_eq!(sets.len(), 1);
+        assert!(!sets[0].isolated);
+        assert!(
+            sets[0]
+                .real
+                .starts_with(data.game(&game.id).dir.join("compatdata/pfx"))
+        );
     }
 
     #[test]
