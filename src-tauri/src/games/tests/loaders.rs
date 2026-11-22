@@ -504,12 +504,19 @@ fn a_game_adds_its_file_to_the_loader_package() {
 fn the_bepinex_preset_has_the_five_and_six_rules() {
     let loader = presets::load(Path::new(super::super::DEV_LOADERS_DIR), "bepinex").unwrap();
     let five = loader.rules(None).unwrap();
-    assert!(five.requires.iter().any(|path| path == "winhttp.dll"));
+    let install = five.install.clone().expect("BepInEx 5 offers its release");
     assert!(
-        five.requires
-            .iter()
-            .any(|path| path == "BepInEx/core/BepInEx.dll")
+        install.to.is_empty(),
+        "the release's root is the game folder"
     );
+    assert!(
+        install
+            .url
+            .starts_with("https://github.com/BepInEx/BepInEx/releases/")
+    );
+    for check in ["winhttp.dll", "BepInEx/core/BepInEx.dll"] {
+        assert!(install.check.iter().any(|path| path == check), "{check}");
+    }
     assert!(
         five.deploy
             .slots
@@ -538,7 +545,15 @@ fn the_bepinex_preset_has_the_five_and_six_rules() {
     );
 
     let six = loader.rules(Some("6")).unwrap();
-    assert!(six.requires.iter().any(|path| path == "winhttp.dll"));
+    assert!(
+        six.install.is_none(),
+        "BepInEx 6 is a pre-release with no fixed package"
+    );
+    assert!(
+        six.requirements
+            .iter()
+            .any(|requirement| requirement.path == "winhttp.dll")
+    );
     assert!(
         six.requires
             .iter()

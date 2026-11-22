@@ -211,7 +211,7 @@ pub(super) fn with_requirement_paths(
 }
 
 /// Appends `over` to `base`, dropping a value whose path key is already there. The order is base first, then over.
-fn merge_lists(mut base: Vec<String>, over: Vec<String>) -> Vec<String> {
+pub(super) fn merge_lists(mut base: Vec<String>, over: Vec<String>) -> Vec<String> {
     let mut keys: BTreeSet<String> = base.iter().map(|value| path_key(value)).collect();
 
     for value in over {

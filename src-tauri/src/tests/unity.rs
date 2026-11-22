@@ -137,18 +137,31 @@ fn a_loader_is_required_until_an_enabled_mod_provides_it() {
         let data = Data::new(base.join("data"));
         save_settings(&data, id, settings_of(&game_root, "")).unwrap();
 
+        // A variant with a loader package asks for it once a mod needs it; one without names the file it needs.
+        let (status_code, deploy_code) = if game.install.is_some() {
+            let plugin = make_zip(&base, "plugin.zip", &[("Plugin.dll", "plugin")]);
+            import(&data, id, &plugin, None, &mut |_, _| {}).unwrap();
+            enable_all(&data, id);
+            (
+                crate::status::stage::LOADER_MISSING,
+                crate::error::LOADER_MISSING_DEPLOY,
+            )
+        } else {
+            ("status.requirement_missing", "deploy.requirement_missing")
+        };
+
         assert!(
-            problem_codes(&data, id).contains(&"status.requirement_missing".to_string()),
+            problem_codes(&data, id).contains(&status_code.to_string()),
             "{id}: the loader is missing, so the status must say so"
         );
         let err = apply_deployment(&data, id).unwrap_err();
-        assert_eq!(err.code, "deploy.requirement_missing", "{id}");
+        assert_eq!(err.code, deploy_code, "{id}");
 
         let zip = make_zip(&base, "mod.zip", BEPINEX_ARCHIVE);
         import(&data, id, &zip, None, &mut |_, _| {}).unwrap();
         enable_all(&data, id);
         assert!(
-            !problem_codes(&data, id).contains(&"status.requirement_missing".to_string()),
+            !problem_codes(&data, id).contains(&status_code.to_string()),
             "{id}: the archive provides the loader, so the requirement is met"
         );
         let _ = fs::remove_dir_all(&base);

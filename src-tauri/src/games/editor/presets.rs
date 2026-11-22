@@ -6,7 +6,7 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::PathBuf;
 
-use super::super::loaders::{LoaderDef, LoaderRules, with_requirement_paths};
+use super::super::loaders::{LoaderDef, LoaderRules, merge_lists, with_requirement_paths};
 use super::super::{GameOrigin, catalog_loaders_dir, loaders_dir, user_loaders_dir};
 use super::{LoaderPresetView, LoaderVariantView};
 use crate::domain::deploy::Deploy;
@@ -128,10 +128,17 @@ fn failed_preset(id: &str, origin: GameOrigin, problem: String) -> LoaderPresetV
     }
 }
 
+/// A variant as the editor shows it. The files that prove its loader is there are its required files and the check
+/// files of its package, so a variant whose loader comes from a package is still recognised in a game folder.
 fn variant_view(name: &str, rules: &LoaderRules) -> LoaderVariantView {
+    let checks = rules
+        .install
+        .as_ref()
+        .map(|install| install.check.clone())
+        .unwrap_or_default();
     LoaderVariantView {
         name: name.to_string(),
-        requires: rules.requires.clone(),
+        requires: merge_lists(rules.requires.clone(), checks),
         places: places_of(&rules.deploy),
         root_files: rules.deploy.root_files.clone(),
     }

@@ -116,7 +116,8 @@
       "name": "BepInEx",
       "schema": 1,
       "file": "loaders/bepinex.toml",
-      "sha256": "c426dc829296aa0946eae037f368af2275a19698a07df2202c4d5b423833d868"
+      "sha256": "0f7f82397f58385f31ada20d4c4fdeb2ac1c48c5352d257667c56e28c852e165",
+      "minGobbo": "0.1.1"
     },
     {
       "id": "unreal",

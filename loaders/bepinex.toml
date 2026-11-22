@@ -1,20 +1,14 @@
 # BepInEx, the loader of Unity games. A game takes the shared rules with `loader = "bepinex"` or, for the IL2CPP
 # build, `loader = { id = "bepinex", variant = "6" }`.
 #
-# A loader preset carries only shared `requires`, `requirements` and `[deploy]` rules. The game owns its folder,
-# detection, programs and tools.
+# A loader preset carries only shared `requires`, `requirements`, `install` and `[deploy]` rules. The game owns its
+# folder, detection, programs and tools.
 
 schema = 1
 id = "bepinex"
 name = "BepInEx"
+min_gobbo = "0.1.1"
 default_variant = "5"
-
-# Both BepInEx 5 and 6 load through this proxy. The settings file is deployed with it but is not required. A requirement
-# implies its path, so the proxy needs no separate `requires` entry.
-[[requirements]]
-name = "BepInEx"
-path = "winhttp.dll"
-url = "https://github.com/BepInEx/BepInEx/releases"
 
 [deploy]
 # The proxy and its settings, both in the game folder.
@@ -48,15 +42,27 @@ dir = "BepInEx/patchers"
 [[deploy.mirror]]
 dir = "BepInEx/monomod"
 
-# BepInEx 5 (Mono) ships its core as BepInEx/core/BepInEx.dll.
-[variants."5"]
-[[variants."5".requirements]]
-name = "BepInEx 5"
-path = "BepInEx/core/BepInEx.dll"
+# BepInEx 5 (Mono). The package is BepInEx's own release for 64-bit Windows; it is offered, never forced. Any enabled
+# mod that ships the proxy and the core counts as the loader, so a build that a mod site publishes for one game (a
+# Nexus or Thunderstore BepInEx pack) works just as well. The setup check lists every copy in the library and lets the
+# user pick one or install the official release. `to` is empty: the release's root is the game folder.
+[variants."5".install]
+name = "BepInEx"
+version = "5.4.23.6"
+to = ""
+check = ["winhttp.dll", "BepInEx/core/BepInEx.dll"]
+url = "https://github.com/BepInEx/BepInEx/releases/download/v5.4.23.6/BepInEx_win_x64_5.4.23.6.zip"
+sha256 = "6c57a714a892efb4e9e1fef63d608a3391f30ec984031c465404e4ee381a0755"
+size = 642076
+
+# BepInEx 6 (IL2CPP) ships the .NET runtime next to the program, under dotnet/. It is still a pre-release whose core file
+# names change between builds, and IL2CPP games usually need a bleeding-edge build, so this variant names no package:
+# it requires only the proxy and links the download page.
+[variants."6"]
+[[variants."6".requirements]]
+name = "BepInEx 6"
+path = "winhttp.dll"
 url = "https://github.com/BepInEx/BepInEx/releases"
 
-# BepInEx 6 (IL2CPP) ships the .NET runtime next to the program, under dotnet/. Its pre-release core file names changed,
-# so this variant requires only the proxy, not a specific core file.
-[variants."6"]
 [[variants."6".deploy.mirror]]
 dir = "dotnet"
