@@ -9,7 +9,9 @@ mod labels;
 mod paths;
 mod unique;
 
-pub use file_names::{is_safe_component, safe_file_name, safe_limited_file_name};
+pub use file_names::{
+    is_invalid_name_char, is_safe_component, safe_file_name, safe_limited_file_name,
+};
 pub use hashes::{path_hash, short_hash};
 pub use import::imported;
 pub use keys::{clean, compact_component, deploy_name, match_key, slug};

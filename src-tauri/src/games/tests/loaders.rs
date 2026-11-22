@@ -426,6 +426,81 @@ fn every_shipped_loader_and_variant_merges_into_a_valid_game() {
 }
 
 #[test]
+fn the_unreal_preset_has_the_pak_and_ue4ss_layouts() {
+    let dir = Path::new(super::super::DEV_LOADERS_DIR);
+    let loader = presets::load(dir, "unreal").unwrap();
+    assert_eq!(loader.default_variant.as_deref(), Some("pak"));
+
+    let pak = loader.rules(None).unwrap();
+    let slot = pak
+        .deploy
+        .slots
+        .iter()
+        .find(|slot| slot.dir == "Content/Paks/~mods")
+        .expect("the pak slot");
+    assert!(slot.flat);
+    assert!(slot.extensions.iter().any(|extension| extension == ".utoc"));
+    assert!(
+        slot.root_extensions
+            .iter()
+            .any(|extension| extension == ".pak")
+    );
+    assert!(pak.deploy.mirror.iter().any(|mirror| {
+        mirror.dir == "Content/Paks/LogicMods"
+            && mirror
+                .extensions
+                .iter()
+                .any(|extension| extension == ".pak")
+    }));
+    assert!(pak.deploy.aliases.contains_key("~mods"));
+    assert!(pak.deploy.aliases.contains_key("LogicMods"));
+    assert!(
+        !pak.deploy
+            .slots
+            .iter()
+            .any(|slot| slot.dir.contains("ue4ss"))
+    );
+
+    let four = loader.rules(Some("ue4ss-4")).unwrap();
+    let slot = four
+        .deploy
+        .slots
+        .iter()
+        .find(|slot| slot.dir == "Binaries/Win64/ue4ss/Mods")
+        .expect("the UE4SS 4 slot");
+    assert_eq!(slot.markers, ["Scripts", "dlls"]);
+    assert_eq!(slot.enable_file.as_deref(), Some("enabled.txt"));
+
+    let three = loader.rules(Some("ue4ss-3")).unwrap();
+    let slot = three
+        .deploy
+        .slots
+        .iter()
+        .find(|slot| slot.dir == "Binaries/Win64/Mods")
+        .expect("the UE4SS 3 slot");
+    assert_eq!(slot.markers, ["Scripts", "dlls"]);
+    assert_eq!(slot.enable_file.as_deref(), Some("enabled.txt"));
+}
+
+#[test]
+fn a_game_adds_its_file_to_the_loader_package() {
+    let text = SLOT.replacen(
+        "[deploy]",
+        "[install]\ncheck = [\"ue4ss/layout.ini\"]\n\n[deploy]",
+        1,
+    );
+    let mut game = GameDef::parse(&text).unwrap();
+    let dir = Path::new(super::super::DEV_LOADERS_DIR);
+    let loader = presets::load(dir, "unreal").unwrap();
+    loader.rules(Some("ue4ss-4")).unwrap().apply_to(&mut game);
+    let install = game.install.expect("the merged package");
+    assert_eq!(install.name, "UE4SS");
+    assert_eq!(install.version, "4.0.0");
+    assert!(install.url.contains("UE4SS"));
+    assert!(install.check.iter().any(|path| path == "ue4ss/layout.ini"));
+}
+
+#[test]
 fn the_bepinex_preset_has_the_five_and_six_rules() {
     let loader = presets::load(Path::new(super::super::DEV_LOADERS_DIR), "bepinex").unwrap();
     let five = loader.rules(None).unwrap();
@@ -705,4 +780,87 @@ fn a_game_requirement_is_required_on_top_of_a_loader_and_without_one() {
     let mut plain = GameDef::parse(&text).unwrap();
     presets::apply(&mut plain, &[]).unwrap();
     assert_eq!(plain.requires, ["Extra/extra.dll"]);
+}
+
+fn unreal_ue4ss_game() -> GameDef {
+    crate::test_support::games::unreal()
+}
+
+#[test]
+fn the_loader_is_needed_only_by_mods_in_its_folders() {
+    use crate::domain::resolver::DeployPlan;
+
+    let game = unreal_ue4ss_game();
+    let root = scratch!("loader-needed-by");
+    let plan = |slots: &[&str], files: &[&str]| {
+        let plan = DeployPlan {
+            slots_used: slots.iter().map(|slot| (*slot).to_string()).collect(),
+            file_count: u32::try_from(files.len()).unwrap(),
+            ..DeployPlan::default()
+        };
+        let placed: std::collections::BTreeSet<String> = files
+            .iter()
+            .map(|path| crate::domain::pathkey::path_key(path))
+            .collect();
+        (plan, placed)
+    };
+    let missing = |slots: &[&str], files: &[&str]| {
+        let (plan, placed) = plan(slots, files);
+        game.missing_loader(&root, &plan, &placed).is_some()
+    };
+
+    assert!(!missing(&[], &[]));
+    assert!(!missing(&[], &["Content/Paks/~mods/Better.pak"]));
+    assert!(missing(&["Binaries/Win64/ue4ss/Mods"], &[]));
+    assert!(missing(&[], &["Content/Paks/LogicMods/Better.pak"]));
+
+    for file in [
+        "Binaries/Win64/dwmapi.dll",
+        "Binaries/Win64/ue4ss/UE4SS.dll",
+    ] {
+        write(&root.join(file), "loader");
+    }
+    assert!(!missing(&["Binaries/Win64/ue4ss/Mods"], &[]));
+}
+
+#[test]
+fn the_loader_release_is_recognised_by_its_file_names_wherever_it_sits() {
+    let game = unreal_ue4ss_game();
+    assert!(game.is_loader_archive(["dwmapi.dll", "ue4ss/UE4SS.dll", "ue4ss/Mods/mods.txt"]));
+    assert!(game.is_loader_archive([
+        "Pal/Binaries/Win64/DWMAPI.dll",
+        "Pal/Binaries/Win64/ue4ss/UE4SS.dll"
+    ]));
+    assert!(!game.is_loader_archive(["Better/Scripts/main.lua"]));
+    assert!(!game.is_loader_archive(["Better.pak", "dwmapi.dll"]));
+}
+
+#[test]
+fn a_game_names_its_own_build_of_the_loader_and_keeps_its_checks() {
+    let text = SLOT.replacen(
+        "[deploy]",
+        "[install]\nversion = \"game-build\"\nurl = \"https://example.com/game-build.zip\"\nsha256 = \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"\n\n[deploy]",
+        1,
+    );
+    let mut game = GameDef::parse(&text).unwrap();
+    let loader = presets::load(Path::new(super::super::DEV_LOADERS_DIR), "unreal").unwrap();
+    loader.rules(Some("ue4ss-4")).unwrap().apply_to(&mut game);
+    let install = game.install.expect("the merged package");
+    assert_eq!(install.version, "game-build");
+    assert_eq!(install.url, "https://example.com/game-build.zip");
+    assert_eq!(install.size, None);
+    assert_eq!(install.to, "Binaries/Win64");
+    assert!(install.check.iter().any(|path| path.ends_with("UE4SS.dll")));
+    assert!(!install.needed_by.is_empty());
+}
+
+#[test]
+fn a_release_without_its_configuration_file_is_still_the_loader() {
+    let mut game = unreal_ue4ss_game();
+    game.install
+        .as_mut()
+        .unwrap()
+        .check
+        .push("Binaries/Win64/ue4ss/Layout.ini".into());
+    assert!(game.is_loader_archive(["dwmapi.dll", "ue4ss/UE4SS.dll"]));
 }

@@ -90,7 +90,7 @@ pub fn extract(
         .iter()
         .map(|item| archive.entries()[item.index].size)
         .sum();
-    check_limits(plan.placed.len(), total)?;
+    check_limits(plan.placed.len() + plan.enable_files.len(), total)?;
     let mut reporter = Reporter::new(total, progress);
     let wanted: BTreeSet<usize> = plan.placed.iter().map(|item| item.index).collect();
     // Indexed by the archive entry, not by the plan: a visit asks for each planned entry once, and a map lookup per
@@ -141,6 +141,17 @@ pub fn extract(
         Ok(())
     })?;
     reporter.finish();
+    // A loader may need a file that no archive has, such as an `enabled.txt`; the plan names it only when the
+    // archive does not ship it. It is written before the checksum is taken, so the mod's integrity covers it.
+    for (group, file) in &plan.enable_files {
+        let at = *position
+            .get(group.as_str())
+            .ok_or(InstallError::UnknownLayout)?;
+        let dst = group_dirs[at].join(file);
+        File::create(&dst).map_err(|error| FileError::new(&dst, error))?;
+        mods[at].files += 1;
+        mods[at].paths.push(file.clone());
+    }
     // The files are still in the working folder, outside the index lock. Hash them here so the stored checksum is
     // taken at import; a later "verify" only has to hash the installed copy again and compare.
     for (at, staged_mod) in mods.iter_mut().enumerate() {

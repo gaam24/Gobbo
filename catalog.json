@@ -34,6 +34,18 @@
       "iconSha256": "ec658ad0d2133a001c5d362969284a2abddbb67081481ee62c1bb97ca0a0366a"
     },
     {
+      "id": "palworld",
+      "name": "Palworld",
+      "schema": 1,
+      "loader": "unreal",
+      "verified": false,
+      "file": "games/palworld/game.toml",
+      "sha256": "f6feafe186c002da75a4cbedee2e7eccab8e3310d9582ed99e7d628124422681",
+      "icon": "games/palworld/icon.webp",
+      "iconSha256": "9afe156d203c03f138138ab4b65dd11acdce24c167bae696d6c8f2102c7d6158",
+      "minGobbo": "0.1.1"
+    },
+    {
       "id": "repo",
       "name": "R.E.P.O.",
       "schema": 1,
@@ -105,6 +117,14 @@
       "schema": 1,
       "file": "loaders/bepinex.toml",
       "sha256": "c426dc829296aa0946eae037f368af2275a19698a07df2202c4d5b423833d868"
+    },
+    {
+      "id": "unreal",
+      "name": "Unreal Engine",
+      "schema": 1,
+      "file": "loaders/unreal.toml",
+      "sha256": "fc8f608267c57059dcf31e66e4e457f96594b2334d89ce5f0e7853512d4de12c",
+      "minGobbo": "0.1.1"
     }
   ]
 }

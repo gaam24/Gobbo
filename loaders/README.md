@@ -73,7 +73,7 @@ first form keeps its path.
 The file name must match `id`. The id is a slug: lowercase letters, digits and `-`. `name` is the display name the
 interface shows, for example `BepInEx`. A variant name is lowercase letters, digits, `-`, `_` or `.`.
 
-`min_gobbo = "0.3.0"` names the oldest Gobbo release that serves the preset correctly, as in `game.toml`; every game
+`min_gobbo = "0.1.1"` names the oldest Gobbo release that serves the preset correctly, as in `game.toml`; every game
 that names the preset inherits it.
 
 `default_variant` is required when the preset has variants, so `loader = "id"` always means one version. It is an error
@@ -97,12 +97,14 @@ loader base  ->  loader variant  ->  game.toml
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | `requires`                  | Added, no duplicates (case-insensitive path key). Loader first, then the game. Every requirement path is added too.             |
 | `requirements`              | Keyed by `path`, case-insensitive. A higher layer replaces the name and URL; new entries are appended. Each `path` is required. |
+| `install`                   | One package. A higher layer appends check paths and `needed_by`; a name, version, `to` or source it sets replaces the lower one. |
 | `deploy.root_files`         | Added, no duplicates. Loader first, then the game.                                                                              |
 | `deploy.slots`              | Keyed by `dir`, case-insensitive. A higher layer replaces the whole slot. New slots are appended.                               |
 | `deploy.mirror`             | Keyed by `dir`, case-insensitive. A higher layer replaces the whole mirror. New mirrors are appended.                           |
 | `deploy.aliases`            | Keyed by alias name, case-insensitive. A higher layer replaces the target.                                                      |
 | `deploy.protected`          | Added, no duplicates.                                                                                                           |
 | `deploy.shared`             | Appended: loader entries first, then the game's.                                                                                |
+| `deploy.moves`              | Appended: loader entries first, then the game's.                                                                                |
 | `deploy.root`, `root_linux` | Only the game. A loader that sets them is invalid.                                                                              |
 
 A requirement implies its file: a file in `requirements` is required without a matching `requires` entry. Use `requires`
@@ -126,30 +128,77 @@ that wrote every rule itself.
 The test `every_shipped_loader_and_variant_merges_into_a_valid_game` walks this folder, so a new preset is checked
 without a new test. A preset is not a game: it has no icon and no detection.
 
-## Unreal and future loaders
+## Unreal Engine
 
-A loader preset is not tied to Unity. A hypothetical UE4SS preset can be data too:
+`loaders/unreal.toml` is the shared layout for Unreal Engine 4 and 5. Its rules are relative to the game's **project
+folder** — the folder that holds `Content/` and `Binaries/`, for example `Pal` in Palworld or `Phoenix` in Hogwarts
+Legacy. The game sets that folder, because only the game definition knows its name:
 
 ```toml
-schema = 1
-id = "ue4ss"
-default_variant = "3"
-
-requires = ["dwmapi.dll"]
-
 [deploy]
-root_files = ["dwmapi.dll"]
-
-[[deploy.slots]]
-dir = "Content/Paks/~mods"
-extensions = [".pak", ".ucas", ".utoc"]
-
-[[deploy.mirror]]
-dir = "Binaries/Win64"
-
-[variants."3"]
-requires = ["ue4ss/UE4SS.dll"]
+root = "{game}/Pal"
 ```
+
+The preset has layout variants. `pak` is the default and carries the flat `Content/Paks/~mods` slot for `.pak` and
+IoStore files, the `Content/Paks/LogicMods` mirror and their archive aliases. `ue4ss-4` and `ue4ss-3` add the
+UE4SS mod slot of the matching release line:
+
+```toml
+loader = { id = "unreal", variant = "ue4ss-4" }
+```
+
+A UE4SS mod is a folder with `Scripts/main.lua` (Lua) or `dlls/main.dll` (C++). The slot lists both in `markers` and
+writes `enabled.txt`, so UE4SS loads the mod without an edit to its `mods.txt`. `enabled.txt` starts a
+mod but does not order it: a mod that must load after another still needs its line in `mods.txt`, and Blueprint paks
+in `LogicMods` need UE4SS's `BPModLoaderMod` enabled there.
+
+The preset also carries the UE4SS package itself:
+
+```toml
+[variants."ue4ss-4".install]
+name = "UE4SS"
+version = "4.0.0"
+to = "Binaries/Win64"
+check = ["Binaries/Win64/dwmapi.dll", "Binaries/Win64/ue4ss/UE4SS.dll"]
+needed_by = ["Binaries/Win64/ue4ss/Mods", "Content/Paks/LogicMods"]
+url = "https://github.com/UE4SS-RE/RE-UE4SS/releases/download/v4.0.0/UE4SS_v4.0.0.zip"
+sha256 = "..."
+size = 8758673
+```
+
+The loader is a mod, exactly like a BepInEx pack: it lives in the library and reaches the game through the overlay, and
+**nothing is written into the game folder**. The importer recognises a loader release: an archive that holds a file
+named like every program among the `check` paths (`.dll`, `.exe`). The folder that holds the first of those programs is
+the release's root, and every file below it is placed at the same path under `to`, so the official zip, a repack under
+`Pal/Binaries/Win64/` and a build with or without extra files all become one mod at game paths (`Binaries/Win64/
+dwmapi.dll`, `Binaries/Win64/ue4ss/...`, the bundled UE4SS mods included). Under Proton the proxy is loaded native
+like every other loader DLL that is there. UE4SS's settings and logs written while the game runs land in the profile's
+overwrite folder, so an update of the loader keeps them.
+
+`needed_by` names the folders whose mods need the package. Once an enabled mod puts a file there, the mod list shows an
+**Install UE4SS** button (the header's primary action, a button in the problems block and a step in Getting started)
+and the apply waits until an enabled mod, or a manual install in the game folder, provides every `check` path. A list
+of plain paks never asks for UE4SS. An empty `needed_by` means every mod needs the package, as BepInEx would.
+
+**Install** runs as a task in the Working panel. A copy already in the library is turned on as it is; otherwise Gobbo
+downloads the release, stops a download that grows past `size`, checks the SHA-256, imports it, names it after the
+package with its version, and turns it on in the active profile. Dropping the release onto the window imports it the
+same way; it joins the list turned off, and the install button turns it on. The setup check shows the name, version,
+source, hash, size and the copy in the library, and offers an update when the definition names a newer version.
+
+A game's own `[install]` adds check paths and `needed_by` folders, and may leave `name` and `version` out. When it names
+its own build with `url`, `sha256` and `size`, that build replaces the preset's: Palworld installs Okaetsu's Palworld
+build of UE4SS, which ships the game's `MemberVariableLayout.ini`, while the preset's `to`, check paths and `needed_by`
+folders still apply. A game can have one package. The package is data, so the same mechanism can serve BepInEx later.
+
+A game with no install block keeps the older manual flow: a `[[requirements]]` entry names the file and links its page.
+
+A pak-only game can name `loader = "unreal"` and gets only the shared pak rules. UE4SS is a 64-bit Windows loader, so a
+32-bit game can still use the `pak` variant but not the `ue4ss-*` variants. A game whose bare paks live in
+`Content/Paks` instead of `~mods` adds its own `move` rule, or a game with a different tree uses its own definition; a
+game on Xbox/Game Pass uses a different binary folder and needs its own variant. Pak load order is the file name and is
+not managed yet, and the `.pak`/`.utoc`/`.ucas` group of one mod can be split only if two mods ship the same file
+names — both are known limits, not per-game branches.
 
 If Unreal 6 changes the folders, add a variant or a new file. If it needs a primitive the schema cannot express (a
 tool, a load-order file, a step), that belongs to the game definition or to a future schema extension, not to a branch

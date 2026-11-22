@@ -122,6 +122,7 @@ const REQUIRED_BACKEND_KINDS: Record<BackendTaskCode, KindEntry> = {
 	collection: { kind: "collection", label: "tasks.kind.collection" },
 	launch: { kind: "launch", label: "tasks.kind.tool" },
 	install: { kind: "install", label: "tasks.kind.toolInstall" },
+	loader: { kind: "install", label: "tasks.kind.loader" },
 };
 
 /// The lookup also keeps a few frontend-only codes that older callers pass in; every backend code comes from the typed
@@ -184,6 +185,7 @@ const FAILED_TITLE: Record<BackendTaskCode, TranslationKey> = {
 	collection: "tasks.failedKind.collection",
 	launch: "tasks.failedKind.launch",
 	install: "tasks.failedKind.install",
+	loader: "tasks.failedKind.loader",
 };
 
 function isBackendCode(code: string): code is BackendTaskCode {

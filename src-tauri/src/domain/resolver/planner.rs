@@ -131,6 +131,10 @@ pub fn plan_with_mode(
         if !m.enabled {
             continue;
         }
+
+        if own_folder.is_some() && !m.files.is_empty() {
+            plan.slots_used.insert(m.slot.to_string());
+        }
         // The library keeps every file list sorted, so the normal path walks it directly. A caller that hands in an
         // unsorted list still gets the old deterministic order. The mod's family, folder and file list are added to
         // the plan once, when its first file is materialized; a full plan then holds indexes, not three strings per
@@ -141,14 +145,14 @@ pub fn plan_with_mode(
         let may_share = !deploy.shared.is_empty();
         // A summary of a slot-only game cannot materialize anything: every file stays in the mod's own folder. Count
         // them without walking the list at all.
-        if !full && !may_keep_path && !may_share && !flat && !mirrored_only {
+        if !full && !may_keep_path && !may_share && !flat && !mirrored_only && slot.is_some() {
             not_materialized =
                 not_materialized.saturating_add(u32::try_from(m.files.len()).unwrap_or(u32::MAX));
             continue;
         }
         // A profile answers the whole list from the rules once. Only the files it names need the per-file path; the
         // rest still count as not materialized. An unsorted list keeps the old order, so it takes the per-file path.
-        let selected = if !full && !flat && sorted {
+        let selected = if !full && !flat && sorted && slot.is_some() {
             match m.layout.map(|profile| &profile.materialized) {
                 Some(Materialized::None) => {
                     not_materialized = not_materialized
@@ -173,7 +177,8 @@ pub fn plan_with_mode(
             let mirrored = mirrored_only || (may_keep_path && deploy.keeps_game_path(rel));
             let shared_rule = !mirrored && !flat && may_share && shared.matches(rel);
 
-            if !full && !mirrored && !flat && !shared_rule {
+            // A mod without a slot (a loader release) keeps its game paths, so its files can meet another mod's.
+            if !full && !mirrored && !flat && !shared_rule && slot.is_some() {
                 // The file stays in the mod's own folder and cannot meet another mod. It still counts, but it does
                 // not need a destination string or a `PlannedFile`.
                 not_materialized = not_materialized.saturating_add(1);
@@ -417,6 +422,8 @@ mod problem_tests {
                 dir: "Mods".to_string(),
                 prefix: String::new(),
                 marker: None,
+                markers: Vec::new(),
+                enable_file: None,
                 extensions: Vec::new(),
                 root_extensions: Vec::new(),
                 root_folder_extensions: Vec::new(),

@@ -26,45 +26,46 @@ impl LayoutPlan<'_> {
         let mut units: Vec<Unit<'b>> = Vec::new();
 
         for rule in &self.slots {
-            let Some(marker) = &rule.slot.marker else {
-                continue;
-            };
-            let marker: Vec<&str> = marker.split('/').filter(|part| !part.is_empty()).collect();
-
-            if marker.is_empty() {
-                continue;
-            }
             // Roots repeat for every file of a mod. A set of normalized roots replaces a scan of the units found so
             // far, which was quadratic in the number of mods.
             let mut seen: FxHashSet<String> = FxHashSet::default();
             // Entries of one mod are usually next to each other. Remembering the last root avoids building and
             // hashing the same normalized path for every file of that mod.
             let mut last: Option<Vec<&str>> = None;
+            let markers = rule.slot.marker.iter().chain(rule.slot.markers.iter());
 
-            for (_, parts) in files {
-                let found = (0..=parts.len().saturating_sub(marker.len()))
-                    .find(|&at| starts_with_path(&parts[at..], &marker));
-                let Some(at) = found else {
-                    continue;
-                };
-                let root = &parts[..at];
-                let reserved = self
-                    .mirrors
-                    .iter()
-                    .any(|rule| starts_with_path(root, &rule.dir))
-                    || self.protected.iter().any(|dir| starts_with_path(root, dir));
-                if reserved || last.as_deref() == Some(root) {
+            for marker in markers {
+                let marker: Vec<&str> = marker.split('/').filter(|part| !part.is_empty()).collect();
+
+                if marker.is_empty() {
                     continue;
                 }
 
-                if seen.insert(root_key(root)) {
-                    units.push(Unit {
-                        slot: rule.slot,
-                        root: root.to_vec(),
-                    });
-                }
+                for (_, parts) in files {
+                    let found = (0..=parts.len().saturating_sub(marker.len()))
+                        .find(|&at| starts_with_path(&parts[at..], &marker));
+                    let Some(at) = found else {
+                        continue;
+                    };
+                    let root = &parts[..at];
+                    let reserved = self
+                        .mirrors
+                        .iter()
+                        .any(|rule| starts_with_path(root, &rule.dir))
+                        || self.protected.iter().any(|dir| starts_with_path(root, dir));
+                    if reserved || last.as_deref() == Some(root) {
+                        continue;
+                    }
 
-                last = Some(root.to_vec());
+                    if seen.insert(root_key(root)) {
+                        units.push(Unit {
+                            slot: rule.slot,
+                            root: root.to_vec(),
+                        });
+                    }
+
+                    last = Some(root.to_vec());
+                }
             }
         }
 

@@ -7,7 +7,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde::Deserialize;
 
-use super::definition::{GameDef, Requirement, ResolvedLoader};
+use super::definition::{GameDef, Install, Requirement, ResolvedLoader};
 use crate::domain::deploy::Deploy;
 use crate::domain::pathkey::path_key;
 
@@ -27,6 +27,8 @@ pub(super) struct LoaderDef {
     pub(super) requires: Vec<String>,
     #[serde(default)]
     pub(super) requirements: Vec<Requirement>,
+    #[serde(default)]
+    pub(super) install: Option<Install>,
     #[serde(default)]
     pub(super) deploy: Deploy,
     #[serde(default)]
@@ -62,6 +64,7 @@ impl LoaderDef {
         let mut rules = LoaderRules {
             requires: self.requires.clone(),
             requirements: self.requirements.clone(),
+            install: self.install.clone(),
             deploy: self.deploy.clone(),
         };
 
@@ -69,6 +72,7 @@ impl LoaderDef {
             rules.requires = merge_lists(rules.requires, variant.requires.clone());
             rules.requirements =
                 merge_requirements(rules.requirements, variant.requirements.clone());
+            rules.install = merge_installs(rules.install, variant.install.clone());
             rules.deploy = merge_deploy(rules.deploy, variant.deploy.clone());
         }
 
@@ -86,6 +90,8 @@ pub(super) struct LoaderVariant {
     #[serde(default)]
     pub(super) requirements: Vec<Requirement>,
     #[serde(default)]
+    pub(super) install: Option<Install>,
+    #[serde(default)]
     pub(super) deploy: Deploy,
 }
 
@@ -94,6 +100,7 @@ pub(super) struct LoaderVariant {
 pub(super) struct LoaderRules {
     pub(super) requires: Vec<String>,
     pub(super) requirements: Vec<Requirement>,
+    pub(super) install: Option<Install>,
     pub(super) deploy: Deploy,
 }
 
@@ -104,6 +111,8 @@ impl LoaderRules {
         game.requires = merge_lists(self.requires, game_requires);
         let game_requirements = std::mem::take(&mut game.requirements);
         game.requirements = merge_requirements(self.requirements, game_requirements);
+        let game_install = std::mem::take(&mut game.install);
+        game.install = merge_installs(self.install, game_install);
         let game_deploy = std::mem::take(&mut game.deploy);
         game.deploy = merge_deploy(self.deploy, game_deploy);
     }
@@ -212,6 +221,34 @@ fn merge_lists(mut base: Vec<String>, over: Vec<String>) -> Vec<String> {
     }
 
     base
+}
+
+/// Merges the loader package. A higher layer adds check paths and `needed_by` folders; a value it sets (name, version,
+/// folder, or its own build's `url` with `sha256` and `size`) replaces the lower one.
+fn merge_installs(base: Option<Install>, over: Option<Install>) -> Option<Install> {
+    match (base, over) {
+        (Some(mut base), Some(over)) => {
+            let replace = |base: &mut String, over: String| {
+                if !over.trim().is_empty() {
+                    *base = over;
+                }
+            };
+            replace(&mut base.name, over.name);
+            replace(&mut base.version, over.version);
+            replace(&mut base.to, over.to);
+
+            if !over.url.trim().is_empty() {
+                base.url = over.url;
+                base.sha256 = over.sha256;
+                base.size = over.size;
+            }
+
+            base.check.extend(over.check);
+            base.needed_by.extend(over.needed_by);
+            Some(base)
+        }
+        (base, over) => over.or(base),
+    }
 }
 
 /// Merges requirement metadata by path: a game entry replaces the loader entry for the same file and keeps the order.

@@ -49,6 +49,36 @@ pub async fn open_requirement_page(game: String, path: String) -> Result<(), App
     .await
 }
 
+/// Installs the loader package a game names, after the user confirms it in the setup dialog. This is the one setup step
+/// that writes real files into the game folder; mods still deploy through the overlay. Runs as a task, so the Working
+/// panel shows the download and `cancel_task` can stop it before the files are written.
+#[tauri::command]
+#[specta::specta]
+pub async fn install_loader(
+    data: tauri::State<'_, crate::context::Data>,
+    tasks: tauri::State<'_, crate::infra::tasks::TaskFlags>,
+    game: String,
+) -> Result<crate::setup::LoaderSetupView, AppError> {
+    use crate::infra::tasks::{TaskKey, kind};
+
+    let key: String = TaskKey::loader(&game).into();
+    crate::commands::run_task(
+        data,
+        &tasks,
+        key,
+        game,
+        kind::LOADER,
+        |root, game, cancel, handle| {
+            let definition = games::load(game)?;
+            let settings = crate::context::load_settings(&root.game(game));
+            crate::setup::install(root, &definition, &settings, cancel, &mut |percent| {
+                handle.progress(percent);
+            })
+        },
+    )
+    .await
+}
+
 /// Reads a game folder and suggests a name, id, programs, markers, loader and store ids for the editor. Read-only.
 #[tauri::command]
 #[specta::specta]

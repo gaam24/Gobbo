@@ -1,14 +1,16 @@
-import { CircleAlert, CircleCheck, CircleX, ExternalLink, RefreshCw } from "lucide-react";
+import { CircleAlert, CircleCheck, CircleX, Download, ExternalLink, RefreshCw } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
 import { useNavigation } from "@/app/contexts/navigation-context";
 import { useNoticeActions } from "@/app/contexts/notices-context";
-import { type CheckState, commands, type PreflightCheck, type PreflightReport } from "@/bindings";
+import { useWorkspace } from "@/app/contexts/workspace-context";
+import { type CheckState, commands, type LoaderSetupView, type PreflightCheck, type PreflightReport } from "@/bindings";
 import { BoxList, BoxListRow, Disclosure } from "@/components/app/content-blocks";
 import { StatusBadge } from "@/components/app/status-badge";
 import { DialogCloseFooter, ModalDialog } from "@/components/modal-dialog";
 import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/field";
+import { Spinner } from "@/components/ui/spinner";
 import { useTranslation } from "@/i18n";
 import { messageOf, translate, unwrap } from "@/lib/ipc";
 import { formatSize } from "@/lib/mods";
@@ -26,12 +28,22 @@ export function SetupDialog({ gameId, onClose }: { gameId: string; onClose: () =
 	const { t } = useTranslation();
 	const { openGameSettings, openMods, openStorage } = useNavigation();
 	const { attempt } = useNoticeActions();
+	const { gameActions } = useWorkspace();
 	const [retry, setRetry] = useState(0);
 	const [failure, setFailure] = useState<string | null>(null);
+	const [installing, setInstalling] = useState(false);
 	const report = useLoad(`${gameId}\n${retry}`, () => unwrap(commands.preflight(gameId)), {
 		onError: (error) => setFailure(messageOf(error)),
 		onSuccess: () => setFailure(null),
 	});
+
+	const installLoader = async () => {
+		setInstalling(true);
+		const ok = await gameActions.installLoader(gameId);
+		setInstalling(false);
+
+		if (ok) setRetry((count) => count + 1);
+	};
 
 	let body: ReactNode;
 
@@ -48,6 +60,8 @@ export function SetupDialog({ gameId, onClose }: { gameId: string; onClose: () =
 		body = (
 			<ReportBody
 				report={report}
+				installing={installing}
+				onInstallLoader={() => void installLoader()}
 				// Close the checklist first: navigating underneath a modal leaves the destination behind the scrim.
 				onOpenSettings={() => {
 					onClose();
@@ -83,6 +97,8 @@ export function SetupDialog({ gameId, onClose }: { gameId: string; onClose: () =
 
 function ReportBody({
 	report,
+	installing,
+	onInstallLoader,
 	onOpenSettings,
 	onShowMods,
 	onOpenStorage,
@@ -90,6 +106,8 @@ function ReportBody({
 	onRetry,
 }: {
 	report: PreflightReport;
+	installing: boolean;
+	onInstallLoader: () => void;
 	onOpenSettings: () => void;
 	onShowMods: () => void;
 	onOpenStorage: () => void;
@@ -107,6 +125,7 @@ function ReportBody({
 					<RefreshCw /> {t("setupCheck.checkAgain")}
 				</Button>
 			</div>
+			{report.loader && <LoaderCard loader={report.loader} installing={installing} onInstall={onInstallLoader} />}
 			<BoxList>
 				{report.checks.map((check) => (
 					<CheckRow
@@ -137,6 +156,76 @@ function ReportBody({
 				</Disclosure>
 			)}
 		</>
+	);
+}
+
+/// The loader package, its source and the copy in the library. Installing imports the release as a mod that the overlay
+/// serves, like every other mod; the game folder is not written.
+function LoaderCard({ loader, installing, onInstall }: { loader: LoaderSetupView; installing: boolean; onInstall: () => void }) {
+	const { t, i18n } = useTranslation();
+	let tone: "success" | "update" | "warning" = "warning";
+	let state = t("setupCheck.loader.missing");
+
+	if (loader.state === "installed") {
+		tone = "success";
+		state = t("setupCheck.loader.installed");
+	} else if (loader.state === "update") {
+		tone = "update";
+		state = t("setupCheck.loader.update");
+	}
+
+	let installed = loader.installed_version;
+
+	if (installed === null && loader.state === "installed") {
+		installed = t("setupCheck.loader.manual");
+	}
+
+	const size = loader.size > 0 ? formatSize(Math.ceil(loader.size / 1024), i18n.language) : null;
+
+	return (
+		<section className="grid gap-2 rounded-lg border p-3" aria-labelledby="setup-loader-title">
+			<div className="flex flex-wrap items-center justify-between gap-2">
+				<div className="grid gap-0.5">
+					<h3 id="setup-loader-title" className="text-sm font-semibold">
+						{loader.name} {loader.version}
+					</h3>
+					<p className="text-muted-foreground text-xs">{t("setupCheck.loader.hint")}</p>
+				</div>
+				<StatusBadge tone={tone}>{state}</StatusBadge>
+			</div>
+			<dl className="grid gap-1 text-xs sm:grid-cols-[auto_1fr] sm:gap-x-3">
+				<dt className="text-muted-foreground">{t("setupCheck.loader.source")}</dt>
+				<dd className="truncate font-mono" title={loader.source}>
+					{loader.source}
+				</dd>
+				<dt className="text-muted-foreground">{t("setupCheck.loader.hash")}</dt>
+				<dd className="truncate font-mono" title={loader.sha256}>
+					{loader.sha256.slice(0, 16)}
+				</dd>
+				{size && (
+					<>
+						<dt className="text-muted-foreground">{t("setupCheck.loader.size")}</dt>
+						<dd className="tabular-nums">{size}</dd>
+					</>
+				)}
+				<dt className="text-muted-foreground">{t("setupCheck.loader.target")}</dt>
+				<dd className="font-mono break-all">{loader.target}</dd>
+				{installed && (
+					<>
+						<dt className="text-muted-foreground">{t("setupCheck.loader.installedVersion")}</dt>
+						<dd>{installed}</dd>
+					</>
+				)}
+			</dl>
+			{loader.state !== "installed" && (
+				<Button type="button" variant="outline" size="sm" className="w-fit" disabled={installing} onClick={onInstall}>
+					{installing ? <Spinner aria-hidden /> : <Download />}
+					{loader.state === "update"
+						? t("setupCheck.loader.updateAction", { name: loader.name })
+						: t("setupCheck.loader.installAction", { name: loader.name })}
+				</Button>
+			)}
+		</section>
 	);
 }
 

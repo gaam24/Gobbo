@@ -106,6 +106,9 @@ pub struct AppError {
 /// so the window can answer in that context, not a duplicate of this code. Keep the strings as they are; the frontend
 /// translates them.
 pub const DOWNLOAD_CANCELLED: &str = "download.cancelled";
+/// An enabled mod needs the game's loader package, and it is not installed, when an apply is attempted anyway. The
+/// status names the same need with `status::stage::LOADER_MISSING`.
+pub const LOADER_MISSING_DEPLOY: &str = "deploy.loader_missing";
 
 /// A saved account without direct-download entitlement. This is the one code for that meaning: a known free account, a
 /// refused paid download and a browser route all answer with it, and the window opens the mod's files page.

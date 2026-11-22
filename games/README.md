@@ -83,10 +83,10 @@ folder it stands for (`plugins/<Mod>/...` becomes `BepInEx/plugins/<Mod>/...`), 
 1. A file under a mirrored folder keeps its game path, and so does a bare file at the archive root that `root_files` names.
 2. A bare file at the archive root that a `[[deploy.move]]` rule takes goes to that rule's folder, keeping its name
    (`loose.archive` becomes `archive/pc/mod/loose.archive`).
-3. A file under a mod root that a slot's `marker` finds belongs to that mod: `<modlet>/ModInfo.xml` makes `<modlet>`
-   a mod; a marker at the archive root makes the whole archive one mod. A folder at the archive root that holds a file
-   of a slot's `root_folder_extensions` is a mod too: `<Plugin>/<plugin>.dll` makes `<Plugin>` one. In a flat slot the
-   folder is only the library name; its files deploy by file name into the slot folder.
+3. A file under a mod root that a slot's `marker` or `markers` finds belongs to that mod: `<modlet>/ModInfo.xml` makes
+   `<modlet>` a mod; a marker at the archive root makes the whole archive one mod. A folder at the archive root that
+   holds a file of a slot's `root_folder_extensions` is a mod too: `<Plugin>/<plugin>.dll` makes `<Plugin>` one. In a
+   flat slot the folder is only the library name; its files deploy by file name into the slot folder.
 4. A file under a slot folder: `Mods/<mod>/...` is the mod `<mod>`, and a file directly in the slot folder belongs to
    the archive's mod.
 5. A file in a `protected` folder that no rule took refuses the whole archive, so an archive cannot silently place a
@@ -246,6 +246,8 @@ to = "archive/pc/mod"
 | `dir`                    | The slot folder. It also names the slot in the library.                                                                                                                                                 |
 | `prefix`                 | The start of the mod folder names in the game, for example `mod`.                                                                                                                                       |
 | `marker`                 | A file or folder that marks a mod root in an archive, for example `ModInfo.xml`, `content`.                                                                                                             |
+| `markers`                | More markers for a loader that accepts several layouts, for example `["Scripts", "dlls"]` for UE4SS Lua and C++ mods. A root found by two markers is added once.                                         |
+| `enable_file`            | A file name Gobbo writes into every mod folder in the slot, for a loader that loads only a folder that has it. UE4SS reads `enabled.txt`. A flat slot cannot use it.                                      |
 | `extensions`             | Only these files go into the slot.                                                                                                                                                                      |
 | `root_extensions`        | Bare files at the archive root with these extensions go into the slot too.                                                                                                                              |
 | `root_folder_extensions` | Folders at the archive root that hold a file with these extensions are mods: `<Plugin>/<plugin>.dll`. In a flat slot the folder names the mod in the library, but its files deploy directly into `dir`. |
@@ -308,6 +310,15 @@ Proton with `args`, for example `["/install", "/quiet", "/norestart"]` for a .NE
 `check` in the prefix (relative to its `pfx` folder) holds a folder that starts with `check_starts_with`. The tool does not
 start while one is missing, and the settings offer to install it after a confirmation. Windows needs none of this.
 
+### `[install]`
+
+The loader package a game can install: its name, version, the folder its release stands for (`to`), check paths,
+`needed_by` folders and an HTTPS source with a SHA-256. The loader preset normally carries the shared package; a game's
+`[install]` adds check paths or names its own build. Installing imports the release into the library as one mod at game
+paths, so the overlay serves it like every other mod. When an enabled mod needs the package, the mod list offers a
+one-click install. See the loader package section in
+[loaders/README.md](../loaders/README.md) for the fields and the safety rules.
+
 ### Path templates
 
 `{game}`, `{prefix}` (the Proton prefix), `{appdata}`, `{local_appdata}`, `{documents}`, `{home}`, and in
@@ -315,7 +326,9 @@ start while one is missing, and the settings offer to install it after a confirm
 folders are the ones Windows programs see inside the prefix. For an install that is not from Steam, the prefix is the
 one Heroic or Lutris names, the one the user picks, or else the one Gobbo owns in the game's data folder; it exists once
 the game has been started. Under Proton the user folders always resolve inside the prefix, never to the Linux home
-folders, so a template waits for the first start instead of moving. A native install (its folder has the
+folders, so a template waits for the first start instead of moving. A game's `user_data` sets are the exception: their
+path is known before the prefix exists, so a shared set is shown as unavailable until the first start instead of
+blocking the mods. A native install (its folder has the
 `linux_markers` or the `path_linux` program) resolves them in the Linux home folders. `..` is refused.
 
 ## Patterns
@@ -326,7 +339,7 @@ folders, so a template waits for the first start instead of moving. A native ins
 | The whole game root is the layout     | `full_root = true`: every archive path is a game path; a bare file needs a `move` rule (Cyberpunk 2077).                                                                                                                               |
 | Unity with BepInEx                    | `loader = "bepinex"` (or `variant = "6"` for IL2CPP). The preset holds the plugin slot, the core/config/patchers/monomod mirrors, the proxy root files and the archive aliases.                                                        |
 | A game on a known loader              | `loader = "<id>"`; the preset in `loaders/<id>.toml` carries the shared `requires` and `[deploy]` rules. The game adds only what is specific to it.                                                                                    |
-| Unreal Engine `.pak` mods             | Flat slot `<Game>/Content/Paks/~mods` with `extensions` and `root_extensions` for `.pak`, or a `loaders/ue4ss.toml` preset when the loader layout is shared.                                                                           |
+| Unreal Engine `.pak` mods             | `loader = "unreal"` and `root = "{game}/<Project>"`: the preset carries the flat `Content/Paks/~mods` slot, the `LogicMods` mirror and their aliases. Add `variant = "ue4ss-4"` (or `"ue4ss-3"`) for UE4SS Lua/C++ mods.               |
 | A mods tree inside the game (`Data/`) | `root = "{game}/Data"` and a mirror per folder (`meshes`, `textures` ...); overlay still works. Plugins at the archive root and a plugin order file are not covered yet.                                                               |
 | One global override tree              | A flat slot (`Data/Override`, `flat = true`) with `root_extensions` and `root_folder_extensions`, plus mirrors for path-sensitive folders; `resource_names = true` makes equal file names conflict across all of them (The Witcher 1). |
 | Mods in the user's data folder        | `root = "{appdata}/<Game>"` (and `root_linux`); overlay covers that root and the game folder stays clean.                                                                                                                              |
@@ -346,6 +359,7 @@ folders, so a template waits for the first start instead of moving. A native ins
 | Valheim                           | `loader = "bepinex"`; Nexus and Thunderstore; native Linux build found and started directly                                                                                                                             | no     |
 | R.E.P.O.                          | `loader = "bepinex"`; Nexus and Thunderstore                                                                                                                                                                              | no     |
 | Content Warning                   | `loader = "bepinex"`; BepInEx mods only; Nexus and Thunderstore                                                                                                                                                           | no     |
+| Palworld                          | `loader = { id = "unreal", variant = "ue4ss-4" }`; `root = "{game}/Pal"`; pak/IoStore, LogicMods and UE4SS Lua/C++ mods; Nexus                                                                                            | no     |
 
 The Witcher: Enhanced Edition covers loose files only. Custom adventures (`.adv` in `{documents}/The Witcher`),
 campaign modules (`.mod`/`.mmd` in `Data/modules`), language packs (`.tlk`/`.key`) and installer-based overhauls
@@ -368,7 +382,7 @@ The Witcher 3 user-data redirect is covered by the synthetic overlay test; check
 treating that part as verified.
 
 Under Proton, Gobbo loads a DLL native when the launched game has it next to the program. The DLLs checked are the common
-mod loaders (`winhttp.dll`, `winmm.dll`, `version.dll`, `dinput8.dll` and others, in `games/proxy.rs`) and each DLL the
+mod loaders (`winhttp.dll`, `winmm.dll`, `version.dll`, `dinput8.dll`, `dwmapi.dll` and others, in `games/proxy.rs`) and each DLL the
 definition lists in `root_files` or mirrors (`bin/x64/version.dll`). Gobbo adds `n,b` for each one that is there, after
 the names the launch settings already give; a loader no mod provides is not named. A game lists its own proxy in
 `root_files` or as a mirror; the common loader names need no entry.

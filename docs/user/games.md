@@ -16,6 +16,7 @@ apply to every game, and a game definition never adds a branch to the program.
 | R.E.P.O.                          | Not yet verified on a real installation |
 | Content Warning                   | Not yet verified on a real installation |
 | The Witcher: Enhanced Edition     | Not yet verified on a real installation |
+| Palworld                          | Not yet verified on a real installation |
 
 **Tested** means detection, import, apply, undo and launch were run on a real installation. A definition without that
 test can still work, but treat it as unfinished: report what you find, and add the evidence to `game.toml` only after
@@ -24,8 +25,17 @@ the test.
 The Witcher: Enhanced Edition currently covers loose files only. Custom adventures, campaign modules, language packs
 and installer-based overhauls are not managed yet.
 
-Some loaders and tools still need a manual install. BepInEx is not installed by Gobbo yet, including for TCG Card Shop
-Simulator. The Script Merger for The Witcher 3 comes from its Nexus mod, with the .NET runtime it needs on Linux.
+BepInEx still needs a manual install, including for TCG Card Shop Simulator. UE4SS installs with one click: as soon as
+an enabled mod needs it, the mod list shows **Install UE4SS**; dropping the UE4SS download onto Gobbo adds it too.
+Gobbo adds UE4SS to your mods and turns it on; like every mod it reaches the game through the overlay, so the game
+folder stays clean. Plain pak mods work without UE4SS. The Script Merger for The Witcher 3 comes from its Nexus mod, with the .NET runtime it needs on Linux.
+
+Palworld uses the shared `unreal` loader preset. The game definition names its project folder, `Pal`, so the preset's
+`Content/Paks/~mods`, `LogicMods` and `Binaries/Win64/ue4ss/Mods` paths land in the right place. The install button
+adds Okaetsu's Palworld build of UE4SS to your mods, the one Palworld mods on Nexus are made with, including the
+Palworld layout file; a manual install is accepted too. The
+definition is prepared for the external (non-Steam) build first; Steam detection uses app id 1623730. UE4SS injects
+code into the game, so use it only on a single-player or private setup with no anti-cheat.
 
 ## Add a game
 

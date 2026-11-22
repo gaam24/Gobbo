@@ -17,6 +17,8 @@ export interface GettingStartedActions {
 	/// Shows what the deployment changes, then deploys.
 	onDeploy?: () => void | Promise<void>;
 	onOpenDownloads?: () => void;
+	/// Installs the mod loader an enabled mod is waiting for.
+	onInstallLoader?: () => void | Promise<void>;
 }
 
 /// A compact deployment summary. The actions live in the game header; the settings show the overlay.
@@ -31,6 +33,7 @@ export function DeploymentSummary({
 	onImport,
 	onDeploy,
 	onOpenDownloads,
+	onInstallLoader,
 }: GettingStartedActions & {
 	gameName: string;
 	status: Status;
@@ -47,6 +50,43 @@ export function DeploymentSummary({
 	const updatesCount = status.mods.filter((mod) => hasUpdate(updates, mod.id)).length;
 	const presentation = gamePresentation(status, { gameRunning, busy });
 	const blocker = presentation.blockedReason;
+	/// A loader an enabled mod needs is one more step before the apply, shown only while it is missing.
+	const loader = presentation.primary.id === "install-loader" ? presentation.primary : null;
+	/// The buttons of the step to do now: import while the library is empty, then install a missing loader, then apply.
+	const startActions = () => {
+		if (status.mods.length === 0) {
+			return (
+				<>
+					{onImport && (
+						<Button size="sm" onClick={() => void onImport()}>
+							<Upload /> {t("mods.import")}
+						</Button>
+					)}
+					{onOpenDownloads && (
+						<Button size="sm" variant="outline" onClick={onOpenDownloads}>
+							<Download /> {t("start.fromNexus")}
+						</Button>
+					)}
+				</>
+			);
+		}
+
+		if (loader && onInstallLoader) {
+			return (
+				<Button size="sm" onClick={() => void onInstallLoader()}>
+					<Download /> {t(loader.labelKey, loader.params)}
+				</Button>
+			);
+		}
+
+		if (enabled.length === 0 || !onDeploy) return null;
+		return (
+			<Button size="sm" disabled={!presentation.canApply} onClick={() => void onDeploy()}>
+				{t("start.deploy.action")}
+			</Button>
+		);
+	};
+
 	/// The list of enabled mods is open only on request; a closed disclosure does not mount its rows.
 	const [deployListOpen, setDeployListOpen] = useState(false);
 
@@ -65,35 +105,22 @@ export function DeploymentSummary({
 							title: t("start.enable.title"),
 							hint: t("start.enable.hint"),
 						},
+						...(loader
+							? [
+									{
+										done: false,
+										title: t("start.loader.title", loader.params),
+										hint: t("start.loader.hint", loader.params),
+									},
+								]
+							: []),
 						{
 							done: false,
 							title: t("start.deploy.title"),
 							hint: t("start.deploy.hint"),
 						},
 					]}
-					actions={
-						status.mods.length === 0 ? (
-							<>
-								{onImport && (
-									<Button size="sm" onClick={() => void onImport()}>
-										<Upload /> {t("mods.import")}
-									</Button>
-								)}
-								{onOpenDownloads && (
-									<Button size="sm" variant="outline" onClick={onOpenDownloads}>
-										<Download /> {t("start.fromNexus")}
-									</Button>
-								)}
-							</>
-						) : (
-							enabled.length > 0 &&
-							onDeploy && (
-								<Button size="sm" disabled={!presentation.canApply} onClick={() => void onDeploy()}>
-									{t("start.deploy.action")}
-								</Button>
-							)
-						)
-					}
+					actions={startActions()}
 				/>
 			)}
 			{status.deployed && status.draft_changes > 0 && onDeploy && (

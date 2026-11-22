@@ -82,6 +82,10 @@ const pl = {
 			title: "Napraw problemy z listą",
 			hint: "Kilka modów trzeba poprawić, zanim da się je zastosować.",
 		},
+		loader: {
+			title: "Zainstaluj {{name}}",
+			hint: "Część Twoich modów potrzebuje {{name}}. Gobbo pobierze go, doda do Twoich modów i sam go włączy.",
+		},
 		fromNexus: "Pobierz mody z Nexusa",
 		changes: {
 			title_one: "{{count}} zmiana nie jest jeszcze w grze",
@@ -341,6 +345,20 @@ const pl = {
 		openStorage: "Otwórz miejsce na dysku",
 		details: "Szczegóły",
 		freeSpace: "{{free}} wolnego",
+		loader: {
+			hint: "Gobbo dodaje loader do Twoich modów, a overlay podaje go grze, więc folder gry zostaje czysty.",
+			source: "Źródło",
+			hash: "SHA-256",
+			size: "Pobieranie",
+			target: "Podawany w",
+			installedVersion: "Zainstalowano",
+			installed: "Zainstalowany",
+			update: "Dostępna aktualizacja",
+			missing: "Niezainstalowany",
+			manual: "zainstalowany poza Gobbo",
+			installAction: "Zainstaluj {{name}}",
+			updateAction: "Zaktualizuj {{name}}",
+		},
 	},
 	tasks: {
 		title: "W toku",
@@ -426,6 +444,7 @@ const pl = {
 			"pack-link": "Pobieranie paczki modów…",
 			tool: "Uruchamianie narzędzia…",
 			toolInstall: "Instalowanie wymagań narzędzia…",
+			loader: "Instalowanie loadera modów…",
 			generic: "W toku…",
 		},
 		failedKind: {
@@ -439,6 +458,7 @@ const pl = {
 			collection: "Instalacja kolekcji się nie udała",
 			launch: "Uruchomienie narzędzia się nie udało",
 			install: "Instalacja wymagań narzędzia się nie udała",
+			loader: "Instalacja loadera modów się nie udała",
 			generic: "Zadanie się nie udało",
 		},
 	},
@@ -480,6 +500,7 @@ const pl = {
 			collection: { failed: "Instalacja kolekcji się nie udała", done: "Kolekcja zainstalowana" },
 			launch: { failed: "Uruchomienie narzędzia się nie udało", done: "Narzędzie zakończyło pracę" },
 			install: { failed: "Instalacja wymagań narzędzia się nie udała", done: "Wymagania narzędzia zainstalowane" },
+			loader: { failed: "Instalacja loadera modów się nie udała", done: "Loader modów zainstalowany" },
 		},
 	},
 	clipboard: {
@@ -536,6 +557,7 @@ const pl = {
 		modsUpdated_many: "Zaktualizowano {{count}} modów.",
 		modsUpdated_other: "Zaktualizowano {{count}} moda.",
 		requirementInstalled: "Zainstalowano wymaganie {{name}}.",
+		loaderInstalled: "{{name}} jest zainstalowany. Mody, które go potrzebują, można już zastosować.",
 		definitionExported: "Zapisano definicję do {{path}}.",
 		communityImported: "Utworzono profil {{profile}} z {{mods}} modami.",
 		communityMissing_one: "W bibliotece brakuje {{count}} paczki z profilu.",
@@ -1676,6 +1698,7 @@ const pl = {
 				collection: "Instalacja kolekcji",
 				launch: "Uruchomienie narzędzia",
 				install: "Wymagania narzędzia",
+				loader: "Instalacja loadera modów",
 			},
 			app: { hidden_to_tray: "Gobbo ukryło się w zasobniku" },
 		},
@@ -2624,6 +2647,8 @@ const pl = {
 		playWithoutMods: "Zagraj bez modów",
 		applyAgain: "Zastosuj ponownie",
 		fixProblems: "Napraw problemy",
+		installLoader: "Zainstaluj {{name}}",
+		installLoaderGeneric: "Zainstaluj loader modów",
 		needsAttention: "Wymaga uwagi",
 		needsAttentionHint: "Popraw problemy na liście modów, zanim zastosujesz zmiany.",
 		busyApplying: "Stosowanie…",
@@ -2733,6 +2758,12 @@ const pl = {
 		archive: {
 			too_many_entries: "Archiwum ma {{count}} pozycji, a Gobbo przyjmuje najwyżej {{limit}}.",
 			too_large: "Po rozpakowaniu archiwum zajmie {{bytes}} bajtów, a Gobbo przyjmuje najwyżej {{limit}}.",
+		},
+		loader: {
+			none: "Ta gra nie ma loadera modów, który Gobbo może zainstalować.",
+			size: "Pobrany loader ma {{actual}} bajtów, a definicja oczekuje {{expected}}.",
+			hash: "Pobrany loader nie zgadza się z sumą SHA-256. Plik nie został zainstalowany.",
+			too_large: "Plik w archiwum loadera jest za duży do instalacji: {{path}}",
 		},
 		catalog: {
 			fetch: "Nie udało się odczytać katalogu gier: {{detail}}",
@@ -2940,6 +2971,7 @@ const pl = {
 			journal_unsafe:
 				"Dziennik zastosowania wskazuje ścieżkę poza obszarem zastosowania: {{path}}. Gobbo niczego nie zmienił i przerwał cofanie.",
 			requirement_missing: "Zanim zastosujesz mody, gra potrzebuje {{path}}.",
+			loader_missing: "Część włączonych modów potrzebuje {{name}}. Najpierw go zainstaluj, potem zastosuj mody.",
 			missing_file: "Brakuje pliku: {{path}}",
 			no_overlay_session: "Mody nie są zastosowane. Najpierw je zastosuj.",
 			overlay_in_use: "Gra w {{path}} nadal działa w overlay. Zatrzymaj ją, zanim zmienisz mody.",
@@ -3137,6 +3169,10 @@ const pl = {
 			loader: {
 				ok: "Loader gry jest gotowy.",
 				missing: "Gra potrzebuje {{name}}, żeby mody działały. Zainstaluj go i sprawdź ponownie.",
+				installed: "{{name}} {{version}} jest zainstalowany.",
+				optional: "{{name}} nie jest zainstalowany. Zwykłe mody działają bez niego; Gobbo poprosi o niego, gdy mod będzie go potrzebował.",
+				install: "Zainstaluj {{name}} {{version}} z karty loadera poniżej.",
+				update: "Dostępny jest {{name}} {{version}}; zaktualizuj go z karty loadera poniżej.",
 			},
 			mods: {
 				ok: "Mody są gotowe.",
@@ -3147,6 +3183,8 @@ const pl = {
 				ok: "Gobbo znalazł foldery, które gra trzyma poza swoim folderem.",
 				none: "Ta gra nie trzyma dodatkowych folderów poza folderem gry.",
 				missing: "Folder {{id}} ({{path}}) nie istnieje. Sprawdź folder gry albo prefiks Protona.",
+				notYet:
+					"Folder {{id}} ({{path}}) pojawi się po pierwszym uruchomieniu, gdy Gobbo utworzy prefiks Protona. Mody możesz zastosować już teraz.",
 			},
 			problems_one: "Plan ma {{count}} problem. Napraw go na liście modów.",
 			problems_few: "Plan ma {{count}} problemy. Napraw je na liście modów.",
@@ -3206,6 +3244,7 @@ const pl = {
 			folder_not_indexed: "W bibliotece jest folder {{folder}}, którego nie ma w indeksie. Przeskanuj bibliotekę.",
 			index_folder_missing: "Mod {{folder}} jest w indeksie, ale nie ma jego folderu w bibliotece. Przeskanuj bibliotekę.",
 			requirement_missing: "Gra wymaga {{path}}. Jakiś mod musi to dostarczyć, zanim zastosujesz mody.",
+			loader_missing: "Część włączonych modów potrzebuje {{name}}. Zainstaluj go przyciskiem poniżej.",
 		},
 		undo: {
 			dir_not_empty: "Folder {{path}} nie jest pusty, więc Gobbo go zostawił.",

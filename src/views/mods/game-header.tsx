@@ -2,6 +2,7 @@ import {
 	ArchiveRestore,
 	ChevronDown,
 	CircleAlert,
+	Download,
 	Files,
 	OctagonX,
 	PanelRightClose,
@@ -84,6 +85,9 @@ export function GameHeader({ gameId, status }: { gameId: string; status: Status 
 				return;
 			case "fix-setup":
 				openDialog({ kind: "setup" });
+				return;
+			case "install-loader":
+				void gameActions.installLoader(gameId);
 				return;
 			case "fix-problems": {
 				// The setup checklist repeats the problems, but the action that fixes them is the list itself.
@@ -323,6 +327,8 @@ function actionIcon(action: GameAction) {
 		case "fix-setup":
 		case "fix-problems":
 			return <Wrench />;
+		case "install-loader":
+			return <Download />;
 		default:
 			return <Play />;
 	}

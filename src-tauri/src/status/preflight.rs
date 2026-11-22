@@ -12,6 +12,7 @@ use crate::deploy::target::deployment_root;
 use crate::domain::pathkey::path_key;
 use crate::error::{AppError, Message};
 use crate::infra::disk;
+use crate::setup::LoaderSetupState;
 
 /// How a preflight check ended. A warning does not block an apply; a problem does.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
@@ -45,6 +46,8 @@ pub struct PreflightReport {
     pub free_space_kb: u32,
     pub total_space_kb: u32,
     pub checks: Vec<PreflightCheck>,
+    /// The loader package the game offers, with its source, version and installed state.
+    pub loader: Option<crate::setup::LoaderSetupView>,
     pub problems: Vec<Message>,
     pub warnings: Vec<Message>,
 }
@@ -59,6 +62,27 @@ fn check(id: &str, state: CheckState, message: Message) -> PreflightCheck {
     }
 }
 
+/// The loader row for a required file that is missing. A file the definition links gets the Get action.
+fn requirement_check(game: &crate::games::GameDef, problem: &Message) -> PreflightCheck {
+    let requirement = problem.params.get("path").and_then(|path| {
+        game.requirements
+            .iter()
+            .find(|requirement| path_key(&requirement.path) == path_key(path))
+    });
+    let Some(requirement) = requirement else {
+        return check("loader", CheckState::Problem, problem.clone());
+    };
+    let linked = requirement.url.as_ref().map(|_| requirement);
+
+    PreflightCheck {
+        id: "loader".to_string(),
+        state: CheckState::Problem,
+        message: Message::new("preflight.loader.missing").with("name", &requirement.name),
+        requirement_path: linked.map(|requirement| requirement.path.clone()),
+        requirement_name: linked.map(|requirement| requirement.name.clone()),
+    }
+}
+
 /// Builds the report from the game status. It does not write; `status` itself only makes the library and archive folders,
 /// as the first look at a game already does.
 pub fn preflight(root: &Data, game_id: &str) -> Result<PreflightReport, AppError> {
@@ -66,6 +90,7 @@ pub fn preflight(root: &Data, game_id: &str) -> Result<PreflightReport, AppError
     let game = root.definition(game_id)?;
     let data = root.game(game_id);
     let settings = load_settings(&data);
+    let loader_setup = crate::setup::view(root, &game, &settings).ok().flatten();
     let mut checks = Vec::new();
 
     let (state, message) = if status.game_ready {
@@ -121,51 +146,78 @@ pub fn preflight(root: &Data, game_id: &str) -> Result<PreflightReport, AppError
     let (state, message) = if status.user_data.is_empty() {
         (CheckState::Ok, Message::new("preflight.userData.none"))
     } else if let Some(set) = status.user_data.iter().find(|set| !set.available) {
-        (
-            CheckState::Problem,
+        // A manual Windows install owns a prefix that does not exist until the first launch. A shared set does not
+        // block mods; an isolated one cannot be prepared until the prefix exists.
+        let message = if set.isolated {
             Message::new("preflight.userData.missing")
-                .with("id", &set.id)
-                .with("path", &set.path),
+        } else {
+            Message::new("preflight.userData.notYet")
+        };
+        (
+            if set.isolated {
+                CheckState::Problem
+            } else {
+                CheckState::Warning
+            },
+            message.with("id", &set.id).with("path", &set.path),
         )
     } else {
         (CheckState::Ok, Message::new("preflight.userData.ok"))
     };
     checks.push(check("user_data", state, message));
 
-    let loader = status
+    let missing_requirement = status
         .problems
         .iter()
         .find(|problem| problem.code == "status.requirement_missing");
-    if let Some(problem) = loader {
-        let requirement = problem.params.get("path").and_then(|path| {
-            game.requirements
-                .iter()
-                .find(|requirement| path_key(&requirement.path) == path_key(path))
-        });
-
-        if let Some(requirement) = requirement {
-            checks.push(PreflightCheck {
-                id: "loader".to_string(),
-                state: CheckState::Problem,
-                message: Message::new("preflight.loader.missing").with("name", &requirement.name),
-                requirement_path: requirement.url.as_ref().map(|_| requirement.path.clone()),
-                requirement_name: requirement.url.as_ref().map(|_| requirement.name.clone()),
-            });
-        } else {
-            checks.push(check("loader", CheckState::Problem, problem.clone()));
-        }
-    } else {
-        checks.push(check(
+    let setup_state = loader_setup.as_ref().map(|setup| setup.state);
+    let loader_message = |code: &str| {
+        let setup = loader_setup.as_ref();
+        Message::new(code)
+            .with("name", setup.map_or("", |setup| setup.name.as_str()))
+            .with("version", setup.map_or("", |setup| setup.version.as_str()))
+    };
+    let loader_needed = status
+        .problems
+        .iter()
+        .any(|problem| problem.code == crate::status::stage::LOADER_MISSING);
+    checks.push(match (setup_state, missing_requirement) {
+        _ if loader_needed => check(
+            "loader",
+            CheckState::Problem,
+            loader_message("preflight.loader.install"),
+        ),
+        (Some(LoaderSetupState::Update), _) => check(
+            "loader",
+            CheckState::Warning,
+            loader_message("preflight.loader.update"),
+        ),
+        (_, Some(problem)) => requirement_check(&game, problem),
+        // No enabled mod needs the loader yet, so a missing one is not a problem; a mod that needs it will ask.
+        (Some(LoaderSetupState::Missing), None) => check(
+            "loader",
+            CheckState::Ok,
+            loader_message("preflight.loader.optional"),
+        ),
+        (Some(LoaderSetupState::Installed), None) => check(
+            "loader",
+            CheckState::Ok,
+            loader_message("preflight.loader.installed"),
+        ),
+        (None, None) => check(
             "loader",
             CheckState::Ok,
             Message::new("preflight.loader.ok"),
-        ));
-    }
+        ),
+    });
 
     let other_problems = status
         .problems
         .iter()
-        .filter(|problem| problem.code != "status.requirement_missing")
+        .filter(|problem| {
+            problem.code != "status.requirement_missing"
+                && problem.code != crate::status::stage::LOADER_MISSING
+        })
         .count();
     if other_problems > 0 {
         checks.push(check(
@@ -249,6 +301,7 @@ pub fn preflight(root: &Data, game_id: &str) -> Result<PreflightReport, AppError
         free_space_kb,
         total_space_kb,
         checks,
+        loader: loader_setup,
         problems: status.problems,
         warnings: status.warnings,
     })

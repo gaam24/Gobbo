@@ -1,0 +1,53 @@
+# Palworld. An Unreal Engine 5 game whose project folder is `Pal`. The `unreal` loader preset supplies the pak and
+# IoStore layout, the LogicMods folder and the UE4SS 4.x mod slot; the game only names its project root and the files
+# the setup check needs.
+#
+# UE4SS is Okaetsu's Palworld build (https://github.com/Okaetsu/RE-UE4SS), the one Palworld mods on Nexus are made
+# and tested with. It is an upstream UE4SS snapshot that ships Palworld's MemberVariableLayout.ini: Palworld changed the
+# engine's UEnum layout, and without that file some Lua and C++ mods crash. The release is pinned by tag and SHA-256.
+# Gobbo imports it as a mod, so it reaches the game through the overlay; a manual install with the same files is
+# accepted too. UE4SS is asked for only when a Lua/C++ or LogicMods mod is enabled; plain paks in `~mods` work without
+# it.
+# Do not keep the game's Workshop UE4SS and a manual/Gobbo install active at the same time: two copies crash the game.
+#
+# Prepared for the external (non-Steam) build first; Steam detection is by app id, and a manual folder works for both.
+# Not verified on a real installation yet.
+
+schema = 1
+id = "palworld"
+name = "Palworld"
+min_gobbo = "0.1.1"
+providers = { nexus = { key = "palworld" } }
+loader = { id = "unreal", variant = "ue4ss-4" }
+
+# The game's own build replaces the preset's official release; the preset's folder, check paths and `needed_by`
+# folders stay, and the layout file is checked too.
+[install]
+name = "UE4SS for Palworld"
+version = "2281fa31"
+check = ["Binaries/Win64/ue4ss/MemberVariableLayout.ini"]
+url = "https://github.com/Okaetsu/RE-UE4SS/releases/download/2281fa31/UE4SS-Palworld-g2281fa31.zip"
+sha256 = "f7543d57f8fdf5eab3731ac52121e6e7ff142fb3bfa17156e931037d0e44875b"
+size = 8631290
+
+[detect]
+steam_app_ids = [1623730]
+steam_install_dirs = ["Palworld"]
+markers = ["Pal/Binaries/Win64/Palworld-Win64-Shipping.exe", "Pal/Content/Paks"]
+
+[[executables]]
+name = "Palworld"
+path = "Pal/Binaries/Win64/Palworld-Win64-Shipping.exe"
+
+[[user_data]]
+id = "saved"
+kind = "saves"
+path = "{local_appdata}/Pal/Saved"
+
+[deploy]
+# The preset's paths are relative to the project folder, not to the folder that holds Palworld.exe.
+root = "{game}/Pal"
+
+[[logs]]
+kind = "loader"
+path = "Pal/Binaries/Win64/ue4ss/UE4SS.log"

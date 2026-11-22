@@ -281,6 +281,7 @@ pub mod games {
     pub const LOADER_ID: &str = "fixture-loader";
     pub const LOADED_ID: &str = "loaded";
     pub const LOADED_DEFAULT_ID: &str = "loaded-default";
+    pub const UNREAL_ID: &str = "unreal-fixture";
 
     /// A game with a mod slot, a mirrored folder, shared files, an order file and a tool.
     pub const SLOT: &str = r#"
@@ -649,6 +650,24 @@ name = "Game"
 path = "game.exe"
 "#;
 
+    /// An Unreal game that takes the shipped preset. The project folder is a child, so the layout is relative to it.
+    pub const UNREAL: &str = r#"
+schema = 1
+id = "unreal-fixture"
+name = "Unreal Fixture"
+loader = { id = "unreal", variant = "ue4ss-4" }
+
+[detect]
+markers = ["Project/Binaries/Win64/game.exe"]
+
+[[executables]]
+name = "Game"
+path = "Project/Binaries/Win64/game.exe"
+
+[deploy]
+root = "{game}/Project"
+"#;
+
     const ALL: &[(&str, &str)] = &[
         (SLOT_ID, SLOT),
         (MIRROR_ID, MIRROR),
@@ -661,6 +680,7 @@ path = "game.exe"
         (ALIASED_ID, ALIASED),
         (LOADED_ID, LOADED),
         (LOADED_DEFAULT_ID, LOADED_DEFAULT),
+        (UNREAL_ID, UNREAL),
     ];
 
     /// Writes the fixture definitions into one folder per process and points `games::load` at it. Called by `load`
@@ -763,6 +783,10 @@ path = "game.exe"
 
     pub fn loaded() -> GameDef {
         load(LOADED_ID)
+    }
+
+    pub fn unreal() -> GameDef {
+        load(UNREAL_ID)
     }
 
     /// The definition with `\n` line endings. A Windows checkout may hold `\r\n`, and the tests search for `\n`.

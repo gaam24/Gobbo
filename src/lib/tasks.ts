@@ -64,6 +64,8 @@ export function dedupeKey(dedupe: TaskDedupe, id = "", backend = false, backendK
 
 	if ("Requirement" in dedupe && dedupe.Requirement) return `requirement:${dedupe.Requirement.game}`;
 
+	if ("Loader" in dedupe && dedupe.Loader) return `loader:${dedupe.Loader.game}`;
+
 	if ("Collection" in dedupe && dedupe.Collection) {
 		return `collection:${dedupe.Collection.game}:${dedupe.Collection.profile}:${dedupe.Collection.collection}`;
 	}
@@ -89,7 +91,7 @@ function isTaskDedupe(value: unknown): value is TaskDedupe {
 	if (value === "Other") return true;
 
 	if (typeof value !== "object" || value === null) return false;
-	const variants = ["Apply", "Import", "Update", "UpdateAll", "Requirement", "Collection", "Pack", "PackLink", "Tool"];
+	const variants = ["Apply", "Import", "Update", "UpdateAll", "Requirement", "Loader", "Collection", "Pack", "PackLink", "Tool"];
 	return variants.some((variant) => variant in value);
 }
 
@@ -127,6 +129,8 @@ function keyFromId(id: string, backend: boolean, backendKind?: string): string {
 			return `update-all:${game}`;
 		case "requirement":
 			return `requirement:${game}`;
+		case "loader":
+			return `loader:${game}`;
 		case "collection":
 			return withDetail("collection");
 		case "pack":

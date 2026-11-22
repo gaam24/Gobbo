@@ -19,6 +19,8 @@ export interface GameDraft {
 	user_data?: UserDataDraft[];
 	requires?: string[];
 	requirements?: RequirementDraft[];
+	/// The loader package a user definition carries. The form has no fields for it yet; a round trip keeps it.
+	install?: InstallDraft;
 	tools?: ToolDraft[];
 	steps?: StepDraft[];
 	logs?: LogSourceDraft[];
@@ -41,6 +43,17 @@ export interface DetectDraft {
 	markers?: string[];
 	linux_markers?: string[];
 	any_marker?: boolean;
+}
+
+export interface InstallDraft {
+	name?: string;
+	version?: string;
+	to?: string;
+	check?: string[];
+	needed_by?: string[];
+	url?: string;
+	sha256?: string;
+	size?: number;
 }
 
 export interface ExecutableDraft {
@@ -74,6 +87,10 @@ export interface SlotDraft {
 	dir: string;
 	prefix?: string;
 	marker?: string;
+	/// More mod roots, for a loader preset with several layouts. Kept on a round trip; the form edits `marker`.
+	markers?: string[];
+	/// A file the importer writes into each mod folder in this slot. Kept on a round trip.
+	enable_file?: string;
 	extensions?: string[];
 	root_extensions?: string[];
 	root_folder_extensions?: string[];
@@ -304,6 +321,7 @@ function cleanDraft(draft: GameDraft): Record<string, unknown> {
 	const requirements = keepFilled(draft.requirements, (entry) => entry.name.trim() !== "" && entry.path.trim() !== "", cleanRequirement);
 
 	if (requirements.length > 0) out.requirements = requirements;
+	if (draft.install) out.install = cleanInstall(draft.install);
 	const profileData = cleanLines(draft.profile_data);
 
 	if (profileData) out.profile_data = profileData;
@@ -397,6 +415,11 @@ function cleanSlot(slot: SlotDraft): Record<string, unknown> {
 	const out: Record<string, unknown> = { dir: slot.dir.trim() };
 	putText(out, "prefix", slot.prefix);
 	putText(out, "marker", slot.marker);
+	putText(out, "enable_file", slot.enable_file);
+
+	const markers = cleanLines(slot.markers);
+
+	if (markers) out.markers = markers;
 
 	for (const key of ["extensions", "root_extensions", "root_folder_extensions"] as const) {
 		const values = cleanLines(slot[key]);
@@ -473,6 +496,21 @@ function cleanRequirement(requirement: RequirementDraft): Record<string, unknown
 		path: requirement.path.trim(),
 	};
 	putText(out, "url", requirement.url);
+	return out;
+}
+
+function cleanInstall(entry: InstallDraft): Record<string, unknown> {
+	const out: Record<string, unknown> = {};
+
+	for (const key of ["name", "version", "to", "url", "sha256"] as const) putText(out, key, entry[key]);
+
+	for (const key of ["check", "needed_by"] as const) {
+		const values = cleanLines(entry[key]);
+
+		if (values) out[key] = values;
+	}
+
+	if ((entry.size ?? 0) > 0) out.size = entry.size;
 	return out;
 }
 

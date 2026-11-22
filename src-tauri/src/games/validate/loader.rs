@@ -2,6 +2,7 @@
 
 use std::collections::BTreeSet;
 
+use super::install::check_install;
 use super::problems::{Problems, is_variant};
 use crate::domain::deploy::Deploy;
 use crate::domain::pathkey;
@@ -59,6 +60,9 @@ impl LoaderDef {
         problems.0.extend(duplicate_problems(&self.deploy));
         problems.relative("required file", &self.requires);
         problems.requirements("loader", &self.requirements);
+        if let Some(install) = &self.install {
+            check_install("loader install", install, &mut problems);
+        }
 
         for (name, variant) in &self.variants {
             let what = format!("variant {name}");
@@ -66,6 +70,9 @@ impl LoaderDef {
             problems.0.extend(duplicate_problems(&variant.deploy));
             problems.relative(&format!("{what} required file"), &variant.requires);
             problems.requirements(&what, &variant.requirements);
+            if let Some(install) = &variant.install {
+                check_install(&format!("{what} install"), install, &mut problems);
+            }
         }
 
         problems.0

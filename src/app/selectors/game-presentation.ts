@@ -15,6 +15,7 @@ export type GameActionId =
 	| "stop"
 	| "fix-setup"
 	| "fix-problems"
+	| "install-loader"
 	| "import"
 	| "enable"
 	| "retry";
@@ -123,7 +124,7 @@ function duringBusy(presentation: GamePresentation, busy: Exclude<GameRuntime["b
 function statusPresentation(status: Status): GamePresentation {
 	const blockedReason = blockerOf(status);
 	const deployedElsewhere = status.profiles.find((profile) => profile.deployed && !profile.active)?.name;
-	const primary = actionOf(status.next_action, blockedReason);
+	const primary = actionOf(status, blockedReason);
 	const nextStep = nextStepOf(status, primary);
 
 	switch (status.stage.kind) {
@@ -261,7 +262,9 @@ function statusPresentation(status: Status): GamePresentation {
 
 /// The primary action for the backend's next action. Each action keeps the label and the handler it had before the
 /// backend decided it; `apply` depends on whether an apply is blocked.
-function actionOf(next: NextAction, blockedReason: TranslationKey | undefined): GameAction {
+function actionOf(status: Status, blockedReason: TranslationKey | undefined): GameAction {
+	const next: NextAction = status.next_action;
+
 	switch (next) {
 		case "set_game_folder":
 			return { id: "fix-setup", labelKey: "header.setGameFolder" };
@@ -269,6 +272,8 @@ function actionOf(next: NextAction, blockedReason: TranslationKey | undefined): 
 			return { id: "fix-setup", labelKey: "header.setSettingsFolder" };
 		case "set_mods_folder":
 			return { id: "fix-setup", labelKey: "header.setModsFolder" };
+		case "install_loader":
+			return { id: "install-loader", labelKey: "header.installLoader", params: { name: loaderName(status) } };
 		case "fix_problems":
 			return { id: "fix-problems", labelKey: "header.fixProblems" };
 		case "import_mods":
@@ -302,6 +307,8 @@ function nextStepOf(status: Status, action: GameAction): GameNextStep | undefine
 				bodyKey: "start.setup.hint",
 				action,
 			};
+		case "install_loader":
+			return { titleKey: "start.loader.title", bodyKey: "start.loader.hint", params: { name: loaderName(status) }, action };
 		case "fix_problems":
 			return { titleKey: "start.fix.title", bodyKey: "start.fix.hint", action };
 		case "import_mods":
@@ -335,6 +342,11 @@ function nextStepOf(status: Status, action: GameAction): GameNextStep | undefine
 		default:
 			return assertNever(status.next_action);
 	}
+}
+
+/// The loader an enabled mod is waiting for, named by the backend's problem. The name comes from the game definition.
+function loaderName(status: Status): string {
+	return status.problems.find((problem) => problem.code === "status.loader_missing")?.params.name ?? "";
 }
 
 /// The backend derives why an apply is impossible. The window only translates that value — it does not re-check the

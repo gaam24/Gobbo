@@ -31,6 +31,7 @@ export function trayLabels(t: ReturnType<typeof useTranslation>["t"]): TrayLabel
 			set_game_folder: t("header.setGameFolder"),
 			set_settings_folder: t("header.setSettingsFolder"),
 			set_mods_folder: t("header.setModsFolder"),
+			install_loader: t("header.installLoaderGeneric"),
 			fix_problems: t("header.fixProblems"),
 			import_mods: t("tray.next.importMods"),
 			enable_mods: t("tray.next.enableMods"),
@@ -54,6 +55,7 @@ export function trayLabels(t: ReturnType<typeof useTranslation>["t"]): TrayLabel
 			collection: t("tasks.kind.collection"),
 			launch: t("tasks.kind.tool"),
 			install: t("tasks.kind.toolInstall"),
+			loader: t("tasks.kind.loader"),
 		},
 		states: {
 			running: t("tasks.group.running"),

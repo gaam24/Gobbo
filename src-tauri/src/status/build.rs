@@ -393,15 +393,26 @@ fn plan_outcome(
         Ok(deploy_plan) => {
             // Most definitions require no game file. Building a key for every planned file is only useful when one
             // does, and a large plan can hold thousands of paths.
-            if !game.requires.is_empty() {
+            if !game.requires.is_empty() || game.install.is_some() {
                 let placed = deploy_plan.placed_keys();
 
-                if let Some(file) = game
-                    .unmet_requirement(Path::new(&settings.game_root), |key| placed.contains(key))
+                if let Some(file) = game.unmet_requirement(Path::new(&settings.game_root), &placed)
                 {
                     outcome
                         .problems
                         .push(Message::new("status.requirement_missing").with("path", file));
+                }
+
+                let deploy_root = crate::context::target::deployment_root(data, game, settings);
+
+                if let Some(install) = deploy_root
+                    .ok()
+                    .and_then(|root| game.missing_loader(&root, &deploy_plan, &placed))
+                {
+                    outcome.problems.push(
+                        Message::new(crate::status::stage::LOADER_MISSING)
+                            .with("name", &install.name),
+                    );
                 }
             }
 

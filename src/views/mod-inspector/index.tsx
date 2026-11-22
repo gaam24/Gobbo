@@ -39,6 +39,7 @@ export function ModInspector({
 	onImport,
 	onDeploy,
 	onOpenDownloads,
+	onInstallLoader,
 	mode,
 	open,
 	onOpenChange,
@@ -88,6 +89,7 @@ export function ModInspector({
 					onImport={onImport}
 					onDeploy={onDeploy}
 					onOpenDownloads={onOpenDownloads}
+					onInstallLoader={onInstallLoader}
 				/>
 			)}
 			{selection.length > 1 && (

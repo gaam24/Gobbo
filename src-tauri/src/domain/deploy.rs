@@ -176,6 +176,14 @@ pub struct Slot {
     /// archive root makes the whole archive one mod, named after the archive.
     #[serde(default)]
     pub marker: Option<String>,
+    /// More mod roots, for a loader that accepts several layouts. A Lua mod marks `<Mod>/Scripts`, a C++ mod marks
+    /// `<Mod>/dlls`; both are one slot. The roots are found like `marker`, and a root found twice is added once.
+    #[serde(default)]
+    pub markers: Vec<String>,
+    /// A file Gobbo writes into every mod folder in this slot, for a loader that loads only a folder that has it.
+    /// for example `enabled.txt`. The file belongs to the library copy, so it is deployed and removed with the mod.
+    #[serde(default)]
+    pub enable_file: Option<String>,
     /// Only these files go into the slot (lowercase, with the dot). Empty means all files.
     #[serde(default)]
     pub extensions: Vec<String>,
@@ -259,6 +267,8 @@ mod tests {
                 dir: "Mods".into(),
                 prefix: "mod".into(),
                 marker: None,
+                markers: Vec::new(),
+                enable_file: None,
                 extensions: Vec::new(),
                 root_extensions: Vec::new(),
                 root_folder_extensions: Vec::new(),

@@ -116,6 +116,11 @@ pub enum TaskDedupe {
         /// The link that is being downloaded.
         link: String,
     },
+    /// The install of a game's loader package. One game has one loader row at a time.
+    Loader {
+        /// The game the loader is installed into.
+        game: String,
+    },
     /// A tool run or a tool's prerequisite install, keyed by game and tool.
     Tool {
         /// The game the tool belongs to.
@@ -144,6 +149,16 @@ impl TaskKey {
             dedupe: TaskDedupe::Tool {
                 game: game.to_string(),
                 tool: tool.to_string(),
+            },
+        }
+    }
+
+    /// The key of the install of one game's loader package.
+    pub fn loader(game: &str) -> Self {
+        Self {
+            id: format!("loader:{game}"),
+            dedupe: TaskDedupe::Loader {
+                game: game.to_string(),
             },
         }
     }
@@ -281,6 +296,9 @@ impl TaskKey {
             "requirement" => TaskDedupe::Requirement {
                 game: game.to_string(),
             },
+            "loader" => TaskDedupe::Loader {
+                game: game.to_string(),
+            },
             "collection" => TaskDedupe::Collection {
                 game: game.to_string(),
                 profile: tail.first().copied().unwrap_or("").to_string(),
@@ -337,6 +355,7 @@ pub const TASK_KINDS: &[&str] = &[
     "collection",
     "launch",
     "install",
+    "loader",
 ];
 
 /// Stable kind codes, named for the call sites that emit them. Each one indexes [`TASK_KINDS`], so there is no second
@@ -362,6 +381,8 @@ pub mod kind {
     pub const LAUNCH: &str = super::TASK_KINDS[8];
     /// A tool's prerequisite install.
     pub const INSTALL: &str = super::TASK_KINDS[9];
+    /// The install of a game's loader package.
+    pub const LOADER: &str = super::TASK_KINDS[10];
 }
 
 /// Stable state codes of a task record.
@@ -826,6 +847,7 @@ mod tests {
                 "collection",
                 "launch",
                 "install",
+                "loader",
             ]
         );
         let distinct: std::collections::HashSet<&str> = TASK_KINDS.iter().copied().collect();

@@ -116,14 +116,21 @@ fn expected_files(plan: &Plan, record: &ModVersion, archive: &Archive) -> BTreeM
             let name = usize::from(folder.contains(&group.to_lowercase()));
             overlap.saturating_mul(2).saturating_add(name)
         })
-        .map(|(_, items)| items.as_slice());
-    let Some(items) = chosen else {
+        .map(|(group, items)| (*group, items.as_slice()));
+    let Some((group, items)) = chosen else {
         return BTreeMap::new();
     };
-    items
+    let mut expected: BTreeMap<String, u64> = items
         .iter()
         .map(|item| (item.rel.clone(), archive.entries()[item.index].size))
-        .collect()
+        .collect();
+
+    if let Some(file) = plan.enable_files.get(group) {
+        // The importer writes an empty file today; keep this in step if a slot ever needs content.
+        expected.entry(file.clone()).or_insert(0);
+    }
+
+    expected
 }
 
 /// A missing archive or record: a user action, since the file can be restored or the mod imported again.

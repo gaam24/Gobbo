@@ -2,6 +2,7 @@
 //! definition is read (see `definition.rs`). The messages are for developers, so they are in English.
 
 mod deploy;
+mod install;
 mod loader;
 mod problems;
 
@@ -26,6 +27,7 @@ impl GameDef {
         self.check_deploy(&mut problems);
         self.check_aliases(&mut problems);
         self.check_load_order(&mut problems);
+        self.check_installs(&mut problems);
         self.check_steps(&mut problems);
         self.check_tools(&mut problems);
         self.check_logs(&mut problems);

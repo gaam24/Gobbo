@@ -14,6 +14,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::domain::library::{Integrity, SkipReason, SkippedFile};
+use crate::domain::pathkey::path_key;
 use crate::error::FileError;
 use crate::games::GameDef;
 use crate::infra::archive::Archive;
@@ -93,9 +94,66 @@ pub struct Naming<'a> {
     pub only: Option<&'a str>,
 }
 
+/// The placement of a loader release: the folder that holds the first program among the package's check files is the
+/// release's root, and every file below it goes to the same path under the package's `to` folder. A repack that wraps
+/// the release in more folders therefore lands where the original release does. Files outside that root are
+/// skipped. `None` when the archive does not hold the program after all.
+fn loader_layout(
+    install: &crate::games::Install,
+    files: &[(usize, Vec<&str>)],
+    base_name: &str,
+    skipped_files: &mut Vec<SkippedFile>,
+) -> Option<Vec<Placed>> {
+    let to = path_key(&install.to);
+    let program = install.check.iter().find_map(|check| {
+        let key = path_key(check);
+        let rel = key.strip_prefix(&format!("{to}/"))?.to_string();
+        std::path::Path::new(&rel)
+            .extension()
+            .is_some_and(|extension| {
+                extension.eq_ignore_ascii_case("dll") || extension.eq_ignore_ascii_case("exe")
+            })
+            .then_some(rel)
+    })?;
+    let program_depth = program.split('/').count();
+    let root = files.iter().find_map(|(_, parts)| {
+        let key = path_key(&parts.join("/"));
+        let at = parts.len().checked_sub(program_depth)?;
+        (key == program || key.ends_with(&format!("/{program}"))).then(|| parts[..at].to_vec())
+    })?;
+    let folder = install.to.trim_end_matches('/');
+    let mut placed = Vec::new();
+
+    for (index, parts) in files {
+        let inside = parts.len() > root.len()
+            && parts
+                .iter()
+                .zip(&root)
+                .all(|(part, root)| part.eq_ignore_ascii_case(root));
+
+        if inside {
+            placed.push(Placed {
+                index: *index,
+                group: base_name.to_string(),
+                slot: String::new(),
+                rel: format!("{folder}/{}", parts[root.len()..].join("/")),
+            });
+        } else {
+            skipped_files.push(SkippedFile {
+                path: parts.join("/"),
+                reason: SkipReason::NoRule,
+            });
+        }
+    }
+
+    Some(placed)
+}
+
 /// The entries of an archive and the mod each one belongs to. Nothing is written yet.
 pub struct Plan {
     pub(super) placed: Vec<Placed>,
+    /// A file to write into a mod folder that a slot's `enable_file` names, by group. It is not an archive entry.
+    pub(super) enable_files: BTreeMap<String, String>,
     /// Entries no rule takes, for example a readme in the root.
     pub(super) skipped: usize,
     /// Every entry that was not unpacked, with its reason.
@@ -233,6 +291,22 @@ pub fn plan_with_roots<'a>(
         files.push((index, split_name(layout_name)?));
     }
 
+    // The loader's own release is one mod whose files keep their game paths, wherever the archive keeps the release.
+    let before = skipped_files.len();
+
+    if let Some(install) = &game.install
+        && game.is_loader_archive(archive.entries().iter().map(|entry| entry.name.as_str()))
+        && let Some(placed) = loader_layout(install, &files, base_name, &mut skipped_files)
+    {
+        let skipped = skipped_files.len() - before;
+        return Ok(Plan {
+            placed,
+            enable_files: BTreeMap::new(),
+            skipped,
+            skipped_files,
+        });
+    }
+
     let layout = LayoutPlan::new(deploy, base_roots);
     let wrapper = layout.wrapper_depth(&files);
 
@@ -270,8 +344,36 @@ pub fn plan_with_roots<'a>(
     }
 
     attach_mirrored(&mut placed);
+    // A slot's `enable_file` is written once per mod, unless the archive already ships it.
+    let mut enable_files: BTreeMap<String, String> = BTreeMap::new();
+
+    for item in &placed {
+        if enable_files.contains_key(&item.group) {
+            continue;
+        }
+
+        if let Some(file) = deploy
+            .slots
+            .iter()
+            .find(|slot| slot.dir == item.slot)
+            .and_then(|slot| slot.enable_file.as_ref())
+        {
+            enable_files.insert(item.group.clone(), file.clone());
+        }
+    }
+
+    for item in &placed {
+        if enable_files
+            .get(&item.group)
+            .is_some_and(|file| path_key(file) == path_key(&item.rel))
+        {
+            enable_files.remove(&item.group);
+        }
+    }
+
     Ok(Plan {
         placed,
+        enable_files,
         skipped,
         skipped_files,
     })
@@ -330,7 +432,7 @@ pub fn install_zip_named_with_roots(
         .iter()
         .map(|item| archive.entries()[item.index].size)
         .sum();
-    check_limits(planned.placed.len(), total)?;
+    check_limits(planned.placed.len() + planned.enable_files.len(), total)?;
 
     if let Some(space) = crate::infra::disk::space_for(library) {
         let free = space.free_kb.saturating_mul(1024);
@@ -366,6 +468,7 @@ pub fn install_zip_named_with_roots(
             keep
         };
         planned.placed.retain(|item| keep.contains(&item.group));
+        planned.enable_files.retain(|group, _| keep.contains(group));
 
         if planned.placed.is_empty() {
             return Err(InstallError::UnknownLayout);

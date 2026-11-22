@@ -158,6 +158,26 @@ fn a_flat_slot_has_no_marker() {
 }
 
 #[test]
+fn markers_and_enable_files_belong_to_mod_folders() {
+    let with = |line: &str| lf(EXTERNAL).replacen("marker = \"ModInfo.xml\"", line, 1);
+    let valid = with("markers = [\"Scripts\", \"dlls\"]\nenable_file = \"enabled.txt\"");
+    let game = GameDef::parse(&valid).unwrap();
+    assert!(game.validate().is_empty(), "{:?}", game.validate());
+
+    has_problem(&with("markers = [\"../Scripts\"]"), "not a relative path");
+    has_problem(&with("marker = \"Scripts\"\nflat = true"), "flat slot");
+    has_problem(
+        &with("enable_file = \"sub/enabled.txt\""),
+        "one valid file name",
+    );
+    has_problem(&with("enable_file = \"CON\""), "one valid file name");
+    has_problem(
+        &with("flat = true\nenable_file = \"enabled.txt\""),
+        "flat slot",
+    );
+}
+
+#[test]
 fn root_files_are_bare_names_listed_once_and_not_game_folders() {
     let with_root_files = |line: &str| {
         lf(PLUGIN).replacen(

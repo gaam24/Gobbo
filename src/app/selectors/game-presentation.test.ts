@@ -35,7 +35,7 @@ function nextActionOf(stage: GameStage_Serialize): NextAction {
 			if (stage.step === "settings") return "set_settings_folder";
 			return "set_mods_folder";
 		case "blocked":
-			return "fix_problems";
+			return stage.reasons.some((reason) => reason.code === "status.loader_missing") ? "install_loader" : "fix_problems";
 		case "empty":
 			return "import_mods";
 		case "no_enabled":
@@ -83,6 +83,18 @@ test("a blocked list offers a fix first and still allows a plain play", () => {
 	expect(presentation.canPlay).toBe(true);
 	expect(presentation.canPlayWithoutMods).toBe(true);
 	expect(presentation.menu.map((action) => action.id)).toEqual(["play"]);
+});
+
+test("a mod that needs the loader leads with one install button named after the loader", () => {
+	const reasons = [{ code: "status.loader_missing", params: { name: "UE4SS" } }];
+	const presentation = gamePresentation(status({ kind: "blocked", reasons }, { problems: reasons }));
+	expect(presentation.primary).toMatchObject({
+		id: "install-loader",
+		labelKey: "header.installLoader",
+		params: { name: "UE4SS" },
+	});
+	expect(presentation.nextStep).toMatchObject({ titleKey: "start.loader.title", params: { name: "UE4SS" } });
+	expect(presentation.canPlayWithoutMods).toBe(true);
 });
 
 test("an empty library leads with import and allows a plain play", () => {

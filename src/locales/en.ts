@@ -83,6 +83,10 @@ const en = {
 			title: "Fix the problems in the list",
 			hint: "A few mods need attention before they can be applied.",
 		},
+		loader: {
+			title: "Install {{name}}",
+			hint: "Some of your mods need {{name}} to work. Gobbo downloads it, adds it to your mods and turns it on for you.",
+		},
 		fromNexus: "Get mods from Nexus",
 		changes: {
 			title_one: "{{count}} change isn't in the game yet",
@@ -333,6 +337,20 @@ const en = {
 		openStorage: "Open storage",
 		details: "Details",
 		freeSpace: "{{free}} free",
+		loader: {
+			hint: "Gobbo adds the loader to your mods and the overlay gives it to the game, so the game folder stays clean.",
+			source: "Source",
+			hash: "SHA-256",
+			size: "Download",
+			target: "Served in",
+			installedVersion: "Installed",
+			installed: "Installed",
+			update: "Update available",
+			missing: "Not installed",
+			manual: "installed outside Gobbo",
+			installAction: "Install {{name}}",
+			updateAction: "Update {{name}}",
+		},
 	},
 	tasks: {
 		title: "Working",
@@ -414,6 +432,7 @@ const en = {
 			"pack-link": "Downloading a mod pack…",
 			tool: "Running a tool…",
 			toolInstall: "Installing tool prerequisites…",
+			loader: "Installing the mod loader…",
 			generic: "Working…",
 		},
 		/// The title of a failed row, by the backend's task kind.
@@ -428,6 +447,7 @@ const en = {
 			collection: "Collection install failed",
 			launch: "Tool run failed",
 			install: "Tool prerequisites failed",
+			loader: "Mod loader install failed",
 			generic: "Task failed",
 		},
 	},
@@ -470,6 +490,7 @@ const en = {
 			collection: { failed: "Collection install failed", done: "Collection installed" },
 			launch: { failed: "Tool run failed", done: "Tool finished" },
 			install: { failed: "Tool prerequisites failed", done: "Tool prerequisites installed" },
+			loader: { failed: "Mod loader install failed", done: "Mod loader installed" },
 		},
 	},
 	clipboard: {
@@ -521,6 +542,7 @@ const en = {
 		modsUpdated_one: "Updated {{count}} mod.",
 		modsUpdated_other: "Updated {{count}} mods.",
 		requirementInstalled: "Installed the requirement {{name}}.",
+		loaderInstalled: "{{name}} is installed. Mods that need it can be applied now.",
 		definitionExported: "Saved the definition to {{path}}.",
 		communityImported: "Created profile {{profile}} with {{mods}} mods.",
 		communityMissing_one: "{{count}} package from the profile isn't in your mods.",
@@ -1589,6 +1611,7 @@ const en = {
 				collection: "Collection install",
 				launch: "Tool run",
 				install: "Tool prerequisites",
+				loader: "Mod loader install",
 			},
 			app: { hidden_to_tray: "Gobbo was hidden in the tray" },
 		},
@@ -2517,6 +2540,8 @@ const en = {
 		playWithoutMods: "Play without mods",
 		applyAgain: "Apply again",
 		fixProblems: "Fix problems",
+		installLoader: "Install {{name}}",
+		installLoaderGeneric: "Install the mod loader",
 		needsAttention: "Needs attention",
 		needsAttentionHint: "Fix the problems in the mod list before you apply.",
 		busyApplying: "Applying…",
@@ -2623,6 +2648,12 @@ const en = {
 		archive: {
 			too_many_entries: "The archive has {{count}} entries, but Gobbo only accepts up to {{limit}}.",
 			too_large: "The archive unpacks to {{bytes}} bytes, but Gobbo only accepts up to {{limit}}.",
+		},
+		loader: {
+			none: "This game has no mod loader that Gobbo can install.",
+			size: "The loader download is {{actual}} bytes, but the definition expects {{expected}}.",
+			hash: "The loader download doesn't match its SHA-256. The file was not installed.",
+			too_large: "A file in the loader archive is too large to install: {{path}}",
 		},
 		catalog: {
 			fetch: "Couldn't read the game catalog: {{detail}}",
@@ -2828,6 +2859,7 @@ const en = {
 			journal_unsafe:
 				"The apply journal names a path outside the folders an apply is allowed to change: {{path}}. Nothing was changed, and undo was stopped.",
 			requirement_missing: "The game needs {{path}} before mods can be applied.",
+			loader_missing: "Some enabled mods need {{name}}. Install it first, then apply the mods.",
 			missing_file: "A file is missing: {{path}}",
 			no_overlay_session: "Nothing is applied yet. Apply the mods first.",
 			overlay_in_use: "The game in {{path}} is still running in its overlay. Stop it before changing the mods.",
@@ -3026,6 +3058,10 @@ const en = {
 			loader: {
 				ok: "The mod loader is ready.",
 				missing: "The game needs {{name}} before mods can be applied. Install it, then check again.",
+				installed: "{{name}} {{version}} is installed.",
+				optional: "{{name}} isn't installed. Plain mods work without it; Gobbo asks for it when a mod needs it.",
+				install: "Install {{name}} {{version}} from the loader card below.",
+				update: "{{name}} {{version}} is available; update it from the loader card below.",
 			},
 			mods: {
 				ok: "Mods are ready.",
@@ -3036,6 +3072,8 @@ const en = {
 				ok: "Found the folders this game keeps outside its game folder.",
 				none: "This game doesn't keep any extra folders outside its game folder.",
 				missing: "The {{id}} folder {{path}} isn't there. Check the game folder or the Proton prefix.",
+				notYet:
+					"The {{id}} folder {{path}} appears after the first launch, when Gobbo creates the game's Proton prefix. You can apply mods now.",
 			},
 			problems_one: "There's {{count}} problem. Fix it in the mod list.",
 			problems_other: "There are {{count}} problems. Fix them in the mod list.",
@@ -3090,6 +3128,7 @@ const en = {
 			folder_not_indexed: "The folder {{folder}} is in your mods but missing from the index. Rescan your mods.",
 			index_folder_missing: "{{folder}} is in the index, but its folder is missing. Rescan your mods.",
 			requirement_missing: "The game needs {{path}}. A mod has to provide it before mods can be applied.",
+			loader_missing: "Some enabled mods need {{name}}. Install it with the button below.",
 		},
 		undo: {
 			dir_not_empty: "The folder {{path}} isn't empty, so it was left in place.",

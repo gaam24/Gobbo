@@ -50,7 +50,7 @@ use crate::error::{AppError, ErrorKind, io_at};
 )]
 pub use definition::Prerequisite;
 pub use definition::{
-    Executable, GameDef, LoadOrder, LogKind, LogSource, Step, Tool, UserData, Verified,
+    Executable, GameDef, Install, LoadOrder, LogKind, LogSource, Step, Tool, UserData, Verified,
 };
 pub use layout::{GAME_TEMPLATE, is_game_relative};
 pub use view::GameView;

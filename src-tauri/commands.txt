@@ -84,6 +84,7 @@ mods::set_mod_priority
 settings::managed_games
 games::scan_games
 games::open_requirement_page
+games::install_loader
 settings::add_game
 settings::check_game_folder
 settings::remove_game

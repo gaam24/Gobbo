@@ -7,6 +7,9 @@ All notable changes to this project are documented in this file. The format foll
 
 ### Added
 
+- **Unreal Engine games can load pak, IoStore and UE4SS mods.** A shared loader preset puts each archive in the folder the game or UE4SS reads it from, and Palworld is the first game definition that uses it, with the Palworld build of UE4SS that Nexus mods expect.
+- **UE4SS installs with one click when a mod needs it.** The mod list shows an Install UE4SS button as soon as an enabled mod uses UE4SS, and plain pak mods never ask for it.
+- **UE4SS is a mod like any other.** Gobbo keeps it in your mods and the overlay gives it to the game, so the game folder stays clean; dropping the UE4SS download onto Gobbo adds it the same way.
 - **Games from GOG, Epic, Heroic, Legendary and Lutris are found where they are installed.** Gobbo reads each launcher's own list, including the Flatpak versions of Heroic and Lutris and minigalaxy's folder.
 - **A GOG or Epic game installed through Heroic or Lutris is recognised by its store.** It needs no extra setup in the game definition.
 - **A GOG game with DLC is found again, and Epic skips unfinished downloads.** An installed DLC no longer hides its game, and a half-downloaded Epic game is not offered.

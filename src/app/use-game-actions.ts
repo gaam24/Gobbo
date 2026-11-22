@@ -663,6 +663,26 @@ export function useGameActions({
 		return installed;
 	};
 
+	/// Installs a game's mod loader from its verified source. The Working panel shows the download; one
+	/// install per game runs at a time. The status is read again, so the list stops asking for the loader.
+	const loaderInstalls = useRef(new Set<string>());
+	const installLoader = async (gameId: string) => {
+		if (loaderInstalls.current.has(gameId)) return false;
+		loaderInstalls.current.add(gameId);
+
+		try {
+			const installed = await attempt(async () => {
+				const view = await unwrap(commands.installLoader(gameId));
+				notify(t("notice.loaderInstalled", { name: view.name }));
+			});
+
+			if (installed) await reloadAfter(gameId);
+			return installed;
+		} finally {
+			loaderInstalls.current.delete(gameId);
+		}
+	};
+
 	/// Installs the whole requirement closure of one mod. The backend saves the profile list once, so the result is one
 	/// undo; blocked steps and failed downloads come back as messages while the rest still runs.
 	const installRequirements = async (folder: string) => {
@@ -1015,6 +1035,7 @@ export function useGameActions({
 		undoUpdates: undoUpdateAll,
 		installRequirement,
 		installRequirements,
+		installLoader,
 		stopGame,
 		saveSettings,
 		setProtonOption,

@@ -34,7 +34,7 @@
 
 Gobbo Mods Organizer is a desktop mod manager for PC games. It keeps a separate mod list for every profile, shows conflicts before they reach the game, and applies mods through an overlay — so the real game folder stays untouched.
 
-> **Status:** 0.1.0, early development. Five games are tested on real installations; four more definitions are ready for testing. See [Supported games](#supported-games).
+> **Status:** 0.1.1, early development. Five games are tested on real installations; five more definitions are ready for testing. See [Supported games](#supported-games).
 
 ## Why Gobbo
 
@@ -102,10 +102,10 @@ The first start asks where Gobbo should keep your data. **Portable** keeps the m
 | <img src="games/the-witcher-3-wild-hunt/icon.webp" width="20" height="20" alt=""> The Witcher 3: Wild Hunt                   | <img src="games/valheim/icon.webp" width="20" height="20" alt=""> Valheim                                            |
 | <img src="games/cyberpunk-2077/icon.webp" width="20" height="20" alt=""> Cyberpunk 2077                                      | <img src="games/repo/icon.webp" width="20" height="20" alt=""> R.E.P.O.                                              |
 | <img src="games/tcg-card-shop-simulator/icon.webp" width="20" height="20" alt=""> TCG Card Shop Simulator                    | <img src="games/content-warning/icon.webp" width="20" height="20" alt=""> Content Warning                            |
-| <img src="games/lethal-company/icon.webp" width="20" height="20" alt=""> Lethal Company                                      |                                                                                                                      |
+| <img src="games/lethal-company/icon.webp" width="20" height="20" alt=""> Lethal Company                                      | <img src="games/palworld/icon.webp" width="20" height="20" alt=""> Palworld                                           |
 | <img src="games/tainted-grail-the-fall-of-avalon/icon.webp" width="20" height="20" alt=""> Tainted Grail: The Fall of Avalon | <img src="games/the-witcher-enhanced-edition/icon.webp" width="20" height="20" alt=""> The Witcher: Enhanced Edition |
 
-A game is a data folder, not code: `games/<id>/game.toml`, with shared layouts in `loaders/<id>.toml`. If your game is missing, see [games/README.md](games/README.md). Some loaders, such as BepInEx for TCG Card Shop Simulator, still need a manual install. The full list and the test statuses are in [Supported games](docs/user/games.md).
+A game is a data folder, not code: `games/<id>/game.toml`, with shared layouts in `loaders/<id>.toml`. If your game is missing, see [games/README.md](games/README.md). BepInEx for TCG Card Shop Simulator still needs a manual install; Palworld's UE4SS comes from a verified setup card. The full list and the test statuses are in [Supported games](docs/user/games.md).
 
 ## Platforms
 

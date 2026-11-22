@@ -7,9 +7,11 @@
 //! - a mirror (`[[deploy.mirror]]`): a game folder whose files keep their game paths (`archive/pc/mod/...`, `DLC/...`,
 //!   `Data/...`). Two mods that write the same path conflict, and the list or the user picks the winner.
 
+mod install;
 mod tools;
 mod user_data;
 
+pub use install::Install;
 pub use tools::{LogKind, LogSource, Prerequisite, Step, Tool};
 pub use user_data::{Detect, Executable, LoadOrder, UserData, Verified};
 
@@ -74,6 +76,10 @@ pub struct GameDef {
     /// its `path`: the file is required whether or not `requires` lists it.
     #[serde(default)]
     pub requirements: Vec<Requirement>,
+    /// The loader package the game can install into its folder. A loader preset carries the shared package; the game
+    /// adds assets when it needs one more file.
+    #[serde(default)]
+    pub install: Option<Install>,
     #[serde(default)]
     pub tools: Vec<Tool>,
     /// Programs the game needs run in its overlay, before it starts or after it exits. A mod asks for them by id in

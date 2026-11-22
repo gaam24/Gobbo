@@ -139,6 +139,9 @@ pub struct DeployPlan {
     /// All files the plan places. In `Full` this is `files.len()`; in `Summary` it also counts the files that were not
     /// materialized.
     pub file_count: u32,
+    /// The slot folders that hold at least one enabled mod. A summary leaves a slot mod's own files out, so this is how
+    /// the status still knows that a loader's mod folder is in use.
+    pub slots_used: std::collections::BTreeSet<String>,
     pub settings: Vec<SettingsRow>,
     pub conflicts: Vec<Conflict>,
     pub problems: Vec<Problem>,
@@ -166,6 +169,21 @@ impl DeployPlan {
         self.source_of(file)
             .and_then(|source| source.files.get(file.file as usize))
             .map_or("", String::as_str)
+    }
+
+    /// Whether the plan puts a file under `dir`, relative to the deployment root: an enabled mod of that slot, or a file
+    /// it materialized there. `placed` is [`Self::placed_keys`].
+    pub fn places_under(&self, dir: &str, placed: &std::collections::BTreeSet<String>) -> bool {
+        let key = crate::domain::pathkey::path_key(dir);
+        let prefix = format!("{key}/");
+
+        self.slots_used
+            .iter()
+            .any(|slot| crate::domain::pathkey::path_key(slot) == key)
+            || placed
+                .range(prefix.clone()..)
+                .next()
+                .is_some_and(|placed| placed.starts_with(&prefix))
     }
 
     /// The path keys of the files the plan places in the deployment root. A game's requirement is met when one of them

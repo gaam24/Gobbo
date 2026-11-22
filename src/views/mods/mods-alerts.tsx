@@ -1,5 +1,5 @@
 import { cn } from "cn";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Download } from "lucide-react";
 import { useState } from "react";
 import type { Status } from "@/bindings";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -16,8 +16,16 @@ const isOpen = (value: unknown): value is boolean => typeof value === "boolean";
 
 /// The problems that block deployment and the warnings that do not. Both are lists of backend messages, translated by
 /// their stable codes; the same block appears in the deployment preview. The warnings fold away, so a long list does
-/// not push the mod table down.
-export function ModsAlerts({ problems, warnings }: { problems: Status["problems"]; warnings: Status["warnings"] }) {
+/// not push the mod table down. A missing mod loader gets its install button right next to the message.
+export function ModsAlerts({
+	problems,
+	warnings,
+	onInstallLoader,
+}: {
+	problems: Status["problems"];
+	warnings: Status["warnings"];
+	onInstallLoader?: () => void;
+}) {
 	const { t } = useTranslation();
 	const [open, setOpen] = useState(() => readPref(WARNINGS_OPEN_PREF, true, isOpen));
 
@@ -39,7 +47,14 @@ export function ModsAlerts({ problems, warnings }: { problems: Status["problems"
 					<AlertDescription>
 						<ul className="list-disc pl-4 wrap-break-word">
 							{problems.map((problem) => (
-								<li key={`${problem.code}${JSON.stringify(problem.params)}`}>{translate(problem)}</li>
+								<li key={`${problem.code}${JSON.stringify(problem.params)}`}>
+									{translate(problem)}
+									{problem.code === "status.loader_missing" && onInstallLoader && (
+										<Button type="button" size="sm" className="mt-2 flex w-fit" onClick={onInstallLoader}>
+											<Download aria-hidden /> {t("header.installLoader", { name: problem.params.name ?? "" })}
+										</Button>
+									)}
+								</li>
 							))}
 						</ul>
 					</AlertDescription>

@@ -80,6 +80,7 @@ impl Default for TrayLabels {
                 ("set_game_folder", "Set the game folder"),
                 ("set_settings_folder", "Set the settings folder"),
                 ("set_mods_folder", "Set the mods folder"),
+                ("install_loader", "Install the mod loader"),
                 ("fix_problems", "Fix problems"),
                 ("import_mods", "Import mods"),
                 ("enable_mods", "Enable mods"),
@@ -153,6 +154,7 @@ fn kind_label(code: &str) -> &'static str {
         "collection" => "Installing collection…",
         "launch" => "Running a tool…",
         "install" => "Installing tool prerequisites…",
+        "loader" => "Installing the mod loader…",
         _ => "Working…",
     }
 }
@@ -170,6 +172,7 @@ fn bootstrap_notice(code: &str, outcome: &str) -> String {
         "collection" => "Collection install",
         "launch" => "Tool run",
         "install" => "Tool prerequisites",
+        "loader" => "Mod loader install",
         _ => "Task",
     };
     let verb = if outcome == crate::infra::tasks::state::FAILED {

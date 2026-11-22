@@ -32,6 +32,7 @@ mod platform;
 mod profiles;
 mod providers;
 mod settings;
+mod setup;
 mod snapshots;
 mod sources;
 mod status;

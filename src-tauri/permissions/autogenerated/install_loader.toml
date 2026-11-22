@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-install-loader"
+description = "Enables the install_loader command without any pre-configured scope."
+commands.allow = ["install_loader"]
+
+[[permission]]
+identifier = "deny-install-loader"
+description = "Denies the install_loader command without any pre-configured scope."
+commands.deny = ["install_loader"]

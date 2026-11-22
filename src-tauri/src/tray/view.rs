@@ -164,6 +164,7 @@ pub const fn action_code(action: NextAction) -> &'static str {
         NextAction::SetGameFolder => "set_game_folder",
         NextAction::SetSettingsFolder => "set_settings_folder",
         NextAction::SetModsFolder => "set_mods_folder",
+        NextAction::InstallLoader => "install_loader",
         NextAction::FixProblems => "fix_problems",
         NextAction::ImportMods => "import_mods",
         NextAction::EnableMods => "enable_mods",

@@ -223,6 +223,12 @@ export const commands = {
 	 *  from the definition, so the window cannot open an arbitrary address.
 	 */
 	openRequirementPage: (game: string, path: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("open_requirement_page", { game, path })),
+	/**
+	 *  Installs the loader package a game names, after the user confirms it in the setup dialog. This is the one setup step
+	 *  that writes real files into the game folder; mods still deploy through the overlay. Runs as a task, so the Working
+	 *  panel shows the download and `cancel_task` can stop it before the files are written.
+	 */
+	installLoader: (game: string) => typedError<LoaderSetupView_Serialize, AppError_Serialize>(__TAURI_INVOKE("install_loader", { game })),
 	/**  Adds a game with its folder. Answers the games added to Gobbo. */
 	addGame: (game: string, gameRoot: string) => typedError<ManagedGame[], AppError_Serialize>(__TAURI_INVOKE("add_game", { game, gameRoot })),
 	/**  Checks a folder for a game before the game is added. The result is the marker file the folder has, if the game names one. */
@@ -585,7 +591,7 @@ export const APP_NOTIFICATIONS = ["hidden_to_tray"] as const;
 
 export const NOTIFICATION_OUTCOMES = ["failed","done"] as const;
 
-export const TASK_KINDS = ["import","update","update-all","requirement","apply","pack","pack-link","collection","launch","install"] as const;
+export const TASK_KINDS = ["import","update","update-all","requirement","apply","pack","pack-link","collection","launch","install","loader"] as const;
 
 /* Types */
 /**  An error returned by a command. */
@@ -3044,6 +3050,51 @@ export type LoaderPresetView_Serialize = {
 	problems: string[],
 };
 
+export type LoaderSetupState = "missing" | "installed" | "update";
+
+/**  What the setup UI needs to know about the loader package of a game. */
+export type LoaderSetupView = LoaderSetupView_Serialize | LoaderSetupView_Deserialize;
+
+/**  What the setup UI needs to know about the loader package of a game. */
+export type LoaderSetupView_Deserialize = {
+	name: string,
+	/**  The version the definition offers. */
+	version: string,
+	/**  The version of the copy in the library, or `None` when it has none (installed by hand, or not installed). */
+	installed_version?: string | null,
+	state: LoaderSetupState,
+	/**  The archive link. */
+	source: string,
+	sha256: string,
+	/**
+	 *  The expected download size in bytes, or `0` when the definition does not name one. A loader release is far
+	 *  below the 4 GiB that fit in the IPC type.
+	 */
+	size: number,
+	/**  The deployment-root-relative folder the release's files are served in. */
+	target: string,
+};
+
+/**  What the setup UI needs to know about the loader package of a game. */
+export type LoaderSetupView_Serialize = {
+	name: string,
+	/**  The version the definition offers. */
+	version: string,
+	/**  The version of the copy in the library, or `None` when it has none (installed by hand, or not installed). */
+	installed_version: string | null,
+	state: LoaderSetupState,
+	/**  The archive link. */
+	source: string,
+	sha256: string,
+	/**
+	 *  The expected download size in bytes, or `0` when the definition does not name one. A loader release is far
+	 *  below the 4 GiB that fit in the IPC type.
+	 */
+	size: number,
+	/**  The deployment-root-relative folder the release's files are served in. */
+	target: string,
+};
+
 /**  A loader preset that seems to be installed in a game folder. The editor preselects it. */
 export type LoaderSuggestion = LoaderSuggestion_Serialize | LoaderSuggestion_Deserialize;
 
@@ -3678,7 +3729,9 @@ export type MountView = {
 };
 
 /**  The one thing the user should do next. The frontend maps it to a label and an action. */
-export type NextAction = "set_game_folder" | "set_settings_folder" | "set_mods_folder" | "fix_problems" | "import_mods" | "enable_mods" | "apply" | "play";
+export type NextAction = "set_game_folder" | "set_settings_folder" | "set_mods_folder" | 
+/**  An enabled mod needs the game's loader package; one click installs it. */
+"install_loader" | "fix_problems" | "import_mods" | "enable_mods" | "apply" | "play";
 
 /**  The kind an option is declared with in the installer, before a `<dependencyType>` can replace it. */
 export type OptionKind = "required" | "optional" | "recommended" | "not_usable" | "could_be_usable";
@@ -4014,6 +4067,8 @@ export type PreflightReport_Deserialize = {
 	free_space_kb: number,
 	total_space_kb: number,
 	checks: PreflightCheck_Deserialize[],
+	/**  The loader package the game offers, with its source, version and installed state. */
+	loader?: LoaderSetupView_Deserialize | null,
 	problems: Message[],
 	warnings: Message[],
 };
@@ -4028,6 +4083,8 @@ export type PreflightReport_Serialize = {
 	free_space_kb: number,
 	total_space_kb: number,
 	checks: PreflightCheck_Serialize[],
+	/**  The loader package the game offers, with its source, version and installed state. */
+	loader: LoaderSetupView_Serialize | null,
 	problems: Message[],
 	warnings: Message[],
 };
@@ -5276,29 +5333,29 @@ export type TaskDedupe =
 ({ Apply: {
 	/**  The game the deployment belongs to. */
 	game: string,
-} }) & { Collection?: never; Import?: never; Pack?: never; PackLink?: never; Requirement?: never; Tool?: never; Update?: never; UpdateAll?: never } | 
+} }) & { Collection?: never; Import?: never; Loader?: never; Pack?: never; PackLink?: never; Requirement?: never; Tool?: never; Update?: never; UpdateAll?: never } | 
 /**  A loose archive import, keyed by game and archive path. */
 ({ Import: {
 	/**  The game the archive is imported into. */
 	game: string,
 	/**  The archive that is being imported. */
 	path: string,
-} }) & { Apply?: never; Collection?: never; Pack?: never; PackLink?: never; Requirement?: never; Tool?: never; Update?: never; UpdateAll?: never } | 
+} }) & { Apply?: never; Collection?: never; Loader?: never; Pack?: never; PackLink?: never; Requirement?: never; Tool?: never; Update?: never; UpdateAll?: never } | 
 /**  The update of one mod. The mod is not part of the group: one game has one update row at a time. */
 ({ Update: {
 	/**  The game the mod belongs to. */
 	game: string,
-} }) & { Apply?: never; Collection?: never; Import?: never; Pack?: never; PackLink?: never; Requirement?: never; Tool?: never; UpdateAll?: never } | 
+} }) & { Apply?: never; Collection?: never; Import?: never; Loader?: never; Pack?: never; PackLink?: never; Requirement?: never; Tool?: never; UpdateAll?: never } | 
 /**  The bulk update of one game. */
 ({ UpdateAll: {
 	/**  The game being updated. */
 	game: string,
-} }) & { Apply?: never; Collection?: never; Import?: never; Pack?: never; PackLink?: never; Requirement?: never; Tool?: never; Update?: never } | 
+} }) & { Apply?: never; Collection?: never; Import?: never; Loader?: never; Pack?: never; PackLink?: never; Requirement?: never; Tool?: never; Update?: never } | 
 /**  A requirement install, single or from a plan. One game has one requirement row at a time. */
 ({ Requirement: {
 	/**  The game the requirement is installed for. */
 	game: string,
-} }) & { Apply?: never; Collection?: never; Import?: never; Pack?: never; PackLink?: never; Tool?: never; Update?: never; UpdateAll?: never } | 
+} }) & { Apply?: never; Collection?: never; Import?: never; Loader?: never; Pack?: never; PackLink?: never; Tool?: never; Update?: never; UpdateAll?: never } | 
 /**  An automatic collection install, keyed by its game, profile and collection. */
 ({ Collection: {
 	/**  The game the collection is installed into. */
@@ -5307,28 +5364,33 @@ export type TaskDedupe =
 	profile: string,
 	/**  The collection being installed. */
 	collection: string,
-} }) & { Apply?: never; Import?: never; Pack?: never; PackLink?: never; Requirement?: never; Tool?: never; Update?: never; UpdateAll?: never } | 
+} }) & { Apply?: never; Import?: never; Loader?: never; Pack?: never; PackLink?: never; Requirement?: never; Tool?: never; Update?: never; UpdateAll?: never } | 
 /**  A pack import or a pack mod download. Both share one group, so the richer local row replaces the backend one. */
 ({ Pack: {
 	/**  The game the pack is imported into. */
 	game: string,
 	/**  The pack file that is being used. */
 	path: string,
-} }) & { Apply?: never; Collection?: never; Import?: never; PackLink?: never; Requirement?: never; Tool?: never; Update?: never; UpdateAll?: never } | 
+} }) & { Apply?: never; Collection?: never; Import?: never; Loader?: never; PackLink?: never; Requirement?: never; Tool?: never; Update?: never; UpdateAll?: never } | 
 /**  A pack link download, keyed by game and link. */
 ({ PackLink: {
 	/**  The game the pack is downloaded for. */
 	game: string,
 	/**  The link that is being downloaded. */
 	link: string,
-} }) & { Apply?: never; Collection?: never; Import?: never; Pack?: never; Requirement?: never; Tool?: never; Update?: never; UpdateAll?: never } | 
+} }) & { Apply?: never; Collection?: never; Import?: never; Loader?: never; Pack?: never; Requirement?: never; Tool?: never; Update?: never; UpdateAll?: never } | 
+/**  The install of a game's loader package. One game has one loader row at a time. */
+({ Loader: {
+	/**  The game the loader is installed into. */
+	game: string,
+} }) & { Apply?: never; Collection?: never; Import?: never; Pack?: never; PackLink?: never; Requirement?: never; Tool?: never; Update?: never; UpdateAll?: never } | 
 /**  A tool run or a tool's prerequisite install, keyed by game and tool. */
 ({ Tool: {
 	/**  The game the tool belongs to. */
 	game: string,
 	/**  The tool's id in the game definition. */
 	tool: string,
-} }) & { Apply?: never; Collection?: never; Import?: never; Pack?: never; PackLink?: never; Requirement?: never; Update?: never; UpdateAll?: never } | 
+} }) & { Apply?: never; Collection?: never; Import?: never; Loader?: never; Pack?: never; PackLink?: never; Requirement?: never; Update?: never; UpdateAll?: never } | 
 /**  Work without a typed identity yet, such as a row restored from a journal written before this field existed. */
 "Other";
 

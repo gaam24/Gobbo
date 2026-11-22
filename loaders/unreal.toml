@@ -1,0 +1,79 @@
+# Unreal Engine 4 and 5. The game sets `deploy.root` to its project folder, the one that holds `Content/` and
+# `Binaries/` (for example `{game}/Pal`); every rule below is relative to that root.
+#
+# `pak` is the shared layout: cooked `.pak` files, UE5 IoStore (`.utoc`/`.ucas`) and the `LogicMods` folder that UE4SS
+# reads. `ue4ss-4` and `ue4ss-3` add the Lua/C++ mod folder of UE4SS 4.x and 3.x and UE4SS's verified release. Once
+# an enabled mod needs UE4SS, the mod list shows an Install UE4SS button and the apply waits until an enabled mod (or
+# a manual install) provides the `check` files. A game may name its own build; Palworld uses the Palworld build.
+
+schema = 1
+id = "unreal"
+name = "Unreal Engine"
+min_gobbo = "0.1.1"
+default_variant = "pak"
+
+[deploy]
+# A cooked pak, its IoStore containers and its signature keep their names in one folder. UE mounts them from there;
+# the file names decide the order, so Gobbo does not rename them. The root-folder rule wraps an archive shaped as
+# `<Mod>/<Mod>.pak` without losing the mod name in the library.
+[[deploy.slots]]
+dir = "Content/Paks/~mods"
+flat = true
+extensions = [".pak", ".utoc", ".ucas", ".sig"]
+root_extensions = [".pak", ".utoc", ".ucas", ".sig"]
+root_folder_extensions = [".pak", ".utoc", ".ucas"]
+
+# Blueprint mods. UE4SS's BPModLoaderMod copies a level actor out of these paks, so they must not be flattened into
+# `~mods`. Without UE4SS the game ignores the folder; the mod is still placed where a later install will find it.
+[[deploy.mirror]]
+dir = "Content/Paks/LogicMods"
+extensions = [".pak", ".utoc", ".ucas", ".sig", ".lua"]
+
+# Archives often keep the game's folder names at their root, for example `~mods/Foo.pak` or `LogicMods/Foo.pak`.
+[deploy.aliases]
+"~mods" = "Content/Paks/~mods"
+LogicMods = "Content/Paks/LogicMods"
+
+# Pak and IoStore mods only. The default, so a game that does not use UE4SS still gets the shared layout.
+[variants.pak]
+
+# UE4SS 4.x keeps everything except the proxy under `ue4ss/`. A Lua mod is `<Mod>/Scripts/main.lua`, a C++ mod is
+# `<Mod>/dlls/main.dll`; both markers point at the same mod folder. `enabled.txt` makes UE4SS load the mod without an
+# edit to `mods.txt`, which belongs to UE4SS itself.
+#
+# The package is UE4SS's own release. Installing it imports the zip into the library as one mod whose files keep their
+# game paths under `to`, so UE4SS reaches the game through the overlay and the game folder stays clean; dropping the
+# same zip onto the window does the same. Only Lua/C++ mods and Blueprint paks need it: a list of plain paks in `~mods`
+# does not ask for UE4SS.
+[variants."ue4ss-4"]
+[variants."ue4ss-4".install]
+name = "UE4SS"
+version = "4.0.0"
+to = "Binaries/Win64"
+check = ["Binaries/Win64/dwmapi.dll", "Binaries/Win64/ue4ss/UE4SS.dll"]
+needed_by = ["Binaries/Win64/ue4ss/Mods", "Content/Paks/LogicMods"]
+url = "https://github.com/UE4SS-RE/RE-UE4SS/releases/download/v4.0.0/UE4SS_v4.0.0.zip"
+sha256 = "251ad0d1381a241750e036f5918cbf2b5d7ec58ebc608cb2dd09d459d0c81e45"
+size = 8758673
+
+[[variants."ue4ss-4".deploy.slots]]
+dir = "Binaries/Win64/ue4ss/Mods"
+markers = ["Scripts", "dlls"]
+enable_file = "enabled.txt"
+
+# UE4SS 3.x and 2.x keep `Mods/` directly in the executable folder. The mod layout is otherwise the same.
+[variants."ue4ss-3"]
+[variants."ue4ss-3".install]
+name = "UE4SS"
+version = "3.0.1"
+to = "Binaries/Win64"
+check = ["Binaries/Win64/dwmapi.dll", "Binaries/Win64/UE4SS.dll"]
+needed_by = ["Binaries/Win64/Mods", "Content/Paks/LogicMods"]
+url = "https://github.com/UE4SS-RE/RE-UE4SS/releases/download/v3.0.1/UE4SS_v3.0.1.zip"
+sha256 = "4b47d4bceddd2f561a4e395bfa00924ccfc945af576a2d0c613e6537846c57ec"
+size = 5523402
+
+[[variants."ue4ss-3".deploy.slots]]
+dir = "Binaries/Win64/Mods"
+markers = ["Scripts", "dlls"]
+enable_file = "enabled.txt"

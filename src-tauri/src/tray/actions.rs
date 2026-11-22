@@ -91,7 +91,8 @@ fn open_step(app: &AppHandle, action: NextAction) {
             open_view(app, "game-settings");
         }
 
-        NextAction::FixProblems
+        NextAction::InstallLoader
+        | NextAction::FixProblems
         | NextAction::ImportMods
         | NextAction::EnableMods
         | NextAction::Apply

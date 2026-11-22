@@ -39,8 +39,10 @@ mod profiles;
 mod proxies;
 mod requirements;
 mod settings;
+mod setup;
 mod snapshots;
 mod unity;
+mod unreal;
 mod updates;
 mod winners;
 
@@ -70,6 +72,9 @@ const EXTERNAL_GAME: &str = test_games::EXTERNAL_ID;
 
 /// A fixture that requires a loader in the game folder.
 const PLUGIN_GAME: &str = test_games::PLUGIN_ID;
+
+/// The Unreal fixture, whose mod layout comes from the shipped preset.
+const UNREAL_GAME: &str = test_games::UNREAL_ID;
 
 /// A fresh folder, separate for each test. It holds a test game and a settings folder, nothing real.
 struct Fixture {

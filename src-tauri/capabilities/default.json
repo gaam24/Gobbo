@@ -87,6 +87,7 @@
     "allow-managed-games",
     "allow-scan-games",
     "allow-open-requirement-page",
+    "allow-install-loader",
     "allow-add-game",
     "allow-check-game-folder",
     "allow-remove-game",

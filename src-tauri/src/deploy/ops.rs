@@ -122,15 +122,19 @@ pub fn apply_deployment_cancellable(
         PlanMode::Full,
     );
 
-    if !game.requires.is_empty() {
+    if !game.requires.is_empty() || game.install.is_some() {
         let placed = deploy_plan.placed_keys();
 
-        if let Some(file) = game
-            .unmet_requirement(std::path::Path::new(&settings.game_root), |key| {
-                placed.contains(key)
-            })
+        if let Some(file) =
+            game.unmet_requirement(std::path::Path::new(&settings.game_root), &placed)
         {
             return Err(AppError::user("deploy.requirement_missing").with("path", file));
+        }
+
+        if let Some(install) = game.missing_loader(&target.root, &deploy_plan, &placed) {
+            return Err(
+                AppError::user(crate::error::LOADER_MISSING_DEPLOY).with("name", &install.name)
+            );
         }
     }
 

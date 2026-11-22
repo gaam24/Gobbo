@@ -62,6 +62,9 @@ pub fn preview(text: &str, path: &Path) -> Result<DefinitionPreview, AppError> {
                 examples: Vec::new(),
             });
         entry.files += 1;
+        if entry.slot.is_empty() && !item.slot.is_empty() {
+            entry.slot.clone_from(&item.slot);
+        }
 
         if entry.examples.len() < 12 {
             let from = archive
@@ -74,6 +77,25 @@ pub fn preview(text: &str, path: &Path) -> Result<DefinitionPreview, AppError> {
                 format!("{}/{}", item.slot, item.rel)
             };
             entry.examples.push(PreviewFile { from, to });
+        }
+    }
+
+    for (group, file) in &plan.enable_files {
+        let Some(entry) = mods.get_mut(group) else {
+            continue;
+        };
+        entry.files += 1;
+
+        if entry.examples.len() < 12 {
+            let to = if entry.slot.is_empty() {
+                file.clone()
+            } else {
+                format!("{}/{}", entry.slot, file)
+            };
+            entry.examples.push(PreviewFile {
+                from: file.clone(),
+                to,
+            });
         }
     }
 

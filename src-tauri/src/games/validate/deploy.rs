@@ -71,13 +71,33 @@ impl GameDef {
         for slot in &deploy.slots {
             let what = format!("slot {}", slot.dir);
 
-            if slot.flat && slot.marker.is_some() {
+            if slot.flat && (slot.marker.is_some() || !slot.markers.is_empty()) {
                 problems.push(format!(
                     "{what}: a flat slot keeps no mod folders, so it cannot use a marker"
                 ));
             }
 
+            if slot.flat && slot.enable_file.is_some() {
+                problems.push(format!(
+                    "{what}: a flat slot keeps no mod folders, so it cannot write an enable file"
+                ));
+            }
+
+            if let Some(file) = &slot.enable_file {
+                let valid = !file.is_empty()
+                    && file.trim() == file
+                    && !file.contains(['/', '\\'])
+                    && crate::domain::naming::safe_file_name(file) == *file;
+
+                if !valid {
+                    problems.push(format!(
+                        "{what}: enable_file must be one valid file name: {file:?}"
+                    ));
+                }
+            }
+
             problems.relative(&what, &slot.marker);
+            problems.relative(&what, &slot.markers);
             problems.extensions(
                 &what,
                 slot.extensions

@@ -53,7 +53,8 @@
   tasks and running games, `menu.rs` turns it into a native menu, `actions.rs` calls the existing use cases, `labels.rs`
   holds the words the window sends, and `state.rs` remembers the last game and busy state), `settings/`
   (app settings, the OS handlers of the provider download links in `links.rs`,
-  the games the user added, restored, removed and their storage in `managed.rs`), `diagnostics/`, `snapshots/` (the
+  the games the user added, restored, removed and their storage in `managed.rs`), `setup/` (the loader package a game
+  can install: the setup view, the verified download, its import as a library mod and turning it on), `diagnostics/`, `snapshots/` (the
   snapshot manifest, capture, restore and view, with the command entry points in `mod.rs`; a snapshot holds the
   profile's list and user-data choices, the legacy store, every isolated set and the overwrite layer), `overwrite/`
   and `mods/`.

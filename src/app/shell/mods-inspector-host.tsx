@@ -78,6 +78,7 @@ function ModsInspectorView() {
 				onImport={pickArchives}
 				onDeploy={deploy}
 				onOpenDownloads={openDownloads}
+				onInstallLoader={() => void gameActions.installLoader(gameId)}
 				mode={wide ? "side" : "sheet"}
 				open={drawerOpen}
 				onOpenChange={setDrawerOpen}

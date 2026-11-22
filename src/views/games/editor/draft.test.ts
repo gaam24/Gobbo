@@ -47,6 +47,27 @@ describe("the game definition draft", () => {
 		expect(parseDraft(written).detect.linux_markers).toEqual(["Game.x86_64"]);
 	});
 
+	test("a loader package survives a round trip through the editor", () => {
+		const text =
+			'schema = 1\nid = "unreal"\nname = "Unreal"\n[install]\nname = "UE4SS"\nversion = "4.0.0"\nto = "Binaries/Win64"\ncheck = ["Binaries/Win64/ue4ss/UE4SS.dll"]\nurl = "https://example.com/ue4ss.zip"\nsha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"\n[detect]\n[deploy]\n[[deploy.slots]]\ndir = "Mods"\n';
+		const written = serializeDraft(parseDraft(text));
+		expect(written).toContain("[install]");
+		expect(written).toContain('name = "UE4SS"');
+		expect(written).toContain('version = "4.0.0"');
+		expect(written).toContain('to = "Binaries/Win64"');
+	});
+
+	test("the loader-only slot fields survive a round trip through the editor", () => {
+		const text =
+			'schema = 1\nid = "unreal"\nname = "Unreal"\n[deploy]\n[[deploy.slots]]\ndir = "Binaries/Win64/ue4ss/Mods"\nmarkers = ["Scripts", "dlls"]\nenable_file = "enabled.txt"\n';
+		const draft = parseDraft(text);
+		expect(draft.deploy.slots?.[0]?.markers).toEqual(["Scripts", "dlls"]);
+		expect(draft.deploy.slots?.[0]?.enable_file).toBe("enabled.txt");
+		const written = serializeDraft(draft);
+		expect(written).toContain('markers = [ "Scripts", "dlls" ]');
+		expect(written).toContain('enable_file = "enabled.txt"');
+	});
+
 	test("a loader string and a named variant round-trip", () => {
 		const base = { ...EMPTY_DRAFT, id: "unity", name: "Unity" };
 		expect(serializeDraft(setLoader(base, "bepinex", ""))).toContain('loader = "bepinex"');

@@ -290,7 +290,11 @@ export function ModsView({ gameId, status }: ModsViewProps) {
 									bisectRunning={status.bisect !== null}
 									onFindMod={() => void gameActions.bisectStart()}
 								/>
-								<ModsAlerts problems={status.problems} warnings={status.warnings} />
+								<ModsAlerts
+									problems={status.problems}
+									warnings={status.warnings}
+									onInstallLoader={() => void gameActions.installLoader(gameId)}
+								/>
 								<ImportVersionBanner
 									mods={pendingVersions}
 									onUse={(item) => {

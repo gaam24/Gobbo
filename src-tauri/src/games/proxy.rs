@@ -1,16 +1,18 @@
 //! The DLLs that a game loads from its program folder and that a mod can provide: a mod loader's proxy such as
-//! `winhttp.dll` or `version.dll`. Windows loads such a file from the program folder before its own copy, but Wine uses
-//! its own copy unless a DLL override asks for the file. So under Proton Gobbo asks for each proxy that is there.
+//! `winhttp.dll`, `version.dll` or `dwmapi.dll`. Windows loads such a file from the program folder before its own
+//! copy, but Wine uses its own copy unless a DLL override asks for the file. So under Proton Gobbo asks for each proxy
+//! that is there.
 
 use crate::games::GameDef;
 
-/// The loader DLLs that mod loaders and mods put next to a game's program. A game with another proxy lists it in its
-/// definition, as a root file or as a mirrored `.dll` (`bin/x64/version.dll`).
+/// The loader DLLs that mod loaders and mods put next to a game's program. A game with
+/// another proxy lists it in its definition, as a root file or as a mirrored `.dll` (`bin/x64/version.dll`).
 const LOADER_DLLS: &[&str] = &[
     "winhttp.dll",
     "winmm.dll",
     "version.dll",
     "dinput8.dll",
+    "dwmapi.dll",
     "dsound.dll",
     "xinput1_3.dll",
     "xinput1_4.dll",
@@ -77,6 +79,13 @@ mod tests {
         game.deploy.root_files.push("Hook.dll".to_string());
         let native = native_dlls(&game, "", |rel| rel == "Hook.dll");
         assert_eq!(native, ["Hook.dll"]);
+    }
+
+    #[test]
+    fn a_dwmapi_proxy_is_loaded_native_under_proton() {
+        let game = test_games::load("plugin");
+        let native = native_dlls(&game, "bin/x64", |rel| rel == "bin/x64/dwmapi.dll");
+        assert_eq!(native, ["dwmapi.dll"]);
     }
 
     #[test]

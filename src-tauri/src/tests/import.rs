@@ -124,6 +124,24 @@ fn the_archive_report_counts_every_unplaced_file_and_zero_when_there_are_none() 
 }
 
 #[test]
+fn an_archive_report_counts_the_generated_enable_file() {
+    let f = game_fixture("import-unreal-report", UNREAL_GAME, &["Project"]);
+    let zip = f.zip(
+        "Lua Mod.zip",
+        &[("BetterBeast/Scripts/main.lua", "print('hello')")],
+    );
+    import(&f.data, UNREAL_GAME, &zip, None, &mut |_, _| {}).unwrap();
+
+    let state = status(&f.data, UNREAL_GAME).unwrap();
+    let folder = state.mods[0].folder.clone();
+    let report = crate::import::archive_report(&f.data, UNREAL_GAME, &folder).unwrap();
+    assert_eq!(report.expected, 2);
+    assert_eq!(report.installed, 2);
+    assert!(report.missing.is_empty(), "{:?}", report.missing);
+    assert!(report.extra.is_empty(), "{:?}", report.extra);
+}
+
+#[test]
 fn an_archive_report_finds_changed_missing_and_extra_files() {
     let f = fixture("import-archive-report");
     let zip = f.zip("Report Mod.zip", &[("Mods/ReportMod/content/x.ws", "x")]);

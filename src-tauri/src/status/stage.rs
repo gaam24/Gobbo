@@ -45,6 +45,10 @@ pub enum SetupStep {
     Mods,
 }
 
+/// The status message of an enabled mod that needs the game's loader package while it is not installed. The mod list
+/// shows it with an install button, and it makes [`NextAction::InstallLoader`] the next action.
+pub const LOADER_MISSING: &str = "status.loader_missing";
+
 /// The one thing the user should do next. The frontend maps it to a label and an action.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
@@ -52,6 +56,8 @@ pub enum NextAction {
     SetGameFolder,
     SetSettingsFolder,
     SetModsFolder,
+    /// An enabled mod needs the game's loader package; one click installs it.
+    InstallLoader,
     FixProblems,
     ImportMods,
     EnableMods,
@@ -156,7 +162,15 @@ pub fn game_stage(input: StageInput<'_>) -> (GameStage, NextAction) {
             GameStage::Blocked {
                 reasons: input.problems.to_vec(),
             },
-            NextAction::FixProblems,
+            if input
+                .problems
+                .iter()
+                .any(|problem| problem.code == LOADER_MISSING)
+            {
+                NextAction::InstallLoader
+            } else {
+                NextAction::FixProblems
+            },
         );
     }
 
