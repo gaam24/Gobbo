@@ -40,7 +40,51 @@ pub fn migrate(root: &Data) -> Result<(), AppError> {
     let games = catalog()?;
     let _state = lock_state(root)?;
     migrate_with(root, &games);
+    repair_game_roots(root, &games);
     Ok(())
+}
+
+/// A game added before the Locate rule learned about wrapper folders may still point at `Game` while the real folder
+/// is `Game/Game`. Fix the saved root once, so an existing install can use the same rules as a newly added one.
+fn repair_game_roots(root: &Data, games: &[games::GameDef]) {
+    for game in games {
+        let data = root.game(&game.id);
+
+        if !data.dir.is_dir() {
+            continue;
+        }
+
+        let settings = load_settings(&data);
+        let current = std::path::PathBuf::from(settings.game_root.trim());
+
+        if settings.game_root.trim().is_empty() || games::detect::has_markers(&current, game) {
+            continue;
+        }
+
+        let Some(found) = games::detect::game_folder(&current, game, !cfg!(windows)) else {
+            continue;
+        };
+
+        if found == current {
+            continue;
+        }
+
+        let mut settings = settings;
+        settings.game_root = found.display().to_string();
+
+        match crate::context::save_settings(root, &game.id, settings) {
+            Ok(()) => crate::infra::log::info(format!(
+                "repaired the folder of {} from {} to {}",
+                game.id,
+                current.display(),
+                found.display()
+            )),
+            Err(error) => crate::infra::log::warn(format!(
+                "could not repair the folder of {}: {error}",
+                game.id
+            )),
+        }
+    }
 }
 
 /// Games added to Gobbo, in the order of their definitions, with folders from the settings.
@@ -142,4 +186,37 @@ fn catalog() -> Result<Vec<games::GameDef>, AppError> {
 fn migrate_with(root: &Data, games: &[games::GameDef]) {
     let known: Vec<String> = games.iter().map(|game| game.id.clone()).collect();
     crate::migrations::run(&root.dir, &known);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_support::{games as test_games, scratch, write};
+
+    #[test]
+    fn an_existing_wrapper_folder_is_repaired_to_the_only_matching_child() {
+        test_games::install();
+        let base = scratch!("repair-game-root");
+        let outer = base.join("Wrapper");
+        let inner = outer.join("Slot Game");
+        write(&inner.join("bin/game.exe"), "");
+        write(&inner.join("content/base"), "");
+        let game = test_games::slot();
+        let data = Data::new(base.join("data"));
+        crate::context::save_settings(
+            &data,
+            &game.id,
+            crate::context::Settings {
+                game_root: outer.display().to_string(),
+                ..crate::context::Settings::default()
+            },
+        )
+        .unwrap();
+
+        repair_game_roots(&data, std::slice::from_ref(&game));
+        assert_eq!(
+            load_settings(&data.game(&game.id)).game_root,
+            inner.display().to_string()
+        );
+    }
 }

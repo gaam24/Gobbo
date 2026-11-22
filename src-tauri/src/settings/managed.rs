@@ -30,13 +30,13 @@ fn game_folder_for(
 
     let path = PathBuf::from(game_root);
 
-    if !detect::has_markers_for(is_linux, &path, game) {
-        return Err(AppError::user("games.not_game_folder")
-            .with("path", game_root)
-            .with("game", &game.name));
+    if let Some(path) = detect::game_folder(&path, game, is_linux) {
+        return Ok(path);
     }
 
-    Ok(path)
+    Err(AppError::user("games.not_game_folder")
+        .with("path", game_root)
+        .with("game", &game.name))
 }
 
 /// Checks a game folder without adding the game. Returns the first of the game's marker files that the folder has, or
@@ -67,13 +67,13 @@ pub fn add_game(root: &Data, game_id: &str, game_root: &str) -> Result<Vec<Manag
     let _state = crate::context::managed::lock_state(root)?;
     let game = games::load(game_id)?;
     let path = game_folder(&game, game_root)?;
-    let game_root = game_root.trim();
+    let game_root = path.display().to_string();
     restore_removed(root, game_id)?;
     let current = crate::context::load_settings(&root.game(game_id));
     let home = crate::games::paths::home();
     let install = detect::classify_install(&home, &path);
     let mut settings = Settings {
-        game_root: game_root.to_string(),
+        game_root,
         source: install.store.to_string(),
         prefix_dir: install.prefix_text(),
         ..current
@@ -207,6 +207,24 @@ dir = "Mods"
             super::check_game_folder_in(&game, &linux.display().to_string(), true).unwrap(),
             None
         );
+    }
+
+    #[test]
+    fn locate_uses_the_only_child_that_has_the_markers() {
+        let base = scratch!("locate-wrapper");
+        let outer = base.join("AstralGames");
+        let inner = outer.join("Game");
+        write(&inner.join("Game.exe"), "");
+        let game = native_game();
+
+        assert_eq!(
+            super::check_game_folder_in(&game, &outer.display().to_string(), false).unwrap(),
+            Some("Game.exe".to_string())
+        );
+
+        let second = outer.join("Game Copy");
+        write(&second.join("Game.exe"), "");
+        assert!(super::check_game_folder_in(&game, &outer.display().to_string(), false).is_err());
     }
 
     #[test]

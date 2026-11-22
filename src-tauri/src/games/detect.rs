@@ -39,6 +39,22 @@ pub fn has_markers(root: &Path, game: &GameDef) -> bool {
     has_markers_for(!cfg!(windows), root, game)
 }
 
+/// The game folder, or the only immediate child that has the markers. A pre-installed game often keeps the real folder
+/// one level down (`Game/Game`); two matching children are ambiguous and give `None` when the parent does not match.
+pub fn game_folder(root: &Path, game: &GameDef, is_linux: bool) -> Option<PathBuf> {
+    if has_markers_for(is_linux, root, game) {
+        return Some(root.to_path_buf());
+    }
+
+    let mut children = fs::read_dir(root)
+        .ok()?
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|child| child.is_dir() && has_markers_for(is_linux, child, game));
+    let first = children.next()?;
+    children.next().is_none().then_some(first)
+}
+
 /// The marker rule with its platform given, so both sides can be tested on one machine. A folder qualifies when all
 /// `markers` exist or, on Linux, when all `linux_markers` exist. `any_marker` relaxes each set the same way; with no
 /// markers the folder itself is enough, and an empty `linux_markers` leaves the rule as it was.
