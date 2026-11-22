@@ -224,11 +224,12 @@ export const commands = {
 	 */
 	openRequirementPage: (game: string, path: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("open_requirement_page", { game, path })),
 	/**
-	 *  Installs the loader package a game names, after the user confirms it in the setup dialog. This is the one setup step
-	 *  that writes real files into the game folder; mods still deploy through the overlay. Runs as a task, so the Working
-	 *  panel shows the download and `cancel_task` can stop it before the files are written.
+	 *  Turns on a copy of the game's loader after a user click: a copy in the library the user picked, the official
+	 *  release, or (`auto`, the quick action) a library copy before a download. The loader is a mod in the library and
+	 *  reaches the game through the overlay; the game folder is not written. Runs as a task, so the Working panel shows a
+	 *  download and `cancel_task` can stop it before the import.
 	 */
-	installLoader: (game: string) => typedError<LoaderSetupView_Serialize, AppError_Serialize>(__TAURI_INVOKE("install_loader", { game })),
+	installLoader: (game: string, choice: LoaderChoice) => typedError<LoaderSetupView_Serialize, AppError_Serialize>(__TAURI_INVOKE("install_loader", { game, choice })),
 	/**  Adds a game with its folder. Answers the games added to Gobbo. */
 	addGame: (game: string, gameRoot: string) => typedError<ManagedGame[], AppError_Serialize>(__TAURI_INVOKE("add_game", { game, gameRoot })),
 	/**  Checks a folder for a game before the game is added. The result is the marker file the folder has, if the game names one. */
@@ -3012,6 +3013,42 @@ export type LaunchSteps = {
 	ready_wait_us: number,
 };
 
+/**  Which copy of the loader `install_loader` turns on. */
+export type LoaderChoice = 
+/**  The quick action: a copy already in the library (the official release first), else the official download. */
+{ kind: "auto" } | 
+/**  The release the definition names: its copy in the library, or the verified download. */
+{ kind: "official" } | 
+/**  One library copy, for example a build a mod site publishes for this game. */
+{ kind: "library"; folder: string };
+
+/**  One copy of the loader in the library: a mod that ships every check file. */
+export type LoaderCopyView = LoaderCopyView_Serialize | LoaderCopyView_Deserialize;
+
+/**  One copy of the loader in the library: a mod that ships every check file. */
+export type LoaderCopyView_Deserialize = {
+	/**  The library folder, which `install_loader` takes to pick this copy. */
+	folder: string,
+	name: string,
+	version?: string | null,
+	/**  Unpacked from the exact release the definition names (same SHA-256). */
+	official: boolean,
+	/**  Enabled in the active profile. */
+	enabled: boolean,
+};
+
+/**  One copy of the loader in the library: a mod that ships every check file. */
+export type LoaderCopyView_Serialize = {
+	/**  The library folder, which `install_loader` takes to pick this copy. */
+	folder: string,
+	name: string,
+	version: string | null,
+	/**  Unpacked from the exact release the definition names (same SHA-256). */
+	official: boolean,
+	/**  Enabled in the active profile. */
+	enabled: boolean,
+};
+
 /**
  *  A loader preset the editor can offer. `places` and `requires` are the base rules; each variant has the rules of the
  *  preset with that variant merged over it, which is what the game would get.
@@ -3050,7 +3087,12 @@ export type LoaderPresetView_Serialize = {
 	problems: string[],
 };
 
-export type LoaderSetupState = "missing" | "installed" | "update";
+export type LoaderSetupState = "missing" | "installed" | 
+/**
+ *  The enabled copy is an older official release. A build from a mod site is never reported as outdated: it is
+ *  the user's choice, and the official release stays one click away.
+ */
+"update";
 
 /**  What the setup UI needs to know about the loader package of a game. */
 export type LoaderSetupView = LoaderSetupView_Serialize | LoaderSetupView_Deserialize;
@@ -3060,7 +3102,7 @@ export type LoaderSetupView_Deserialize = {
 	name: string,
 	/**  The version the definition offers. */
 	version: string,
-	/**  The version of the copy in the library, or `None` when it has none (installed by hand, or not installed). */
+	/**  The version of the enabled copy, or `None` when it has none (installed by hand, or not installed). */
 	installed_version?: string | null,
 	state: LoaderSetupState,
 	/**  The archive link. */
@@ -3071,8 +3113,13 @@ export type LoaderSetupView_Deserialize = {
 	 *  below the 4 GiB that fit in the IPC type.
 	 */
 	size: number,
-	/**  The deployment-root-relative folder the release's files are served in. */
+	/**  The deployment-root-relative folder the release's files are served in. Empty means the deployment root. */
 	target: string,
+	/**
+	 *  Every copy of the loader in the library, the official release and builds from mod sites alike. The user picks
+	 *  which one the active profile uses.
+	 */
+	copies: LoaderCopyView_Deserialize[],
 };
 
 /**  What the setup UI needs to know about the loader package of a game. */
@@ -3080,7 +3127,7 @@ export type LoaderSetupView_Serialize = {
 	name: string,
 	/**  The version the definition offers. */
 	version: string,
-	/**  The version of the copy in the library, or `None` when it has none (installed by hand, or not installed). */
+	/**  The version of the enabled copy, or `None` when it has none (installed by hand, or not installed). */
 	installed_version: string | null,
 	state: LoaderSetupState,
 	/**  The archive link. */
@@ -3091,8 +3138,13 @@ export type LoaderSetupView_Serialize = {
 	 *  below the 4 GiB that fit in the IPC type.
 	 */
 	size: number,
-	/**  The deployment-root-relative folder the release's files are served in. */
+	/**  The deployment-root-relative folder the release's files are served in. Empty means the deployment root. */
 	target: string,
+	/**
+	 *  Every copy of the loader in the library, the official release and builds from mod sites alike. The user picks
+	 *  which one the active profile uses.
+	 */
+	copies: LoaderCopyView_Serialize[],
 };
 
 /**  A loader preset that seems to be installed in a game folder. The editor preselects it. */

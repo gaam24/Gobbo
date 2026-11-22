@@ -1,5 +1,6 @@
-//! The confirmed install of a game's loader package: download and verify the release, import it into the library as one
-//! mod, and enable it in the active profile. The game folder is never written; the overlay serves the loader.
+//! The confirmed install of a game's loader package: pick a copy in the library or download and verify the official
+//! release, import it into the library as one mod, and make it the one enabled copy in the active profile. The game
+//! folder is never written; the overlay serves the loader.
 
 use std::fs;
 use std::path::Path;
@@ -16,15 +17,21 @@ use crate::infra::http::download;
 use crate::infra::io::digest_file;
 use crate::infra::tasks::{cancelled, stop_if};
 
+use super::LoaderChoice;
+
 /// A loader release is small. The limit stops a damaged or hostile link from filling the disk.
 const MAX_BYTES: u64 = 512 * 1024 * 1024;
 
-/// Installs the game's loader package. Only a user click calls this. A copy already in the library is enabled as it is;
-/// otherwise the verified release is downloaded and imported first. `progress` gets the download percent.
+/// Turns on one copy of the game's loader in the active profile and turns off every other copy, so two loaders never
+/// fight over the same proxy. Only a user click calls this. `choice` decides the copy: a library copy the user picked
+/// (for example a build a mod site publishes for this game), the official release (downloaded and verified when the
+/// library does not hold it), or, for the quick action, a copy already in the library before a download. `progress`
+/// gets the download percent.
 pub fn install(
     data: &Data,
     game: &GameDef,
     settings: &Settings,
+    choice: &LoaderChoice,
     cancel: &AtomicBool,
     progress: &mut dyn FnMut(u32),
 ) -> Result<super::LoaderSetupView, AppError> {
@@ -34,18 +41,27 @@ pub fn install(
         .ok_or_else(|| AppError::user("loader.none"))?;
     let game_data = data.game(&game.id);
     let library = crate::context::load_library_shared(&game_data, game)?;
-    // A copy of this version, or one the user imported by hand without a version, is used as it is.
-    let reusable = super::library_copy(&library, install)
-        .filter(|copy| {
-            copy.info
-                .version
-                .as_deref()
-                .is_none_or(|version| version == install.version)
-        })
-        .map(|copy| copy.folder.clone());
-    drop(library);
+    let profiles = crate::context::data::load_profiles_shared(&game_data)?;
+    let copies = super::copies(&library, profiles.active(), install);
+    drop((library, profiles));
 
-    let folder = if let Some(folder) = reusable {
+    let picked = match choice {
+        LoaderChoice::Library { folder } => Some(
+            copies
+                .iter()
+                .find(|copy| copy.folder == *folder)
+                .map(|copy| copy.folder.clone())
+                .ok_or_else(|| AppError::user("loader.copy_unknown").with("folder", folder))?,
+        ),
+        LoaderChoice::Official => copies
+            .iter()
+            .find(|copy| copy.official)
+            .map(|copy| copy.folder.clone()),
+        // The copies are sorted: the enabled one, the official release, then the newest import.
+        LoaderChoice::Auto => copies.first().map(|copy| copy.folder.clone()),
+    };
+
+    let folder = if let Some(folder) = picked {
         folder
     } else {
         let folder = download_and_import(data, game, install, cancel, progress)?;
@@ -64,10 +80,14 @@ pub fn install(
         folder
     };
 
-    // A new mod joins the profiles turned off; adopt it, then turn it on in the active profile.
+    // A new mod joins the profiles turned off; adopt it, then make it the one enabled copy in the active profile.
     crate::status::sync_profiles(data, &game.id)?;
-    let family = family_of(data, game, &folder)?;
-    crate::profiles::edits::set_mod_enabled(data, &game.id, &family, true)?;
+    let others: Vec<String> = copies
+        .iter()
+        .filter(|copy| copy.folder != folder)
+        .map(|copy| copy.folder.clone())
+        .collect();
+    crate::profiles::edits::use_only(data, &game.id, &folder, &others)?;
 
     super::view(data, game, settings)?
         .ok_or_else(|| AppError::unexpected("the installed loader disappeared from the definition"))

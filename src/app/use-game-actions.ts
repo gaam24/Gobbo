@@ -3,6 +3,7 @@ import type { GameRuntime } from "@/app/selectors/game-presentation";
 import {
 	commands,
 	type DeployProgress,
+	type LoaderChoice,
 	type ManagedGame,
 	type Message,
 	type ModGroup,
@@ -52,6 +53,9 @@ interface GameBusy {
 	updateKind: "update" | "requirement";
 	updateModName: string | null;
 }
+
+/// The quick loader action: a copy already in the library first, else the official download.
+const AUTO_LOADER: LoaderChoice = { kind: "auto" };
 
 const IDLE_BUSY: GameBusy = {
 	busy: null,
@@ -663,16 +667,17 @@ export function useGameActions({
 		return installed;
 	};
 
-	/// Installs a game's mod loader from its verified source. The Working panel shows the download; one
-	/// install per game runs at a time. The status is read again, so the list stops asking for the loader.
+	/// Turns on a copy of a game's mod loader: a copy in the library, or the official release from its verified source.
+	/// `auto`, the quick action, prefers a copy already in the library. The Working panel shows a download; one install
+	/// per game runs at a time. The status is read again, so the list stops asking for the loader.
 	const loaderInstalls = useRef(new Set<string>());
-	const installLoader = async (gameId: string) => {
+	const installLoader = async (gameId: string, choice: LoaderChoice = AUTO_LOADER) => {
 		if (loaderInstalls.current.has(gameId)) return false;
 		loaderInstalls.current.add(gameId);
 
 		try {
 			const installed = await attempt(async () => {
-				const view = await unwrap(commands.installLoader(gameId));
+				const view = await unwrap(commands.installLoader(gameId, choice));
 				notify(t("notice.loaderInstalled", { name: view.name }));
 			});
 

@@ -25,10 +25,16 @@ the test.
 The Witcher: Enhanced Edition currently covers loose files only. Custom adventures, campaign modules, language packs
 and installer-based overhauls are not managed yet.
 
-BepInEx still needs a manual install, including for TCG Card Shop Simulator. UE4SS installs with one click: as soon as
-an enabled mod needs it, the mod list shows **Install UE4SS**; dropping the UE4SS download onto Gobbo adds it too.
-Gobbo adds UE4SS to your mods and turns it on; like every mod it reaches the game through the overlay, so the game
-folder stays clean. Plain pak mods work without UE4SS. The Script Merger for The Witcher 3 comes from its Nexus mod, with the .NET runtime it needs on Linux.
+BepInEx 5 and UE4SS install with one click: as soon as an enabled mod needs the loader, the mod list shows
+**Install BepInEx** or **Install UE4SS**; dropping the loader's download onto Gobbo adds it too. Gobbo adds the loader
+to your mods and turns it on; like every mod it reaches the game through the overlay, so the game folder stays clean.
+Plain pak mods work without UE4SS.
+
+You are never tied to the official release. Many games have a build of the loader on Nexus or Thunderstore made for
+them (TCG Card Shop Simulator, for example), and mods there expect it. Import that build like any mod: the install
+button then turns it on instead of downloading. **Setup check** lists every copy of the loader in your mods, shows
+the one in use, and lets you switch between them and the official release; the others stay in your mods, turned off.
+BepInEx 6 (IL2CPP games) is still a manual install from its release page. The Script Merger for The Witcher 3 comes from its Nexus mod, with the .NET runtime it needs on Linux.
 
 Palworld uses the shared `unreal` loader preset. The game definition names its project folder, `Pal`, so the preset's
 `Content/Paks/~mods`, `LogicMods` and `Binaries/Win64/ue4ss/Mods` paths land in the right place. The install button

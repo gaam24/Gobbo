@@ -69,6 +69,35 @@ pub fn set_mod_enabled(root: &Data, game: &str, id: &str, enabled: bool) -> Resu
     save_profiles(&data, &profiles)
 }
 
+/// Selects the library version `folder` for its family and enables it in the active profile, and disables the entries
+/// that use one of the `others` versions. Only those entries change, not their groups: the loader setup uses this to
+/// keep one copy of a loader enabled, and a group with an unrelated mod must not follow it.
+pub fn use_only(root: &Data, game: &str, folder: &str, others: &[String]) -> Result<(), AppError> {
+    let definition = root.definition(game)?;
+    let data = root.game(game);
+    let library = load_library_shared(&data, &definition)?;
+    let family = library
+        .versions
+        .get(folder)
+        .map(|version| version.family.clone())
+        .ok_or_else(|| AppError::user("library.version_unknown").with("folder", folder))?;
+    drop(library);
+    let _profiles = lock_profiles();
+    let mut profiles = load_profiles(&data)?;
+    profiles.active_entry_mut(&family)?;
+
+    for entry in &mut profiles.active_mut().mods {
+        if entry.id == family {
+            entry.folder = folder.to_string();
+            entry.enabled = true;
+        } else if others.contains(&entry.folder) {
+            entry.enabled = false;
+        }
+    }
+
+    save_profiles(&data, &profiles)
+}
+
 /// Creates one group from `ids`. A selection of fewer than two distinct mods is refused by the rule.
 pub fn group_mods(root: &Data, game: &str, ids: &[String]) -> Result<(), AppError> {
     let (data, _pages) = game_pages(root, game)?;

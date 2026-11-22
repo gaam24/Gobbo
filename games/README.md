@@ -316,7 +316,9 @@ The loader package a game can install: its name, version, the folder its release
 `needed_by` folders and an HTTPS source with a SHA-256. The loader preset normally carries the shared package; a game's
 `[install]` adds check paths or names its own build. Installing imports the release into the library as one mod at game
 paths, so the overlay serves it like every other mod. When an enabled mod needs the package, the mod list offers a
-one-click install. See the loader package section in
+one-click install. The package is offered, never forced: any enabled mod that ships the check files counts, so a build
+from a mod site works too, and the setup check lets the user pick a copy. `to` may be empty for a loader whose root is
+the deployment root. See the loader package section in
 [loaders/README.md](../loaders/README.md) for the fields and the safety rules.
 
 ### Path templates

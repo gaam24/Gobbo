@@ -11,8 +11,8 @@ loader = { id = "bepinex", variant = "6" }      # a named variant
 ```
 
 The game keeps its own `detect`, `executables`, `providers`, `user_data`, `tools`, `steps`, `load_order` and
-`deploy.root`: those belong to the game, not to the loader. A preset can only add `requires`, `requirements` and
-`[deploy]` rules.
+`deploy.root`: those belong to the game, not to the loader. A preset can only add `requires`, `requirements`,
+`install` and `[deploy]` rules.
 
 ## File shape
 
@@ -20,13 +20,8 @@ The game keeps its own `detect`, `executables`, `providers`, `user_data`, `tools
 schema = 1
 id = "bepinex"
 name = "BepInEx"
+min_gobbo = "0.1.1"
 default_variant = "5"
-
-# A requirement implies its path: winhttp.dll is required without a `requires` line.
-[[requirements]]
-name = "BepInEx"
-path = "winhttp.dll"
-url = "https://github.com/BepInEx/BepInEx/releases"
 
 [deploy]
 root_files = ["winhttp.dll", "doorstop_config.ini"]
@@ -55,13 +50,21 @@ dir = "BepInEx/patchers"
 [[deploy.mirror]]
 dir = "BepInEx/monomod"
 
-[variants."5"]
-[[variants."5".requirements]]
-name = "BepInEx 5"
-path = "BepInEx/core/BepInEx.dll"
-url = "https://github.com/BepInEx/BepInEx/releases"
+[variants."5".install]
+name = "BepInEx"
+version = "5.4.23.6"
+to = ""
+check = ["winhttp.dll", "BepInEx/core/BepInEx.dll"]
+url = "https://github.com/BepInEx/BepInEx/releases/download/v5.4.23.6/BepInEx_win_x64_5.4.23.6.zip"
+sha256 = "6c57a714a892efb4e9e1fef63d608a3391f30ec984031c465404e4ee381a0755"
+size = 642076
 
 [variants."6"]
+[[variants."6".requirements]]
+name = "BepInEx 6"
+path = "winhttp.dll"
+url = "https://github.com/BepInEx/BepInEx/releases"
+
 [[variants."6".deploy.mirror]]
 dir = "dotnet"
 ```
@@ -189,9 +192,45 @@ source, hash, size and the copy in the library, and offers an update when the de
 A game's own `[install]` adds check paths and `needed_by` folders, and may leave `name` and `version` out. When it names
 its own build with `url`, `sha256` and `size`, that build replaces the preset's: Palworld installs Okaetsu's Palworld
 build of UE4SS, which ships the game's `MemberVariableLayout.ini`, while the preset's `to`, check paths and `needed_by`
-folders still apply. A game can have one package. The package is data, so the same mechanism can serve BepInEx later.
+folders still apply. A game can have one package. The package is data; BepInEx 5 uses the same mechanism.
 
 A game with no install block keeps the older manual flow: a `[[requirements]]` entry names the file and links its page.
+
+## Loader packages are offered, never forced
+
+The package in `install` is the official release, but it is only one copy of the loader. Mod sites often publish a
+build of the loader for one game — a newer release, a pack with the game's fixes, or a bleeding-edge build — and mods on
+that site expect it. Gobbo treats every mod in the library that ships each `check` file as a copy of the loader:
+
+- The apply needs **an** enabled copy, whichever it is. Any enabled mod that provides the `check` files, or a manual
+  install in the deployment root, meets the package.
+- The setup check lists the copies with their name and version, marks the one in use and the official release (the copy
+  unpacked from the archive with the definition's SHA-256), and offers **Use this one** for each other copy and a
+  button for the official release. The one the user picks becomes the only enabled copy in the active profile; the
+  others stay in the library, turned off, so two loaders never fight over the same proxy.
+- The quick action (the header's **Install** button, the problems block and Getting started) turns on a copy that is
+  already in the library, the official release first and then the newest import, and downloads the official release
+  only when the library has none.
+- **Update available** is shown only for an older copy the official install put there. A build from a mod site is the
+  user's choice and is never reported as outdated.
+
+`to = ""` (or no `to`) means the release's root is the deployment root itself, as for BepInEx, whose proxy sits next to
+the game's program. When the game's own rules already put every `check` file at its game path, the importer keeps them:
+a BepInEx pack that bundles plugins still sends the plugins to their slot. Only when the rules cannot place the release
+(UE4SS below the program folder) does the release become one mod at game paths below the folder that holds its first
+program, so a repack wrapped in more folders lands where the original does and files outside it are skipped.
+
+## BepInEx
+
+`loaders/bepinex.toml` is the shared layout for Unity games. Variant `5` (Mono, the default) carries the official
+64-bit Windows release as its package, with `winhttp.dll` and `BepInEx/core/BepInEx.dll` as check files and an empty
+`needed_by`, so any enabled mod asks for the loader. Variant `6` (IL2CPP) names no package: BepInEx 6 is a pre-release
+whose core file names change between builds and IL2CPP games usually need a bleeding-edge build, so it requires the
+proxy and links the release page.
+
+BepInEx has no load-order file: a plugin declares the plugins it needs and BepInEx sorts them. The mod list order only
+decides which mod wins a file both ship. A 32-bit game, or a native Linux build that loads BepInEx through
+`run_bepinex.sh`, needs its own `[install]` with the matching release.
 
 A pak-only game can name `loader = "unreal"` and gets only the shared pak rules. UE4SS is a 64-bit Windows loader, so a
 32-bit game can still use the `pak` variant but not the `ue4ss-*` variants. A game whose bare paks live in

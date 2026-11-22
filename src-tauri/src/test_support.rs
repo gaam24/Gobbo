@@ -282,6 +282,7 @@ pub mod games {
     pub const LOADED_ID: &str = "loaded";
     pub const LOADED_DEFAULT_ID: &str = "loaded-default";
     pub const UNREAL_ID: &str = "unreal-fixture";
+    pub const UNITY_ID: &str = "unity-fixture";
 
     /// A game with a mod slot, a mirrored folder, shared files, an order file and a tool.
     pub const SLOT: &str = r#"
@@ -668,6 +669,22 @@ path = "Project/Binaries/Win64/game.exe"
 root = "{game}/Project"
 "#;
 
+    /// A Unity game that takes the shipped `BepInEx` preset, whose loader package installs into the game folder itself.
+    pub const UNITY: &str = r#"
+schema = 1
+id = "unity-fixture"
+name = "Unity Fixture"
+providers = { thunderstore = { key = "unity-fixture" } }
+loader = "bepinex"
+
+[detect]
+markers = ["game.exe"]
+
+[[executables]]
+name = "Game"
+path = "game.exe"
+"#;
+
     const ALL: &[(&str, &str)] = &[
         (SLOT_ID, SLOT),
         (MIRROR_ID, MIRROR),
@@ -681,6 +698,7 @@ root = "{game}/Project"
         (LOADED_ID, LOADED),
         (LOADED_DEFAULT_ID, LOADED_DEFAULT),
         (UNREAL_ID, UNREAL),
+        (UNITY_ID, UNITY),
     ];
 
     /// Writes the fixture definitions into one folder per process and points `games::load` at it. Called by `load`
@@ -787,6 +805,10 @@ root = "{game}/Project"
 
     pub fn unreal() -> GameDef {
         load(UNREAL_ID)
+    }
+
+    pub fn unity() -> GameDef {
+        load(UNITY_ID)
     }
 
     /// The definition with `\n` line endings. A Windows checkout may hold `\r\n`, and the tests search for `\n`.

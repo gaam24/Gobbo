@@ -49,15 +49,17 @@ pub async fn open_requirement_page(game: String, path: String) -> Result<(), App
     .await
 }
 
-/// Installs the loader package a game names, after the user confirms it in the setup dialog. This is the one setup step
-/// that writes real files into the game folder; mods still deploy through the overlay. Runs as a task, so the Working
-/// panel shows the download and `cancel_task` can stop it before the files are written.
+/// Turns on a copy of the game's loader after a user click: a copy in the library the user picked, the official
+/// release, or (`auto`, the quick action) a library copy before a download. The loader is a mod in the library and
+/// reaches the game through the overlay; the game folder is not written. Runs as a task, so the Working panel shows a
+/// download and `cancel_task` can stop it before the import.
 #[tauri::command]
 #[specta::specta]
 pub async fn install_loader(
     data: tauri::State<'_, crate::context::Data>,
     tasks: tauri::State<'_, crate::infra::tasks::TaskFlags>,
     game: String,
+    choice: crate::setup::LoaderChoice,
 ) -> Result<crate::setup::LoaderSetupView, AppError> {
     use crate::infra::tasks::{TaskKey, kind};
 
@@ -68,12 +70,19 @@ pub async fn install_loader(
         key,
         game,
         kind::LOADER,
-        |root, game, cancel, handle| {
+        move |root, game, cancel, handle| {
             let definition = games::load(game)?;
             let settings = crate::context::load_settings(&root.game(game));
-            crate::setup::install(root, &definition, &settings, cancel, &mut |percent| {
-                handle.progress(percent);
-            })
+            crate::setup::install(
+                root,
+                &definition,
+                &settings,
+                &choice,
+                cancel,
+                &mut |percent| {
+                    handle.progress(percent);
+                },
+            )
         },
     )
     .await

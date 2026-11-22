@@ -13,7 +13,7 @@ use crate::context::{Data, Settings};
 use crate::infra::io::digest_file;
 use crate::test_support::{games as test_games, make_zip, scratch};
 
-use super::{LoaderSetupState, install, view};
+use super::{LoaderChoice, LoaderSetupState, install, view};
 
 fn settings(root: &std::path::Path) -> Settings {
     Settings {
@@ -106,7 +106,15 @@ fn the_loader_becomes_one_enabled_mod_with_game_paths_and_the_game_folder_stays_
         view(&data, &game, &settings).unwrap().unwrap().state,
         LoaderSetupState::Missing
     );
-    let after = install(&data, &game, &settings, &not_cancelled(), &mut |_| {}).unwrap();
+    let after = install(
+        &data,
+        &game,
+        &settings,
+        &LoaderChoice::Auto,
+        &not_cancelled(),
+        &mut |_| {},
+    )
+    .unwrap();
     server.join().unwrap();
 
     assert_eq!(after.state, LoaderSetupState::Installed);
@@ -148,7 +156,15 @@ fn a_copy_in_the_library_is_enabled_without_a_download() {
     let (url, server) = serve(bytes);
     point_at(&mut game, url, hash, None);
     let settings = settings(&game_root);
-    install(&data, &game, &settings, &not_cancelled(), &mut |_| {}).unwrap();
+    install(
+        &data,
+        &game,
+        &settings,
+        &LoaderChoice::Auto,
+        &not_cancelled(),
+        &mut |_| {},
+    )
+    .unwrap();
     server.join().unwrap();
     let folder = enabled_folders(&data, &game.id).remove(0);
     let family = crate::context::load_library(&data.game(&game.id), &game)
@@ -166,7 +182,15 @@ fn a_copy_in_the_library_is_enabled_without_a_download() {
         "0".repeat(64),
         None,
     );
-    install(&data, &game, &settings, &not_cancelled(), &mut |_| {}).unwrap();
+    install(
+        &data,
+        &game,
+        &settings,
+        &LoaderChoice::Auto,
+        &not_cancelled(),
+        &mut |_| {},
+    )
+    .unwrap();
     assert_eq!(enabled_folders(&data, &game.id), [folder]);
 }
 
@@ -196,6 +220,7 @@ fn a_wrong_hash_imports_nothing() {
         &data,
         &game,
         &settings(&game_root),
+        &LoaderChoice::Auto,
         &not_cancelled(),
         &mut |_| {},
     )
@@ -221,6 +246,7 @@ fn a_download_larger_than_its_named_size_stops() {
         &data,
         &game,
         &settings(&game_root),
+        &LoaderChoice::Auto,
         &not_cancelled(),
         &mut |_| {},
     )
@@ -236,9 +262,215 @@ fn a_cancelled_install_downloads_nothing() {
         &data,
         &game,
         &settings(&game_root),
+        &LoaderChoice::Auto,
         &AtomicBool::new(true),
         &mut |_| {},
     )
     .unwrap_err();
     assert!(error.is_cancelled(), "{}", error.code);
+}
+
+/// A game folder and data folder for the Unity fixture, whose loader package installs into the game folder itself.
+fn unity_fixture(
+    name: &str,
+) -> (
+    std::path::PathBuf,
+    std::path::PathBuf,
+    Data,
+    crate::games::GameDef,
+) {
+    let base = scratch!(name);
+    let game_root = base.join("game");
+    fs::create_dir_all(&game_root).unwrap();
+    let data = Data::new(base.join("data"));
+    (base, game_root, data, test_games::unity())
+}
+
+/// A loader build as a mod site publishes it: wrapped in a folder, with a bundled plugin and the site's own files.
+fn site_build(base: &std::path::Path) -> std::path::PathBuf {
+    make_zip(
+        base,
+        "Owner-LoaderPack-9.9.9.zip",
+        &[
+            ("LoaderPack/winhttp.dll", "site proxy"),
+            ("LoaderPack/doorstop_config.ini", "settings"),
+            ("LoaderPack/BepInEx/core/BepInEx.dll", "site core"),
+            ("LoaderPack/BepInEx/plugins/Fix/Fix.dll", "bundled plugin"),
+            ("manifest.json", "{}"),
+        ],
+    )
+}
+
+fn official_release(base: &std::path::Path) -> (Vec<u8>, String) {
+    let zip = make_zip(
+        base,
+        "official.zip",
+        &[
+            ("winhttp.dll", "proxy"),
+            ("doorstop_config.ini", "settings"),
+            ("BepInEx/core/BepInEx.dll", "core"),
+        ],
+    );
+    let hash = digest_file::<Sha256>(&zip, &mut |_| {}).unwrap();
+    (fs::read(&zip).unwrap(), hash)
+}
+
+#[test]
+fn a_loader_build_with_a_plugin_keeps_the_game_rules_and_counts_as_the_loader() {
+    let (base, game_root, data, game) = unity_fixture("loader-site-build-paths");
+    let zip = site_build(&base);
+    let view = crate::test_support::import_from(
+        &data,
+        &game.id,
+        &zip,
+        None,
+        Some(crate::domain::source::SourceRef::new(
+            "thunderstore",
+            "Owner-LoaderPack",
+        )),
+        &mut |_, _| {},
+    )
+    .unwrap();
+    assert_eq!(view.folders.len(), 1);
+    let library = crate::context::load_library(&data.game(&game.id), &game).unwrap();
+    let copy = &library.versions[&view.folders[0]];
+    // The wrapper folder is gone, the proxy and core keep their game paths and the plugin is in the plugin slot.
+    assert_eq!(copy.slot, "BepInEx/plugins");
+    for file in [
+        "winhttp.dll",
+        "doorstop_config.ini",
+        "BepInEx/core/BepInEx.dll",
+    ] {
+        assert!(
+            copy.files.iter().any(|path| path == file),
+            "{file}: {:?}",
+            copy.files
+        );
+    }
+    assert!(
+        !copy
+            .files
+            .iter()
+            .any(|path| path.ends_with("manifest.json"))
+    );
+    let setup = view_of(&data, &game, &game_root);
+    assert_eq!(setup.copies.len(), 1);
+}
+
+fn view_of(
+    data: &Data,
+    game: &crate::games::GameDef,
+    game_root: &std::path::Path,
+) -> super::LoaderSetupView {
+    view(data, game, &settings(game_root)).unwrap().unwrap()
+}
+
+#[test]
+fn the_user_picks_between_a_build_from_a_mod_site_and_the_official_release() {
+    let (base, game_root, data, mut game) = unity_fixture("loader-site-or-official");
+    let settings = settings(&game_root);
+    let site = crate::test_support::import_from(
+        &data,
+        &game.id,
+        &site_build(&base),
+        None,
+        Some(crate::domain::source::SourceRef::new(
+            "thunderstore",
+            "Owner-LoaderPack",
+        )),
+        &mut |_, _| {},
+    )
+    .unwrap()
+    .folders
+    .remove(0);
+
+    let before = view(&data, &game, &settings).unwrap().unwrap();
+    assert_eq!(before.state, LoaderSetupState::Missing);
+    assert_eq!(before.target, "");
+    assert_eq!(before.copies.len(), 1);
+    assert!(!before.copies[0].official && !before.copies[0].enabled);
+
+    // The quick action turns on the copy in the library: no server answers, so a download would fail.
+    point_at(
+        &mut game,
+        "https://127.0.0.1:9/unused.zip".into(),
+        "0".repeat(64),
+        None,
+    );
+    let after = install(
+        &data,
+        &game,
+        &settings,
+        &LoaderChoice::Auto,
+        &not_cancelled(),
+        &mut |_| {},
+    )
+    .unwrap();
+    assert_eq!(
+        after.state,
+        LoaderSetupState::Installed,
+        "a site build is never outdated"
+    );
+    assert_eq!(
+        enabled_folders(&data, &game.id),
+        std::slice::from_ref(&site)
+    );
+
+    // The official release is one click away, and it replaces the site build in the profile.
+    let (bytes, hash) = official_release(&base);
+    let (url, server) = serve(bytes);
+    point_at(&mut game, url, hash, None);
+    let official = install(
+        &data,
+        &game,
+        &settings,
+        &LoaderChoice::Official,
+        &not_cancelled(),
+        &mut |_| {},
+    )
+    .unwrap();
+    server.join().unwrap();
+    assert_eq!(official.copies.len(), 2);
+    let official_copy = official.copies.iter().find(|copy| copy.official).unwrap();
+    assert!(official_copy.enabled);
+    assert_eq!(
+        enabled_folders(&data, &game.id),
+        std::slice::from_ref(&official_copy.folder)
+    );
+
+    // And back: the site build again, with the official copy turned off and kept in the library.
+    let back = install(
+        &data,
+        &game,
+        &settings,
+        &LoaderChoice::Library {
+            folder: site.clone(),
+        },
+        &not_cancelled(),
+        &mut |_| {},
+    )
+    .unwrap();
+    assert_eq!(back.copies.len(), 2);
+    assert_eq!(enabled_folders(&data, &game.id), [site]);
+    assert!(
+        !game_root.join("winhttp.dll").exists(),
+        "the game folder must stay untouched"
+    );
+}
+
+#[test]
+fn an_unknown_library_copy_is_refused() {
+    let (_base, game_root, data, game) = unity_fixture("loader-unknown-copy");
+    let error = install(
+        &data,
+        &game,
+        &settings(&game_root),
+        &LoaderChoice::Library {
+            folder: "missing".into(),
+        },
+        &not_cancelled(),
+        &mut |_| {},
+    )
+    .unwrap_err();
+    assert_eq!(error.code, "loader.copy_unknown");
 }
