@@ -84,10 +84,27 @@ impl Session {
     /// The layers of this session, as the platform sees them.
     pub fn layers(&self) -> Layers {
         Layers::new(
-            self.root.clone(),
+            self.view_root().to_path_buf(),
             Some(self.mods.clone()),
             self.overwrite.clone(),
         )
+    }
+
+    /// The folder the view is mounted on. `prepare` builds the mod layer as a mirror of the game folder when the
+    /// deployment root is the game folder or a folder inside it, so the view covers the game folder then; a root outside
+    /// the game folder is mounted on its own.
+    pub fn view_root(&self) -> &Path {
+        if crate::deploy::root_in_game(&self.root, &self.game_root).is_some() {
+            &self.game_root
+        } else {
+            &self.root
+        }
+    }
+
+    /// The layers as the game sees them from its own folder, where its programs and their proxy DLLs are. A root
+    /// outside the game folder holds none of the game's programs: `None`.
+    pub fn game_layers(&self) -> Option<Layers> {
+        crate::deploy::root_in_game(&self.root, &self.game_root).map(|_| self.layers())
     }
 
     /// The isolated redirects that add a mount outside the game folder.
@@ -109,8 +126,8 @@ pub fn mounts_path(state: &Path) -> PathBuf {
 pub fn mount_config(session: &Session) -> MountConfig {
     let mut mounts = vec![MountSpec {
         id: MountSpec::GAME_ID.to_string(),
-        guest: session.root.clone(),
-        root: session.root.clone(),
+        guest: session.view_root().to_path_buf(),
+        root: session.view_root().to_path_buf(),
         staging: Some(session.mods.clone()),
         upper: session.overwrite.clone(),
     }];
@@ -171,8 +188,10 @@ pub fn prepare_with_progress(
     // The old files are just hardlinks, so removing them does not touch the library or the game.
     let reused = matches_plan(plan, library, &session.mods, &inner)?;
     // The layer is removed under a game that still runs from it, so a rebuild waits until the overlay is free.
-    if !reused && in_use(&session.root) {
-        return Err(DeployError::OverlayInUse { path: session.root });
+    if !reused && in_use(session.view_root()) {
+        return Err(DeployError::OverlayInUse {
+            path: session.view_root().to_path_buf(),
+        });
     }
 
     if !reused && session.mods.exists() {

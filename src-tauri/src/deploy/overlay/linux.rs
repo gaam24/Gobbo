@@ -40,7 +40,7 @@ const MAX_LOWERDIR_LEN: usize = 250;
 impl Session {
     /// Layers from the top: the mod layer, then the game.
     fn lowerdir(&self) -> String {
-        format!("{}:{}", self.mods.display(), self.root.display())
+        format!("{}:{}", self.mods.display(), self.view_root().display())
     }
 
     /// The `mount -t overlay` options. The mod layer lies above the game, so its files win.
@@ -58,7 +58,7 @@ impl Session {
 /// options, the layer list must fit in what the kernel accepts, and a tiny overlay must really mount in a user namespace.
 /// The last check catches a kernel with unprivileged user namespaces disabled, which otherwise looks like a game crash.
 pub fn check(session: &Session) -> Result<(), DeployError> {
-    check_mount_path(&session.root)?;
+    check_mount_path(session.view_root())?;
     check_mount_path(&session.state)?;
     let lowerdir_len = session.lowerdir().len();
 
@@ -144,7 +144,7 @@ pub fn command(session: &Session, program: &str, args: &[String]) -> Command {
         ])
         .args(["sh", "-c", SCRIPT, "mm-overlay"])
         .arg(session.options())
-        .arg(&session.root)
+        .arg(session.view_root())
         .arg(&session.game_root)
         .arg(program)
         .args(args)

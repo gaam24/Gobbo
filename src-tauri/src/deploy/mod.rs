@@ -87,19 +87,26 @@ pub struct ApplyReport {
     pub files: usize,
 }
 
+/// Where a deployment root lies inside a game folder: empty for the game folder itself, `Data` for `{game}/Data`. `None`
+/// for a root outside the game. Links are resolved when the paths exist, so a symlinked game folder does not look like
+/// another place. The mod layer and the mounted view both follow this one rule.
+pub fn root_in_game(root: &Path, game_root: &Path) -> Option<PathBuf> {
+    let inside = |root: &Path, game: &Path| root.strip_prefix(game).ok().map(Path::to_path_buf);
+    inside(root, game_root).or_else(|| {
+        let (root, game) = (
+            fs::canonicalize(root).ok()?,
+            fs::canonicalize(game_root).ok()?,
+        );
+        inside(&root, &game)
+    })
+}
+
 impl Target {
     /// Where the deployment root lies inside the game folder: empty for the game folder itself, `Data` for
     /// `{game}/Data`. `None` for a root outside the game. Links are resolved when the paths exist, so a symlinked game
     /// folder does not look like another place.
     pub fn root_in_game(&self) -> Option<PathBuf> {
-        let inside = |root: &Path, game: &Path| root.strip_prefix(game).ok().map(Path::to_path_buf);
-        inside(&self.root, &self.game_root).or_else(|| {
-            let (root, game) = (
-                fs::canonicalize(&self.root).ok()?,
-                fs::canonicalize(&self.game_root).ok()?,
-            );
-            inside(&root, &game)
-        })
+        root_in_game(&self.root, &self.game_root)
     }
 
     /// The journal roots this deployment may touch. Undo refuses an entry outside them, because a journal is a file

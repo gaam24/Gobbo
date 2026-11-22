@@ -384,7 +384,8 @@ pub fn game_env(
 
 /// The DLLs of a launch that load native: the loader DLLs and the proxies of the definition that the launched view of
 /// the game has next to the program. `program` is the game's program relative to the game folder. The view is the overlay
-/// layer when the session's deployment root is the game folder; a game whose mods live elsewhere runs its own program
+/// layer seen from the game folder when the deployment root is the game folder or a folder inside it, so a proxy that a
+/// mod places next to the program is found there; a game whose mods live outside the game folder runs its own program
 /// folder, which the overlay does not change.
 pub fn native_dlls_for_launch(
     game: &GameDef,
@@ -393,17 +394,14 @@ pub fn native_dlls_for_launch(
     session: Option<&Session>,
 ) -> Vec<String> {
     let dir = crate::games::proxy::program_dir(program);
-    session
-        .filter(|session| session.root == session.game_root)
-        .map_or_else(
-            || crate::games::proxy::native_dlls(game, dir, |rel| game_root.join(rel).is_file()),
-            |session| {
-                let layers = session.layers();
-                crate::games::proxy::native_dlls(game, dir, |rel| {
-                    layers.resolve(rel, Path::is_file).is_some()
-                })
-            },
-        )
+    session.and_then(Session::game_layers).map_or_else(
+        || crate::games::proxy::native_dlls(game, dir, |rel| game_root.join(rel).is_file()),
+        |layers| {
+            crate::games::proxy::native_dlls(game, dir, |rel| {
+                layers.resolve(rel, Path::is_file).is_some()
+            })
+        },
+    )
 }
 
 pub fn has_overlay_session(state: &Path) -> Result<bool, AppError> {
@@ -426,6 +424,32 @@ mod tests {
     use crate::test_support::games as test_games;
     use crate::test_support::scratch;
     use std::fs;
+
+    #[test]
+    fn a_proxy_from_a_mod_under_a_deployment_root_inside_the_game_loads_native() {
+        let base = scratch!("launch-native-inner-root");
+        let game_root = base.join("game");
+        let program = "inner/bin/game.exe";
+        fs::create_dir_all(game_root.join("inner/bin")).unwrap();
+        fs::write(game_root.join(program), "").unwrap();
+        let session = Session::with_roots(
+            &base.join("state"),
+            &game_root.join("inner"),
+            &game_root,
+            Vec::new(),
+        );
+        let proxy = session.mods.join("inner/bin/version.dll");
+        fs::create_dir_all(proxy.parent().unwrap()).unwrap();
+        fs::write(&proxy, "proxy").unwrap();
+        let game = test_games::mirror();
+
+        assert_eq!(
+            native_dlls_for_launch(&game, &game_root, program, Some(&session)),
+            ["version.dll"],
+            "the loader mod's proxy is in the layer, not in the game folder"
+        );
+        assert!(native_dlls_for_launch(&game, &game_root, program, None).is_empty());
+    }
 
     #[test]
     fn a_launch_that_carries_the_settings_does_not_read_config_again() {

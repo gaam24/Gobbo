@@ -27,3 +27,7 @@ All notable changes to this project are documented in this file. The format foll
 - **Mods of a Windows game outside Steam stay in one place.** Gobbo waits for the game's first start instead of using a folder that changes after it.
 - **The Witcher 3, Cyberpunk 2077 and Tainted Grail are found from a GOG install too.** A GOG copy of these games appears on the Games page like a Steam copy.
 - **Locate finds the game inside the folder you pick.** When the game sits one level down, Gobbo uses that folder, and a game added that way before is repaired once.
+
+### Fixed
+
+- **Mods reach a game whose mod folder is inside the game folder.** The game now sees them, and a mod loader among them, at the paths it reads them from.

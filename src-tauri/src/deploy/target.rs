@@ -47,7 +47,18 @@ pub fn folder_readiness(
         game: is_dir(&settings.game_root),
         settings: !game.has_load_order() || is_dir(&settings.settings_dir) || settings_redirected,
         mods: if settings.mods_root.trim().is_empty() {
-            !game.has_external_root() || !mods_root.is_empty()
+            if game.has_external_root() {
+                // The overlay can cover a folder outside the game that does not exist yet; the user may create or
+                // point at it after the first launch.
+                !mods_root.is_empty()
+            } else if settings.game_root.trim().is_empty() {
+                // The game folder is the first missing folder; a mods folder cannot be judged before it is chosen.
+                true
+            } else {
+                // A root inside the game (including the game folder itself) must exist. A missing subfolder root
+                // means the wrong folder was picked.
+                is_dir(&mods_root)
+            }
         } else {
             is_dir(&settings.mods_root)
         },
