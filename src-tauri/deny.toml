@@ -2,8 +2,14 @@
 # Run from this folder: `cargo deny check`.
 
 [graph]
-# Check every target the workspace builds; Windows-only crates must be seen too.
-targets = []
+# The platforms Gobbo ships (PLATFORMS.md): Windows x64, the 32-bit and ARM64 Windows builds, and Linux. Crates that only
+# macOS, iOS, Android or WebAssembly builds use are not checked, because Gobbo never builds them.
+targets = [
+  "x86_64-pc-windows-msvc",
+  "i686-pc-windows-msvc",
+  "aarch64-pc-windows-msvc",
+  "x86_64-unknown-linux-gnu",
+]
 
 [advisories]
 version = 2
