@@ -15,6 +15,7 @@ use crate::deploy::remove::delete_mod;
 #[cfg(target_os = "linux")]
 use crate::deploy::remove::reinstall_mod;
 use crate::domain::deployment::DeploymentRecord;
+#[cfg(target_os = "linux")]
 use crate::launch::start::overlay_session_state;
 #[cfg(target_os = "linux")]
 use crate::profiles::actions::switch_profile;

@@ -154,6 +154,11 @@ fn serve(answers: Vec<Vec<u8>>) -> (String, JoinHandle<()>) {
             loop {
                 match listener.accept() {
                     Ok((mut stream, _)) => {
+                        // Windows gives an accepted socket the listener's non-blocking mode. A read that cannot wait
+                        // would skip the request, and closing the socket then resets the client's connection.
+                        stream
+                            .set_nonblocking(false)
+                            .expect("the accepted stream blocks");
                         let _ = stream.set_read_timeout(Some(Duration::from_secs(5)));
                         let mut request = [0_u8; 8192];
                         let _ = stream.read(&mut request);

@@ -79,7 +79,8 @@ pub enum IdKind {
     Gog,
     /// An Epic `AppName`, matched against `epic_ids`.
     Epic,
-    /// A Lutris game slug, matched against `lutris_slugs`.
+    /// A Lutris game slug, matched against `lutris_slugs`. Lutris is Linux-only, so Windows never has this kind.
+    #[cfg(not(windows))]
     Lutris,
 }
 
@@ -154,6 +155,7 @@ pub fn matches(game: &GameDef, candidate: &Candidate) -> bool {
     let ids = match candidate.kind {
         IdKind::Gog => &game.detect.gog_ids,
         IdKind::Epic => &game.detect.epic_ids,
+        #[cfg(not(windows))]
         IdKind::Lutris => &game.detect.lutris_slugs,
     };
     let opted_in = has(ids) || (candidate.store == Store::Heroic && has(&game.detect.heroic_slugs));
@@ -234,7 +236,7 @@ mod tests {
         ));
         assert!(!matches(
             &game,
-            &candidate(Store::Lutris, IdKind::Lutris, &root, "123")
+            &candidate(Store::Heroic, IdKind::Gog, &root, "SlotApp")
         ));
 
         // `heroic_slugs` names a Heroic app whose id is in no store list.

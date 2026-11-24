@@ -82,8 +82,16 @@ pub struct Detect {
     /// Heroic slugs, for a store that keeps a game under its own name.
     #[serde(default)]
     pub heroic_slugs: Vec<String>,
-    /// Lutris `game_slug` values.
+    /// Lutris `game_slug` values. Only the Linux build reads them, but every platform parses them, so one definition
+    /// file works on both systems.
     #[serde(default)]
+    #[cfg_attr(
+        windows,
+        allow(
+            dead_code,
+            reason = "Lutris is Linux-only; the field stays so a shared definition parses on Windows too"
+        )
+    )]
     pub lutris_slugs: Vec<String>,
     /// Files that identify the game folder, relative to it.
     #[serde(default)]

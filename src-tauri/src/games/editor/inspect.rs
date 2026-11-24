@@ -371,6 +371,7 @@ fn store_ids(folder: &Path) -> StoreIds {
         let list = match candidate.kind {
             super::super::stores::IdKind::Gog => &mut ids.gog,
             super::super::stores::IdKind::Epic => &mut ids.epic,
+            #[cfg(not(windows))]
             super::super::stores::IdKind::Lutris => &mut ids.lutris,
         };
 

@@ -457,7 +457,7 @@ mod tests {
         let home = scratch!("scan-many");
         let steam = steam_home(&home, &[]);
         let steam_root = install_slot(&steam, "Slot Game");
-        let gog_root = home.join("GOG Games/Slot Gog");
+        let gog_root = home.join("GOG Games").join("Slot Gog");
         // The GOG folder has the game files and one `goggame-*.info` file naming the product id.
         write(&gog_root.join("bin/game.exe"), "");
         write(&gog_root.join("content/base/x.txt"), "");

@@ -478,6 +478,8 @@ mod tests {
         assert_eq!(sets[0].kind, Kind::Saves);
     }
 
+    // An owned Proton prefix exists only on Linux: Windows runs a Windows install directly, with no prefix.
+    #[cfg(not(windows))]
     #[test]
     fn a_shared_set_uses_the_known_owned_prefix_before_the_first_launch() {
         let (data, mut game, settings, _) = fixture("user-data-owned-prefix");
@@ -614,9 +616,14 @@ default = "isolated"
             ..Settings::default()
         };
         let data = Data::new(base.join("data"));
-        let target =
-            crate::deploy::target::target_for(&game, &settings, data.profile_state("p1"), &profile)
-                .unwrap();
+        let target = crate::deploy::target::target_for(
+            &data,
+            &game,
+            &settings,
+            data.profile_state("p1"),
+            &profile,
+        )
+        .unwrap();
         assert_eq!(
             target.settings,
             Some(

@@ -127,7 +127,7 @@ fn copy_mapped_module(actual: &[u16], buffer: *mut u16, size: u32) -> u32 {
     let answer = guest_module_units(actual, &mut mapped);
     // The truncation path sets `ERROR_INSUFFICIENT_BUFFER`; the guard must not restore the original error over it.
     drop(last_error);
-    copy(answer, buffer, size)
+    copy_units(answer, buffer, size)
 }
 
 /// Copies the game path of a module path in a layer into the program's ANSI buffer.
