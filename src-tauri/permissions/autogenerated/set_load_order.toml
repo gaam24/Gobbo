@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-set-load-order"
+description = "Enables the set_load_order command without any pre-configured scope."
+commands.allow = ["set_load_order"]
+
+[[permission]]
+identifier = "deny-set-load-order"
+description = "Denies the set_load_order command without any pre-configured scope."
+commands.deny = ["set_load_order"]

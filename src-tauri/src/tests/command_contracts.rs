@@ -13,7 +13,7 @@ use crate::error::RecoveryAction;
 use crate::infra::tasks::TaskFlags;
 use crate::launch::tools::running::run_tool;
 use crate::profiles::actions::{
-    delete_profile, rename_profile, set_mod_priority, set_mod_version, set_profile_user_data,
+    delete_profile, rename_profile, set_load_order, set_mod_version, set_profile_user_data,
     switch_profile,
 };
 use crate::profiles::history::preview::preview_restore;
@@ -108,16 +108,10 @@ fn a_stale_list_names_the_mod_and_profile_it_points_at() {
         "library.mod_missing"
     );
     assert_eq!(
-        set_mod_priority(&f.data, MIRROR_GAME, "local:nope", Some(1))
+        set_load_order(&f.data, MIRROR_GAME, &["local:nope".to_string()])
             .unwrap_err()
             .code,
-        "profile.priority_unsupported"
-    );
-    assert_eq!(
-        set_mod_priority(&f.data, MIRROR_GAME, "local:nope", None)
-            .unwrap_err()
-            .code,
-        "library.mod_missing"
+        "profile.load_order_unsupported"
     );
     assert_eq!(
         delete_mod(&f.data, MIRROR_GAME, "local:nope")

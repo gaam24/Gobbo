@@ -20,6 +20,7 @@ behind **Advanced**, a `HelpHint`, or a technical log.
 | **Archive report**          | archive comparison  | The archive copy checked against the installed mod folder.                            |
 | **Needs attention**         | unmet requirements  | A mod needs another mod, a loader or a file the profile does not provide.             |
 | **Overrides / Overridden**  | wins / loses        | Which mod's copy of a shared file reaches the game.                                   |
+| **Load order**              | load priority       | The order the game loads the chosen mods in. Mods left out get no number.             |
 | **Group**                   | mod group           | A named set of mods in a profile that stays together in the list and switches as one. |
 | **Translation group**       | translation group   | A group whose first mod is the base and whose other mods are localized copies of it.  |
 | **Mod page**                | source / provider   | The page a mod comes from, such as Nexus Mods or Thunderstore.                        |

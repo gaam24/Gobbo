@@ -254,6 +254,7 @@ pub fn target(base: &Path) -> crate::deploy::Target {
         root: root.clone(),
         game_root: root,
         settings: None,
+        order_file: None,
         state: base.join("state"),
         user_data: Vec::new(),
     }
@@ -277,6 +278,8 @@ pub mod games {
     pub const USER_DATA_COPY_ID: &str = "user-data-copy";
     pub const PLUGIN_ID: &str = "plugin";
     pub const FLAT_ID: &str = "flat";
+    /// The slot game with a UE4SS-style list (`mods.txt`) in its deployment root instead of a settings folder.
+    pub const UE4SS_ORDER_ID: &str = "ue4ss-order";
     pub const ALIASED_ID: &str = "aliased";
     pub const LOADER_ID: &str = "fixture-loader";
     pub const LOADED_ID: &str = "loaded";
@@ -718,6 +721,18 @@ path = "game.exe"
                 fs::create_dir_all(&folder).unwrap();
                 fs::write(folder.join("game.toml"), text).unwrap();
             }
+
+            // The slot game with its order file moved into the deployment root, as UE4SS's `mods.txt` is.
+            let ue4ss = lf(SLOT)
+                .replacen("id = \"slot\"", &format!("id = \"{UE4SS_ORDER_ID}\""), 1)
+                .replacen(
+                    "format = \"mods_settings\"\nfile = \"{documents}/Slot Game/mods.settings\"",
+                    "format = \"ue4ss_mods_txt\"\nfile = \"Mods/mods.txt\"",
+                    1,
+                );
+            let folder = games.join(UE4SS_ORDER_ID);
+            fs::create_dir_all(&folder).unwrap();
+            fs::write(folder.join("game.toml"), ue4ss).unwrap();
 
             fs::create_dir_all(&loaders).unwrap();
             fs::write(loaders.join(format!("{LOADER_ID}.toml")), LOADER).unwrap();

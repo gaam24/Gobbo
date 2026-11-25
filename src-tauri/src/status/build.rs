@@ -18,7 +18,7 @@ use crate::deploy::target::is_ready;
 use crate::domain::library::{Library, LibraryView};
 use crate::domain::profiles::entry::ProfileMod;
 use crate::domain::profiles::{Profiles, ProfilesView};
-use crate::domain::resolver::PlanMode;
+use crate::domain::resolver::{ModInput, PlanMode, is_orderable};
 use crate::error::AppError;
 use crate::error::Message;
 use crate::error::io_at;
@@ -30,7 +30,9 @@ use crate::library::relations::{SourceLookup, UnmetRequirements, relation_warnin
 use crate::library::sync::sync_profiles as sync_profile_lists;
 use crate::status::bisect::bisect_view;
 use crate::status::stage::{StageInput, game_stage};
-use crate::status::views::{DeployedRow, ExecutableView, ProfileView, Status, UserDataView};
+use crate::status::views::{
+    DeployedRow, ExecutableView, LoadOrderRange, ProfileView, Status, UserDataView,
+};
 use rustc_hash::{FxHashMap, FxHasher};
 use std::fs;
 use std::hash::{Hash, Hasher};
@@ -113,7 +115,13 @@ pub(super) fn status_inner(
     let disk_folders = data.library_folders()?;
     let folder_check = data.folder_check(&library, &disk_folders);
     let mut problems = index_problems(&library, &listed, &folder_check);
-    let mut plan = plan_outcome(&data, &game, &settings, &profiles, &library, &listed);
+    // The planner's inputs of the list, built once: the plan and the load order flags both read them.
+    let inputs = library.inputs(&listed);
+    let orderable: Vec<bool> = inputs
+        .iter()
+        .map(|input| is_orderable(&game.deploy, input))
+        .collect();
+    let mut plan = plan_outcome(&data, &game, &settings, &profiles, &inputs);
     problems.append(&mut plan.problems);
 
     let lookup = SourceLookup::new(&view, &listed);
@@ -122,6 +130,7 @@ pub(super) fn status_inner(
         library: &library,
         view: &view,
         lookup: &lookup,
+        orderable: &orderable,
     };
     let mods = mod_views(
         &listed,
@@ -192,7 +201,7 @@ pub(super) fn status_inner(
         u32::try_from(mods.iter().filter(|view| view.enabled).count()).unwrap_or(u32::MAX);
     let input = StageInput {
         game_ready: ready.game_ready,
-        needs_settings_dir: game.has_load_order(),
+        needs_settings_dir: game.has_settings_file(),
         settings_ready: ready.settings_ready,
         needs_mods_root: game.has_external_root(),
         mods_ready: ready.mods_ready,
@@ -219,7 +228,11 @@ pub(super) fn status_inner(
         needs_mods_root: game.has_external_root(),
         mods_ready: ready.mods_ready,
         mods_root: ready.mods_root,
-        needs_settings_dir: game.has_load_order(),
+        needs_settings_dir: game.has_settings_file(),
+        load_order: game.load_order.as_ref().map(|order| LoadOrderRange {
+            priority_min: order.priority_min,
+            priority_max: order.priority_max,
+        }),
         deployed,
         draft_changes,
         deployed_at,
@@ -371,8 +384,7 @@ fn plan_outcome(
     game: &GameDef,
     settings: &Settings,
     profiles: &Profiles,
-    library: &Library,
-    listed: &[ProfileMod],
+    inputs: &[ModInput<'_>],
 ) -> PlanOutcome {
     let mut outcome = PlanOutcome::default();
 
@@ -392,7 +404,7 @@ fn plan_outcome(
         settings,
         profiles.active(),
         &profiles.active().winners,
-        &library.inputs(listed),
+        inputs,
         PlanMode::Summary,
     ) {
         Ok(deploy_plan) => {

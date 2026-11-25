@@ -909,9 +909,17 @@ export function useGameActions({
 	/// The mod's own data: each command answers with the refreshed status, so the UI sees the change at once.
 	const setModTags = (modId: string, tags: string[]) => changeQueued((gameId) => commands.setModTags(gameId, modId, tags));
 	const setModNote = (modId: string, note: string) => changeQueued((gameId) => commands.setModNote(gameId, modId, note));
-	/// The load priority the user sets for a mod. `null` clears it, and the game orders that mod itself.
-	const setModPriority = (modId: string, priority: number | null) =>
-		changeQueued((gameId) => commands.setModPriority(gameId, modId, priority));
+	/// The load order of the active profile: the mods listed get the game's numbers in that order, and every other mod is
+	/// left to the game. The window sends the whole order at once, so one save is one list change. The result is true
+	/// when the save worked; a failure is already a notice, and the window stays open with the order the user made.
+	const setLoadOrder = async (order: string[]): Promise<boolean> => {
+		let saved = false;
+		await queued(async (gameId) => {
+			setStatusFor(gameId, await unwrap(commands.setLoadOrder(gameId, order)));
+			saved = true;
+		});
+		return saved;
+	};
 	const setModInstructions = (modId: string, text: string) => changeQueued((gameId) => commands.setModInstructions(gameId, modId, text));
 	const setModRelations = (modId: string, relations: Relations) =>
 		changeQueued((gameId) => commands.setModRelations(gameId, modId, relations));
@@ -1069,7 +1077,7 @@ export function useGameActions({
 		reinstallMod,
 		setModTags,
 		setModNote,
-		setModPriority,
+		setLoadOrder,
 		setModInstructions,
 		setModRelations,
 		addRelation,

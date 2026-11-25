@@ -72,6 +72,9 @@ pub struct ModView {
     pub priority: u32,
     /// The load priority the user set, written to the game's settings file. `None` leaves the order to the game.
     pub load_priority: Option<u32>,
+    /// The game reads the mod's own folder in its load order file, so a number given to the mod reaches the game. The
+    /// load order window offers only these mods.
+    pub orderable: bool,
     pub files: u32,
     /// Size in KB. Specta does not export `u64` to TypeScript, and KB fit in `u32`.
     pub size_kb: u32,
@@ -251,6 +254,15 @@ pub struct KnownRows {
     pub revisions: Vec<String>,
 }
 
+/// The priorities a game's load order file takes, from its definition. The window never guesses them.
+#[derive(Debug, Clone, Copy, Serialize, specta::Type)]
+pub struct LoadOrderRange {
+    /// The lowest priority number the game reads.
+    pub priority_min: u32,
+    /// The highest priority number the game reads.
+    pub priority_max: u32,
+}
+
 /// The game's status: everything the window reads to draw the list, the header and the next action.
 #[derive(Debug, Serialize, specta::Type)]
 pub struct Status {
@@ -277,6 +289,9 @@ pub struct Status {
     pub mods_root: String,
     /// The game reads `mods.settings`, so Gobbo needs its folder.
     pub needs_settings_dir: bool,
+    /// The priorities the game reads from its load order file, when it has one. The load order window numbers its mods
+    /// inside this range.
+    pub load_order: Option<LoadOrderRange>,
     pub deployed: bool,
     /// Mods whose place differs from the last deployed list (added, removed, or moved). Zero when they match.
     pub draft_changes: u32,

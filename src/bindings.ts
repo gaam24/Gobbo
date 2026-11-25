@@ -212,8 +212,11 @@ export const commands = {
 	 *  for its whole duration and `cancel_task` can stop it before it begins.
 	 */
 	installToolPrerequisites: (game: string, tool: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("install_tool_prerequisites", { game, tool })),
-	/**  Saves the load priority the user set for a mod, or clears it with `null`. */
-	setModPriority: (game: string, id: string, priority: number | null) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("set_mod_priority", { game, id, priority })),
+	/**
+	 *  Saves the load order of the active profile: the mods listed get the game's priorities in that order, and every
+	 *  other mod is left to the game.
+	 */
+	setLoadOrder: (game: string, order: string[]) => typedError<Status_Serialize, AppError_Serialize>(__TAURI_INVOKE("set_load_order", { game, order })),
 	/**  Games added to Gobbo, with the game folder and whether that folder exists. Games outside this list have no tabs. */
 	managedGames: () => typedError<ManagedGame[], AppError_Serialize>(__TAURI_INVOKE("managed_games")),
 	/**  Looks for supported games in the Steam libraries and the other stores on this computer. Read-only; nothing changes. */
@@ -2172,6 +2175,50 @@ export type DownloadView_Serialize = {
  */
 export type EfficiencyMode = "off" | "auto" | "always";
 
+/**
+ *  The engine a game folder was recognised as. The editor preselects its loader and variant when no loader is installed,
+ *  and sets the project folder as the deployment root.
+ */
+export type EngineSuggestion = EngineSuggestion_Serialize | EngineSuggestion_Deserialize;
+
+/**
+ *  The engine a game folder was recognised as. The editor preselects its loader and variant when no loader is installed,
+ *  and sets the project folder as the deployment root.
+ */
+export type EngineSuggestion_Deserialize = {
+	/**  The loader preset that serves the engine. */
+	loader_id: string,
+	/**  The preset's display name, for example `BepInEx`. */
+	loader_name: string,
+	/**  The engine's display name, for example `Unity`. */
+	engine_name: string,
+	/**  The variant to use, when the preset has variants. */
+	variant?: string | null,
+	/**  The short name of the matched variant, for example `IL2CPP`. */
+	label?: string | null,
+	/**  The project folder relative to the game folder, for example `Project`, when the preset names one and it is there. */
+	root?: string | null,
+};
+
+/**
+ *  The engine a game folder was recognised as. The editor preselects its loader and variant when no loader is installed,
+ *  and sets the project folder as the deployment root.
+ */
+export type EngineSuggestion_Serialize = {
+	/**  The loader preset that serves the engine. */
+	loader_id: string,
+	/**  The preset's display name, for example `BepInEx`. */
+	loader_name: string,
+	/**  The engine's display name, for example `Unity`. */
+	engine_name: string,
+	/**  The variant to use, when the preset has variants. */
+	variant: string | null,
+	/**  The short name of the matched variant, for example `IL2CPP`. */
+	label: string | null,
+	/**  The project folder relative to the game folder, for example `Project`, when the preset names one and it is there. */
+	root: string | null,
+};
+
 /**  How the interface shows an error: a user action, a temporary failure, a permanent one, or a bug. */
 export type ErrorKind = 
 /**  The user can fix it, for example by saving a key or choosing a folder. The fix is shown next to the error. */
@@ -2237,6 +2284,8 @@ export type FolderInspection_Deserialize = {
 	steam?: SteamSuggestion_Deserialize | null,
 	/**  Loader presets whose files were found in the folder. */
 	loaders: LoaderSuggestion_Deserialize[],
+	/**  The engine the folder matches, even when a loader is already installed: that loader stays the stronger signal. */
+	engine?: EngineSuggestion_Deserialize | null,
 	stores: StoreIds,
 };
 
@@ -2257,6 +2306,8 @@ export type FolderInspection_Serialize = {
 	steam: SteamSuggestion_Serialize | null,
 	/**  Loader presets whose files were found in the folder. */
 	loaders: LoaderSuggestion_Serialize[],
+	/**  The engine the folder matches, even when a loader is already installed: that loader stays the stronger signal. */
+	engine: EngineSuggestion_Serialize | null,
 	stores: StoreIds,
 };
 
@@ -3045,6 +3096,14 @@ export type LaunchSteps = {
 	ready_wait_us: number,
 };
 
+/**  The priorities a game's load order file takes, from its definition. The window never guesses them. */
+export type LoadOrderRange = {
+	/**  The lowest priority number the game reads. */
+	priority_min: number,
+	/**  The highest priority number the game reads. */
+	priority_max: number,
+};
+
 /**  Which copy of the loader `install_loader` turns on. */
 export type LoaderChoice = 
 /**  The quick action: a copy already in the library (the official release first), else the official download. */
@@ -3081,6 +3140,75 @@ export type LoaderCopyView_Serialize = {
 	enabled: boolean,
 };
 
+/**  One variant of an engine, with the markers that choose it. */
+export type LoaderEngineVariantView = LoaderEngineVariantView_Serialize | LoaderEngineVariantView_Deserialize;
+
+/**  One variant of an engine, with the markers that choose it. */
+export type LoaderEngineVariantView_Deserialize = {
+	/**  The preset variant this entry selects. */
+	variant: string,
+	/**  A short name for the variant, for example `IL2CPP`. */
+	label?: string | null,
+	/**  Folder patterns that must all exist in the game folder for this variant. A pattern may list alternatives with `|`. */
+	markers: string[],
+};
+
+/**  One variant of an engine, with the markers that choose it. */
+export type LoaderEngineVariantView_Serialize = {
+	/**  The preset variant this entry selects. */
+	variant: string,
+	/**  A short name for the variant, for example `IL2CPP`. */
+	label: string | null,
+	/**  Folder patterns that must all exist in the game folder for this variant. A pattern may list alternatives with `|`. */
+	markers: string[],
+};
+
+/**
+ *  The engine rules of a loader preset: the folder patterns that prove the engine is in a game folder, and the variant
+ *  and project folder that fit it.
+ */
+export type LoaderEngineView = LoaderEngineView_Serialize | LoaderEngineView_Deserialize;
+
+/**
+ *  The engine rules of a loader preset: the folder patterns that prove the engine is in a game folder, and the variant
+ *  and project folder that fit it.
+ */
+export type LoaderEngineView_Deserialize = {
+	/**  The engine's display name, for example `Unity`. */
+	name: string,
+	/**  Folder patterns that must all exist in the game folder. A pattern may list alternatives with `|`. */
+	markers: string[],
+	/**  The variant suggested when no entry of `variants` matches. */
+	variant?: string | null,
+	/**
+	 *  The project folder pattern. Its first segment is a wildcard for the project folder, and the rest is the folder the
+	 *  project keeps its mods in, for example `Content/Paks`.
+	 */
+	root?: string | null,
+	/**  The variants the folder can match by their own markers, in the order the preset lists them. */
+	variants: LoaderEngineVariantView_Deserialize[],
+};
+
+/**
+ *  The engine rules of a loader preset: the folder patterns that prove the engine is in a game folder, and the variant
+ *  and project folder that fit it.
+ */
+export type LoaderEngineView_Serialize = {
+	/**  The engine's display name, for example `Unity`. */
+	name: string,
+	/**  Folder patterns that must all exist in the game folder. A pattern may list alternatives with `|`. */
+	markers: string[],
+	/**  The variant suggested when no entry of `variants` matches. */
+	variant: string | null,
+	/**
+	 *  The project folder pattern. Its first segment is a wildcard for the project folder, and the rest is the folder the
+	 *  project keeps its mods in, for example `Content/Paks`.
+	 */
+	root: string | null,
+	/**  The variants the folder can match by their own markers, in the order the preset lists them. */
+	variants: LoaderEngineVariantView_Serialize[],
+};
+
 /**
  *  A loader preset the editor can offer. `places` and `requires` are the base rules; each variant has the rules of the
  *  preset with that variant merged over it, which is what the game would get.
@@ -3101,6 +3229,8 @@ export type LoaderPresetView_Deserialize = {
 	root_files: string[],
 	variants: LoaderVariantView[],
 	problems: string[],
+	/**  How a game folder is recognised as this preset's engine, when the preset names one. */
+	engine?: LoaderEngineView_Deserialize | null,
 };
 
 /**
@@ -3117,6 +3247,8 @@ export type LoaderPresetView_Serialize = {
 	root_files: string[],
 	variants: LoaderVariantView[],
 	problems: string[],
+	/**  How a game folder is recognised as this preset's engine, when the preset names one. */
+	engine: LoaderEngineView_Serialize | null,
 };
 
 export type LoaderSetupState = "missing" | "installed" | 
@@ -3648,6 +3780,11 @@ export type ModView_Deserialize = {
 	priority: number,
 	/**  The load priority the user set, written to the game's settings file. `None` leaves the order to the game. */
 	load_priority?: number | null,
+	/**
+	 *  The game reads the mod's own folder in its load order file, so a number given to the mod reaches the game. The
+	 *  load order window offers only these mods.
+	 */
+	orderable: boolean,
 	files: number,
 	/**  Size in KB. Specta does not export `u64` to TypeScript, and KB fit in `u32`. */
 	size_kb: number,
@@ -3726,6 +3863,11 @@ export type ModView_Serialize = {
 	priority: number,
 	/**  The load priority the user set, written to the game's settings file. `None` leaves the order to the game. */
 	load_priority: number | null,
+	/**
+	 *  The game reads the mod's own folder in its load order file, so a number given to the mod reaches the game. The
+	 *  load order window offers only these mods.
+	 */
+	orderable: boolean,
 	files: number,
 	/**  Size in KB. Specta does not export `u64` to TypeScript, and KB fit in `u32`. */
 	size_kb: number,
@@ -5159,6 +5301,11 @@ export type Status_Deserialize = {
 	mods_root: string,
 	/**  The game reads `mods.settings`, so Gobbo needs its folder. */
 	needs_settings_dir: boolean,
+	/**
+	 *  The priorities the game reads from its load order file, when it has one. The load order window numbers its mods
+	 *  inside this range.
+	 */
+	load_order?: LoadOrderRange | null,
 	deployed: boolean,
 	/**  Mods whose place differs from the last deployed list (added, removed, or moved). Zero when they match. */
 	draft_changes: number,
@@ -5250,6 +5397,11 @@ export type Status_Serialize = {
 	mods_root: string,
 	/**  The game reads `mods.settings`, so Gobbo needs its folder. */
 	needs_settings_dir: boolean,
+	/**
+	 *  The priorities the game reads from its load order file, when it has one. The load order window numbers its mods
+	 *  inside this range.
+	 */
+	load_order: LoadOrderRange | null,
 	deployed: boolean,
 	/**  Mods whose place differs from the last deployed list (added, removed, or moved). Zero when they match. */
 	draft_changes: number,

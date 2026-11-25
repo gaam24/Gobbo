@@ -255,6 +255,7 @@ fn a_row_takes_its_page_from_the_same_source_as_its_preview() {
         library: &library,
         view: &view,
         lookup: &lookup,
+        orderable: &[],
     };
     let row = mod_view(
         0,

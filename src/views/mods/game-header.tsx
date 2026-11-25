@@ -4,6 +4,7 @@ import {
 	CircleAlert,
 	Download,
 	Files,
+	ListOrdered,
 	OctagonX,
 	PanelRightClose,
 	PanelRightOpen,
@@ -243,6 +244,11 @@ export function GameHeader({ gameId, status }: { gameId: string; status: Status 
 								<span className="text-muted-foreground ml-auto font-mono text-xs tabular-nums">{status.conflict_count}</span>
 							)}
 						</DropdownMenuItem>
+						{status.load_order && (
+							<DropdownMenuItem onSelect={() => openDialog({ kind: "load-order" })}>
+								<ListOrdered /> {t("loadOrder.title")}
+							</DropdownMenuItem>
+						)}
 					</DropdownMenuContent>
 				</DropdownMenu>
 			</div>

@@ -315,7 +315,8 @@ impl Profile {
         history::winner_changes(&self.deployed_winners, &self.winners)
     }
 
-    /// How many list changes wait for a deployment: added, removed, moved or updated mods, and file winners.
+    /// How many list changes wait for a deployment: added, removed, moved or updated mods, changed load priorities, and
+    /// file winners.
     pub fn draft_changes(&self) -> u32 {
         diff::changed_count_filtered(&self.deployed_mods, &self.mods, |entry| entry.enabled)
             + self.winner_changes()

@@ -6,6 +6,7 @@ pub mod diff;
 pub mod entry;
 pub mod group;
 pub mod history;
+pub mod load_order;
 pub mod view;
 
 mod profile;

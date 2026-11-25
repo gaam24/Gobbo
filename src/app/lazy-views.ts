@@ -66,6 +66,11 @@ export const SortPreviewDialog = lazy(async () => {
 	return { default: component };
 });
 
+export const LoadOrderDialog = lazy(async () => {
+	const { LoadOrderDialog: component } = await import("@/views/load-order/load-order-dialog");
+	return { default: component };
+});
+
 export const ManualUpdateDialog = lazy(async () => {
 	const { ManualUpdateDialog: component } = await import("@/views/mods/manual-update-dialog");
 	return { default: component };

@@ -53,7 +53,6 @@ function ModsInspectorView() {
 				}}
 				onSetTags={gameActions.setModTags}
 				onSetNote={gameActions.setModNote}
-				onSetPriority={gameActions.setModPriority}
 				onSetInstructions={gameActions.setModInstructions}
 				onSetRelations={gameActions.setModRelations}
 				onSetFileWinner={gameActions.setFileWinner}

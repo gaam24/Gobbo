@@ -10,7 +10,6 @@ import type { ModActions } from "@/views/mod-inspector/mod-details";
 import { InfoSection } from "@/views/mod-inspector/sections/info-section";
 import { InstructionsSection } from "@/views/mod-inspector/sections/instructions-section";
 import { NoteSection } from "@/views/mod-inspector/sections/note-section";
-import { PrioritySection } from "@/views/mod-inspector/sections/priority-section";
 import { RelationsSection } from "@/views/mod-inspector/sections/relations-section";
 import { StepsSection } from "@/views/mod-inspector/sections/steps-section";
 import { TagsSection } from "@/views/mod-inspector/sections/tags-section";
@@ -22,7 +21,6 @@ interface OverviewTabProps
 		| "onSelectVersion"
 		| "onSetTags"
 		| "onSetNote"
-		| "onSetPriority"
 		| "onSetInstructions"
 		| "onSetRelations"
 		| "onSetInfo"
@@ -37,8 +35,6 @@ interface OverviewTabProps
 	versions: VersionView[];
 	update?: UpdateReport;
 	allTags: string[];
-	/// The game reads load priorities from its settings file, so the section is shown.
-	showPriority: boolean;
 	/// Every mod of the profile, to pick the related ones from.
 	mods: Mod[];
 	/// The steps of the game and this mod's choices; null while the details load.
@@ -57,10 +53,8 @@ export function OverviewTab({
 	onDeleteUnusedVersions,
 	onSetTags,
 	onSetNote,
-	onSetPriority,
 	onSetInstructions,
 	onSetRelations,
-	showPriority,
 	mods,
 	onSetInfo,
 	onSetSteps,
@@ -194,9 +188,6 @@ export function OverviewTab({
 					steps={steps}
 					onSave={(beforeStart, afterEnd) => onSetSteps(mod.folder, beforeStart, afterEnd)}
 				/>
-			)}
-			{showPriority && (
-				<PrioritySection key={`priority-${mod.folder}-${mod.load_priority ?? ""}`} mod={mod} onSetPriority={onSetPriority} />
 			)}
 			<TagsSection mod={mod} allTags={allTags} onSetTags={onSetTags} />
 			<NoteSection key={`note-${mod.folder}-${mod.notes}`} mod={mod} onSetNote={onSetNote} />

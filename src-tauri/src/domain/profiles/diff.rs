@@ -23,7 +23,8 @@ pub struct ListDiff<'a> {
     pub enabled_off: Vec<&'a Entry>,
     /// Entries both lists have with another load priority.
     pub priority_changed: u32,
-    /// Entries whose place, version or presence changed. This is the count the status reports as draft changes.
+    /// Entries whose place, version or presence changed. The status's draft count also takes the priority changes, see
+    /// `changed_count_filtered`.
     pub changed: u32,
 }
 
@@ -63,34 +64,37 @@ fn prepare<'a>(old: &'a [Entry], new: impl IntoIterator<Item = &'a Entry>) -> Pr
     }
 }
 
-/// The number of entries whose place, version or presence changed. The same rule as `diff(...).changed`, without
-/// building the lists of added, removed and updated entries that a caller interested only in the count never reads.
+/// The status's draft count of the whole list, see `changed_count_filtered`.
 #[cfg(test)]
 pub fn changed_count(old: &[Entry], new: &[Entry]) -> u32 {
     changed_count_filtered(old, new, |_| true)
 }
 
-/// The same count after `keep` picks the new entries. Borrowing the new list lets a caller count only the enabled
-/// entries without cloning them into an owned `Vec<Entry>`.
+/// The number of entries whose place, version, presence or load priority changed, after `keep` picks the new entries.
+/// This is the status's draft count: `diff(...).changed` plus the priority changes, because the deployment writes the
+/// priorities into the game's order file, so a changed priority waits for a deployment like a moved mod does. Borrowing
+/// the new list lets a caller count only the enabled entries without cloning them into an owned `Vec<Entry>`.
 pub fn changed_count_filtered<'a>(
     old: &'a [Entry],
     new: impl IntoIterator<Item = &'a Entry>,
     mut keep: impl FnMut(&Entry) -> bool,
 ) -> u32 {
     let prepared = prepare(old, new.into_iter().filter(move |entry| keep(entry)));
-    let updated = prepared
-        .common
-        .iter()
-        .filter(|(_, before, after)| before.folder != after.folder)
-        .count();
     let removed = old
         .iter()
         .filter(|entry| !prepared.new_ids.contains(entry.id.as_str()))
         .count();
-    let changed = prepared.added.len()
-        + removed
-        + updated
-        + usize::try_from(moved(&prepared.common)).unwrap_or(usize::MAX);
+    // An entry counts once, however many of its changes differ: a moved entry whose priority changed is one change.
+    let in_order = in_order_flags(&prepared.common);
+    let kept_changed = prepared
+        .common
+        .iter()
+        .zip(&in_order)
+        .filter(|((_, before, after), in_order)| {
+            before.folder != after.folder || before.priority != after.priority || !**in_order
+        })
+        .count();
+    let changed = prepared.added.len() + removed + kept_changed;
     u32::try_from(changed).unwrap_or(u32::MAX)
 }
 
@@ -143,14 +147,20 @@ fn moved(common: &[(usize, &Entry, &Entry)]) -> u32 {
         return 0;
     }
 
-    let positions: Vec<usize> = common.iter().map(|(at, _, _)| *at).collect();
-    let in_order = longest_increasing(&positions);
+    let in_order = in_order_flags(common);
     let count = common
         .iter()
         .enumerate()
         .filter(|(index, (_, before, after))| !in_order[*index] && before.folder == after.folder)
         .count();
     u32::try_from(count).unwrap_or(u32::MAX)
+}
+
+/// Whether each common entry is part of the longest increasing run of the old places. The entries that are not keep
+/// their relative order only if they move.
+fn in_order_flags(common: &[(usize, &Entry, &Entry)]) -> Vec<bool> {
+    let positions: Vec<usize> = common.iter().map(|(at, _, _)| *at).collect();
+    longest_increasing(&positions)
 }
 
 /// Marks one longest strictly increasing subsequence of `positions`. `tails[k]` is the smallest last value of an
@@ -303,5 +313,47 @@ mod tests {
         assert_eq!(diff.priority_changed, 1);
         assert_eq!(diff.moved, 0);
         assert_eq!(diff.changed, 0);
+    }
+
+    #[test]
+    fn a_priority_change_is_a_draft_change_and_an_entry_counts_once() {
+        let prioritized = |id: &str, folder: &str, priority: u32| Entry {
+            priority: Some(priority),
+            ..entry(id, folder, true)
+        };
+        let old = [
+            prioritized("a", "a1", 1),
+            entry("b", "b1", true),
+            entry("c", "c1", true),
+        ];
+
+        let reprioritized = [
+            prioritized("a", "a1", 2),
+            entry("b", "b1", true),
+            entry("c", "c1", true),
+        ];
+        assert_eq!(changed_count(&old, &reprioritized), 1);
+
+        // The moved entry's priority changes too, which is still one change.
+        let moved_and_reprioritized = [
+            entry("b", "b1", true),
+            entry("c", "c1", true),
+            prioritized("a", "a1", 2),
+        ];
+        assert_eq!(changed_count(&old, &moved_and_reprioritized), 1);
+
+        // Switched off, the entry is removed; its new priority is not a second change.
+        let switched_off = [
+            Entry {
+                enabled: false,
+                ..prioritized("a", "a1", 2)
+            },
+            entry("b", "b1", true),
+            entry("c", "c1", true),
+        ];
+        assert_eq!(
+            changed_count_filtered(&old, &switched_off, |entry| entry.enabled),
+            1
+        );
     }
 }

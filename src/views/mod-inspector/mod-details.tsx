@@ -30,7 +30,6 @@ export interface ModActions {
 	onSelect: (folders: string[]) => void;
 	onSetTags: (modId: string, tags: string[]) => void | Promise<void>;
 	onSetNote: (modId: string, note: string) => void | Promise<void>;
-	onSetPriority: (modId: string, priority: number | null) => void | Promise<void>;
 	onSetInstructions: (modId: string, text: string) => void | Promise<void>;
 	onSetRelations: (modId: string, relations: Relations) => void | Promise<void>;
 	onSetFileWinner: (path: string, familyId: string | null) => void | Promise<void>;
@@ -63,7 +62,6 @@ export function ModDetails({
 	onSelect,
 	onSetTags,
 	onSetNote,
-	onSetPriority,
 	onSetInstructions,
 	onSetRelations,
 	onSetFileWinner,
@@ -225,10 +223,8 @@ export function ModDetails({
 					onDeleteUnusedVersions={onDeleteUnusedVersions}
 					onSetTags={onSetTags}
 					onSetNote={onSetNote}
-					onSetPriority={onSetPriority}
 					onSetInstructions={onSetInstructions}
 					onSetRelations={onSetRelations}
-					showPriority={status.needs_settings_dir}
 					mods={status.mods}
 					onSetInfo={onSetInfo}
 					onSetSteps={onSetSteps}

@@ -185,9 +185,10 @@ crate::commands::game_commands! {
     change set_requirement_ignored(id: String, provider: String, req_mod_id: String, ignored: bool) =
         |root, game| crate::library::set_requirement_ignored(root, game, &id, &provider, &req_mod_id, ignored);
 
-    /// Saves the load priority the user set for a mod, or clears it with `null`.
-    change set_mod_priority(id: String, priority: Option<u32>) =
-        |root, game| crate::profiles::actions::set_mod_priority(root, game, &id, priority);
+    /// Saves the load order of the active profile: the mods listed get the game's priorities in that order, and every
+    /// other mod is left to the game.
+    change set_load_order(order: Vec<String>) =
+        |root, game| crate::profiles::actions::set_load_order(root, game, &order);
 
     /// Saves the steps a mod asks for. Each step must be one the game defines for that phase.
     change set_mod_steps(folder: String, before_start: Vec<String>, after_end: Vec<String>) =

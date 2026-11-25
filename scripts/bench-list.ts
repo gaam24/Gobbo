@@ -14,6 +14,7 @@ function makeMod(index: number): Status_Serialize["mods"][number] {
 		enabled: index % 2 === 0,
 		priority: index + 1,
 		load_priority: null,
+		orderable: true,
 		files: 10,
 		size_kb: 128,
 		wins: index % 11 === 0 ? 1 : 0,

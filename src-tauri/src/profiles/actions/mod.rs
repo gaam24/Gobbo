@@ -24,7 +24,9 @@ use crate::deploy::target::journal_roots;
 use crate::deploy::undo;
 use crate::deploy::undo_blocked_while_running;
 use crate::domain::profiles::Row;
+use crate::domain::profiles::load_order::{PriorityRange, assign_priorities};
 use crate::domain::profiles::{Entry as ProfileEntry, Separator, normalize_groups};
+use crate::domain::resolver::is_orderable;
 use crate::error::game_running as game_is_running_error;
 use crate::error::{AppError, io_at};
 use crate::games;
@@ -213,32 +215,38 @@ pub fn set_mod_version(root: &Data, game_id: &str, id: &str, folder: &str) -> Re
     save_profiles(&data, &profiles)
 }
 
-/// Saves the priority the user set for a mod in the active profile, or clears it with `None`. The game's settings
-/// file gets a row only for mods with a priority. The value must be inside the game's `priority_min..=priority_max`.
-pub fn set_mod_priority(
-    root: &Data,
-    game_id: &str,
-    id: &str,
-    priority: Option<u32>,
-) -> Result<(), AppError> {
-    let _profiles = lock_profiles();
+/// Saves the load order of the active profile: the mods in `order` get the game's priorities in that order, and every
+/// other mod loses its priority, so the game orders it itself. The game's settings file gets a row only for the mods
+/// that have one. The game must have a load order, the range must have a number for every mod in `order`, and every
+/// mod in `order` must have a folder of its own, since the game reads no number for any other (see `is_orderable`).
+pub fn set_load_order(root: &Data, game_id: &str, order: &[String]) -> Result<(), AppError> {
     let game = games::load(game_id)?;
     let data = root.game(game_id);
-
-    if let Some(value) = priority {
-        let Some(order) = &game.load_order else {
-            return Err(AppError::user("profile.priority_unsupported"));
-        };
-
-        if !(order.priority_min..=order.priority_max).contains(&value) {
-            return Err(AppError::user("profile.priority_out_of_range")
-                .with("min", order.priority_min)
-                .with("max", order.priority_max));
-        }
-    }
-
+    let Some(load_order) = &game.load_order else {
+        return Err(AppError::user("profile.load_order_unsupported"));
+    };
+    let range = PriorityRange {
+        min: load_order.priority_min,
+        max: load_order.priority_max,
+    };
+    // The library is read before the profile lock, as every change to the profiles does (see `create_profile`).
+    let library = load_library(&data, &game)?;
+    let _profiles = lock_profiles();
     let mut profiles = load_profiles(&data)?;
-    profiles.active_entry_mut(id)?.priority = priority;
+    // The family ids of the mods the game reads in order: the same list and planner inputs the status shows.
+    let orderable = {
+        let listed = crate::library::active_mods(&profiles, &library, &game);
+        let inputs = library.inputs(&listed);
+        listed
+            .iter()
+            .zip(&inputs)
+            .filter(|(_, input)| is_orderable(&game.deploy, input))
+            .map(|(entry, _)| entry.id.clone())
+            .collect::<BTreeSet<String>>()
+    };
+    assign_priorities(&mut profiles.active_mut().mods, order, range, |id| {
+        orderable.contains(id)
+    })?;
     save_profiles(&data, &profiles)
 }
 

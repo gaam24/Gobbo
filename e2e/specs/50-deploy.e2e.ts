@@ -112,21 +112,20 @@ describe("deploy", () => {
 		await invoke("undo", { game: id });
 		await cleanupFixture(id, fixture.root);
 	});
-	it("writes the game's load order file from the list and the priority", async () => {
+	it("writes the game's load order file from the load order window", async () => {
 		const game = await deployGame("deploy-order", { loadOrder: true });
 		const status = await waitForStatus(game.id, (current) => current.mods.length === 1);
 		const mod = status.mods[0];
 		assert.ok(mod);
-		await invoke("set_mod_priority", {
+		await invoke("set_load_order", {
 			game: game.id,
-			id: mod.id,
-			priority: 5,
+			order: [mod.id],
 		});
 		await apply(game.id);
 		const settings = path.join(game.fixture.root, "settings/mods.settings");
 		expectText(settings, `[mod${mod.folder}]`);
 		expectText(settings, "Enabled=1");
-		expectText(settings, "Priority=5");
+		expectText(settings, "Priority=1");
 		await invoke("undo", { game: game.id });
 		await cleanupFixture(game.id, game.fixture.root);
 	});

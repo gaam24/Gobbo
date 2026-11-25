@@ -69,7 +69,7 @@ impl GameDef {
                 variant: loader.variant.clone(),
                 default_variant: loader.default_variant,
             }),
-            needs_settings_dir: self.has_load_order(),
+            needs_settings_dir: self.has_settings_file(),
             needs_mods_root: self.has_external_root(),
             providers: self
                 .providers

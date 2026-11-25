@@ -15,6 +15,7 @@ export function modFixture(overrides: ModOverrides = {}): ModView_Serialize {
 		enabled: true,
 		priority: 1,
 		load_priority: null,
+		orderable: true,
 		files: 2,
 		size_kb: 10,
 		wins: 0,

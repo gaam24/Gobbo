@@ -80,7 +80,7 @@ overwrite::overwrite_to_mod
 overwrite::clear_overwrite
 launch::run_tool
 launch::install_tool_prerequisites
-mods::set_mod_priority
+mods::set_load_order
 settings::managed_games
 games::scan_games
 games::open_requirement_page

@@ -32,6 +32,9 @@ pub(in crate::status) struct LibraryContext<'a> {
     pub(in crate::status) view: &'a LibraryView<'a>,
     /// The enabled families and the names from the same view.
     pub(in crate::status) lookup: &'a SourceLookup<'a, 'a, 'a>,
+    /// Whether each listed mod can take a load order number (`is_orderable`), by its place in the list. A row past the
+    /// end of this list is not orderable.
+    pub(in crate::status) orderable: &'a [bool],
 }
 
 /// One mod of the shown profile, with its record in the library, its source data and its conflicts.
@@ -100,6 +103,7 @@ pub(in crate::status) fn mod_view(
         enabled: entry.enabled,
         priority: index as u32 + 1,
         load_priority: entry.priority,
+        orderable: context.orderable.get(index).copied().unwrap_or(false),
         files: record.map_or(0, |record| record.files.len() as u32),
         size_kb: record.map_or(0, |record| size_kb(record.size_bytes)),
         wins: plan.wins.get(&entry.id).copied().unwrap_or(0),

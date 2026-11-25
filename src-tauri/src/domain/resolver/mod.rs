@@ -9,9 +9,10 @@
 //! Two mods meet at a game path (a mirror or a flat slot), and at a shared kind of file
 //! (`domain::deploy::Shared`) that the game reads from one mod only. Of those, only the winner's copy is deployed: the
 //! one the user chose, else the first on the list. Files in a mod's own folder never meet another mod's. Only mods with
-//! a priority the user set get a row in the game's order file.
+//! a priority the user set, and a folder of their own (`is_orderable`), get a row in the game's order file.
 
 mod model;
+mod own_folder;
 mod planner;
 mod shared;
 
@@ -22,6 +23,7 @@ pub use model::PlanSource;
 #[cfg(test)]
 pub use model::PlannedFile;
 pub use model::{Conflict, DeployPlan, LayoutProfile, ModInput, PlanMode, Problem, SettingsRow};
+pub use own_folder::is_orderable;
 pub use planner::LayoutRules;
 pub use planner::{layout_profile, plan_with_mode};
 

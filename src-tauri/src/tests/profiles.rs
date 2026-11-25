@@ -10,7 +10,7 @@ use crate::profiles::actions::delete_profile;
 use crate::profiles::actions::move_profile_user_data;
 use crate::profiles::actions::rename_profile;
 use crate::profiles::actions::save_profile;
-use crate::profiles::actions::set_mod_priority;
+use crate::profiles::actions::set_load_order;
 use crate::profiles::actions::set_profile_user_data;
 use crate::profiles::actions::switch_profile;
 #[cfg(windows)]
@@ -18,7 +18,6 @@ use crate::profiles::actions::user_data_size;
 use crate::profiles::compare::compare_profiles;
 use crate::status::details::mod_versions;
 use crate::status::sync_profiles as status;
-use crate::status::views::Status;
 use crate::test_support::import;
 
 /// A game with one user-data set outside its folder, at `<settings>/user`.
@@ -128,10 +127,128 @@ fn a_new_separator_above_the_others_keeps_their_ids() {
 }
 
 #[test]
-fn only_a_priority_the_user_sets_reaches_the_settings_file() {
-    let f = fixture("priority");
+fn only_the_mods_in_the_load_order_reach_the_settings_file() {
+    let f = fixture("load-order");
     f.import_two_mods();
     f.enable_all(SLOT_GAME);
+    let family = |folder: &str| {
+        status(&f.data, SLOT_GAME)
+            .unwrap()
+            .mods
+            .iter()
+            .find(|m| m.folder == folder)
+            .unwrap()
+            .id
+            .clone()
+    };
+    let (family_a, family_b) = (family("modA"), family("modB"));
+    let load = |folder: &str| {
+        status(&f.data, SLOT_GAME)
+            .unwrap()
+            .mods
+            .iter()
+            .find(|m| m.folder == folder)
+            .unwrap()
+            .load_priority
+    };
+
+    // Only modB is in the order, so only modB gets a number. The game orders modA itself.
+    set_load_order(&f.data, SLOT_GAME, std::slice::from_ref(&family_b)).unwrap();
+    assert_eq!(load("modB"), Some(1));
+    assert_eq!(load("modA"), None);
+    // The list order is not the load order: modA still comes first in the list.
+    assert_eq!(status(&f.data, SLOT_GAME).unwrap().mods[0].folder, "modA");
+
+    // A longer order numbers its mods in the order the user gave them.
+    set_load_order(&f.data, SLOT_GAME, &[family_b.clone(), family_a]).unwrap();
+    assert_eq!(load("modB"), Some(1));
+    assert_eq!(load("modA"), Some(2));
+
+    // An order that names a mod the profile does not have changes nothing.
+    let unknown = set_load_order(&f.data, SLOT_GAME, &["local:nope".to_string()]).unwrap_err();
+    assert_eq!(unknown.code, "profile.load_order_unknown");
+    assert_eq!(load("modA"), Some(2));
+
+    set_load_order(&f.data, SLOT_GAME, std::slice::from_ref(&family_b)).unwrap();
+    apply_deployment(&f.data, SLOT_GAME).unwrap();
+    let settings = fs::read_to_string(f.settings_dir.join("mods.settings")).unwrap();
+    assert!(
+        settings.contains("[modB]\nEnabled=1\nPriority=1\n"),
+        "{settings}"
+    );
+    assert!(!settings.contains("[modA]"), "{settings}");
+    undo_deployment(&f.data, SLOT_GAME).unwrap();
+
+    set_load_order(&f.data, SLOT_GAME, &[]).unwrap();
+    assert_eq!(load("modB"), None);
+}
+
+#[test]
+fn a_mod_the_game_reads_no_order_for_cannot_be_numbered() {
+    let f = fixture("load-order-orderable");
+    f.import_two_mods();
+    // Every file of this mod keeps its game path, so the mod has no folder of its own for the game to read an order from.
+    let zip = f.zip("mirrored.zip", &[("DLC/dlc-only/blob0.bundle", "mirrored")]);
+    import(&f.data, SLOT_GAME, &zip, None, &mut |_, _| {}).unwrap();
+    f.enable_all(SLOT_GAME);
+    let listed = status(&f.data, SLOT_GAME).unwrap().mods;
+    let id_of = |folder: &str| {
+        listed
+            .iter()
+            .find(|m| m.folder == folder)
+            .unwrap()
+            .id
+            .clone()
+    };
+    let (family_a, family_b) = (id_of("modA"), id_of("modB"));
+    let mirrored = listed.iter().find(|m| !m.orderable).unwrap().id.clone();
+    assert!(
+        listed
+            .iter()
+            .find(|m| m.folder == "modA")
+            .unwrap()
+            .orderable
+    );
+    assert!(
+        listed
+            .iter()
+            .find(|m| m.folder == "modB")
+            .unwrap()
+            .orderable
+    );
+
+    let error = set_load_order(&f.data, SLOT_GAME, std::slice::from_ref(&mirrored)).unwrap_err();
+    assert_eq!(error.code, "profile.load_order_not_orderable");
+    // A refused order changes nothing, even when it also names a mod the game can order.
+    let error = set_load_order(&f.data, SLOT_GAME, &[family_b.clone(), mirrored]).unwrap_err();
+    assert_eq!(error.code, "profile.load_order_not_orderable");
+    assert!(
+        status(&f.data, SLOT_GAME)
+            .unwrap()
+            .mods
+            .iter()
+            .all(|m| m.load_priority.is_none())
+    );
+
+    set_load_order(&f.data, SLOT_GAME, &[family_b, family_a]).unwrap();
+    let after = status(&f.data, SLOT_GAME).unwrap();
+    assert_eq!(
+        after
+            .mods
+            .iter()
+            .find(|m| m.folder == "modB")
+            .unwrap()
+            .load_priority,
+        Some(1)
+    );
+}
+
+#[test]
+fn a_load_order_change_waits_for_a_deployment_and_then_applies() {
+    let f = fixture("load-order-draft");
+    f.import_two_mods();
+    f.enable_all(SLOT_GAME);
+    apply_deployment(&f.data, SLOT_GAME).unwrap();
     let family_b = status(&f.data, SLOT_GAME)
         .unwrap()
         .mods
@@ -141,35 +258,69 @@ fn only_a_priority_the_user_sets_reaches_the_settings_file() {
         .id
         .clone();
 
-    set_mod_priority(&f.data, SLOT_GAME, &family_b, Some(50)).unwrap();
-    let before = status(&f.data, SLOT_GAME).unwrap();
-    let load = |status: &Status, folder: &str| {
-        status
-            .mods
-            .iter()
-            .find(|m| m.folder == folder)
-            .unwrap()
-            .load_priority
-    };
-    assert_eq!(load(&before, "modB"), Some(50));
-    assert_eq!(load(&before, "modA"), None);
-    // The list order is not the load priority: modA still comes first.
-    assert_eq!(before.mods[0].folder, "modA");
-
-    let out_of_range = set_mod_priority(&f.data, SLOT_GAME, &family_b, Some(0)).unwrap_err();
-    assert_eq!(out_of_range.code, "profile.priority_out_of_range");
-
+    // The list is the same, so only the priority changed: the deployed settings file must still be written again.
+    set_load_order(&f.data, SLOT_GAME, std::slice::from_ref(&family_b)).unwrap();
+    assert_eq!(status(&f.data, SLOT_GAME).unwrap().draft_changes, 1);
     apply_deployment(&f.data, SLOT_GAME).unwrap();
+
+    assert_eq!(status(&f.data, SLOT_GAME).unwrap().draft_changes, 0);
     let settings = fs::read_to_string(f.settings_dir.join("mods.settings")).unwrap();
     assert!(
-        settings.contains("[modB]\nEnabled=1\nPriority=50\n"),
+        settings.contains("[modB]\nEnabled=1\nPriority=1\n"),
         "{settings}"
     );
-    assert!(!settings.contains("[modA]"), "{settings}");
     undo_deployment(&f.data, SLOT_GAME).unwrap();
+}
 
-    set_mod_priority(&f.data, SLOT_GAME, &family_b, None).unwrap();
-    assert_eq!(load(&status(&f.data, SLOT_GAME).unwrap(), "modB"), None);
+/// The first file called `name` below `dir`, searching every folder.
+fn find_named(dir: &std::path::Path, name: &str) -> Option<std::path::PathBuf> {
+    for entry in fs::read_dir(dir).ok()?.flatten() {
+        let path = entry.path();
+
+        if path.is_dir() {
+            if let Some(found) = find_named(&path, name) {
+                return Some(found);
+            }
+        } else if path.file_name().is_some_and(|file| file == name) {
+            return Some(path);
+        }
+    }
+
+    None
+}
+
+#[test]
+fn an_order_file_in_the_deployment_root_is_written_into_the_layer_not_the_game() {
+    let game = test_games::UE4SS_ORDER_ID;
+    let f = fixture("ue4ss-order");
+    save_settings(&f.data, game, f.settings()).unwrap();
+    for (name, folder, text) in [
+        ("modA.zip", "modA", "from A"),
+        ("modB.zip", "modB", "from B"),
+    ] {
+        let entry = format!("Mods/{folder}/content/x.ws");
+        let zip = f.zip(name, &[(entry.as_str(), text)]);
+        import(&f.data, game, &zip, None, &mut |_, _| {}).unwrap();
+    }
+    f.enable_all(game);
+    let family_b = status(&f.data, game)
+        .unwrap()
+        .mods
+        .iter()
+        .find(|m| m.folder == "modB")
+        .unwrap()
+        .id
+        .clone();
+
+    set_load_order(&f.data, game, &[family_b]).unwrap();
+    apply_deployment(&f.data, game).unwrap();
+
+    // Only modB is in the order, so the list names only modB, and it is written where the overlay serves it.
+    let list = find_named(&f.base.join("data"), "mods.txt").expect("the layer holds the list");
+    assert_eq!(fs::read_to_string(&list).unwrap(), "modB : 1\r\n");
+    assert!(list.ends_with(std::path::Path::new("Mods").join("mods.txt")));
+    // The game folder keeps no list of its own, and the library copy of the mods is untouched.
+    assert!(!f.game_root.join("Mods").join("mods.txt").exists());
 }
 
 #[test]

@@ -30,6 +30,7 @@ export type AppDialog =
 	| { kind: "setup" }
 	| { kind: "health" }
 	| { kind: "sort" }
+	| { kind: "load-order" }
 	| { kind: "community-profile" }
 	| { kind: "snapshots" }
 	| { kind: "conflicts" }

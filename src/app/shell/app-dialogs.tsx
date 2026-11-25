@@ -17,6 +17,7 @@ import {
 	FomodWizard,
 	GroupEditDialog,
 	HealthDialog,
+	LoadOrderDialog,
 	ManualUpdateDialog,
 	OverwriteDialog,
 	PackExportDialog,
@@ -315,6 +316,17 @@ export function AppDialogs() {
 			{dialog?.kind === "conflicts" && gameId && (
 				<Suspense fallback={null}>
 					<ConflictExplorerDialog gameId={gameId} onClose={closeDialog} />
+				</Suspense>
+			)}
+			{dialog?.kind === "load-order" && gameId && status?.load_order && (
+				<Suspense fallback={null}>
+					<LoadOrderDialog
+						mods={status.mods}
+						range={status.load_order}
+						settingsReady={status.settings_ready}
+						onSave={gameActions.setLoadOrder}
+						onClose={closeDialog}
+					/>
 				</Suspense>
 			)}
 			{dialog?.kind === "overwrite" && gameId && (

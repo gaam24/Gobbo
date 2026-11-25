@@ -83,7 +83,7 @@
     "allow-clear-overwrite",
     "allow-run-tool",
     "allow-install-tool-prerequisites",
-    "allow-set-mod-priority",
+    "allow-set-load-order",
     "allow-managed-games",
     "allow-scan-games",
     "allow-open-requirement-page",

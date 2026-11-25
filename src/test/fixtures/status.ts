@@ -29,6 +29,7 @@ export function statusFixture(stage: GameStage_Serialize, overrides: Partial<Sta
 		mods_ready: true,
 		mods_root: "/games/Game",
 		needs_settings_dir: false,
+		load_order: null,
 		deployed: false,
 		draft_changes: 0,
 		deployed_at: null,

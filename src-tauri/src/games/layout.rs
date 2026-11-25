@@ -4,7 +4,7 @@
 use std::collections::BTreeSet;
 use std::path::Path;
 
-use super::definition::{GameDef, Install};
+use super::definition::{GameDef, Install, LoadOrder};
 use crate::domain::pathkey::path_key;
 use crate::domain::resolver::DeployPlan;
 
@@ -22,9 +22,18 @@ pub(super) fn prefer_linux<'a>(base: &'a str, linux: Option<&'a str>, native: bo
 }
 
 impl GameDef {
-    /// Whether the game reads an order file that Gobbo writes. Then Gobbo needs the folder of that file.
-    pub const fn has_load_order(&self) -> bool {
-        self.load_order.is_some()
+    /// The order file in the settings folder the user chooses, when the game has one. An order file inside the
+    /// deployment root (UE4SS's `mods.txt`) is not one of them.
+    pub fn settings_order(&self) -> Option<&LoadOrder> {
+        self.load_order
+            .as_ref()
+            .filter(|order| order.uses_settings_folder())
+    }
+
+    /// Whether that order file lives in the settings folder the user chooses. Then Gobbo needs that folder. An order
+    /// file inside the deployment root (UE4SS's `mods.txt`) needs no folder of its own.
+    pub fn has_settings_file(&self) -> bool {
+        self.settings_order().is_some()
     }
 
     /// Places in the game that the UI shows: the slot folders and the mirrored folders.

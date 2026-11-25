@@ -14,7 +14,7 @@ use crate::games::{GAME_TEMPLATE, GameDef};
 /// order file or the folder has not been chosen yet. An empty folder must never turn into a path at the root.
 pub fn settings_file(game: &GameDef, settings: &Settings) -> Option<PathBuf> {
     let dir = settings.settings_dir.trim();
-    let order = game.load_order.as_ref()?;
+    let order = game.settings_order()?;
     (!dir.is_empty()).then(|| order.file_in(Path::new(dir)))
 }
 

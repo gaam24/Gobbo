@@ -87,7 +87,7 @@ impl GameDef {
         prefix: Option<PathBuf>,
         under_proton: bool,
     ) -> Option<PathBuf> {
-        let order = self.load_order.as_ref()?;
+        let order = self.settings_order()?;
         let context = paths::Context {
             game_root: game_root.to_path_buf(),
             prefix,

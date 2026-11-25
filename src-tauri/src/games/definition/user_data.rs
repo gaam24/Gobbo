@@ -129,23 +129,27 @@ impl Executable {
     }
 }
 
-/// The file the game reads the order of its mods from. The priorities the user sets are kept in the range
-/// `priority_min..=priority_max`, and a lower number wins.
+/// The file the game reads the order of its mods from. The numbers the user gives the mods are kept in the range
+/// `priority_min..=priority_max`, and a lower number loads first.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct LoadOrder {
-    /// The only format so far. Reading it still refuses a format Gobbo cannot write.
-    #[allow(
-        dead_code,
-        reason = "one format so far; the field rejects the formats Gobbo cannot write"
-    )]
+    /// The format of the file. It decides where the file lives and how its lines are written.
     pub format: OrderFormat,
-    /// The file, as a path template. The user can point to another folder; the file name stays.
+    /// `mods_settings`: the file as a path template, in the folder the user chose (the file name stays).
+    /// `ue4ss_mods_txt`: the file's path relative to the deployment root, for example `Binaries/Win64/Mods/mods.txt`.
     pub file: String,
     #[serde(default = "default_priority_min")]
     pub priority_min: u32,
     #[serde(default = "default_priority_max")]
     pub priority_max: u32,
+}
+
+impl LoadOrder {
+    /// Whether the file lives in the folder of the game's settings that the user chooses.
+    pub fn uses_settings_folder(&self) -> bool {
+        self.format == OrderFormat::ModsSettings
+    }
 }
 
 const fn default_priority_min() -> u32 {
@@ -160,6 +164,10 @@ const fn default_priority_max() -> u32 {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum OrderFormat {
-    /// A section per mod folder, with `Enabled` and `Priority` (The Witcher 3's `mods.settings`).
+    /// A section per mod folder, with `Enabled` and `Priority` (The Witcher 3's `mods.settings`), in the folder the
+    /// user chooses.
     ModsSettings,
+    /// One line per mod folder, `Name : 1` or `Name : 0`, in the order the lines come (UE4SS's `mods.txt`). The file
+    /// lives in the deployment root and is written into the profile's mod layer, so the game folder stays untouched.
+    Ue4ssModsTxt,
 }
