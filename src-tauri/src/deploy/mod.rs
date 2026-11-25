@@ -9,6 +9,7 @@
 
 mod apply;
 mod error;
+mod mods_txt;
 #[cfg(test)]
 mod plan;
 mod progress;
@@ -75,6 +76,9 @@ pub struct Target {
     pub game_root: PathBuf,
     /// The game's order file, for example `mods.settings`. `None` when the game does not use one.
     pub settings: Option<PathBuf>,
+    /// An order file inside the deployment root, relative to it (UE4SS's `mods.txt`). Gobbo writes it into the
+    /// profile's mod layer after the mods are placed. `None` when the order is in the settings folder or absent.
+    pub order_file: Option<String>,
     /// The Gobbo state folder: the journal and the overlay layer.
     pub state: PathBuf,
     /// The user-data sets of the active profile. Empty for a game that declares none. The overlay uses the redirect

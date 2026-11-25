@@ -108,6 +108,7 @@ fn external_fixture(name: &str) -> (Fixture, PathBuf) {
             root: external.clone(),
             game_root: base.join("game"),
             settings: None,
+            order_file: None,
             state: base.join("state"),
             user_data: Vec::new(),
         },

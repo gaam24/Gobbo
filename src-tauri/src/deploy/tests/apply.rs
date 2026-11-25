@@ -29,6 +29,7 @@ fn a_redirect_settings_file_starts_from_the_lower_copy() {
         root: base.join("game"),
         game_root: base.join("game"),
         settings: Some(upper.join("mods.settings")),
+        order_file: None,
         state: base.join("state"),
         user_data: vec![UserDataSet {
             id: "documents".into(),

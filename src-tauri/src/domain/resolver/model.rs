@@ -103,8 +103,16 @@ pub enum Problem {
     DuplicateMod { id: String },
     /// Two files of one mod land at the same path, for example two folders of a flat slot with the same file name.
     DuplicateDestination { path: String, id: String },
-    /// A file and a folder land at paths that cannot coexist (`DLC/x` and `DLC/x/y`).
-    FileFolderCollision { path: String },
+    /// A file and a folder land at paths that cannot coexist (`DLC/x` and `DLC/x/y`). `path` is the file's path. `file`
+    /// and `folder` are the names of the mod that puts the file there and of the mod that puts files under it. When
+    /// `same_mod` is set, one mod does both and the user has to change the archive; otherwise turning one mod off
+    /// clears the clash.
+    FileFolderCollision {
+        path: String,
+        file: String,
+        folder: String,
+        same_mod: bool,
+    },
 }
 
 impl Problem {
@@ -115,9 +123,20 @@ impl Problem {
             Self::DuplicateDestination { path, id } => Message::new("plan.duplicate_destination")
                 .with("path", path)
                 .with("id", id),
-            Self::FileFolderCollision { path } => {
-                Message::new("plan.file_folder_collision").with("path", path)
-            }
+            Self::FileFolderCollision {
+                path,
+                same_mod: true,
+                ..
+            } => Message::new("plan.file_folder_collision").with("path", path),
+            Self::FileFolderCollision {
+                path,
+                file,
+                folder,
+                same_mod: false,
+            } => Message::new("plan.file_folder_collision_between")
+                .with("path", path)
+                .with("file", file)
+                .with("folder", folder),
         }
     }
 }

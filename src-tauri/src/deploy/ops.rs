@@ -87,14 +87,20 @@ pub fn apply_deployment_cancellable(
         // A layer of this profile that the running game already uses cannot be rebuilt under it. The game's order
         // file is shared by every profile, so an apply that would write it also waits.
         let safe = state_is_overlay(&state)
-            && !game.has_load_order()
+            && !game.has_settings_file()
             && !(active_prepared && profiles.last_launched.as_deref() == Some(active.as_str()));
         if !safe {
             return Err(game_is_running_error());
         }
     }
 
-    overlay::make_room(&prepared, &active, game.has_load_order(), running, &roots)?;
+    overlay::make_room(
+        &prepared,
+        &active,
+        game.has_settings_file(),
+        running,
+        &roots,
+    )?;
 
     if active_prepared {
         // A layer that already matches the list and is what the game runs is the deployment the user asked for.

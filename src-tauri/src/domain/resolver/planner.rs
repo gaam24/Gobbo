@@ -1,14 +1,15 @@
 //! Builds the deployment plan: where each file lands, which copy of a contested file is deployed, and the problems that
 //! stop a deployment.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
-use rustc_hash::FxHashSet;
+use rustc_hash::FxHashMap;
 
 use super::model::{
     Conflict, DeployPlan, LayoutProfile, Materialized, ModInput, PlanMode, PlannedFile, Problem,
     SettingsRow,
 };
+use super::own_folder::{has_own_folder, mirrored_only_of};
 use super::shared::SharedRules;
 use crate::domain::deploy::{Deploy, Slot};
 use crate::domain::naming;
@@ -106,20 +107,16 @@ pub fn plan_with_mode(
         }
 
         let slot = deploy.slot(&m.slot);
-        // A mod whose files all mirror game paths has no folder of its own. The library's profile already answered
-        // this; a library built in memory still scans its list.
-        let mirrored_only = match m.layout {
-            Some(profile) if profile.materialized != Materialized::Unknown => profile.mirrored_only,
-            _ => deploy.mirrored_only(&m.files),
-        };
+        let mirrored_only = mirrored_only_of(deploy, m);
         let own_folder = match slot {
-            Some(slot) if !slot.flat && !mirrored_only => {
+            Some(slot) if has_own_folder(slot, mirrored_only) => {
                 let name = naming::deploy_name(&slot.prefix, &m.display_name, &m.folder);
                 Some(unique_name(name, &m.id, &mut taken_names))
             }
             _ => None,
         };
 
+        // Only a mod with a folder of its own gets a row: the game reads no number for any other (see `is_orderable`).
         if let (Some(priority), Some(folder)) = (m.priority, &own_folder) {
             plan.settings.push(SettingsRow {
                 folder: folder.clone(),
@@ -263,7 +260,7 @@ pub fn plan_with_mode(
     settle_contests(contests, winners, &mut plan);
 
     if full {
-        check_file_folder_collisions(&mut plan);
+        check_file_folder_collisions(&mut plan, mods);
     }
 
     plan.file_count = u32::try_from(plan.files.len())
@@ -273,34 +270,72 @@ pub fn plan_with_mode(
 }
 
 /// A deployment cannot write a file `DLC/x` and a file `DLC/x/y` in one pass: one of them would have to be a folder.
-/// The plan names the pair before the first write, rather than failing halfway through with `ENOTDIR`.
-fn check_file_folder_collisions(plan: &mut DeployPlan) {
-    // All keys live in one string and one range table. The old version allocated a fresh key for every ancestor of
-    // every file, which was a large allocation cost on a plan of a thousand mods.
-    let capacity: usize = plan.files.iter().map(|file| file.dest.len() + 1).sum();
-    let mut arena = String::with_capacity(capacity);
-    let mut ranges: Vec<std::ops::Range<usize>> = Vec::with_capacity(plan.files.len());
+/// The plan names the two mods before the first write, rather than failing halfway through with `ENOTDIR`. A clash is
+/// named once, however many files of the folder touch it.
+fn check_file_folder_collisions(plan: &mut DeployPlan, mods: &[ModInput<'_>]) {
+    // (path of the file, family with the file, family with the files under it), in order and without repeats.
+    let mut clashes: BTreeSet<(String, String, String)> = BTreeSet::new();
+    {
+        // All keys live in one string and one range table. The old version allocated a fresh key for every ancestor of
+        // every file, which was a large allocation cost on a plan of a thousand mods.
+        let capacity: usize = plan.files.iter().map(|file| file.dest.len() + 1).sum();
+        let mut arena = String::with_capacity(capacity);
+        let mut ranges: Vec<std::ops::Range<usize>> = Vec::with_capacity(plan.files.len());
 
-    for file in &plan.files {
-        ranges.push(path_key_into(&file.dest, &mut arena));
-    }
+        for file in &plan.files {
+            ranges.push(path_key_into(&file.dest, &mut arena));
+        }
 
-    let destinations: FxHashSet<&str> = ranges.iter().map(|range| &arena[range.clone()]).collect();
+        // The planned file at each key, so a folder's ancestor finds the file that blocks it.
+        let files_at: FxHashMap<&str, usize> = ranges
+            .iter()
+            .enumerate()
+            .map(|(at, range)| (&arena[range.clone()], at))
+            .collect();
 
-    for (file, range) in plan.files.iter().zip(&ranges) {
-        let key = &arena[range.clone()];
-        let mut at = key.len();
+        for (file, range) in plan.files.iter().zip(&ranges) {
+            let key = &arena[range.clone()];
+            let mut at = key.len();
 
-        while let Some(slash) = key[..at].rfind('/') {
-            at = slash;
+            while let Some(slash) = key[..at].rfind('/') {
+                at = slash;
 
-            if destinations.contains(&key[..at]) {
-                plan.problems.push(Problem::FileFolderCollision {
-                    path: file.dest.clone(),
-                });
-                break;
+                if let Some(&holder) = files_at.get(&key[..at]) {
+                    let holder = &plan.files[holder];
+                    clashes.insert((
+                        holder.dest.clone(),
+                        plan.family(holder).to_string(),
+                        plan.family(file).to_string(),
+                    ));
+                    break;
+                }
             }
         }
+    }
+
+    if clashes.is_empty() {
+        return;
+    }
+
+    // The names the interface shows; a family without a mod in the list keeps its id.
+    let names: FxHashMap<&str, &str> = mods
+        .iter()
+        .map(|m| (m.id.as_ref(), m.display_name.as_ref()))
+        .collect();
+    let name_of = |id: &str| {
+        names
+            .get(id)
+            .map_or_else(|| id.to_string(), |name| (*name).to_string())
+    };
+
+    for (path, file_id, folder_id) in clashes {
+        let problem = Problem::FileFolderCollision {
+            path,
+            file: name_of(&file_id),
+            folder: name_of(&folder_id),
+            same_mod: file_id == folder_id,
+        };
+        plan.problems.push(problem);
     }
 }
 

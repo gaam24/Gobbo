@@ -45,7 +45,9 @@ pub fn folder_readiness(
         .unwrap_or_default();
     FolderReadiness {
         game: is_dir(&settings.game_root),
-        settings: !game.has_load_order() || is_dir(&settings.settings_dir) || settings_redirected,
+        settings: !game.has_settings_file()
+            || is_dir(&settings.settings_dir)
+            || settings_redirected,
         mods: if settings.mods_root.trim().is_empty() {
             if game.has_external_root() {
                 // The overlay can cover a folder outside the game that does not exist yet; the user may create or
@@ -94,10 +96,17 @@ pub fn target_for(
     }
     let settings_path =
         settings_file(game, settings).map(|path| user_data::write_path(&user_data, &path));
+    // An order file inside the deployment root is written into the mod layer, so it is named here, not as a path.
+    let order_file = game
+        .load_order
+        .as_ref()
+        .filter(|order| !order.uses_settings_folder())
+        .map(|order| order.file.clone());
     Ok(Target {
         root: deployment_root(data, game, settings)?,
         game_root: PathBuf::from(settings.game_root.trim()),
         settings: settings_path,
+        order_file,
         state,
         user_data,
     })

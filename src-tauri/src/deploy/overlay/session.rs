@@ -16,9 +16,11 @@ use super::report::{layer_prefix, write_layer_dlls};
 use super::windows::check;
 use crate::deploy::apply::{layer_jobs, write_settings};
 use crate::deploy::journal::{Entry, Journal, JournalRoots};
+use crate::deploy::mods_txt::write_order;
 use crate::deploy::{
     ApplyReport, DeployError, DeployProgress, DeployStage, Target, scan, state_is_overlay, undo,
 };
+use crate::domain::pathkey::path_key;
 use crate::domain::resolver::DeployPlan;
 use crate::domain::user_data::Set as UserDataSet;
 use crate::error::AppError;
@@ -186,7 +188,13 @@ pub fn prepare_with_progress(
 
     // The layer from the previous session of this profile stays when it matches the plan. Otherwise we build it again.
     // The old files are just hardlinks, so removing them does not touch the library or the game.
-    let reused = matches_plan(plan, library, &session.mods, &inner)?;
+    let reused = matches_plan(
+        plan,
+        library,
+        &session.mods,
+        &inner,
+        target.order_file.as_deref(),
+    )?;
     // The layer is removed under a game that still runs from it, so a rebuild waits until the overlay is free.
     if !reused && in_use(session.view_root()) {
         return Err(DeployError::OverlayInUse {
@@ -261,6 +269,7 @@ pub fn prepare_with_progress(
         report.files,
     ));
     write_settings(journal, target, &plan.settings)?;
+    write_order(plan, library, target, &base)?;
     write_layer_dlls(&session, plan, &inner);
     Ok(report)
 }
@@ -282,7 +291,7 @@ pub fn finish(overwrite: &Path, warnings: &mut Vec<Message>) {
 pub fn make_room(
     prepared: &BTreeMap<String, PathBuf>,
     active: &str,
-    has_load_order: bool,
+    has_settings_file: bool,
     running: bool,
     roots: &JournalRoots,
 ) -> Result<(), AppError> {
@@ -291,7 +300,7 @@ pub fn make_room(
             continue;
         }
         // An overlay layer can stay for fast switching, unless the game's order file is shared between profiles.
-        if !state_is_overlay(path) || has_load_order {
+        if !state_is_overlay(path) || has_settings_file {
             if running {
                 return Err(game_is_running_error());
             }
@@ -304,23 +313,39 @@ pub fn make_room(
 }
 
 /// Whether the layer from the previous session matches the plan: the same set of files, and each one is a hardlink to a file
-/// in the library. Then nothing has to be built again, which saves the most time with large modpacks.
+/// in the library. Then nothing has to be built again, which saves the most time with large modpacks. `order_file` is the
+/// list `write_order` writes into the layer. When the plan has rows for it, that file is written again on every apply, so
+/// it is not a hardlink and the check leaves it out.
 pub(in crate::deploy) fn matches_plan(
     plan: &DeployPlan,
     library: &Path,
     mods: &Path,
     inner: &Path,
+    order_file: Option<&str>,
 ) -> Result<bool, DeployError> {
     if !mods.is_dir() {
         return Ok(false);
     }
     // The scan lists the layer's files with `/` and sorted, so the plan's paths take the same form.
     let prefix = layer_prefix(inner);
+    let rewritten = order_file
+        .filter(|_| !plan.settings.is_empty())
+        .map(|rel| path_key(&format!("{prefix}{rel}")));
+    let is_rewritten = |layered: &str| {
+        rewritten
+            .as_deref()
+            .is_some_and(|key| path_key(layered) == key)
+    };
     let mut planned = Vec::with_capacity(plan.files.len());
 
     for file in &plan.files {
-        let src = library.join(plan.folder(file)).join(plan.rel_path(file));
         let layered = format!("{prefix}{}", file.dest);
+
+        if is_rewritten(&layered) {
+            continue;
+        }
+
+        let src = library.join(plan.folder(file)).join(plan.rel_path(file));
 
         if !same_file(&src, &mods.join(&layered)) {
             return Ok(false);
@@ -329,7 +354,8 @@ pub(in crate::deploy) fn matches_plan(
         planned.push(layered);
     }
 
-    let present = scan::list_files(mods)?;
+    let mut present = scan::list_files(mods)?;
+    present.retain(|layered| !is_rewritten(layered));
     planned.sort_unstable();
     Ok(planned == present)
 }

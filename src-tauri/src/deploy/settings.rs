@@ -92,7 +92,7 @@ pub fn revert(current: &str, touched: &[Touched]) -> String {
     join(&lines, eol)
 }
 
-fn join(lines: &[String], eol: &str) -> String {
+pub(super) fn join(lines: &[String], eol: &str) -> String {
     let mut out = String::new();
 
     for line in lines {

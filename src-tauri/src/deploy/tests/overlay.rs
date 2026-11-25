@@ -165,7 +165,7 @@ fn a_root_inside_the_game_folder_is_a_folder_inside_the_layer() {
     undo(&f.target.journal_roots()).unwrap();
 
     // The same plan reuses the layer.
-    assert!(matches_plan(&plan, &f.library, &session.mods, Path::new("Data")).unwrap());
+    assert!(matches_plan(&plan, &f.library, &session.mods, Path::new("Data"), None).unwrap());
 }
 
 #[test]
@@ -176,7 +176,7 @@ fn a_staging_left_by_undo_is_reused_when_it_matches_the_plan() {
     undo(&f.target.journal_roots()).unwrap();
 
     let session = overlay_session(&f);
-    assert!(matches_plan(&plan, &f.library, &session.mods, Path::new("")).unwrap());
+    assert!(matches_plan(&plan, &f.library, &session.mods, Path::new(""), None).unwrap());
 
     let again = overlay_apply(&f, &plan);
     assert_eq!(again.files, 1);
@@ -193,7 +193,8 @@ fn a_staging_with_other_files_is_not_reused() {
     overlay_apply(&f, &overlay_plan(&f, "Mods", &["modA"]));
     undo(&f.target.journal_roots()).unwrap();
     let other = overlay_plan(&f, "Mods", &[]);
-    assert!(!matches_plan(&other, &f.library, &overlay_session(&f).mods, Path::new("")).unwrap());
+    let mods = overlay_session(&f).mods;
+    assert!(!matches_plan(&other, &f.library, &mods, Path::new(""), None).unwrap());
 }
 
 #[test]

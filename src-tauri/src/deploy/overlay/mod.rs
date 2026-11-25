@@ -60,7 +60,7 @@ pub use run::run;
 pub use run::{
     Launcher, clear_outputs, execute, run_step, run_with_env, run_with_output, start_with_env,
 };
-#[cfg(all(test, not(windows)))]
+#[cfg(test)]
 pub(super) use session::matches_plan;
 pub use session::{
     Session, check_support, finish, make_room, prepare_with_progress, wait_released,

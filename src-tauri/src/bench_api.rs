@@ -733,6 +733,7 @@ impl DeployFixture {
             root: game_root.clone(),
             game_root,
             settings: None,
+            order_file: None,
             state: dir.join("state"),
             user_data: Vec::new(),
         };
