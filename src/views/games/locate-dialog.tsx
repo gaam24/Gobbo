@@ -10,6 +10,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { useTranslation } from "@/i18n";
 import { messageOf } from "@/lib/ipc";
 import { pickFolder } from "@/lib/tauri";
+import { cleanPath } from "@/views/games/editor/game-path";
 
 /// How long the folder check waits after the last change to the folder, so it does not run on every keystroke.
 const CHECK_DELAY_MS = 300;
@@ -82,7 +83,7 @@ export function LocateDialog({
 		result: FolderCheck;
 	} | null>(null);
 	const [busy, setBusy] = useState(false);
-	const trimmed = folder.trim();
+	const trimmed = cleanPath(folder);
 
 	useEffect(() => {
 		if (!trimmed) return;

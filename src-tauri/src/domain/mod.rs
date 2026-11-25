@@ -24,6 +24,7 @@ pub mod mod_steps;
 pub mod naming;
 pub mod pack;
 pub mod pathkey;
+pub mod pattern;
 pub mod profiles;
 pub mod progress;
 pub mod proton_options;

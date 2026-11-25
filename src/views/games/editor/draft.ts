@@ -170,6 +170,8 @@ export interface LogSourceDraft {
 
 const ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
+const TRAILING_FOLDER_SEPARATORS = /\/+$/;
+
 /// The `game.toml` schema version the editor writes.
 const SCHEMA_VERSION = 1;
 
@@ -245,6 +247,18 @@ export function slugify(text: string): string {
 		.replaceAll(/[^a-z0-9]+/g, "-")
 		.replaceAll(/^-+|-+$/g, "");
 	return slug === "" ? "game" : slug;
+}
+
+/// The id a name suggests: its slug, or nothing while the name is blank.
+function suggestedId(name: string): string {
+	return name.trim() === "" ? "" : slugify(name);
+}
+
+/// The id for a new name. The id follows the name while it is still the suggestion of the name it came from, so typing
+/// `Example Game` fills in `example-game` and not only its first letter. An id the user typed is kept.
+export function idForName(draft: GameDraft, name: string): string {
+	const followsName = draft.id === "" || draft.id === suggestedId(draft.name);
+	return followsName ? suggestedId(name) : draft.id;
 }
 
 export function loaderId(draft: GameDraft): string {
@@ -404,8 +418,8 @@ function cleanDeploy(deploy: DeployDraft): Record<string, unknown> {
 }
 
 function cleanMove(move: MoveDraft): Record<string, unknown> {
-	const out: Record<string, unknown> = { to: move.to.trim() };
-	const extensions = cleanLines(move.extensions);
+	const out: Record<string, unknown> = { to: cleanFolder(move.to) };
+	const extensions = cleanExtensions(move.extensions);
 
 	if (extensions) out.extensions = extensions;
 	return out;
@@ -422,7 +436,7 @@ function cleanSlot(slot: SlotDraft): Record<string, unknown> {
 	if (markers) out.markers = markers;
 
 	for (const key of ["extensions", "root_extensions", "root_folder_extensions"] as const) {
-		const values = cleanLines(slot[key]);
+		const values = cleanExtensions(slot[key]);
 
 		if (values) out[key] = values;
 	}
@@ -433,7 +447,7 @@ function cleanSlot(slot: SlotDraft): Record<string, unknown> {
 
 function cleanMirror(mirror: MirrorDraft): Record<string, unknown> {
 	const out: Record<string, unknown> = { dir: mirror.dir.trim() };
-	const extensions = cleanLines(mirror.extensions);
+	const extensions = cleanExtensions(mirror.extensions);
 
 	if (extensions) out.extensions = extensions;
 	putText(out, "prefix", mirror.prefix);
@@ -443,7 +457,7 @@ function cleanMirror(mirror: MirrorDraft): Record<string, unknown> {
 function cleanShared(shared: SharedDraft): Record<string, unknown> {
 	const out: Record<string, unknown> = {};
 	putText(out, "dir", shared.dir);
-	const extensions = cleanLines(shared.extensions);
+	const extensions = cleanExtensions(shared.extensions);
 
 	if (extensions) out.extensions = extensions;
 	return out;
@@ -596,6 +610,18 @@ function keepFilled<T>(
 	clean: (entry: T) => Record<string, unknown>,
 ): Array<Record<string, unknown>> {
 	return (entries ?? []).filter((entry) => filled(entry)).map((entry) => clean(entry));
+}
+
+/// Extensions as the rules compare them: lower case, with the dot. `.PAK` is the file type of `.pak`, so the editor writes
+/// it in lower case instead of refusing it.
+function cleanExtensions(values: string[] | undefined): string[] | undefined {
+	return cleanLines(values?.map((value) => value.toLowerCase()));
+}
+
+/// A folder inside the game as the rules want it: `/` separators and no trailing separator, so a folder typed with a
+/// backslash or a final slash is accepted.
+function cleanFolder(text: string): string {
+	return text.trim().replaceAll("\\", "/").replace(TRAILING_FOLDER_SEPARATORS, "");
 }
 
 function cleanLines(values: string[] | undefined): string[] | undefined {

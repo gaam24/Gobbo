@@ -47,7 +47,7 @@ export function AdvancedProfiles({ draft, onChange }: { draft: GameDraft; onChan
 			>
 				{sets.map((set, index) => (
 					<RepeatRow
-						key={`user-data-${set.id}`}
+						key={index} // eslint-disable-line react/no-array-index-key -- the rows are edited in place
 						title={set.id || t("editor.profiles.userData")}
 						onRemove={() =>
 							onChange({

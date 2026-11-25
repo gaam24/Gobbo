@@ -1,10 +1,11 @@
 import { Check, FolderOpen } from "lucide-react";
+import type { EngineSuggestion_Serialize } from "@/bindings";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { useTranslation } from "@/i18n";
-import { slugify } from "@/views/games/editor/draft";
+import { idForName } from "@/views/games/editor/draft";
 import { EditorField } from "@/views/games/editor/fields";
 import { QuickSection } from "@/views/games/editor/quick-section";
 import type { QuickProps } from "@/views/games/editor/quick-types";
@@ -26,12 +27,13 @@ export function QuickGame({
 	const { t } = useTranslation();
 	const detectedSteam = inspection?.steam;
 	const stores = inspection?.stores;
+	const engine = inspection?.engine;
 
 	const setName = (name: string) =>
 		onChange({
 			...draft,
 			name,
-			id: editing || draft.id !== "" ? draft.id : slugify(name),
+			id: editing ? draft.id : idForName(draft, name),
 		});
 
 	return (
@@ -96,6 +98,7 @@ export function QuickGame({
 								})}
 							</Badge>
 						)}
+						{engine && <Badge variant="outline">{engineBadgeText(engine)}</Badge>}
 					</p>
 					{inspection.loaders.length > 0 && (
 						<p className="text-muted-foreground">
@@ -104,6 +107,14 @@ export function QuickGame({
 							})}
 						</p>
 					)}
+					{engine && (
+						<p className="text-muted-foreground">
+							{t("editor.quick.engineLoader", {
+								loader: engine.variant ? `${engine.loader_name} ${engine.variant}` : engine.loader_name,
+							})}
+						</p>
+					)}
+					{engine?.root && <p className="text-muted-foreground">{t("editor.quick.engineRoot", { root: engine.root })}</p>}
 				</div>
 			)}
 			<div className="grid gap-4 md:grid-cols-2">
@@ -125,4 +136,10 @@ export function QuickGame({
 			{idWarning && <p className="text-destructive text-sm">{idWarning}</p>}
 		</QuickSection>
 	);
+}
+
+/// The engine as its badge names it: the engine's name and, when the preset names the build, its label, such as
+/// `Unity (IL2CPP)`. Names are not translated.
+function engineBadgeText(engine: EngineSuggestion_Serialize): string {
+	return engine.label ? `${engine.engine_name} (${engine.label})` : engine.engine_name;
 }

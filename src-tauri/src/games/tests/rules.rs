@@ -307,6 +307,27 @@ fn the_order_file_is_a_safe_template_of_a_file() {
 }
 
 #[test]
+fn a_ue4ss_order_file_lies_in_a_slot_folder_of_the_game() {
+    let with_file = |file: &str| {
+        lf(SLOT).replacen(
+            "format = \"mods_settings\"\nfile = \"{documents}/Slot Game/mods.settings\"",
+            &format!("format = \"ue4ss_mods_txt\"\nfile = \"{file}\""),
+            1,
+        )
+    };
+    let no_order_problem = |text: &str| {
+        !problems(text)
+            .iter()
+            .any(|problem| problem.contains("load_order"))
+    };
+
+    // The fixture's slot is `Mods`, so its list in that folder is valid; a list elsewhere, or an absolute path, is not.
+    assert!(no_order_problem(&with_file("Mods/mods.txt")));
+    assert!(!no_order_problem(&with_file("Other/mods.txt")));
+    assert!(!no_order_problem(&with_file("/Mods/mods.txt")));
+}
+
+#[test]
 fn a_root_folder_is_a_lowercase_extension() {
     has_problem(
         &lf(PLUGIN).replacen(

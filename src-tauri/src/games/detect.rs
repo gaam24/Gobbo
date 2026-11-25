@@ -59,6 +59,13 @@ pub fn game_folder(root: &Path, game: &GameDef, is_linux: bool) -> Option<PathBu
 /// `markers` exist or, on Linux, when all `linux_markers` exist. `any_marker` relaxes each set the same way; with no
 /// markers the folder itself is enough, and an empty `linux_markers` leaves the rule as it was.
 pub fn has_markers_for(is_linux: bool, root: &Path, game: &GameDef) -> bool {
+    root.is_dir() && satisfied_set(is_linux, root, game).is_some()
+}
+
+/// The marker set the folder satisfies under the rule of `has_markers_for`: the definition's `markers` first, then, on
+/// Linux, its `linux_markers`. `None` when neither is satisfied. Every reader of the rule goes through here, so the
+/// folder that is accepted and the marker that is shown cannot disagree.
+fn satisfied_set<'a>(is_linux: bool, root: &Path, game: &'a GameDef) -> Option<&'a [String]> {
     /// Whether one set of markers is satisfied. An empty set needs no file, which keeps the folder itself enough.
     fn set_matches(markers: &[String], any: bool, root: &Path) -> bool {
         markers.is_empty()
@@ -69,10 +76,43 @@ pub fn has_markers_for(is_linux: bool, root: &Path, game: &GameDef) -> bool {
             }
     }
 
-    let linux = &game.detect.linux_markers;
-    root.is_dir()
-        && (set_matches(&game.detect.markers, game.detect.any_marker, root)
-            || (is_linux && !linux.is_empty() && set_matches(linux, game.detect.any_marker, root)))
+    let any = game.detect.any_marker;
+    let markers = game.detect.markers.as_slice();
+    let linux = game.detect.linux_markers.as_slice();
+
+    if set_matches(markers, any, root) {
+        Some(markers)
+    } else if is_linux && !linux.is_empty() && set_matches(linux, any, root) {
+        Some(linux)
+    } else {
+        None
+    }
+}
+
+/// The marker file to show for a folder the rule accepts: the first file of the satisfied set that the folder has.
+/// `None` when the folder is not accepted, or when the satisfied set names no file.
+pub fn marker_file_for(is_linux: bool, root: &Path, game: &GameDef) -> Option<String> {
+    if !root.is_dir() {
+        return None;
+    }
+
+    satisfied_set(is_linux, root, game)?
+        .iter()
+        .find(|marker| root.join(marker).exists())
+        .cloned()
+}
+
+/// The marker files a game folder of this game is asked to have on this platform, as a message shows them: the
+/// definition's `markers`, and on Linux its `linux_markers` after ` /`, because either set is enough.
+pub fn expected_markers(is_linux: bool, game: &GameDef) -> String {
+    let mut sets = vec![game.detect.markers.join(", ")];
+
+    if is_linux {
+        sets.push(game.detect.linux_markers.join(", "));
+    }
+
+    sets.retain(|set| !set.is_empty());
+    sets.join(" / ")
 }
 
 /// Whether two paths name the same folder. Links are resolved first, so a store's path and the game folder it points at

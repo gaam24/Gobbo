@@ -48,7 +48,7 @@ export function AdvancedTools({ draft, onChange }: { draft: GameDraft; onChange:
 			>
 				{tools.map((tool, index) => (
 					<RepeatRow
-						key={`tool-${tool.id}`}
+						key={index} // eslint-disable-line react/no-array-index-key -- the rows are edited in place
 						title={tool.name || tool.id || t("editor.tools.tool")}
 						onRemove={() => setTools(tools.filter((_, at) => at !== index))}
 					>

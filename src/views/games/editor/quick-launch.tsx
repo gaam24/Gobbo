@@ -1,40 +1,67 @@
+import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { useTranslation } from "@/i18n";
+import { pickFile } from "@/lib/tauri";
 import { EditorField } from "@/views/games/editor/fields";
+import { FoundPicker } from "@/views/games/editor/found-picker";
+import { relativeToFolder } from "@/views/games/editor/game-path";
 import { QuickSection } from "@/views/games/editor/quick-section";
 import type { QuickProps } from "@/views/games/editor/quick-types";
 
 const PATH_SEPARATOR = /[\\/]/;
 const EXE_SUFFIX = /\.exe$/i;
 
-/// The program Gobbo starts. The field is a datalist, so a detected program is one click and a native Linux program
-/// can still be typed by hand.
-export function QuickLaunch({ draft, onChange, inspection }: QuickProps) {
+/// The name a program gets from its path: the file name without `.exe`.
+function nameOf(path: string): string {
+	return path.split(PATH_SEPARATOR).at(-1)?.replace(EXE_SUFFIX, "") ?? "";
+}
+
+/// The program Gobbo starts. The path field lists every program Gobbo found, whatever the field holds, and still takes a
+/// path typed by hand. Browse picks a file inside the game folder.
+export function QuickLaunch({ draft, onChange, inspection, folder }: QuickProps) {
 	const { t } = useTranslation();
+	const [outside, setOutside] = useState(false);
 	const executables = draft.executables;
 	const firstExecutable = executables[0];
+	const found = inspection?.executables.map((executable) => executable.path) ?? [];
 
 	const setExecutable = (path: string) => {
-		const name = path.split(PATH_SEPARATOR).at(-1)?.replace(EXE_SUFFIX, "") ?? "";
+		setOutside(false);
+		// A name that is not the name of the previous path was typed by the user, so it stays.
+		const previousName = firstExecutable?.name ?? "";
+		const previousPath = firstExecutable?.path ?? "";
+		const typed = previousName !== "" && previousName !== nameOf(previousPath);
 		onChange({
 			...draft,
-			executables: [{ name, path }, ...executables.slice(1)],
+			executables: [{ name: typed ? previousName : nameOf(path), path }, ...executables.slice(1)],
 		});
+	};
+
+	const browse = async () => {
+		const picked = await pickFile();
+
+		if (picked === null) return;
+
+		const relative = relativeToFolder(folder, picked);
+
+		if (relative === null) setOutside(true);
+		else setExecutable(relative);
 	};
 
 	return (
 		<QuickSection number={3} title={t("editor.quick.launchTitle")} hint={t("editor.quick.launchHint")}>
 			<div className="grid gap-4 md:grid-cols-2">
 				<EditorField id="editor-executable" label={t("editor.quick.executable")} hint={t("editor.quick.executableHint")}>
-					<Input
+					<FoundPicker
 						id="editor-executable"
-						className="font-mono text-xs"
-						list="editor-executables"
 						value={firstExecutable?.path ?? ""}
+						onChange={setExecutable}
+						found={found}
+						menuLabel={t("editor.quick.foundPrograms")}
 						placeholder="Game.exe"
-						spellCheck={false}
-						onChange={(event) => setExecutable(event.currentTarget.value)}
+						onBrowse={folder.trim() === "" ? undefined : () => void browse()}
 					/>
+					{outside && <p className="text-destructive text-sm">{t("editor.quick.programOutside")}</p>}
 				</EditorField>
 				<EditorField id="editor-executable-name" label={t("editor.quick.executableName")}>
 					<Input
@@ -52,15 +79,6 @@ export function QuickLaunch({ draft, onChange, inspection }: QuickProps) {
 					/>
 				</EditorField>
 			</div>
-			{inspection && inspection.executables.length > 0 && (
-				<datalist id="editor-executables">
-					{inspection.executables.map((executable) => (
-						<option key={executable.path} value={executable.path} label={executable.name}>
-							{executable.name}
-						</option>
-					))}
-				</datalist>
-			)}
 			{executables.length > 1 && <p className="text-muted-foreground text-xs">{t("editor.quick.morePrograms")}</p>}
 		</QuickSection>
 	);

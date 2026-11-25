@@ -70,7 +70,10 @@ export function AdvancedExtras({ draft, onChange }: { draft: GameDraft; onChange
 				onAdd={addProvider}
 			>
 				{providers.map(([id, entry], index) => (
-					<div key={`${id}-${entry.key ?? ""}`} className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_auto] md:items-end">
+					<div
+						key={index} // eslint-disable-line react/no-array-index-key -- the rows are edited in place
+						className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_auto] md:items-end"
+					>
 						<EditorField id={`editor-provider-id-${index}`} label={t("editor.extras.provider")}>
 							<TextInput
 								id={`editor-provider-id-${index}`}

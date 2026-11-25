@@ -22,25 +22,38 @@ fn game_folder_for(
     game_root: &str,
     is_linux: bool,
 ) -> Result<PathBuf, AppError> {
-    let game_root = game_root.trim();
+    // A folder typed as `~/...` is in the home folder, as the saved game folder is.
+    let game_root =
+        crate::domain::pathkey::expand_home(game_root.trim(), &crate::games::paths::home());
 
     if game_root.is_empty() {
         return Err(crate::error::game_folder_missing());
     }
 
-    let path = PathBuf::from(game_root);
+    let path = PathBuf::from(&game_root);
 
     if let Some(path) = detect::game_folder(&path, game, is_linux) {
         return Ok(path);
     }
 
-    Err(AppError::user("games.not_game_folder")
-        .with("path", game_root)
-        .with("game", &game.name))
+    if !path.is_dir() {
+        return Err(AppError::user("games.not_a_folder").with("path", &game_root));
+    }
+
+    // The message names the files the rule asks for, so the user knows what the folder must hold.
+    let code = if game.detect.any_marker {
+        "games.not_game_folder_any"
+    } else {
+        "games.not_game_folder"
+    };
+    Err(AppError::user(code)
+        .with("path", &game_root)
+        .with("game", &game.name)
+        .with("files", detect::expected_markers(is_linux, game)))
 }
 
-/// Checks a game folder without adding the game. Returns the first of the game's marker files that the folder has, or
-/// `None` when the game defines no markers (or only the native Linux ones are present).
+/// Checks a game folder without adding the game. Returns the marker file that the folder matched under the scan's rule
+/// (the first file of the satisfied set that it has), or `None` when the satisfied set names no file.
 pub fn check_game_folder(game_id: &str, game_root: &str) -> Result<Option<String>, AppError> {
     let game = games::load(game_id)?;
     check_game_folder_in(&game, game_root, !crate::platform::is_windows())
@@ -53,12 +66,7 @@ fn check_game_folder_in(
     is_linux: bool,
 ) -> Result<Option<String>, AppError> {
     let path = game_folder_for(game, game_root, is_linux)?;
-    Ok(game
-        .detect
-        .markers
-        .iter()
-        .find(|marker| path.join(marker).exists())
-        .cloned())
+    Ok(detect::marker_file_for(is_linux, &path, game))
 }
 
 /// Adds a game to Gobbo. `game_root` must have the files from the game definition. When the game was removed before, its
@@ -203,10 +211,58 @@ dir = "Mods"
             Some("Game.exe".to_string())
         );
         assert!(super::check_game_folder_in(&game, &linux.display().to_string(), false).is_err());
+        // The native folder is accepted by its Linux marker, so that is the marker the check shows.
         assert_eq!(
             super::check_game_folder_in(&game, &linux.display().to_string(), true).unwrap(),
-            None
+            Some("Game.x86_64".to_string())
         );
+    }
+
+    #[test]
+    fn a_folder_without_the_markers_names_the_files_it_should_have() {
+        let base = scratch!("locate-message");
+        let empty = base.join("Empty Folder");
+        std::fs::create_dir_all(&empty).unwrap();
+        let game = native_game();
+        let text = empty.display().to_string();
+
+        let windows = super::game_folder_for(&game, &text, false).unwrap_err();
+        assert_eq!(windows.code, "games.not_game_folder");
+        assert_eq!(windows.params["files"], "Game.exe");
+
+        let linux = super::game_folder_for(&game, &text, true).unwrap_err();
+        assert_eq!(linux.params["files"], "Game.exe / Game.x86_64");
+
+        let mut any = native_game();
+        any.detect.any_marker = true;
+        let either = super::game_folder_for(&any, &text, true).unwrap_err();
+        assert_eq!(either.code, "games.not_game_folder_any");
+
+        let missing = base.join("No Such Folder").display().to_string();
+        let not_a_folder = super::game_folder_for(&game, &missing, false).unwrap_err();
+        assert_eq!(not_a_folder.code, "games.not_a_folder");
+    }
+
+    #[test]
+    fn the_check_accepts_exactly_the_folders_the_scan_recognises() {
+        let base = scratch!("locate-agrees");
+        let game = native_game();
+        let windows = base.join("Windows Game");
+        write(&windows.join("Game.exe"), "");
+        let native = base.join("Native Game");
+        write(&native.join("Game.x86_64"), "");
+        let partial = base.join("Partial Game");
+        write(&partial.join("Other.txt"), "");
+
+        for is_linux in [false, true] {
+            for folder in [&windows, &native, &partial] {
+                let scanned = crate::games::detect::has_markers_for(is_linux, folder, &game);
+                let checked =
+                    super::check_game_folder_in(&game, &folder.display().to_string(), is_linux)
+                        .is_ok();
+                assert_eq!(scanned, checked, "{} on linux={is_linux}", folder.display());
+            }
+        }
     }
 
     #[test]

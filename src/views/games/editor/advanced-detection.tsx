@@ -1,17 +1,44 @@
+import { useState } from "react";
 import { useTranslation } from "@/i18n";
+import { pickFile } from "@/lib/tauri";
 import type { DetectDraft, ExecutableDraft, GameDraft } from "@/views/games/editor/draft";
 import { AddRowButton, EditorField, LinesField, RepeatRow, SwitchField, TextInput } from "@/views/games/editor/fields";
+import { FoundPicker } from "@/views/games/editor/found-picker";
+import { relativeToFolder } from "@/views/games/editor/game-path";
 
 /// The detection fields: how Gobbo finds the folder again on this computer and on another one. The quick step fills
-/// the marker and the Steam values from the folder; this section is for the rest and for a second store.
-export function AdvancedDetection({ draft, onChange }: { draft: GameDraft; onChange: (draft: GameDraft) => void }) {
+/// the marker and the Steam values from the folder; this section is for the rest and for a second store. `programs` are
+/// the programs Gobbo found in the game folder, and a program browsed for is made relative to `folder`.
+export function AdvancedDetection({
+	draft,
+	onChange,
+	programs,
+	folder,
+}: {
+	draft: GameDraft;
+	onChange: (draft: GameDraft) => void;
+	programs: string[];
+	folder: string;
+}) {
 	const { t } = useTranslation();
 	const detect = draft.detect;
+	const [outsideRow, setOutsideRow] = useState<number | null>(null);
 
 	const update = (patch: Partial<DetectDraft>) => onChange({ ...draft, detect: { ...detect, ...patch } });
 	const updateExecutable = (index: number, patch: Partial<ExecutableDraft>) => {
 		const executables = draft.executables.map((executable, at) => (at === index ? { ...executable, ...patch } : executable));
 		onChange({ ...draft, executables });
+	};
+
+	const browseProgram = async (index: number) => {
+		const picked = await pickFile();
+
+		if (picked === null) return;
+
+		const relative = relativeToFolder(folder, picked);
+		setOutsideRow(relative === null ? index : null);
+
+		if (relative !== null) updateExecutable(index, { path: relative });
 	};
 
 	return (
@@ -111,7 +138,7 @@ export function AdvancedDetection({ draft, onChange }: { draft: GameDraft; onCha
 				<div className="grid gap-3">
 					{draft.executables.map((executable, index) => (
 						<RepeatRow
-							key={`${executable.name}-${executable.path}`}
+							key={index} // eslint-disable-line react/no-array-index-key -- the rows are edited in place
 							title={executable.name || executable.path || t("editor.detection.executable")}
 							onRemove={() =>
 								onChange({
@@ -129,11 +156,18 @@ export function AdvancedDetection({ draft, onChange }: { draft: GameDraft; onCha
 									/>
 								</EditorField>
 								<EditorField id={`editor-exe-path-${index}`} label={t("editor.detection.executablePath")}>
-									<TextInput
+									<FoundPicker
 										id={`editor-exe-path-${index}`}
 										value={executable.path}
-										onChange={(path) => updateExecutable(index, { path })}
+										onChange={(path) => {
+											setOutsideRow(null);
+											updateExecutable(index, { path });
+										}}
+										found={programs}
+										menuLabel={t("editor.quick.foundPrograms")}
+										onBrowse={folder.trim() === "" ? undefined : () => void browseProgram(index)}
 									/>
+									{outsideRow === index && <p className="text-destructive text-sm">{t("editor.quick.programOutside")}</p>}
 								</EditorField>
 								<EditorField
 									id={`editor-exe-linux-${index}`}

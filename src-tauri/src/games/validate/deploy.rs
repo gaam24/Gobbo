@@ -214,7 +214,27 @@ impl GameDef {
         let Some(order) = &self.load_order else {
             return;
         };
-        problems.template("load_order.file", &order.file);
+
+        if order.uses_settings_folder() {
+            problems.template("load_order.file", &order.file);
+        } else {
+            // A UE4SS list sits in the deployment root and names mod folders, so it must lie in a slot's folder,
+            // where those mods are. The file name is not checked: a loader may ship another one.
+            problems.relative("load_order.file", std::iter::once(&order.file));
+            let in_slot = order.file.rsplit_once('/').is_some_and(|(folder, _)| {
+                self.deploy
+                    .slots
+                    .iter()
+                    .any(|slot| pathkey::path_key(&slot.dir) == pathkey::path_key(folder))
+            });
+
+            if !in_slot {
+                problems.push(format!(
+                    "load_order.file must lie in a slot folder of the game: {:?}",
+                    order.file
+                ));
+            }
+        }
 
         if order.file.ends_with(['/', '\\']) {
             problems.push(format!(

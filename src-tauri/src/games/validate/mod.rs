@@ -208,7 +208,7 @@ impl GameDef {
 
             if source.pattern.is_empty()
                 || source.pattern.contains(['/', '\\'])
-                || source.pattern.contains("..")
+                || source.pattern == ".."
             {
                 problems.push(format!(
                     "{what} pattern must be a file name without folders: {:?}",

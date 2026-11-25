@@ -107,6 +107,8 @@ export function GameEditor({ id, onClose }: { id: string | null; onClose: () => 
 						draft={editor.draft}
 						onChange={editor.update}
 						directories={editor.inspection?.directories ?? []}
+						programs={editor.inspection?.executables.map((executable) => executable.path) ?? []}
+						folder={editor.folder}
 						source={editor.source}
 						sourceDirty={editor.sourceDirty}
 						formText={editor.formText}

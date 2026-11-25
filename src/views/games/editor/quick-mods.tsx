@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useTranslation } from "@/i18n";
 import { loaderId, loaderVariant, placeSummary, setLoader } from "@/views/games/editor/draft";
 import { EditorField, SwitchField } from "@/views/games/editor/fields";
+import { FoundPicker } from "@/views/games/editor/found-picker";
 import { QuickSection } from "@/views/games/editor/quick-section";
 import type { QuickProps } from "@/views/games/editor/quick-types";
 
@@ -16,6 +17,7 @@ export function QuickMods({ draft, onChange, inspection, presets, layout, onLayo
 	const brokenPresets = presets.filter((preset) => preset.problems.length > 0);
 	const selectedPreset = usablePresets.find((preset) => preset.id === loaderId(draft));
 	const detected = inspection?.loaders.find((loader) => loader.id === selectedPreset?.id);
+	const directories = inspection?.directories ?? [];
 	const places = check?.summary?.game.places ?? placeSummary(draft);
 	const layoutPlaces = draft.deploy.full_root ? t("editor.quick.fullRoot") : places.join(", ") || "—";
 
@@ -129,18 +131,17 @@ export function QuickMods({ draft, onChange, inspection, presets, layout, onLayo
 						hint={t("editor.quick.slotDirHint")}
 						className="md:col-span-2"
 					>
-						<Input
+						<FoundPicker
 							id="editor-slot-dir"
-							className="font-mono text-xs"
-							list="editor-directories"
 							value={draft.deploy.slots?.[0]?.dir ?? ""}
 							placeholder="Mods"
-							spellCheck={false}
-							onChange={(event) => {
+							found={directories}
+							menuLabel={t("editor.quick.foundFolders")}
+							onChange={(dir) => {
 								const slots = [...(draft.deploy.slots ?? [])];
 								slots[0] = {
 									...(slots[0] ?? { dir: "" }),
-									dir: event.currentTarget.value,
+									dir,
 								};
 								onChange({ ...draft, deploy: { ...draft.deploy, slots } });
 							}}
@@ -194,20 +195,24 @@ export function QuickMods({ draft, onChange, inspection, presets, layout, onLayo
 			{layout === "mirror" && (
 				<div className="grid gap-3">
 					{(draft.deploy.mirror ?? []).map((mirror, index) => (
-						<div key={mirror.dir} className="flex flex-wrap items-end gap-2">
+						// The rows are edited in place: a key taken from the folder name would change on every letter and
+						// the field would lose the cursor.
+						<div
+							key={index} // eslint-disable-line react/no-array-index-key -- the rows are edited in place
+							className="flex flex-wrap items-end gap-2"
+						>
 							<EditorField id={`editor-mirror-${index}`} label={t("editor.quick.mirrorDir")} className="min-w-0 flex-1">
-								<Input
+								<FoundPicker
 									id={`editor-mirror-${index}`}
-									className="font-mono text-xs"
-									list="editor-directories"
 									value={mirror.dir}
 									placeholder="Data"
-									spellCheck={false}
-									onChange={(event) => {
+									found={directories}
+									menuLabel={t("editor.quick.foundFolders")}
+									onChange={(dir) => {
 										const mirrors = [...(draft.deploy.mirror ?? [])];
 										mirrors[index] = {
 											...mirrors[index],
-											dir: event.currentTarget.value,
+											dir,
 										};
 										onChange({
 											...draft,
@@ -257,15 +262,6 @@ export function QuickMods({ draft, onChange, inspection, presets, layout, onLayo
 			{layout === "custom" && <p className="text-muted-foreground text-sm">{t("editor.quick.customHint")}</p>}
 
 			<p className="text-muted-foreground text-sm">{t("editor.quick.layoutSummary", { places: layoutPlaces })}</p>
-			{inspection && inspection.directories.length > 0 && (
-				<datalist id="editor-directories">
-					{inspection.directories.map((directory) => (
-						<option key={directory} value={directory} label={directory}>
-							{directory}
-						</option>
-					))}
-				</datalist>
-			)}
 		</QuickSection>
 	);
 }

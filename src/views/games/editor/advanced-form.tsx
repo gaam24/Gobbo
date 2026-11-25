@@ -14,6 +14,8 @@ import type { GameDraft } from "@/views/games/editor/draft";
 export function AdvancedForm({
 	draft,
 	onChange,
+	folder,
+	programs,
 	directories,
 	source,
 	sourceDirty,
@@ -24,6 +26,10 @@ export function AdvancedForm({
 }: {
 	draft: GameDraft;
 	onChange: (draft: GameDraft) => void;
+	/** The game folder as the user gave it; a browsed program is made relative to it. */
+	folder: string;
+	/** The programs Gobbo found in the game folder, offered by the program fields. */
+	programs: string[];
 	directories: string[];
 	source: string;
 	sourceDirty: boolean;
@@ -39,7 +45,7 @@ export function AdvancedForm({
 			<div className="grid gap-10">
 				<section id="editor-detection" className="grid scroll-mt-6 gap-4">
 					<SectionHeading title={t("editor.advanced.detection")} />
-					<AdvancedDetection draft={draft} onChange={onChange} />
+					<AdvancedDetection draft={draft} onChange={onChange} programs={programs} folder={folder} />
 				</section>
 				<section id="editor-deploy" className="grid scroll-mt-6 gap-4 border-t pt-8">
 					<SectionHeading title={t("editor.advanced.deploy")} />

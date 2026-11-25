@@ -7,7 +7,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde::Deserialize;
 
-use super::definition::{GameDef, Install, Requirement, ResolvedLoader};
+use super::definition::{GameDef, Install, LoadOrder, Requirement, ResolvedLoader};
 use crate::domain::deploy::Deploy;
 use crate::domain::pathkey::path_key;
 
@@ -36,6 +36,9 @@ pub(super) struct LoaderDef {
     pub(super) deploy: Deploy,
     #[serde(default)]
     pub(super) variants: BTreeMap<String, LoaderVariant>,
+    /// How the editor recognises a game folder as this preset's engine. A suggestion only: a game takes nothing from it.
+    #[serde(default)]
+    pub(super) engine: Option<EngineDef>,
 }
 
 impl LoaderDef {
@@ -70,6 +73,7 @@ impl LoaderDef {
             install: self.install.clone(),
             deploy: self.deploy.clone(),
             config_mirror: self.config_mirror.clone(),
+            load_order: None,
         };
 
         if let Some(variant) = variant {
@@ -82,6 +86,8 @@ impl LoaderDef {
             if variant.config_mirror.is_some() {
                 rules.config_mirror.clone_from(&variant.config_mirror);
             }
+
+            rules.load_order.clone_from(&variant.load_order);
         }
 
         rules.requires = with_requirement_paths(rules.requires, &rules.requirements);
@@ -105,6 +111,51 @@ pub(super) struct LoaderVariant {
     pub(super) install: Option<Install>,
     #[serde(default)]
     pub(super) deploy: Deploy,
+    /// The order file this layout's loader reads. A variant names it because each release keeps it in its own folder.
+    /// The game's own `load_order` wins when it has one.
+    #[serde(default)]
+    pub(super) load_order: Option<LoadOrder>,
+}
+
+/// The `[engine]` table of a preset: how the editor recognises a game folder as this engine. Every marker is a folder
+/// pattern (see `domain::pattern`), or several joined with `|` (see `marker_alternatives`).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct EngineDef {
+    /// The engine's display name, for example `Unity`.
+    pub(super) name: String,
+    /// The markers that must all exist in the game folder; each one may list alternatives.
+    pub(super) markers: Vec<String>,
+    /// The variant suggested when no entry of `variants` matches. Without it the preset's default variant is suggested.
+    #[serde(default)]
+    pub(super) variant: Option<String>,
+    /// A `*/` pattern for the project folder, for example `*/Content/Paks`. The folder its first segment matches becomes
+    /// the game's deployment root, `{game}/<folder>`.
+    #[serde(default)]
+    pub(super) root: Option<String>,
+    /// The variants a folder can match by their own markers. The first entry whose markers all exist is used.
+    #[serde(default)]
+    pub(super) variants: Vec<EngineVariant>,
+}
+
+/// One variant an engine can match, with the markers that show it.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct EngineVariant {
+    /// The preset variant this entry selects.
+    pub(super) variant: String,
+    /// A short name the editor shows next to the engine, for example `IL2CPP`.
+    #[serde(default)]
+    pub(super) label: Option<String>,
+    /// The markers that must all exist in the game folder for this variant to match; each one may list alternatives.
+    pub(super) markers: Vec<String>,
+}
+
+/// The alternatives of one engine marker. A build that names a file differently (`UnityPlayer.dll` on Windows,
+/// `UnityPlayer.so` on Linux) lists both with `|` between them, and the marker matches when one alternative does. Each
+/// alternative is trimmed, so `a.dll | a.so` reads the same.
+pub(super) fn marker_alternatives(marker: &str) -> impl Iterator<Item = &str> {
+    marker.split('|').map(str::trim)
 }
 
 /// The effective rules of a preset: its base, with the selected variant merged over it.
@@ -115,6 +166,7 @@ pub(super) struct LoaderRules {
     pub(super) install: Option<Install>,
     pub(super) deploy: Deploy,
     pub(super) config_mirror: Option<String>,
+    pub(super) load_order: Option<LoadOrder>,
 }
 
 impl LoaderRules {
@@ -128,6 +180,10 @@ impl LoaderRules {
         game.install = merge_installs(self.install, game_install);
         let game_deploy = std::mem::take(&mut game.deploy);
         game.deploy = merge_deploy(self.deploy, game_deploy);
+
+        if game.load_order.is_none() {
+            game.load_order = self.load_order;
+        }
     }
 }
 

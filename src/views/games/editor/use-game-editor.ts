@@ -18,6 +18,7 @@ import {
 	serializeDraft,
 	setLoader,
 } from "@/views/games/editor/draft";
+import { cleanPath } from "@/views/games/editor/game-path";
 import type { LayoutMode } from "@/views/games/editor/quick-types";
 import { applySuggestions } from "@/views/games/editor/suggestions";
 
@@ -48,11 +49,11 @@ export interface GameEditorModel {
 	sourceError: string | null;
 	activeText: string;
 	dirty: boolean;
-	/// Where the definition came from; `null` for a new draft.
+	/** Where the definition came from; `null` for a new draft. */
 	origin: GameOrigin | null;
-	/// `<data>/definitions`, the folder that holds a user's games and loaders. `null` until the data folder is read.
+	/** `<data>/definitions`, the folder that holds a user's games and loaders. `null` until the data folder is read. */
 	definitionsFolder: string | null;
-	/// Whether at least one user definition is loaded, so the folder exists and can be opened.
+	/** Whether at least one user definition is loaded, so the folder exists and can be opened. */
 	hasUserDefinitions: boolean;
 	openDefinitionsFolder: () => void;
 	update: (draft: GameDraft) => void;
@@ -103,7 +104,9 @@ export function useGameEditor(id: string | null, onClose: () => void): GameEdito
 	useEffect(() => {
 		managedRef.current = managed;
 	}, [managed]);
-	const inspected = useRef<string | null>(null);
+	// The folder whose inspection the screen waits for. A walk answers for the folder it was asked about; an answer for
+	// any other folder is dropped, so a slow walk never fills the screen with the programs of an older folder.
+	const latestFolder = useRef("");
 
 	// The editor is one draft; the shell asks before a screen change would lose it.
 	useEffect(() => {
@@ -161,41 +164,55 @@ export function useGameEditor(id: string | null, onClose: () => void): GameEdito
 	}, [id]);
 
 	const inspect = useCallback(async (path: string) => {
-		const trimmed = path.trim();
+		const trimmed = cleanPath(path);
 
 		if (!trimmed) return;
+		latestFolder.current = trimmed;
 		setInspecting(true);
 		setInspectError(null);
 
+		let result: FolderInspection_Serialize | null = null;
+		let failure: string | null = null;
+
 		try {
-			const result = await unwrap(commands.inspectGameFolder(trimmed));
-			setInspection(result);
-			const current = draftRef.current;
-			const next = applySuggestions(current, result);
-
-			if (JSON.stringify(next) !== JSON.stringify(current)) {
-				setDraft(next);
-				setDirty(true);
-			}
-
-			if (!current.loader && (current.deploy.slots?.length ?? 0) === 0 && (current.deploy.mirror?.length ?? 0) === 0) {
-				setLayout(result.loaders.length > 0 ? "loader" : "slot");
-			}
-		} catch (failure) {
-			setInspectError(messageOf(failure));
+			result = await unwrap(commands.inspectGameFolder(trimmed));
+		} catch (error) {
+			failure = messageOf(error);
 		}
 
+		// The folder changed while the walk ran: that answer is not the folder on screen, and the newer request owns the
+		// spinner.
+		if (latestFolder.current !== trimmed) return;
+
 		setInspecting(false);
+
+		if (result === null) {
+			setInspectError(failure);
+			return;
+		}
+
+		setInspection(result);
+		const current = draftRef.current;
+		const next = applySuggestions(current, result);
+
+		if (JSON.stringify(next) !== JSON.stringify(current)) {
+			setDraft(next);
+			setDirty(true);
+		}
+
+		if (!current.loader && (current.deploy.slots?.length ?? 0) === 0 && (current.deploy.mirror?.length ?? 0) === 0) {
+			setLayout(result.loaders.length > 0 || result.engine ? "loader" : "slot");
+		}
 	}, []);
 
-	// A folder is read after a short pause, so typing a path does not run a walk per key.
+	// A folder is read after a short pause, so typing a path does not run a walk per key. Every change of the text reads
+	// the folder again, even one that returns to the folder already read, because a change clears the inspection.
 	useEffect(() => {
 		if (!loaded) return;
-		const trimmed = folder.trim();
+		const trimmed = cleanPath(folder);
 
-		if (!trimmed || inspected.current === trimmed) return;
+		if (!trimmed) return;
 		const timer = window.setTimeout(() => {
-			inspected.current = trimmed;
 			void inspect(trimmed);
 		}, 500);
 		return () => window.clearTimeout(timer);
@@ -284,6 +301,9 @@ export function useGameEditor(id: string | null, onClose: () => void): GameEdito
 
 	const changeFolder = (value: string) => {
 		setFolder(value);
+		// An answer for the text before this change is no longer the folder on screen.
+		latestFolder.current = "";
+		setInspecting(false);
 		setInspection(null);
 		setInspectError(null);
 	};
@@ -291,10 +311,15 @@ export function useGameEditor(id: string | null, onClose: () => void): GameEdito
 	const browse = async () => {
 		const picked = await pickFolder();
 
-		if (picked) {
-			inspected.current = null;
-			changeFolder(picked);
+		if (!picked) return;
+
+		// The same folder again changes nothing in the field, so it is read again here.
+		if (cleanPath(picked) === cleanPath(folder)) {
+			void inspect(picked);
+			return;
 		}
+
+		changeFolder(picked);
 	};
 
 	const changeSource = (value: string) => {
@@ -371,8 +396,8 @@ export function useGameEditor(id: string | null, onClose: () => void): GameEdito
 			onClose();
 			await reloadGames();
 
-			if (!editing && folder.trim()) {
-				await gameActions.addGame(saved.id, folder.trim());
+			if (!editing && cleanPath(folder)) {
+				await gameActions.addGame(saved.id, cleanPath(folder));
 			} else {
 				notify(t("editor.notice.saved", { name: saved.name }));
 			}

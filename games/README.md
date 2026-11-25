@@ -10,7 +10,10 @@ A game ships after it has been tested on a real installation.
 
 A game can also be added from the window: **Games → Add your own game** reads a game folder, suggests the definition
 and writes it under `<data>/definitions/games/<id>/`. The same editor edits a user definition again and checks a draft
-against a real mod archive without importing it. The rest of this section is the file format the editor writes.
+against a real mod archive without importing it. The editor also reads the folder for its engine: a loader preset's
+`[engine]` table names the markers of an engine, and the editor preselects the loader and variant that fit (see
+[loaders/README.md](../loaders/README.md#engine-detection)). The rest of this section is the file format the editor
+writes.
 
 1. Copy `_template/` to `games/<id>/` and fill in `game.toml`. Delete what does not apply.
 2. Add `icon.webp` (optional; see [Icon standard](#icon-standard)). Without it the interface falls back to the first
@@ -267,13 +270,17 @@ under `dir` gets it when it lacks it: `DLC/Corvo` becomes `DLC/dlcCorvo`).
 ### `[load_order]`
 
 The file the game reads its mod order from. Without this table the game orders its mods itself, and the list decides
-only the conflicts.
+only the conflicts. The mod order window gives the mods the user picks a number inside the range below; the list of mods
+does not set it.
 
-| Key                            | Meaning                                                                         |
-| ------------------------------ | ------------------------------------------------------------------------------- |
-| `format`                       | `mods_settings`: a section per mod folder with `Enabled` and `Priority`.        |
-| `file`                         | The file as a template. Its folder is found on its own; the user can change it. |
-| `priority_min`, `priority_max` | The priorities the user may set, `1` to `9999` by default. The lower one wins.  |
+| Key                            | Meaning                                                                                                                                  |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `format`                       | `mods_settings`: a section per mod folder with `Enabled` and `Priority`. `ue4ss_mods_txt`: a `Folder : 1` line per mod, in order (UE4SS). |
+| `file`                         | `mods_settings`: a template in the folder the user chooses; the user can change the folder. `ue4ss_mods_txt`: a path relative to the deployment root, inside a slot's folder. |
+| `priority_min`, `priority_max` | The numbers the user may give a mod, `1` to `9999` by default. The lower one loads first.                                               |
+
+A `ue4ss_mods_txt` list is written into the profile's mod layer, not the game folder. A loader variant may name it
+(see [loaders/README.md](../loaders/README.md)), and a game's own `load_order` wins over the variant's.
 
 ### `[[steps]]`
 

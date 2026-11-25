@@ -44,6 +44,24 @@ dir = "BepInEx/patchers"
 [[deploy.mirror]]
 dir = "BepInEx/monomod"
 
+# How the editor recognises a Unity game that has no loader yet. Every marker must exist in the game folder; a marker
+# with `|` accepts any of its names, so the Windows (.dll) and the native Linux (.so) build of one file both match. The
+# first variant whose markers all exist wins, so IL2CPP (GameAssembly) comes before Mono; without a match the default is
+# suggested.
+[engine]
+name = "Unity"
+markers = ["UnityPlayer.dll|UnityPlayer.so", "*_Data"]
+
+[[engine.variants]]
+variant = "6"
+label = "IL2CPP"
+markers = ["GameAssembly.dll|GameAssembly.so"]
+
+[[engine.variants]]
+variant = "5"
+label = "Mono"
+markers = ["*_Data/Managed"]
+
 # BepInEx 5 (Mono). The package is BepInEx's own release for 64-bit Windows; it is offered, never forced. Any enabled
 # mod that ships the proxy and the core counts as the loader, so a build that a mod site publishes for one game (a
 # Nexus or Thunderstore BepInEx pack) works just as well. The setup check lists every copy in the library and lets the

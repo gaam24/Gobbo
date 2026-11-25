@@ -4,10 +4,11 @@
 //! shipped game.
 //!
 //! The entry points are small; the work lives in `check.rs` (the draft, the save and the source), `inspect.rs` (what a
-//! game folder suggests) and `presets.rs` (the loader list). The public types stay here because the commands and the
-//! import preview both name them.
+//! game folder suggests), `engine.rs` (the engine a folder matches) and `presets.rs` (the loader list). The public types
+//! stay here because the commands and the import preview both name them.
 
 mod check;
+mod engine;
 mod inspect;
 mod package;
 mod presets;
@@ -92,6 +93,8 @@ pub struct LoaderPresetView {
     pub root_files: Vec<String>,
     pub variants: Vec<LoaderVariantView>,
     pub problems: Vec<String>,
+    /// How a game folder is recognised as this preset's engine, when the preset names one.
+    pub engine: Option<LoaderEngineView>,
 }
 
 /// One variant of a loader preset.
@@ -101,6 +104,52 @@ pub struct LoaderVariantView {
     pub requires: Vec<String>,
     pub places: Vec<String>,
     pub root_files: Vec<String>,
+}
+
+/// The engine rules of a loader preset: the folder patterns that prove the engine is in a game folder, and the variant
+/// and project folder that fit it.
+#[derive(Debug, Clone, Serialize, Type)]
+pub struct LoaderEngineView {
+    /// The engine's display name, for example `Unity`.
+    pub name: String,
+    /// Folder patterns that must all exist in the game folder. A pattern may list alternatives with `|`.
+    pub markers: Vec<String>,
+    /// The variant suggested when no entry of `variants` matches.
+    pub variant: Option<String>,
+    /// The project folder pattern. Its first segment is a wildcard for the project folder, and the rest is the folder the
+    /// project keeps its mods in, for example `Content/Paks`.
+    pub root: Option<String>,
+    /// The variants the folder can match by their own markers, in the order the preset lists them.
+    pub variants: Vec<LoaderEngineVariantView>,
+}
+
+/// One variant of an engine, with the markers that choose it.
+#[derive(Debug, Clone, Serialize, Type)]
+pub struct LoaderEngineVariantView {
+    /// The preset variant this entry selects.
+    pub variant: String,
+    /// A short name for the variant, for example `IL2CPP`.
+    pub label: Option<String>,
+    /// Folder patterns that must all exist in the game folder for this variant. A pattern may list alternatives with `|`.
+    pub markers: Vec<String>,
+}
+
+/// The engine a game folder was recognised as. The editor preselects its loader and variant when no loader is installed,
+/// and sets the project folder as the deployment root.
+#[derive(Debug, Clone, Serialize, Type)]
+pub struct EngineSuggestion {
+    /// The loader preset that serves the engine.
+    pub loader_id: String,
+    /// The preset's display name, for example `BepInEx`.
+    pub loader_name: String,
+    /// The engine's display name, for example `Unity`.
+    pub engine_name: String,
+    /// The variant to use, when the preset has variants.
+    pub variant: Option<String>,
+    /// The short name of the matched variant, for example `IL2CPP`.
+    pub label: Option<String>,
+    /// The project folder relative to the game folder, for example `Project`, when the preset names one and it is there.
+    pub root: Option<String>,
 }
 
 /// One program found in a game folder, as a suggestion for the launch step.
@@ -156,5 +205,7 @@ pub struct FolderInspection {
     pub steam: Option<SteamSuggestion>,
     /// Loader presets whose files were found in the folder.
     pub loaders: Vec<LoaderSuggestion>,
+    /// The engine the folder matches, even when a loader is already installed: that loader stays the stronger signal.
+    pub engine: Option<EngineSuggestion>,
     pub stores: StoreIds,
 }

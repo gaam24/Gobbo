@@ -1,10 +1,10 @@
 # Unreal Engine 4 and 5. The game sets `deploy.root` to its project folder, the one that holds `Content/` and
-# `Binaries/` (for example `{game}/Pal`); every rule below is relative to that root.
+# `Binaries/` (for example `{game}/Project`); every rule below is relative to that root.
 #
 # `pak` is the shared layout: cooked `.pak` files, UE5 IoStore (`.utoc`/`.ucas`) and the `LogicMods` folder that UE4SS
 # reads. `ue4ss-4` and `ue4ss-3` add the Lua/C++ mod folder of UE4SS 4.x and 3.x and UE4SS's verified release. Once
 # an enabled mod needs UE4SS, the mod list shows an Install UE4SS button and the apply waits until an enabled mod (or
-# a manual install) provides the `check` files. A game may name its own build; Palworld uses the Palworld build.
+# a manual install) provides the `check` files. A game may name its own build, which replaces the preset's.
 
 schema = 1
 id = "unreal"
@@ -35,12 +35,21 @@ extensions = [".pak", ".utoc", ".ucas", ".sig", ".lua"]
 "~mods" = "Content/Paks/~mods"
 LogicMods = "Content/Paks/LogicMods"
 
+# How the editor recognises an Unreal game that has no loader yet: the engine folder must exist, and the project folder
+# is the folder that holds the game's paks. The UE4SS variant is suggested, so a new game gets the UE4SS layout; UE4SS
+# is still asked for only when a mod needs it.
+[engine]
+name = "Unreal Engine"
+markers = ["Engine/Binaries"]
+variant = "ue4ss-4"
+root = "*/Content/Paks"
+
 # Pak and IoStore mods only. The default, so a game that does not use UE4SS still gets the shared layout.
 [variants.pak]
 
 # UE4SS 4.x keeps everything except the proxy under `ue4ss/`. A Lua mod is `<Mod>/Scripts/main.lua`, a C++ mod is
-# `<Mod>/dlls/main.dll`; both markers point at the same mod folder. `enabled.txt` makes UE4SS load the mod without an
-# edit to `mods.txt`, which belongs to UE4SS itself.
+# `<Mod>/dlls/main.dll`; both markers point at the same mod folder. `enabled.txt` makes UE4SS load the mod; the order of
+# the mods is the list `mods.txt` (see the variant's `load_order` below), which Gobbo writes for the mods the user orders.
 #
 # The package is UE4SS's own release. Installing it imports the zip into the library as one mod whose files keep their
 # game paths under `to`, so UE4SS reaches the game through the overlay and the game folder stays clean; dropping the
@@ -49,6 +58,11 @@ LogicMods = "Content/Paks/LogicMods"
 [variants."ue4ss-4"]
 # UE4SS keeps its enabled-mod list and per-mod flags with the mods, in this variant's own slot.
 config_mirror = "Binaries/Win64/ue4ss/Mods"
+
+# The load order of the mods is the list in this folder. Gobbo writes the mods the user puts in the load order into it.
+[variants."ue4ss-4".load_order]
+format = "ue4ss_mods_txt"
+file = "Binaries/Win64/ue4ss/Mods/mods.txt"
 
 [variants."ue4ss-4".install]
 name = "UE4SS"
@@ -69,6 +83,11 @@ enable_file = "enabled.txt"
 [variants."ue4ss-3"]
 # Its settings live in that same folder, so this variant names its own slot for community-profile configs.
 config_mirror = "Binaries/Win64/Mods"
+
+# The same list, in the folder that holds `Mods/` in this release line.
+[variants."ue4ss-3".load_order]
+format = "ue4ss_mods_txt"
+file = "Binaries/Win64/Mods/mods.txt"
 
 [variants."ue4ss-3".install]
 name = "UE4SS"

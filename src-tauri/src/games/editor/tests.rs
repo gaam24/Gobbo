@@ -167,8 +167,8 @@ fn saving_refuses_an_official_id() {
 #[test]
 fn a_slug_folds_common_letters_and_drops_punctuation() {
     assert_eq!(
-        slugify("The Witcher 3: Wild Hunt"),
-        "the-witcher-3-wild-hunt"
+        slugify("Example Game 3: Second Chapter"),
+        "example-game-3-second-chapter"
     );
     assert_eq!(slugify("Zażółć gęślą jaźń"), "zazolc-gesla-jazn");
     assert_eq!(slugify("..."), "game");
@@ -277,4 +277,242 @@ fn a_user_definition_wins_over_an_official_and_a_bundled_one() {
     let source = source_from(None, None, &shipped, "mine").expect("the bundled file");
     assert_eq!(source.origin, GameOrigin::Bundled);
     assert_eq!(source.text, "bundled");
+}
+
+#[test]
+fn the_shipped_presets_name_their_engines_and_load_without_problems() {
+    let presets = presets_from(&[(loaders(), GameOrigin::Bundled)]);
+
+    for preset in &presets {
+        assert!(
+            preset.problems.is_empty(),
+            "{}: {:?}",
+            preset.id,
+            preset.problems
+        );
+    }
+
+    let unity = presets
+        .iter()
+        .find(|preset| preset.id == "bepinex")
+        .and_then(|preset| preset.engine.as_ref())
+        .expect("BepInEx names its engine");
+    assert_eq!(unity.name, "Unity");
+    assert_eq!(unity.variant, None, "the default variant is the fallback");
+    let variants: Vec<&str> = unity
+        .variants
+        .iter()
+        .map(|variant| variant.variant.as_str())
+        .collect();
+    assert_eq!(variants, ["6", "5"], "IL2CPP is checked before Mono");
+    assert_eq!(unity.variants[0].label.as_deref(), Some("IL2CPP"));
+
+    let unreal = presets
+        .iter()
+        .find(|preset| preset.id == "unreal")
+        .and_then(|preset| preset.engine.as_ref())
+        .expect("the Unreal preset names its engine");
+    assert_eq!(unreal.name, "Unreal Engine");
+    assert_eq!(unreal.variant.as_deref(), Some("ue4ss-4"));
+    assert_eq!(unreal.root.as_deref(), Some("*/Content/Paks"));
+}
+
+#[test]
+fn a_unity_game_with_managed_code_and_no_il2cpp_runtime_is_mono() {
+    let game = scratch!("editor-engine-mono").join("Example Game");
+    write(&game.join("Example.exe"), "");
+    write(&game.join("UnityPlayer.dll"), "");
+    write(&game.join("Example_Data/Managed/Assembly-CSharp.dll"), "");
+
+    let inspection = inspect_folder(&game.display().to_string()).expect("the folder is readable");
+    let engine = inspection.engine.expect("the engine is recognised");
+    assert_eq!(engine.loader_id, "bepinex");
+    assert_eq!(engine.loader_name, "BepInEx");
+    assert_eq!(engine.engine_name, "Unity");
+    assert_eq!(engine.variant.as_deref(), Some("5"));
+    assert_eq!(engine.label.as_deref(), Some("Mono"));
+    assert_eq!(engine.root, None);
+    assert!(inspection.loaders.is_empty(), "no loader is installed yet");
+}
+
+#[test]
+fn a_unity_game_with_an_il2cpp_runtime_is_il2cpp_even_with_a_managed_folder() {
+    let game = scratch!("editor-engine-il2cpp").join("Example Game");
+    write(&game.join("Example.exe"), "");
+    write(&game.join("UnityPlayer.dll"), "");
+    write(&game.join("GameAssembly.dll"), "");
+    write(&game.join("Example_Data/Managed/UnityEngine.dll"), "");
+    write(
+        &game.join("Example_Data/il2cpp_data/Metadata/global-metadata.dat"),
+        "",
+    );
+
+    let inspection = inspect_folder(&game.display().to_string()).expect("the folder is readable");
+    let engine = inspection.engine.expect("the engine is recognised");
+    assert_eq!(engine.loader_id, "bepinex");
+    assert_eq!(engine.variant.as_deref(), Some("6"));
+    assert_eq!(engine.label.as_deref(), Some("IL2CPP"));
+    assert_eq!(engine.root, None);
+}
+
+#[test]
+fn an_unreal_game_takes_its_project_folder_and_never_the_engine_folder() {
+    let game = scratch!("editor-engine-unreal").join("Example Game");
+    write(&game.join("Engine/Binaries/Win64/Engine.dll"), "");
+    write(&game.join("Engine/Content/Paks/Engine.pak"), "");
+    write(&game.join("Project/Binaries/Win64/Project.exe"), "");
+    write(&game.join("Project/Content/Paks/pakchunk0-Windows.pak"), "");
+
+    let inspection = inspect_folder(&game.display().to_string()).expect("the folder is readable");
+    let engine = inspection.engine.expect("the engine is recognised");
+    assert_eq!(engine.loader_id, "unreal");
+    assert_eq!(engine.engine_name, "Unreal Engine");
+    assert_eq!(engine.variant.as_deref(), Some("ue4ss-4"));
+    assert_eq!(engine.label, None);
+    assert_eq!(engine.root.as_deref(), Some("Project"));
+}
+
+#[test]
+fn a_folder_with_no_engine_marker_has_no_engine_and_no_loader() {
+    let game = scratch!("editor-engine-none").join("Example Game");
+    write(&game.join("readme.txt"), "");
+
+    let inspection = inspect_folder(&game.display().to_string()).expect("the folder is readable");
+    assert!(inspection.engine.is_none());
+    assert!(inspection.loaders.is_empty());
+}
+
+#[test]
+fn an_installed_loader_stays_the_choice_and_the_engine_is_still_reported() {
+    let game = scratch!("editor-engine-installed").join("Example Game");
+    write(&game.join("UnityPlayer.dll"), "");
+    write(&game.join("Example_Data/Managed/Assembly-CSharp.dll"), "");
+    write(&game.join("winhttp.dll"), "");
+    write(&game.join("BepInEx/core/BepInEx.dll"), "");
+
+    let inspection = inspect_folder(&game.display().to_string()).expect("the folder is readable");
+    let installed = inspection
+        .loaders
+        .iter()
+        .find(|loader| loader.id == "bepinex")
+        .expect("the installed BepInEx is found");
+    assert_eq!(installed.variant.as_deref(), Some("5"));
+    let engine = inspection.engine.expect("the engine is still reported");
+    assert_eq!(engine.loader_id, "bepinex");
+    assert_eq!(engine.label.as_deref(), Some("Mono"));
+}
+
+/// The program paths a folder inspection offers, best first.
+fn programs_of(game: &std::path::Path) -> Vec<String> {
+    inspect_folder(&game.display().to_string())
+        .expect("the folder is readable")
+        .executables
+        .into_iter()
+        .map(|program| program.path)
+        .collect()
+}
+
+#[test]
+fn a_large_folder_that_sorts_first_does_not_hide_the_programs_at_the_root() {
+    let game = scratch!("editor-inspect-large").join("Example Game");
+
+    for index in 0..2_100 {
+        write(
+            &game.join("Assets").join(format!("asset-{index:04}.dat")),
+            "",
+        );
+    }
+
+    write(&game.join("Example.exe"), "");
+    write(&game.join("Checksum.exe"), "");
+    let programs = programs_of(&game);
+    assert!(
+        programs.contains(&"Example.exe".to_string()),
+        "{programs:?}"
+    );
+    assert!(
+        programs.contains(&"Checksum.exe".to_string()),
+        "{programs:?}"
+    );
+}
+
+#[test]
+fn the_program_named_after_the_game_comes_first_then_the_others_and_a_helper_last() {
+    let game = scratch!("editor-inspect-rank").join("Example's Game");
+    write(&game.join("Checksum.exe"), &"x".repeat(5_000));
+    write(&game.join("Launcher.exe"), "x");
+    write(&game.join("Beta.exe"), &"x".repeat(500));
+    write(&game.join("unins000.exe"), "x");
+    write(&game.join("bin/Examples Game.exe"), "x");
+
+    assert_eq!(
+        programs_of(&game),
+        [
+            "bin/Examples Game.exe",
+            "Beta.exe",
+            "Launcher.exe",
+            "Checksum.exe"
+        ],
+        "the name matches first, the larger file of two comes first, the helper is last, and the installer is not offered"
+    );
+}
+
+#[test]
+fn a_program_deep_in_the_engine_folder_is_offered_beside_the_root_program() {
+    let game = scratch!("editor-inspect-deep").join("Example");
+    write(&game.join("Example.exe"), "");
+    write(
+        &game.join("Project/Binaries/Win64/Example-Win64-Shipping.exe"),
+        "",
+    );
+    write(
+        &game.join("Project/Binaries/Win64/Example-Win64-Shipping.exe.tmp"),
+        "",
+    );
+
+    let programs = programs_of(&game);
+    assert_eq!(programs.first().map(String::as_str), Some("Example.exe"));
+    assert!(
+        programs.contains(&"Project/Binaries/Win64/Example-Win64-Shipping.exe".to_string()),
+        "{programs:?}"
+    );
+}
+
+#[test]
+fn every_program_is_offered_not_only_the_first_few() {
+    let game = scratch!("editor-inspect-many").join("Example Game");
+
+    for index in 0..20 {
+        write(&game.join(format!("Tool {index:02}.exe")), "");
+    }
+
+    assert_eq!(programs_of(&game).len(), 20);
+}
+
+#[test]
+fn the_folder_list_is_shallow_first_and_stops_at_the_second_level() {
+    let game = scratch!("editor-inspect-folders").join("Example Game");
+    write(&game.join("Zed/Deep/Deeper/file.txt"), "");
+    write(&game.join("Mods/readme.txt"), "");
+
+    let inspection = inspect_folder(&game.display().to_string()).expect("the folder is readable");
+    let folders = inspection.directories;
+    let position = |wanted: &str| folders.iter().position(|folder| folder == wanted);
+    assert!(position("Mods").is_some(), "{folders:?}");
+    assert!(position("Zed/Deep").is_some(), "{folders:?}");
+    assert!(position("Zed/Deep/Deeper").is_none(), "{folders:?}");
+    assert!(position("Mods") < position("Zed/Deep"), "{folders:?}");
+}
+
+#[test]
+fn a_program_whose_name_is_part_of_the_game_name_comes_before_an_unrelated_one() {
+    let game = scratch!("editor-inspect-partial").join("Example Game Remastered");
+    write(&game.join("Launcher.exe"), "x");
+    write(&game.join("bin/Example Game.exe"), "x");
+
+    assert_eq!(
+        programs_of(&game),
+        ["bin/Example Game.exe", "Launcher.exe"],
+        "the program whose name is part of the game's name comes first, though it is one folder deeper"
+    );
 }

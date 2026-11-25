@@ -94,7 +94,8 @@ A preset may use every `[deploy]` key a game may use, except `root` and `root_li
 root; the loader describes the layout below it. This lets a game whose mods live outside its folder use the same preset.
 
 A loader may not set `detect`, `executables`, `providers`, `user_data`, `profile_data`, `tools`, `steps` or
-`load_order`. Unknown keys are errors.
+`load_order` at its top level. A variant may set `load_order`, the order file its release reads (a variant names it
+because each release keeps it in its own folder); a game's own `load_order` wins over it. Unknown keys are errors.
 
 ## How the rules are merged
 
@@ -138,7 +139,50 @@ that wrote every rule itself.
 4. Run `cargo test` in `src-tauri`.
 
 The test `every_shipped_loader_and_variant_merges_into_a_valid_game` walks this folder, so a new preset is checked
-without a new test. A preset is not a game: it has no icon and no detection.
+without a new test. A preset is not a game: it has no icon, and its `[engine]` table (see below) only suggests it in the
+editor.
+
+## Engine detection
+
+A preset can describe the engine it serves, so the add-a-game editor recognises a game folder that has no loader yet.
+The `[engine]` table names the markers that must all exist in the game folder, and the variant that fits:
+
+```toml
+[engine]
+name = "Unity"
+markers = ["UnityPlayer.dll|UnityPlayer.so", "*_Data"]   # all must exist in the game folder
+[[engine.variants]]                               # the first whose markers all exist wins
+variant = "6"
+label = "IL2CPP"
+markers = ["GameAssembly.dll"]
+[[engine.variants]]
+variant = "5"
+label = "Mono"
+markers = ["*_Data/Managed"]
+```
+
+- `name` is the engine's display name. Every marker is a path with `/` separators. A `*` in one segment matches any run
+  of characters in that segment, so `*_Data` matches `Example_Data` and `*` matches any folder name. Case is ignored as
+  every path key ignores it, on Windows and Linux alike.
+- A marker may list alternatives with `|`: `UnityPlayer.dll|UnityPlayer.so` is satisfied when either file is there. Use
+  it when one file has another name in another build, such as a native Linux build of a Windows game. Each alternative
+  is a folder pattern of its own (spaces around `|` are ignored), and an empty alternative is an error. The same rule
+  applies to a variant's markers; `root` takes one pattern only.
+- `variant` is suggested when no `[[engine.variants]]` entry matches; without it the preset's `default_variant` is
+  suggested. A variant named here must exist in the preset. Put a variant whose markers overlap another one first.
+- `root` is an optional `*/` pattern for the project folder, for example `root = "*/Content/Paks"`. The folder its first
+  segment matches becomes the game's deployment root, `{game}/<folder>`, when the draft has no root yet and its loader is
+  this preset. A folder that a marker names (`Engine` for `Engine/Binaries`) is the engine's own and is never the project.
+- A folder can match several presets. The one with the most matching markers is suggested; presets are checked in id
+  order, so a tie keeps the earlier one.
+
+An installed loader stays the stronger signal: the editor keeps the loader it finds in the folder and still reports the
+engine. The engine suggests a loader only when the draft has no layout yet. The check reads the first levels the patterns
+name and never writes. The table is a suggestion, not a game rule: a game takes nothing from it, and its own
+`loader = "..."` line is the choice that counts.
+
+The shipped `bepinex` preset names Unity (IL2CPP first, then Mono, with 5 as the default), and `unreal` names Unreal
+Engine with the UE4SS variant as the default.
 
 ## Unreal Engine
 
@@ -160,9 +204,14 @@ loader = { id = "unreal", variant = "ue4ss-4" }
 ```
 
 A UE4SS mod is a folder with `Scripts/main.lua` (Lua) or `dlls/main.dll` (C++). The slot lists both in `markers` and
-writes `enabled.txt`, so UE4SS loads the mod without an edit to its `mods.txt`. `enabled.txt` starts a
-mod but does not order it: a mod that must load after another still needs its line in `mods.txt`, and Blueprint paks
-in `LogicMods` need UE4SS's `BPModLoaderMod` enabled there.
+writes `enabled.txt`, which starts the mod. It does not order it. The order is `mods.txt`, the list in the variant's
+`load_order` (`Binaries/Win64/ue4ss/Mods/mods.txt` for `ue4ss-4`, `Binaries/Win64/Mods/mods.txt` for `ue4ss-3`).
+
+The mod list window gives the mods the user orders a number, and Gobbo writes them into that file as `Folder : 1`
+(enabled) or `Folder : 0` (off), in the order of the numbers. The file lives in the deployment root, so it is written
+into the profile's mod layer and the game folder stays untouched. The lines the release ships (for example
+`BPModLoaderMod : 1`) keep their place; an ordered mod takes the place of its own first line, or goes at the end. Blueprint
+paks in `LogicMods` still need UE4SS's `BPModLoaderMod` enabled in that list.
 
 The preset also carries the UE4SS package itself:
 
@@ -256,7 +305,8 @@ in Rust.
 
 - One loader per game. A preset may contain several slots and mirrors, so it can describe more than one layout.
 - No auto-detection of the installed loader version. The game definition chooses the variant; the definition editor
-  suggests a variant when it finds the preset's files in the game folder.
+  suggests a variant when it finds the preset's files in the game folder, and the `[engine]` table suggests one when a
+  game folder has no loader yet.
 - A user loader lives in `<data>/definitions/loaders/<id>.toml` and wins over a bundled or catalog-downloaded preset
   with the same id. The definition editor lists all three. Shipped and downloaded loaders stay read-only.
 - A preset ships in the definition catalog with the games: an install brings the loader a game names when it is

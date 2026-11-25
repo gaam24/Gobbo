@@ -20,6 +20,7 @@ function inspectionWith(stores: FolderInspection_Serialize["stores"]): FolderIns
 		markers: [],
 		steam: null,
 		loaders: [],
+		engine: null,
 		stores,
 	};
 }
@@ -83,4 +84,31 @@ test("the quick step shows a badge for each store the folder was recognized by",
 	expect(html).toContain("ExampleGame");
 	expect(html).toContain("Lutris");
 	expect(html).toContain("example-lutris");
+});
+
+test("a detected engine shows its build, the loader it sets up and the project folder", () => {
+	const html = render(null, {
+		...inspectionWith({ gog: [], epic: [], lutris: [] }),
+		engine: {
+			loader_id: "unreal",
+			loader_name: "Unreal Engine",
+			engine_name: "Unreal Engine",
+			variant: "ue4ss-4",
+			label: null,
+			root: "Project",
+		},
+	});
+	expect(html).toContain("Unreal Engine");
+	expect(html).toContain("Set up with Unreal Engine ue4ss-4.");
+	expect(html).toContain("Project folder: Project.");
+});
+
+test("a Unity engine names its build next to the loader it sets up", () => {
+	const html = render(null, {
+		...inspectionWith({ gog: [], epic: [], lutris: [] }),
+		engine: { loader_id: "bepinex", loader_name: "BepInEx", engine_name: "Unity", variant: "6", label: "IL2CPP", root: null },
+	});
+	expect(html).toContain("Unity (IL2CPP)");
+	expect(html).toContain("Set up with BepInEx 6.");
+	expect(html).not.toContain("Project folder");
 });

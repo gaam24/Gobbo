@@ -37,9 +37,10 @@ impl Problems {
         }
     }
 
-    /// A path template: not empty and never leaving its folder through `..`.
+    /// A path template: not empty and never leaving its folder through a `..` segment. A name that only contains two
+    /// dots, such as `Team..Saves`, is an ordinary folder name.
     pub(super) fn template(&mut self, what: &str, template: &str) {
-        if template.trim().is_empty() || template.contains("..") {
+        if template.trim().is_empty() || template.split(['/', '\\']).any(|part| part == "..") {
             self.push(format!("{what} is not a safe path template: {template:?}"));
         }
     }

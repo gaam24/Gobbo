@@ -14,6 +14,7 @@ const SECTION_LABELS: Partial<Record<string, TranslationKey>> = {
 	load_order: "editor.sections.loadOrder",
 	tools: "editor.sections.tools",
 	steps: "editor.sections.steps",
+	extras: "editor.sections.extras",
 	source: "editor.sections.source",
 };
 
@@ -39,7 +40,7 @@ export function QuickCheck({ check, issues }: QuickProps) {
 			)}
 			{issues.length === 0 && check !== null && !check.ok && (
 				<ul className="grid gap-1 text-sm">
-					{check.problems.slice(0, 8).map((problem) => (
+					{check.problems.map((problem) => (
 						<li key={`${problem.section}-${problem.message}`} className="text-destructive">
 							<span className="text-muted-foreground text-xs">{t(SECTION_LABELS[problem.section] ?? "editor.sections.source")}</span>{" "}
 							{problem.message}

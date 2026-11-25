@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/i18n";
 import type { DeployDraft, GameDraft, MirrorDraft, MoveDraft, SharedDraft, SlotDraft } from "@/views/games/editor/draft";
 import { EditorField, LinesField, RepeatableSection, RepeatRow, SwitchField, TextInput } from "@/views/games/editor/fields";
+import { FoundPicker } from "@/views/games/editor/found-picker";
 
 /// Every deploy rule: the folders a mod may use, the game paths it may keep, and the archive names that stand for a
 /// game folder. The quick step writes only the first two; this section is where a user adds a mirror or an alias.
@@ -119,17 +120,19 @@ export function AdvancedDeploy({
 			>
 				{slots.map((slot, index) => (
 					<RepeatRow
-						key={slot.dir}
+						key={index} // eslint-disable-line react/no-array-index-key -- the rows are edited in place
 						title={slot.dir || t("editor.deploy.slot")}
 						onRemove={() => update({ slots: slots.filter((_, at) => at !== index) })}
 					>
 						<div className="grid gap-4 md:grid-cols-2">
 							<EditorField id={`editor-slot-dir-${index}`} label={t("editor.deploy.slotDir")}>
-								<TextInput
+								<FoundPicker
 									id={`editor-slot-dir-${index}`}
 									value={slot.dir}
 									onChange={(dir) => updateSlot(index, { dir })}
 									placeholder={suggest(directories, "Mods")}
+									found={directories}
+									menuLabel={t("editor.quick.foundFolders")}
 								/>
 							</EditorField>
 							<EditorField id={`editor-slot-prefix-${index}`} label={t("editor.deploy.slotPrefix")}>
@@ -202,11 +205,13 @@ export function AdvancedDeploy({
 					>
 						<div className="grid gap-4 md:grid-cols-2">
 							<EditorField id={`editor-mirror-dir-${index}`} label={t("editor.deploy.mirrorDir")}>
-								<TextInput
+								<FoundPicker
 									id={`editor-mirror-dir-${index}`}
 									value={mirror.dir}
 									onChange={(dir) => updateMirror(index, { dir })}
 									placeholder={suggest(directories, "Data")}
+									found={directories}
+									menuLabel={t("editor.quick.foundFolders")}
 								/>
 							</EditorField>
 							<EditorField id={`editor-mirror-prefix-${index}`} label={t("editor.deploy.mirrorPrefix")}>
@@ -307,7 +312,10 @@ export function AdvancedDeploy({
 				onAdd={addAlias}
 			>
 				{aliases.map(([name, target], index) => (
-					<div key={name} className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_auto] md:items-end">
+					<div
+						key={index} // eslint-disable-line react/no-array-index-key -- the rows are edited in place
+						className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_auto] md:items-end"
+					>
 						<EditorField id={`editor-alias-name-${index}`} label={t("editor.deploy.aliasName")}>
 							<TextInput
 								id={`editor-alias-name-${index}`}

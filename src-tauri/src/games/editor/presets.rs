@@ -6,9 +6,11 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::PathBuf;
 
-use super::super::loaders::{LoaderDef, LoaderRules, merge_lists, with_requirement_paths};
+use super::super::loaders::{
+    EngineDef, LoaderDef, LoaderRules, merge_lists, with_requirement_paths,
+};
 use super::super::{GameOrigin, catalog_loaders_dir, loaders_dir, user_loaders_dir};
-use super::{LoaderPresetView, LoaderVariantView};
+use super::{LoaderEngineVariantView, LoaderEngineView, LoaderPresetView, LoaderVariantView};
 use crate::domain::deploy::Deploy;
 
 /// The loader presets the editor offers: the user's first, the official catalog second, the bundled folder last. A
@@ -80,6 +82,7 @@ pub(super) fn presets_from(dirs: &[(PathBuf, GameOrigin)]) -> Vec<LoaderPresetVi
                     root_files: loader.deploy.root_files,
                     variants: Vec::new(),
                     problems,
+                    engine: None,
                 });
                 continue;
             }
@@ -105,6 +108,7 @@ pub(super) fn presets_from(dirs: &[(PathBuf, GameOrigin)]) -> Vec<LoaderPresetVi
                 root_files: loader.deploy.root_files,
                 variants,
                 problems,
+                engine: loader.engine.as_ref().map(engine_view),
             });
         }
     }
@@ -125,6 +129,26 @@ fn failed_preset(id: &str, origin: GameOrigin, problem: String) -> LoaderPresetV
         root_files: Vec::new(),
         variants: Vec::new(),
         problems: vec![problem],
+        engine: None,
+    }
+}
+
+/// The engine rules of a preset as the editor reads them. The checks already ran when the preset loaded.
+fn engine_view(engine: &EngineDef) -> LoaderEngineView {
+    LoaderEngineView {
+        name: engine.name.clone(),
+        markers: engine.markers.clone(),
+        variant: engine.variant.clone(),
+        root: engine.root.clone(),
+        variants: engine
+            .variants
+            .iter()
+            .map(|variant| LoaderEngineVariantView {
+                variant: variant.variant.clone(),
+                label: variant.label.clone(),
+                markers: variant.markers.clone(),
+            })
+            .collect(),
     }
 }
 

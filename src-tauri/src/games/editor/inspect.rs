@@ -1,10 +1,14 @@
-//! What a chosen game folder suggests: the programs, the relative folders, the store ids and an installed loader. The
-//! folder is only read; the editor decides what to fill in. The loader signals are data-driven: a preset's `requires`,
-//! places and root files are checked in the folder, never a loader id in this code.
+//! What a chosen game folder suggests: the programs, the relative folders, the store ids, an installed loader and the
+//! engine. The folder is only read; the editor decides what to fill in. The loader and engine signals are data-driven: a
+//! preset's `requires`, places, root files and `[engine]` markers are checked in the folder, never a loader id in this
+//! code.
 
+use std::cmp::Ordering;
+use std::collections::VecDeque;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use super::engine;
 use super::{
     ExecutableSuggestion, FolderInspection, LoaderPresetView, LoaderSuggestion, SteamSuggestion,
     StoreIds,
@@ -34,7 +38,7 @@ pub fn inspect_folder(path: &str) -> Result<FolderInspection, AppError> {
                 |name| name.to_string_lossy().into_owned(),
             )
         });
-    let executables = executables(&folder);
+    let executables = executables(&folder, &name);
     let markers = executables
         .first()
         .map(|executable| vec![executable.path.clone()])
@@ -49,108 +53,216 @@ pub fn inspect_folder(path: &str) -> Result<FolderInspection, AppError> {
         markers,
         steam,
         loaders: detected_loaders(&folder, &presets),
+        engine: engine::detect(&folder, &presets),
         stores: store_ids(&folder),
     })
 }
 
-fn executables(folder: &Path) -> Vec<ExecutableSuggestion> {
-    let mut found = Vec::new();
-    let mut budget = 2_000usize;
-    walk_executables(folder, folder, 0, &mut budget, &mut found);
-    let folder_key = folder
+/// The most folders a walk reads. Each folder costs one listing, so this bounds the work, not the number of files.
+const FOLDER_BUDGET: usize = 2_000;
+
+/// The most entries read from one folder, in name order. A game folder never comes near it; the cap only bounds a
+/// pathological folder.
+const ENTRY_CAP: usize = 20_000;
+
+/// How many folders below the game folder the program search reads: `Engine/Binaries/Win64` is three.
+const PROGRAM_DEPTH: usize = 3;
+
+/// How many folders the folder list keeps. It is a list of suggestions, shallow folders first.
+const DIRECTORY_LIMIT: usize = 500;
+
+/// The shorter of two names must have this many characters before one containing the other counts as a match. A short
+/// word such as `game` is part of many names and would match too much.
+const PARTIAL_NAME_MIN: usize = 6;
+
+/// Words that mark a helper program rather than the game: a crash reporter, a checksum or verify tool, an updater,
+/// patcher, setup, configuration, benchmark or editor. A helper is offered after the other programs, never hidden;
+/// `check` also covers `checksum` and `checker`.
+const HELPER_WORDS: &[&str] = &[
+    "crash",
+    "report",
+    "helper",
+    "check",
+    "verify",
+    "update",
+    "patch",
+    "setup",
+    "config",
+    "benchmark",
+    "editor",
+];
+
+/// The programs of a game folder, best first. The folder name and the game's display name are the names a program may
+/// match.
+fn executables(folder: &Path, name: &str) -> Vec<ExecutableSuggestion> {
+    let folder_name = folder
         .file_name()
-        .map(|name| name.to_string_lossy().to_ascii_lowercase())
+        .map(|value| value.to_string_lossy().into_owned())
         .unwrap_or_default();
-    found.sort_by(|left, right| {
-        left.0
-            .matches('/')
-            .count()
-            .cmp(&right.0.matches('/').count())
-            .then_with(|| {
-                let left_match = left.0.to_ascii_lowercase().contains(&folder_key);
-                let right_match = right.0.to_ascii_lowercase().contains(&folder_key);
-                right_match.cmp(&left_match)
-            })
-            .then_with(|| right.1.cmp(&left.1))
-            .then_with(|| left.0.cmp(&right.0))
+    let names = [folder_name.as_str(), name];
+    let mut programs = walk(folder, PROGRAM_DEPTH, |entry, is_dir| {
+        !is_dir && is_program(entry)
     });
-    found
+    programs.sort_by(|left, right| program_order(left, right, &names));
+    programs
         .into_iter()
-        .take(12)
-        .map(|(path, _, _)| ExecutableSuggestion {
-            name: path.rsplit('/').next().unwrap_or(&path).to_string(),
-            path,
+        .map(|program| ExecutableSuggestion {
+            name: program.name,
+            path: program.path,
         })
         .collect()
 }
 
-fn walk_executables(
-    root: &Path,
-    dir: &Path,
+/// A file or folder that `walk` returned.
+struct Entry {
+    /// Relative to the walked folder, with `/` separators.
+    path: String,
+    /// The name as the folder spells it.
+    name: String,
+    size: u64,
+    /// How many folders lie between the walked folder and the folder that holds the entry: 0 for the walked folder's
+    /// own entries.
     depth: usize,
-    budget: &mut usize,
-    out: &mut Vec<(String, u64, usize)>,
-) {
-    if depth > 3 || *budget == 0 {
-        return;
-    }
+}
 
-    for entry in sorted_entries(dir) {
-        if *budget == 0 {
+/// The files and folders below `folder`, `max_depth` folders deep, in breadth-first order: every folder of one depth is
+/// read before any folder below it. A large folder that sorts early therefore never hides a shallow file, and the
+/// budgets count folders, not files. Installer and runtime folders and hidden folders are not read, a symbolic link is
+/// not followed, and a folder that cannot be read is empty. `keep` names the entries to return, by name and kind.
+fn walk(folder: &Path, max_depth: usize, keep: impl Fn(&str, bool) -> bool) -> Vec<Entry> {
+    let mut found = Vec::new();
+    let mut queue = VecDeque::from([(folder.to_path_buf(), 0usize)]);
+    let mut listed = 0usize;
+
+    while let Some((dir, depth)) = queue.pop_front() {
+        if listed == FOLDER_BUDGET {
             break;
         }
 
-        let Ok(metadata) = entry.metadata() else {
-            continue;
-        };
+        listed += 1;
 
-        if metadata.file_type().is_symlink() {
-            continue;
-        }
+        for entry in sorted_entries(&dir).into_iter().take(ENTRY_CAP) {
+            let Ok(metadata) = entry.metadata() else {
+                continue;
+            };
 
-        let name = entry.file_name().to_string_lossy().into_owned();
-        let lower = name.to_ascii_lowercase();
-
-        if metadata.is_dir() {
-            if SKIP_DIRS.contains(&lower.as_str()) || lower.starts_with('.') {
+            if metadata.file_type().is_symlink() {
                 continue;
             }
 
-            walk_executables(root, &entry.path(), depth + 1, budget, out);
-            continue;
-        }
+            let is_dir = metadata.is_dir();
 
-        if !metadata.is_file() {
-            continue;
-        }
+            if !is_dir && !metadata.is_file() {
+                continue;
+            }
 
-        *budget = budget.saturating_sub(1);
-        let is_exe = Path::new(&name)
-            .extension()
-            .is_some_and(|extension| extension.eq_ignore_ascii_case("exe"));
-        if !is_exe
-            || SKIP_EXE_PREFIXES
-                .iter()
-                .any(|prefix| lower.starts_with(prefix))
-        {
-            continue;
-        }
+            let name = entry.file_name().to_string_lossy().into_owned();
+            let lower = name.to_ascii_lowercase();
 
-        let path = entry.path();
-        let Some(relative) = path.strip_prefix(root).ok() else {
-            continue;
-        };
-        out.push((
-            relative.to_string_lossy().replace('\\', "/"),
-            metadata.len(),
-            depth,
-        ));
+            if is_dir && (lower.starts_with('.') || SKIP_DIRS.contains(&lower.as_str())) {
+                continue;
+            }
+
+            let path = entry.path();
+
+            if is_dir && depth < max_depth {
+                queue.push_back((path.clone(), depth + 1));
+            }
+
+            if keep(&name, is_dir)
+                && let Ok(relative) = path.strip_prefix(folder)
+            {
+                found.push(Entry {
+                    path: relative.to_string_lossy().replace('\\', "/"),
+                    name,
+                    size: metadata.len(),
+                    depth,
+                });
+            }
+        }
     }
+
+    found
+}
+
+/// Whether a file name is a program the game could start: an `.exe` that is not an installer or a crash handler.
+fn is_program(file_name: &str) -> bool {
+    let lower = file_name.to_ascii_lowercase();
+    Path::new(&lower)
+        .extension()
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("exe"))
+        && !SKIP_EXE_PREFIXES
+            .iter()
+            .any(|prefix| lower.starts_with(prefix))
+}
+
+/// The order the programs are offered in, best first: a program whose name is the game's name comes before one whose
+/// name contains it, and both before the rest; a helper program comes after the others; then the shallower folder, the
+/// larger file and the path.
+fn program_order(left: &Entry, right: &Entry, names: &[&str]) -> Ordering {
+    name_rank(&left.name, names)
+        .cmp(&name_rank(&right.name, names))
+        .then_with(|| is_helper(&left.name).cmp(&is_helper(&right.name)))
+        .then_with(|| left.depth.cmp(&right.depth))
+        .then_with(|| right.size.cmp(&left.size))
+        .then_with(|| left.path.cmp(&right.path))
+}
+
+/// How well a program's name matches the game's names: 0 when the name is one of them, 1 when one contains the other
+/// (and the shorter has at least `PARTIAL_NAME_MIN` characters), 2 otherwise.
+fn name_rank(file_name: &str, names: &[&str]) -> u8 {
+    let program = comparable(file_stem(file_name));
+    let mut rank = 2;
+
+    for name in names.iter().map(|name| comparable(name)) {
+        if program.is_empty() || name.is_empty() {
+            continue;
+        }
+
+        if program == name {
+            return 0;
+        }
+
+        // The longer name must contain the shorter one, and the shorter one must be long enough to mean something.
+        let (longer, shorter) = if program.chars().count() >= name.chars().count() {
+            (program.as_str(), name.as_str())
+        } else {
+            (name.as_str(), program.as_str())
+        };
+
+        if shorter.chars().count() >= PARTIAL_NAME_MIN && longer.contains(shorter) {
+            rank = 1;
+        }
+    }
+
+    rank
+}
+
+/// Whether a program is a helper, by the words in its name (see `HELPER_WORDS`).
+fn is_helper(file_name: &str) -> bool {
+    let key = comparable(file_stem(file_name));
+    HELPER_WORDS.iter().any(|word| key.contains(word))
+}
+
+/// A file name without its last extension: `Game Setup.exe` gives `Game Setup`.
+fn file_stem(file_name: &str) -> &str {
+    file_name
+        .rsplit_once('.')
+        .map_or(file_name, |(stem, _)| stem)
+}
+
+/// A name as the program search compares it: its letters and digits in lower case. Case, spaces, apostrophes and other
+/// punctuation do not count, so `Example's Game` and `ExamplesGame` are the same name.
+fn comparable(text: &str) -> String {
+    text.chars()
+        .filter(|character| character.is_alphanumeric())
+        .flat_map(char::to_lowercase)
+        .collect()
 }
 
 /// The entries of a folder, sorted by name. A folder that cannot be read is empty: an inspection never fails a form
 /// because one protected subfolder is not readable.
-fn sorted_entries(dir: &Path) -> Vec<fs::DirEntry> {
+pub(super) fn sorted_entries(dir: &Path) -> Vec<fs::DirEntry> {
     let Ok(entries) = fs::read_dir(dir) else {
         return Vec::new();
     };
@@ -182,55 +294,15 @@ const SKIP_EXE_PREFIXES: &[&str] = &[
     "ue5prereqsetup",
 ];
 
+/// The folders at the first two levels, shallow first, for the pickers of the mod folders.
 fn directories(folder: &Path) -> Vec<String> {
-    let mut out = Vec::new();
-    let mut budget = 400usize;
-    walk_directories(folder, folder, 0, &mut budget, &mut out);
+    let mut out: Vec<(usize, String)> = walk(folder, 1, |_, is_dir| is_dir)
+        .into_iter()
+        .map(|entry| (entry.depth, entry.path))
+        .collect();
     out.sort();
-    out.truncate(200);
-    out
-}
-
-fn walk_directories(
-    root: &Path,
-    dir: &Path,
-    depth: usize,
-    budget: &mut usize,
-    out: &mut Vec<String>,
-) {
-    if depth >= 2 || *budget == 0 {
-        return;
-    }
-
-    for entry in sorted_entries(dir) {
-        if *budget == 0 {
-            break;
-        }
-
-        let Ok(metadata) = entry.metadata() else {
-            continue;
-        };
-
-        if !metadata.is_dir() || metadata.file_type().is_symlink() {
-            continue;
-        }
-
-        let name = entry.file_name().to_string_lossy().into_owned();
-        let lower = name.to_ascii_lowercase();
-
-        if lower.starts_with('.') || SKIP_DIRS.contains(&lower.as_str()) {
-            continue;
-        }
-
-        let path = entry.path();
-
-        if let Ok(relative) = path.strip_prefix(root) {
-            *budget = budget.saturating_sub(1);
-            out.push(relative.to_string_lossy().replace('\\', "/"));
-        }
-
-        walk_directories(root, &path, depth + 1, budget, out);
-    }
+    out.truncate(DIRECTORY_LIMIT);
+    out.into_iter().map(|(_, path)| path).collect()
 }
 
 fn detected_loaders(folder: &Path, presets: &[LoaderPresetView]) -> Vec<LoaderSuggestion> {

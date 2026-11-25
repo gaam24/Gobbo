@@ -426,6 +426,41 @@ fn every_shipped_loader_and_variant_merges_into_a_valid_game() {
 }
 
 #[test]
+fn the_ue4ss_variants_name_their_own_mods_txt_and_the_pak_layout_names_none() {
+    let dir = Path::new(super::super::DEV_LOADERS_DIR);
+    let loader = presets::load(dir, "unreal").unwrap();
+
+    assert!(loader.rules(None).unwrap().load_order.is_none());
+
+    let four = loader
+        .rules(Some("ue4ss-4"))
+        .unwrap()
+        .load_order
+        .expect("ue4ss-4 names its list");
+    assert_eq!(four.file, "Binaries/Win64/ue4ss/Mods/mods.txt");
+    assert!(!four.uses_settings_folder());
+
+    let three = loader
+        .rules(Some("ue4ss-3"))
+        .unwrap()
+        .load_order
+        .expect("ue4ss-3 names its list");
+    assert_eq!(three.file, "Binaries/Win64/Mods/mods.txt");
+}
+
+#[test]
+fn a_ue4ss_game_takes_the_list_of_its_variant_and_needs_no_settings_folder() {
+    let game = unreal_ue4ss_game();
+    let order = game
+        .load_order
+        .as_ref()
+        .expect("the variant names the list");
+
+    assert_eq!(order.file, "Binaries/Win64/ue4ss/Mods/mods.txt");
+    assert!(!game.has_settings_file());
+}
+
+#[test]
 fn the_unreal_preset_has_the_pak_and_ue4ss_layouts() {
     let dir = Path::new(super::super::DEV_LOADERS_DIR);
     let loader = presets::load(dir, "unreal").unwrap();
@@ -848,8 +883,8 @@ fn the_loader_release_is_recognised_by_its_file_names_wherever_it_sits() {
     let game = unreal_ue4ss_game();
     assert!(game.is_loader_archive(["dwmapi.dll", "ue4ss/UE4SS.dll", "ue4ss/Mods/mods.txt"]));
     assert!(game.is_loader_archive([
-        "Pal/Binaries/Win64/DWMAPI.dll",
-        "Pal/Binaries/Win64/ue4ss/UE4SS.dll"
+        "Project/Binaries/Win64/DWMAPI.dll",
+        "Project/Binaries/Win64/ue4ss/UE4SS.dll"
     ]));
     assert!(!game.is_loader_archive(["Better/Scripts/main.lua"]));
     assert!(!game.is_loader_archive(["Better.pak", "dwmapi.dll"]));
@@ -975,4 +1010,152 @@ fn the_chosen_variants_config_mirror_reaches_the_resolved_loader() {
 
     let resolved = game.resolved_loader.expect("the game names a loader");
     assert_eq!(resolved.config_mirror.as_deref(), Some("ExtraConfig"));
+}
+
+/// A preset whose `[engine]` table names a fallback variant, one variant that matches by its own marker and a project
+/// folder. Every name in it is generic.
+const ENGINE_LOADER: &str = r#"
+schema = 1
+id = "fixture-engine"
+name = "Fixture Engine"
+default_variant = "a"
+
+[deploy]
+
+[[deploy.slots]]
+dir = "Mods"
+
+[variants.a]
+
+[variants.b]
+
+[engine]
+name = "Example Engine"
+markers = ["Example.dll", "*_Data"]
+variant = "a"
+root = "*/Content/Paks"
+
+[[engine.variants]]
+variant = "b"
+label = "Second"
+markers = ["Second.dll"]
+"#;
+
+#[test]
+fn an_engine_table_is_read_and_its_variants_must_be_the_presets_own() {
+    let loader = presets::LoaderDef::parse(ENGINE_LOADER).unwrap();
+    assert!(loader.validate().is_empty(), "{:?}", loader.validate());
+
+    let engine = loader.engine.as_ref().expect("the preset names an engine");
+    assert_eq!(engine.name, "Example Engine");
+    assert_eq!(engine.markers, ["Example.dll", "*_Data"]);
+    assert_eq!(engine.variant.as_deref(), Some("a"));
+    assert_eq!(engine.root.as_deref(), Some("*/Content/Paks"));
+    assert_eq!(engine.variants[0].variant, "b");
+    assert_eq!(engine.variants[0].label.as_deref(), Some("Second"));
+    assert_eq!(engine.variants[0].markers, ["Second.dll"]);
+
+    // A preset without an engine table has none, and the engine table is not a game rule.
+    assert!(presets::LoaderDef::parse(LOADER).unwrap().engine.is_none());
+}
+
+#[test]
+fn a_broken_engine_table_names_its_problem() {
+    let cases = [
+        (
+            ENGINE_LOADER.replacen("name = \"Example Engine\"", "name = \" \"", 1),
+            "engine name is empty",
+        ),
+        (
+            ENGINE_LOADER.replacen("markers = [\"Example.dll\", \"*_Data\"]", "markers = []", 1),
+            "needs at least one marker",
+        ),
+        (
+            ENGINE_LOADER.replacen(
+                "markers = [\"Second.dll\"]",
+                "markers = [\"/Second.dll\"]",
+                1,
+            ),
+            "not a folder pattern inside the game",
+        ),
+        (
+            ENGINE_LOADER.replacen("variant = \"a\"\nroot", "variant = \"missing\"\nroot", 1),
+            "is not one of the variants",
+        ),
+        (
+            ENGINE_LOADER.replacen("variant = \"b\"", "variant = \"zzz\"", 1),
+            "is not one of the variants",
+        ),
+        (
+            format!(
+                "{ENGINE_LOADER}\n[[engine.variants]]\nvariant = \"b\"\nmarkers = [\"Third.dll\"]\n"
+            ),
+            "is listed twice",
+        ),
+        (
+            ENGINE_LOADER.replacen("root = \"*/Content/Paks\"", "root = \"Content/Paks\"", 1),
+            "engine root must be a folder pattern that starts with */",
+        ),
+        (
+            ENGINE_LOADER.replacen(
+                "root = \"*/Content/Paks\"",
+                "root = \"*Project/Content\"",
+                1,
+            ),
+            "engine root must be a folder pattern that starts with */",
+        ),
+        (
+            ENGINE_LOADER.replacen(
+                "root = \"*/Content/Paks\"",
+                "root = \"*/Content|*/Paks\"",
+                1,
+            ),
+            "engine root must be a folder pattern that starts with */",
+        ),
+        (
+            ENGINE_LOADER.replacen(
+                "markers = [\"Second.dll\"]",
+                "markers = [\"Second.dll|\"]",
+                1,
+            ),
+            "not a folder pattern inside the game",
+        ),
+        (
+            ENGINE_LOADER.replacen(
+                "markers = [\"Example.dll\", \"*_Data\"]",
+                "markers = [\"Example.dll||Example.so\"]",
+                1,
+            ),
+            "not a folder pattern inside the game",
+        ),
+    ];
+
+    for (text, expected) in cases {
+        let problems = presets::LoaderDef::parse(&text).unwrap().validate();
+        assert!(
+            problems.iter().any(|problem| problem.contains(expected)),
+            "{expected}: {problems:?}"
+        );
+    }
+}
+
+#[test]
+fn an_engine_marker_may_list_alternatives_for_the_same_file() {
+    let text = ENGINE_LOADER
+        .replacen(
+            "markers = [\"Example.dll\", \"*_Data\"]",
+            "markers = [\"Example.dll | Example.so\", \"*_Data\"]",
+            1,
+        )
+        .replacen(
+            "markers = [\"Second.dll\"]",
+            "markers = [\"Second.dll|Second.so\"]",
+            1,
+        );
+    let loader = presets::LoaderDef::parse(&text).unwrap();
+    assert!(loader.validate().is_empty(), "{:?}", loader.validate());
+
+    let engine = loader.engine.as_ref().expect("the preset names an engine");
+    assert_eq!(engine.markers[0], "Example.dll | Example.so");
+    assert_eq!(engine.variants[0].markers, ["Second.dll|Second.so"]);
 }

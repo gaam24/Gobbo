@@ -20,7 +20,7 @@
   `platform::store_folders`),
   how an install starts in `runtime.rs`, paths, the catalog
   in `catalog.rs`, the official catalog downloaded from GitHub in `remote/` (the manifest fetch, the schema gate and
-  the checksummed install), the catalog commands and the definition editor in `editor/`; the import dry run is
+  the checksummed install), the catalog commands and the definition editor in `editor/` (the engine a folder matches, from the `[engine]` tables of the loader presets, is `editor/engine.rs`); the import dry run is
   `import/preview.rs`),
   `library/` (mutations: rescan, delete, metadata, the manual source id in `source_id.rs`, generic `fields.rs`,
   `relations.rs` for the requirement checks and warnings, `sync.rs` keeping each profile in step
@@ -102,12 +102,14 @@
   `SourceMeta::checked` in `page.rs` is the one merge-and-stamp rule for a page a check stored;
   `SourceRef.part_id` names a provider's persistent installable file group, such as a Nexus `mod_file_id`, so two parts
   of one page stay separate; the library, profiles and packs store this model, and each provider maps its own records
-  to it), `resolver/` (the deployment plan: `planner.rs` with `PlanMode`, `model.rs`, `shared.rs`), `profiles/`
+  to it), `resolver/` (the deployment plan: `planner.rs` with `PlanMode`, `model.rs`, `shared.rs`, and `own_folder.rs`,
+  the rule for which mods get a folder of their own, shared by the planner and the load order window), `profiles/`
   (`profile.rs` for one profile and its list, `set/` for the set and its operations, `entry.rs` for one mod in a
   profile, `view.rs` for the family/version indexes, `diff.rs` for the one comparison of two lists, `history.rs` for
   the compact summary of a list change),
   `user_data.rs` (the universal `Kind`/`Mode`/`Isolation` and the resolved `Set`),
-  `naming/` (library and game folder names, safe file names and the relative-path rule), `pathkey.rs`, `version.rs`,
+  `naming/` (library and game folder names, safe file names and the relative-path rule), `pathkey.rs`, `pattern.rs` (the
+  folder patterns of the loader engine rules, matched by path key, with the listing passed in), `version.rs`,
   `mod_steps.rs` (the per-mod step file and the `Phase` the launch runs), `arguments.rs`, `fomod.rs` (the wizard
   choices, keyed by step and group position, kept with a version), `pack.rs` (a pack mod and its waiting entry; the
   pack reader and writer live in `packs`), `storage.rs` (the shared `StorageMode`).
