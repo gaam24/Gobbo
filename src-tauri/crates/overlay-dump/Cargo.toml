@@ -17,9 +17,7 @@ path = "src/bin/dump32.rs"
 [lints]
 workspace = true
 
-[dependencies]
+[target.'cfg(windows)'.dependencies]
 # The session and environment names are owned by the plain-std ring crate, so the app and the hook share one owner.
 gobbo-overlay-decisions.workspace = true
-
-[target.'cfg(windows)'.dependencies]
 minidumper = "0.11"

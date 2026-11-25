@@ -265,7 +265,7 @@ fn legacy_long(path: &Path) -> bool {
 
 /// See the Windows version: only Windows has the legacy limit.
 #[cfg(not(windows))]
-fn legacy_long(_path: &Path) -> bool {
+const fn legacy_long(_path: &Path) -> bool {
     false
 }
 

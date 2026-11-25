@@ -17,7 +17,8 @@ workspace = true
 [dependencies]
 # The report types are plain data and are read by Gobbo on every platform, not only where the probe binary runs.
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
 
 [target.'cfg(windows)'.dependencies]
 gobbo-overlay-core.workspace = true
+# Only the Windows checks write the JSON report.
+serde_json = "1"
