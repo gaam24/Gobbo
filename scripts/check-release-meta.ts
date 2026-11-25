@@ -5,42 +5,18 @@ import { releaseVersion } from "./release-version";
 
 /// One owner for the app version: `release.json` at the repository root. Every copy is asserted against it, so a bump
 /// changes that one value and any file left behind fails `bun run guard` (part of `bun run lint`). The
-/// updater tests read it through the shared `releaseVersion()` accessor instead of repeating the version. The supported-games tables in
-/// both READMEs are checked against `games/*/game.toml` for the same reason: adding a definition cannot update one
-/// list and forget the other.
+/// updater tests read it through the shared `releaseVersion()` accessor instead of repeating the version. The README
+/// status line is prose, not a version copy: it says the project is in early development, with no number or count to
+/// keep in step. The supported-games tables in both READMEs are checked against `games/*/game.toml`: adding a
+/// definition cannot update one list and forget the other.
 
 const root = join(import.meta.dir, "..");
 const CARGO_VERSION = /\[workspace\.package\]\s*\n\s*version\s*=\s*"(\d+\.\d+\.\d+)"/;
 const JSON_VERSION = /"version"\s*:\s*"(\d+\.\d+\.\d+)"/;
-const README_STATUS = /\*\*Status:\*\*\s+(\S+),/;
 const BUG_VERSION = /id: version[\s\S]*?placeholder:\s*(\S+)/;
 const ICON_ID = /games\/([a-z0-9-]+)\/icon\.webp/g;
 const TOML_NAME = /^name\s*=\s*"([^"]+)"/m;
 const SEPARATOR = /^-+$/;
-const SUMMARY = /(\w+) games? are tested on real installations; (\w+) more definitions? are ready/i;
-
-const NUMBER_WORDS: Record<string, number> = {
-	one: 1,
-	two: 2,
-	three: 3,
-	four: 4,
-	five: 5,
-	six: 6,
-	seven: 7,
-	eight: 8,
-	nine: 9,
-	ten: 10,
-	eleven: 11,
-	twelve: 12,
-	thirteen: 13,
-	fourteen: 14,
-	fifteen: 15,
-	sixteen: 16,
-	seventeen: 17,
-	eighteen: 18,
-	nineteen: 19,
-	twenty: 20,
-};
 
 interface Game {
 	id: string;
@@ -93,7 +69,6 @@ export function checkReleaseMeta(problems: string[]): void {
 	expectVersion(read("package.json"), JSON_VERSION, "package.json", version, problems);
 	expectVersion(read("src-tauri/tauri.conf.json"), JSON_VERSION, "src-tauri/tauri.conf.json", version, problems);
 	expectVersion(read("src-tauri/Cargo.toml"), CARGO_VERSION, "src-tauri/Cargo.toml", version, problems);
-	expectVersion(read("README.md"), README_STATUS, "README.md status", version, problems);
 
 	expectVersion(read(".github/ISSUE_TEMPLATE/bug_report.yml"), BUG_VERSION, "bug_report.yml version placeholder", version, problems);
 
@@ -127,18 +102,4 @@ export function checkReleaseMeta(problems: string[]): void {
 		"games/README.md supported-games table",
 		problems,
 	);
-
-	const summary = SUMMARY.exec(readme);
-	const tested = rows.filter((cells) => (cells[2] ?? "").toLowerCase() === "yes").length;
-	const ready = rows.filter((cells) => (cells[2] ?? "").toLowerCase() === "no").length;
-	if (summary === null) {
-		problems.push("README.md: keep the 'N games are tested ...; M more definitions are ready' status summary");
-	} else {
-		const words = [summary[1], summary[2]].map((word) => NUMBER_WORDS[(word ?? "").toLowerCase()]);
-		if (words[0] !== tested || words[1] !== ready) {
-			problems.push(
-				`README.md status summary says ${String(words[0] ?? "?")}/${String(words[1] ?? "?")} but the game table says ${tested}/${ready}`,
-			);
-		}
-	}
 }
