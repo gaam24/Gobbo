@@ -30,9 +30,35 @@ pub fn parse_env(text: &str) -> Result<Vec<(String, String)>, AppError> {
     Ok(vars)
 }
 
-/// Game parameters: separated by spaces. Quotes are not supported; they reach the game literally.
+/// Game parameters: separated by spaces. A pair of double quotation marks keeps the words between them as one
+/// parameter, and the marks are removed, so `-config "C:\My Games\a.ini"` passes one path. A backslash is never an
+/// escape, so a Windows path reaches the game as it is. A quotation mark that is never closed takes the rest of the text.
 pub fn parse_args(text: &str) -> Vec<String> {
-    text.split_whitespace().map(str::to_string).collect()
+    let mut args = Vec::new();
+    let mut current = String::new();
+    let mut started = false;
+    let mut quoted = false;
+
+    for c in text.chars() {
+        if c == '"' {
+            quoted = !quoted;
+            started = true;
+        } else if c.is_whitespace() && !quoted {
+            if started {
+                args.push(std::mem::take(&mut current));
+                started = false;
+            }
+        } else {
+            current.push(c);
+            started = true;
+        }
+    }
+
+    if started {
+        args.push(current);
+    }
+
+    args
 }
 
 /// The `WINEDLLOVERRIDES` value that makes Wine load each DLL from the game folder before its own copy (`n,b`), for the
@@ -157,5 +183,35 @@ mod tests {
             vec!["-skipStartScreen", "-windowed"]
         );
         assert!(parse_args("").is_empty());
+        assert!(parse_args("   ").is_empty());
+    }
+
+    #[test]
+    fn a_quoted_value_with_spaces_is_one_argument() {
+        assert_eq!(
+            parse_args(r#"-config "C:\My Games\settings.ini" -windowed"#),
+            vec![r"-config", r"C:\My Games\settings.ini", "-windowed"]
+        );
+        assert_eq!(
+            parse_args(r#"-name="Example's Game" -x"#),
+            vec!["-name=Example's Game", "-x"]
+        );
+        assert_eq!(parse_args(r#""" -x"#), vec!["", "-x"]);
+    }
+
+    #[test]
+    fn backslashes_and_apostrophes_are_kept_as_they_are() {
+        assert_eq!(
+            parse_args(r#"-path "C:\Games\Example's Game\" -x"#),
+            vec!["-path", r"C:\Games\Example's Game\", "-x"]
+        );
+    }
+
+    #[test]
+    fn a_quotation_mark_that_is_never_closed_takes_the_rest() {
+        assert_eq!(
+            parse_args(r#"-title "My Game -windowed"#),
+            vec!["-title", "My Game -windowed"]
+        );
     }
 }

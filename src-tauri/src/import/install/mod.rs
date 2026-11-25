@@ -358,6 +358,7 @@ pub fn plan_with_roots<'a>(
 
         if let Some(placed) = loader_layout(install, &loader_files, base_name, &mut loader_skipped)
         {
+            refuse_unwritable(&placed, archive)?;
             let skipped = loader_skipped.len() - before;
             return Ok(Plan {
                 placed,
@@ -371,6 +372,7 @@ pub fn plan_with_roots<'a>(
     if placed.is_empty() {
         return Err(InstallError::UnknownLayout);
     }
+    refuse_unwritable(&placed, archive)?;
 
     attach_mirrored(&mut placed);
     // A slot's `enable_file` is written once per mod, unless the archive already ships it.
@@ -550,7 +552,7 @@ pub use apply::fail_after;
 pub use apply::{extract, place};
 pub use errors::InstallError;
 use layout::{LayoutPlan, UnitIndex, attach_mirrored};
-use naming::{free_folder_name, is_folder_for, split_name, wanted_name};
+use naming::{free_folder_name, is_folder_for, refuse_unwritable, split_name, wanted_name};
 pub use roots::base_roots;
 
 #[cfg(test)]

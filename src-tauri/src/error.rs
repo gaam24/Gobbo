@@ -3,7 +3,7 @@
 //! the matching section for other texts), so a translation never has to be built in Rust.
 //!
 //! Codes are grouped by where a failure happens and how specific it is: `profile.*` (singular) names a failure of one
-//! item in a list (`profile.duplicate_mod`, `profile.priority_out_of_range`, `profile.separator_name`), while
+//! item in a list (`profile.duplicate_mod`, `profile.load_order_full`, `profile.separator_name`), while
 //! `profiles.*` (plural) names the profile set or a command on it (`profiles.name_taken`, `profiles.not_found`,
 //! `profiles.copy_same`). `source.*` is a generic provider failure (`source.unknown`, `source.bad_link`), where
 //! `nexus.*` and `thunderstore.*` name an adapter's failure and `relations.*` names one in the mod-relations context —

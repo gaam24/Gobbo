@@ -17,6 +17,23 @@ pub fn windows_key(path: &str) -> String {
     key
 }
 
+/// Expands a `~` at the start of a typed path to `home`: `~` alone, or `~/` or `~\` before the rest. Any other text is
+/// kept as it is, and so is every path when `home` is empty, because `~/x` without a home would become `/x`.
+pub fn expand_home(text: &str, home: &Path) -> String {
+    let Some(rest) = text
+        .strip_prefix('~')
+        .filter(|_| !home.as_os_str().is_empty())
+    else {
+        return text.to_string();
+    };
+
+    match rest.strip_prefix(['/', '\\']) {
+        Some(tail) => home.join(tail).display().to_string(),
+        None if rest.is_empty() => home.display().to_string(),
+        None => text.to_string(),
+    }
+}
+
 /// Appends the key of `path` to `out` and returns the range it occupies. A caller that builds many keys can keep them
 /// in one string instead of allocating one `String` per path.
 pub fn path_key_into(path: &str, out: &mut String) -> Range<usize> {
@@ -165,6 +182,20 @@ mod tests {
             windows_key("D:/Games/Example Game/"),
             r"d:\games\example game"
         );
+    }
+
+    #[test]
+    fn a_typed_home_path_expands_and_other_tildes_stay() {
+        let home = Path::new("/home/slot");
+        assert_eq!(expand_home("~", home), "/home/slot");
+        assert_eq!(
+            expand_home("~/Games/Example's Game", home),
+            home.join("Games/Example's Game").display().to_string()
+        );
+        assert_eq!(expand_home("~user/Games", home), "~user/Games");
+        assert_eq!(expand_home("/games/~/x", home), "/games/~/x");
+        // Without a home folder the text stays as typed, instead of becoming a path at the root.
+        assert_eq!(expand_home("~/Games", Path::new("")), "~/Games");
     }
 
     #[test]

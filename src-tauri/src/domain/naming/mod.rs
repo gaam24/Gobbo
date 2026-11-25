@@ -10,8 +10,8 @@ mod paths;
 mod unique;
 
 pub use file_names::{
-    file_name_from_url, is_invalid_name_char, is_safe_component, safe_file_name,
-    safe_limited_file_name,
+    file_name_from_url, is_invalid_name_char, is_safe_component, is_windows_component,
+    safe_file_name, safe_limited_file_name,
 };
 pub use hashes::{path_hash, short_hash};
 pub use import::imported;

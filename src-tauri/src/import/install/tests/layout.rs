@@ -263,3 +263,60 @@ fn a_wrapper_around_a_game_folder_is_still_taken_off() {
     assert_eq!(import.mods[0].files, 1);
     assert!(library.join("Wrapped/Mod.dll").is_file());
 }
+
+#[test]
+fn a_skipped_file_whose_name_windows_cannot_store_does_not_block_the_mod() {
+    let base = scratch!("layout-skipped-name");
+    let library = base.join("library");
+    let zip = make_zip(
+        &base,
+        "modA.zip",
+        &[
+            ("Mods/modA/content/x.dat", "x"),
+            ("Read me: install first.txt", "read me"),
+            ("CON.txt", "device name"),
+            ("notes?.txt", "question"),
+        ],
+    );
+
+    let import = install_into(&zip, &library, &slot_game(), DIGEST);
+    assert_one_mod(&import, "modA", 1);
+    assert_eq!(import.skipped, 3);
+    assert!(library.join("modA/content/x.dat").is_file());
+}
+
+#[test]
+fn mods_whose_names_clean_to_the_same_text_each_get_a_folder() {
+    let base = scratch!("layout-same-clean-name");
+    let library = base.join("library");
+    // Names without ASCII letters all clean to `Import`, so the three mods of one archive ask for the same folder.
+    let zip = make_zip(
+        &base,
+        "pack.zip",
+        &[
+            ("Mods/Броня/content/a.dat", "a"),
+            ("Mods/Одежда/content/b.dat", "b"),
+            ("Mods/Оружие/content/c.dat", "c"),
+        ],
+    );
+
+    let import = install_into(&zip, &library, &slot_game(), DIGEST);
+    assert_eq!(import.mods.len(), 3);
+    let folders: BTreeSet<&str> = import
+        .mods
+        .iter()
+        .map(|installed| installed.folder.as_str())
+        .collect();
+    assert_eq!(
+        folders.len(),
+        3,
+        "each mod gets its own folder: {folders:?}"
+    );
+    for installed in &import.mods {
+        assert_eq!(installed.files, 1);
+        assert!(library.join(&installed.folder).is_dir());
+    }
+    assert!(library.join("pack - Import").is_dir());
+    assert!(library.join("pack - Import (01234567)").is_dir());
+    assert!(library.join("pack - Import (01234567) (2)").is_dir());
+}

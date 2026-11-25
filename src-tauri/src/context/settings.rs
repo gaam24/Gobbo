@@ -95,8 +95,8 @@ pub fn load_settings(data: &Data) -> Settings {
     )
 }
 
-/// Saves a game's settings after trimming the paths. It waits for a list edit that is running, so a whole save and an
-/// edit of one list never write over each other.
+/// Saves a game's settings after trimming the paths and expanding a typed `~` to the home folder. It waits for a list
+/// edit that is running, so a whole save and an edit of one list never write over each other.
 pub fn save_settings(root: &Data, game_id: &str, settings: Settings) -> Result<(), AppError> {
     let _write = lock_settings();
     write_settings(root, game_id, settings)
@@ -111,9 +111,11 @@ fn write_settings(root: &Data, game_id: &str, settings: Settings) -> Result<(), 
     let previous = load_settings(&data);
     let mut settings = settings;
 
+    // A folder typed as `~/Games/...` means the home folder; the saved value is the full path, so every reader gets the same.
+    let home = crate::games::paths::home();
+
     for value in settings.paths_mut() {
-        let trimmed = value.trim().to_string();
-        *value = trimmed;
+        *value = crate::domain::pathkey::expand_home(value.trim(), &home);
     }
 
     if settings.game_root != previous.game_root {

@@ -60,17 +60,19 @@ pub fn is_safe_component(name: &str) -> bool {
         return false;
     }
 
-    if cfg!(windows) {
-        if name.ends_with(['.', ' ']) || is_reserved_file_name(name) {
-            return false;
-        }
+    !cfg!(windows) || is_windows_component(name)
+}
 
-        if name.chars().any(is_invalid_name_char) {
-            return false;
-        }
-    }
-
-    true
+/// Whether a path component is a name Windows stores, on every platform. It is the rule `is_safe_component` applies on
+/// Windows. Import uses it on Linux too: a name Linux stores but Windows refuses would make the library differ between
+/// the two systems, so both refuse it.
+pub fn is_windows_component(name: &str) -> bool {
+    !name.is_empty()
+        && name != "."
+        && name != ".."
+        && !name.ends_with(['.', ' '])
+        && !is_reserved_file_name(name)
+        && !name.chars().any(is_invalid_name_char)
 }
 
 /// Keeps a name below a safe length. The extension is preserved when it fits; a long stem and then a long extension
@@ -151,6 +153,18 @@ mod tests {
         assert!(!is_safe_component("a?b"));
         assert!(is_safe_component("Console"));
         assert!(is_safe_component("name.txt"));
+    }
+
+    #[test]
+    fn the_windows_component_rule_applies_on_every_platform() {
+        for name in [
+            "CON", "NUL.txt", "name.", "name ", "a:b", "a?b", "a\\b", "..", "",
+        ] {
+            assert!(!is_windows_component(name), "{name:?} must be refused");
+        }
+        assert!(is_windows_component("Console"));
+        assert!(is_windows_component("name.txt"));
+        assert!(is_windows_component("Read me (EN).txt"));
     }
 
     #[test]

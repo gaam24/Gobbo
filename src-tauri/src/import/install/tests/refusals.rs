@@ -54,3 +54,24 @@ fn path_escaping_the_library_is_refused() {
     assert!(matches!(err, InstallError::UnsafeEntry { .. }));
     assert!(!base.join("evil.ws").exists());
 }
+
+#[test]
+fn a_mod_file_under_a_name_windows_cannot_store_is_refused_and_nothing_is_written() {
+    let base = scratch!("unwritable-placed");
+    let library = base.join("library");
+    let zip = make_zip(
+        &base,
+        "modA.zip",
+        &[
+            ("Mods/modA/content/ok.dat", "ok"),
+            ("Mods/modA/content/a:b.dat", "stream"),
+        ],
+    );
+
+    let err = install_zip(&zip, &library, &slot_game(), DIGEST, None, &mut |_| {}).unwrap_err();
+    assert!(matches!(
+        err,
+        InstallError::UnsafeEntry { ref name } if name == "Mods/modA/content/a:b.dat"
+    ));
+    assert!(!library.join("modA").exists());
+}

@@ -186,13 +186,18 @@ pub fn place(
     naming: Naming<'_>,
 ) -> Result<Import, InstallError> {
     let mut named: Vec<(String, usize)> = Vec::with_capacity(staged.mods.len());
+    // The names this archive already chose. The folders move only after every name is set, so the library does not show
+    // them yet: two groups whose clean names match (both `Import`, when their names have no ASCII letters) must still
+    // get two folders.
+    let mut taken: BTreeSet<String> = BTreeSet::new();
 
     for (at, staged_mod) in staged.mods.iter().enumerate() {
         let wanted = wanted_name(naming.base_name, staged.mods.len(), &staged_mod.group);
         let name = match naming.only {
             Some(folder) => folder.to_string(),
-            None => free_folder_name(library, &wanted, naming.digest)?,
+            None => free_folder_name(library, &wanted, naming.digest, &taken)?,
         };
+        taken.insert(crate::domain::pathkey::path_key(&name));
         named.push((name, at));
     }
     // The library lists its folders by name, so the mods are moved and reported in that order.
