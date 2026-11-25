@@ -1,14 +1,16 @@
 import { X } from "lucide-react";
 import { useState } from "react";
 import { SectionHeading } from "@/components/app/content-blocks";
+import { SuggestionInput } from "@/components/suggestion-input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import { useTranslation } from "@/i18n";
+import { tagSuggestions, withTag } from "@/lib/mod-tags";
 import type { Mod } from "@/lib/mods";
 
-/// Tags of the selected mod: removable chips, and a field with suggestions from all the game's tags.
+/// Tags of the selected mod: removable chips, and a field whose list offers the game's other tags. Enter or a pick from
+/// the list adds a tag.
 export function TagsSection({
 	mod,
 	allTags,
@@ -20,11 +22,12 @@ export function TagsSection({
 }) {
 	const { t } = useTranslation();
 	const [value, setValue] = useState("");
-	const trimmed = value.trim();
 
-	const add = () => {
-		if (!trimmed || mod.tags.includes(trimmed)) return;
-		void onSetTags(mod.id, [...mod.tags, trimmed]);
+	// A blank or repeated name changes nothing, and then the field keeps its text.
+	const add = (name: string) => {
+		const tags = withTag(mod.tags, name);
+		if (tags === null) return;
+		void onSetTags(mod.id, tags);
 		setValue("");
 	};
 
@@ -58,26 +61,24 @@ export function TagsSection({
 				<FieldLabel htmlFor="mod-tags" className="sr-only">
 					{t("mods.tags.title")}
 				</FieldLabel>
-				<Input
+				<SuggestionInput
 					id="mod-tags"
 					value={value}
-					placeholder={t("mods.tags.placeholder")}
-					list="gobbo-mod-tags"
-					spellCheck={false}
-					onChange={(event) => setValue(event.currentTarget.value)}
+					onChange={setValue}
+					onSelect={add}
 					onKeyDown={(event) => {
 						if (event.key === "Enter") {
 							event.preventDefault();
-							add();
+							add(value);
 						}
 					}}
+					suggestions={tagSuggestions(allTags, mod.tags)}
+					menuLabel={t("mods.tags.existing")}
+					emptyLabel={t("mods.tags.none")}
+					placeholder={t("mods.tags.placeholder")}
+					menuClassName="w-56"
 				/>
 			</Field>
-			<datalist id="gobbo-mod-tags">
-				{allTags.map((tag) => (
-					<option key={tag} value={tag} aria-label={tag} />
-				))}
-			</datalist>
 		</section>
 	);
 }
