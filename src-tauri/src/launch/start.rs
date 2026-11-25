@@ -254,6 +254,37 @@ fn launch_command_with_settings(
     program_launch(game, &data, settings, exe, home)
 }
 
+/// Whether a path is at or past the legacy `MAX_PATH` of Windows, 260 UTF-16 units. Windows starts a program at such a
+/// path only in its verbatim form, and it refuses such a path as a working folder. Every other system takes any length.
+#[cfg(windows)]
+fn legacy_long(path: &Path) -> bool {
+    use std::os::windows::ffi::OsStrExt;
+
+    path.as_os_str().encode_wide().count() >= 260
+}
+
+/// See the Windows version: only Windows has the legacy limit.
+#[cfg(not(windows))]
+fn legacy_long(_path: &Path) -> bool {
+    false
+}
+
+/// The text that starts a program at `path`. On Windows a path past the legacy limit gets the verbatim prefix, which the
+/// system reads without the limit: `\\?\C:\...`, or `\\?\UNC\server\share\...` for a network path. Any other path keeps
+/// its text.
+fn program_text(path: &Path) -> String {
+    let text = path.display().to_string();
+
+    if !legacy_long(path) || !path.is_absolute() || text.starts_with(r"\\?\") {
+        return text;
+    }
+
+    text.strip_prefix(r"\\").map_or_else(
+        || format!(r"\\?\{text}"),
+        |network| format!(r"\\?\UNC\{network}"),
+    )
+}
+
 /// How a program of the game starts: the game itself or one of its tools. Through Proton for a Steam game on Linux, in
 /// the overlay layers when an overlay is deployed. A program a mod brings is found in the layers.
 #[cfg_attr(
@@ -312,7 +343,12 @@ pub(super) fn program_launch(
         return Err(executable_missing(path.display()));
     }
 
-    let program = path.display().to_string();
+    // A program started without the overlay gets the verbatim form of a long path; the overlay keeps its own text.
+    let program = if session.is_some() {
+        path.display().to_string()
+    } else {
+        program_text(&path)
+    };
     // Games often load their own files by relative path, so they start in the folder of their executable.
     let folder = path.parent().unwrap_or(game_root.as_path()).to_path_buf();
     let args = launch_args(exe, settings);
@@ -320,7 +356,10 @@ pub(super) fn program_launch(
     let env = game_env(settings, false, &[], None)?;
     let mut launch = Launch::new(program, args, env, session);
 
-    if let Launch::Plain(command) = &mut launch {
+    // Windows refuses a working folder of the legacy limit or longer, so such a game starts in the folder Gobbo runs in.
+    if let Launch::Plain(command) = &mut launch
+        && !legacy_long(&folder)
+    {
         command.current_dir(&folder);
     }
 
@@ -505,5 +544,37 @@ mod tests {
             command.get_program(),
             folder_b.join("bin/x64/game.exe").as_os_str()
         );
+    }
+
+    /// Windows only: a copy of the system shell in a folder past the legacy path limit starts through the real launch
+    /// path and exits with its code. Without the verbatim program path the start fails with "path not found".
+    #[cfg(windows)]
+    #[test]
+    fn a_program_in_a_folder_past_the_legacy_path_limit_starts_on_windows() {
+        let base = scratch!("launch-legacy-long");
+        let mut folder = base.clone();
+        while !legacy_long(&folder) {
+            folder = folder.join("long-folder-name-segment-0123456789");
+        }
+        fs::create_dir_all(&folder).unwrap();
+        let shell = PathBuf::from(std::env::var_os("SystemRoot").unwrap()).join("System32/cmd.exe");
+        fs::copy(shell, folder.join("tool.exe")).unwrap();
+
+        let mut game = test_games::slot();
+        game.executables[0].path = "tool.exe".to_string();
+        let root = Data::new(base.join("data"));
+        let data = root.game(&game.id);
+        let settings = Settings {
+            game_root: folder.display().to_string(),
+            launch_args: "/c exit 0".to_string(),
+            ..Settings::default()
+        };
+        let exe = pick_executable(&game, None).unwrap();
+        let (launch, with_mods, spawn_error) =
+            program_launch(&game, &data, &settings, exe, &base).unwrap();
+        assert!(!with_mods);
+
+        let mut running = launch.start(spawn_error, None).unwrap();
+        assert_eq!(running.wait(), Some(0));
     }
 }

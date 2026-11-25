@@ -2,9 +2,12 @@
 //! folder of its install, in `steamapps/common` of every library for Valve's own Proton, in the system-wide
 //! `/usr/share/steam` and `/usr/local/share/steam`, and in the folders named by `STEAM_EXTRA_COMPAT_TOOLS_PATHS`.
 
+use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::fs;
+use std::iter::Peekable;
 use std::path::{Path, PathBuf};
+use std::str::Chars;
 
 use crate::platform::ProtonBuild;
 
@@ -116,8 +119,49 @@ fn installed_protons_in(dirs: &[PathBuf]) -> Vec<ProtonBuild> {
         .into_iter()
         .map(|candidate| candidate.build)
         .collect();
-    builds.sort_by(|a, b| a.name.cmp(&b.name).then_with(|| a.folder.cmp(&b.folder)));
+    builds.sort_by(|a, b| natural_cmp(&a.name, &b.name).then_with(|| a.folder.cmp(&b.folder)));
     builds
+}
+
+/// Orders two build names with each run of digits read as one number, so `Proton 9.0` comes before `Proton 10.0`. The
+/// other characters compare as they are. The last name in this order is the newest build.
+fn natural_cmp(left: &str, right: &str) -> Ordering {
+    let mut left = left.chars().peekable();
+    let mut right = right.chars().peekable();
+
+    loop {
+        let order = match (left.peek().copied(), right.peek().copied()) {
+            (None, None) => return Ordering::Equal,
+            (None, Some(_)) => return Ordering::Less,
+            (Some(_), None) => return Ordering::Greater,
+            (Some(a), Some(b)) if a.is_ascii_digit() && b.is_ascii_digit() => {
+                let a = take_digits(&mut left);
+                let b = take_digits(&mut right);
+                let (a, b) = (a.trim_start_matches('0'), b.trim_start_matches('0'));
+                a.len().cmp(&b.len()).then_with(|| a.cmp(b))
+            }
+            (Some(a), Some(b)) => {
+                left.next();
+                right.next();
+                a.cmp(&b)
+            }
+        };
+
+        if order != Ordering::Equal {
+            return order;
+        }
+    }
+}
+
+/// Takes the run of digits at the front of `chars`.
+fn take_digits(chars: &mut Peekable<Chars<'_>>) -> String {
+    let mut digits = String::new();
+
+    while let Some(digit) = chars.next_if(char::is_ascii_digit) {
+        digits.push(digit);
+    }
+
+    digits
 }
 
 /// A build and the tool key Steam uses, from `compatibilitytool.vdf` or else the folder name.
@@ -245,7 +289,8 @@ pub fn proton_at(dir: &Path) -> Option<PathBuf> {
     proton.is_file().then_some(proton)
 }
 
-/// The last folder alphabetically that matches `wanted` and has a `proton` file. A folder without one is skipped.
+/// The newest folder that matches `wanted` and has a `proton` file: the last one by version number, see `natural_cmp`.
+/// A folder without one is skipped.
 fn newest_proton(dir: &Path, wanted: impl Fn(&str) -> bool) -> Option<PathBuf> {
     let mut names: Vec<String> = fs::read_dir(dir)
         .ok()?
@@ -253,7 +298,7 @@ fn newest_proton(dir: &Path, wanted: impl Fn(&str) -> bool) -> Option<PathBuf> {
         .map(|entry| entry.file_name().to_string_lossy().into_owned())
         .filter(|name| wanted(name))
         .collect();
-    names.sort();
+    names.sort_by(|a, b| natural_cmp(a, b));
     names
         .iter()
         .rev()
@@ -408,6 +453,48 @@ mod tests {
             find_proton(&steam, &library),
             Some(library.join("steamapps/common/Proton 9.0/proton"))
         );
+    }
+
+    #[test]
+    fn the_newest_build_is_the_highest_version_not_the_last_name() {
+        let base = scratch!("newest-version");
+        let library = base.join("library");
+        let steam = base.join("steam");
+        let common = library.join("steamapps/common");
+        proton(&common, "Proton 9.0");
+        proton(&common, "Proton 10.0");
+
+        assert_eq!(
+            find_proton(&steam, &library),
+            Some(common.join("Proton 10.0/proton"))
+        );
+        let builds = installed_protons_in(std::slice::from_ref(&common));
+        let names: Vec<&str> = builds.iter().map(|build| build.name.as_str()).collect();
+        assert_eq!(names, ["Proton 9.0", "Proton 10.0"]);
+    }
+
+    #[test]
+    fn digit_runs_compare_as_numbers() {
+        let mut names = vec![
+            "Proton 10.0",
+            "Proton 9.0",
+            "GE-Proton10-1",
+            "GE-Proton9-20",
+            "Proton Hotfix",
+        ];
+        names.sort_by(|a, b| natural_cmp(a, b));
+        assert_eq!(
+            names,
+            [
+                "GE-Proton9-20",
+                "GE-Proton10-1",
+                "Proton 9.0",
+                "Proton 10.0",
+                "Proton Hotfix",
+            ]
+        );
+        assert_eq!(natural_cmp("tool01", "tool1"), Ordering::Equal);
+        assert_eq!(natural_cmp("tool", "tool1"), Ordering::Less);
     }
 
     #[test]

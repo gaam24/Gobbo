@@ -14,6 +14,8 @@ use super::running::tool_of;
 #[cfg(not(windows))]
 use crate::domain::naming;
 #[cfg(not(windows))]
+use crate::domain::pathkey::starts_with_ignore_ascii_case;
+#[cfg(not(windows))]
 use crate::error::{ErrorKind, io_at};
 #[cfg(not(windows))]
 use crate::games::Prerequisite;
@@ -72,15 +74,16 @@ pub const fn missing_prerequisites(
     Vec::new()
 }
 
-/// Whether a prerequisite is in the prefix: its `check` folder holds a folder that starts with the expected name.
+/// Whether a prerequisite is in the prefix: its `check` folder holds a folder that starts with the expected name. The
+/// installer chooses the letter case of the name, and Windows ignores it, so the comparison ignores ASCII case too.
 #[cfg(not(windows))]
 fn is_installed(wine: &Path, prerequisite: &Prerequisite) -> bool {
     fs::read_dir(wine.join(&prerequisite.check)).is_ok_and(|entries| {
         entries.flatten().any(|entry| {
-            entry
-                .file_name()
-                .to_string_lossy()
-                .starts_with(&prerequisite.check_starts_with)
+            starts_with_ignore_ascii_case(
+                &entry.file_name().to_string_lossy(),
+                &prerequisite.check_starts_with,
+            )
         })
     })
 }
@@ -179,4 +182,39 @@ fn fetch_installer(data: &Data, prerequisite: &Prerequisite) -> Result<PathBuf, 
 
     fs::rename(&part, &target).map_err(io_at(&target))?;
     Ok(target)
+}
+
+/// Non-Windows only: Windows runs a tool with its own runtime and checks no prefix. The two attributes keep the test
+/// section recognised by the architecture guard, which cuts production code at a plain `#[cfg(test)]`.
+#[cfg(test)]
+#[cfg(not(windows))]
+mod tests {
+    use super::*;
+    use crate::test_support::scratch;
+
+    fn prerequisite(check: &str, check_starts_with: &str) -> Prerequisite {
+        Prerequisite {
+            name: "Runtime".to_string(),
+            url: "https://example.invalid/runtime.exe".to_string(),
+            sha512: String::new(),
+            args: Vec::new(),
+            check: check.to_string(),
+            check_starts_with: check_starts_with.to_string(),
+        }
+    }
+
+    #[test]
+    fn a_prerequisite_is_installed_when_a_folder_starts_with_its_name_in_any_case() {
+        let prefix = scratch!("prerequisite-case");
+        fs::create_dir_all(prefix.join("drive_c/shared/Runtime-8.0.33")).unwrap();
+        let check = "drive_c/shared";
+
+        assert!(is_installed(&prefix, &prerequisite(check, "runtime-8")));
+        assert!(is_installed(&prefix, &prerequisite(check, "RUNTIME-8.0")));
+        assert!(!is_installed(&prefix, &prerequisite(check, "Runtime-9")));
+        assert!(!is_installed(
+            &prefix,
+            &prerequisite("drive_c/missing", "Runtime")
+        ));
+    }
 }
