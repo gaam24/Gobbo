@@ -2113,7 +2113,7 @@ checksum = "e4eba85ea1d0a966a983acd07deee566e67395d2d96b6fb39e62b5a833f1eb0b"
 
 [[package]]
 name = "gobbo"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "base64 0.23.1",
  "bsdiff",
@@ -2176,7 +2176,7 @@ dependencies = [
 
 [[package]]
 name = "gobbo-overlay-bench"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "gobbo-overlay-core",
  "gobbo-overlay-decisions",
@@ -2187,7 +2187,7 @@ dependencies = [
 
 [[package]]
 name = "gobbo-overlay-core"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "criterion",
  "proptest",
@@ -2197,11 +2197,11 @@ dependencies = [
 
 [[package]]
 name = "gobbo-overlay-decisions"
-version = "0.1.1"
+version = "0.2.0"
 
 [[package]]
 name = "gobbo-overlay-dump"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "gobbo-overlay-decisions",
  "minidumper",
@@ -2209,7 +2209,7 @@ dependencies = [
 
 [[package]]
 name = "gobbo-overlay-hook"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "crash-handler",
  "detour",
@@ -2224,7 +2224,7 @@ dependencies = [
 
 [[package]]
 name = "gobbo-overlay-launch"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "gobbo-overlay-core",
  "gobbo-overlay-pe",
@@ -2234,14 +2234,14 @@ dependencies = [
 
 [[package]]
 name = "gobbo-overlay-pe"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "proptest",
 ]
 
 [[package]]
 name = "gobbo-overlay-probe"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "gobbo-overlay-core",
  "serde",

@@ -21,7 +21,7 @@ schema = 1
 id = "bepinex"
 name = "BepInEx"
 config_mirror = "BepInEx/config"
-min_gobbo = "0.1.1"
+min_gobbo = "0.2.0"
 default_variant = "5"
 
 [deploy]
@@ -84,7 +84,7 @@ the game and name a folder the preset declares as a slot, a mirror or an alias t
 loads instead of silently missing the profile's config files. A preset without config files leaves the field out; no
 loader id is named in code.
 
-`min_gobbo = "0.1.1"` names the oldest Gobbo release that serves the preset correctly, as in `game.toml`; every game
+`min_gobbo = "0.2.0"` names the oldest Gobbo release that serves the preset correctly, as in `game.toml`; every game
 that names the preset inherits it.
 
 `default_variant` is required when the preset has variants, so `loader = "id"` always means one version. It is an error

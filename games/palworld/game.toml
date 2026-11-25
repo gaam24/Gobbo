@@ -16,7 +16,7 @@
 schema = 1
 id = "palworld"
 name = "Palworld"
-min_gobbo = "0.1.1"
+min_gobbo = "0.2.0"
 providers = { nexus = { key = "palworld" } }
 loader = { id = "unreal", variant = "ue4ss-4" }
 

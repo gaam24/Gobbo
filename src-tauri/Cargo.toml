@@ -5,7 +5,7 @@ resolver = "3"
 
 # Every member inherits these with `version.workspace = true` and the like, so a version, an edition or a lint is set once.
 [workspace.package]
-version = "0.1.1"
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.97"
 license = "GPL-3.0-only"

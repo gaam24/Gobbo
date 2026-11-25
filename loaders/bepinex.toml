@@ -9,7 +9,7 @@ id = "bepinex"
 name = "BepInEx"
 # Where an unpacked community profile keeps BepInEx's config files; the bare `config` folder is checked as well.
 config_mirror = "BepInEx/config"
-min_gobbo = "0.1.1"
+min_gobbo = "0.2.0"
 default_variant = "5"
 
 [deploy]

@@ -34,7 +34,7 @@
 
 Gobbo Mods Organizer is a desktop mod manager for PC games. It keeps a separate mod list for every profile, shows conflicts before they reach the game, and applies mods through an overlay — so the real game folder stays untouched.
 
-> **Status:** 0.1.1, early development. Five games are tested on real installations; five more definitions are ready for testing. See [Supported games](#supported-games).
+> **Status:** Early development. Some games are tested on real installations; some more definitions are ready for testing. See [Supported games](#supported-games).
 
 ## Why Gobbo
 

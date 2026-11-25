@@ -3,7 +3,7 @@
 All notable changes to this project are documented in this file. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses semantic versions.
 
-## v0.1.1 (Unreleased)
+## v0.2.0
 
 ### Added
 
@@ -56,3 +56,5 @@ All notable changes to this project are documented in this file. The format foll
 - **Extensions typed in capitals are accepted.** They are saved in lower case, the way the game's files name them.
 - **A move target with a final slash or backslashes is accepted.** Gobbo writes it with `/` and no final slash.
 - **Every problem of a game definition is listed.** The check used to show only the first eight.
+
+## v0.2.1 (Unreleased)
