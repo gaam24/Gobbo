@@ -7,35 +7,52 @@ All notable changes to this project are documented in this file. The format foll
 
 ### Added
 
-- **Unreal Engine games can load pak, IoStore and UE4SS mods.** A shared loader preset puts each archive in the folder the game or UE4SS reads it from, and Palworld is the first game definition that uses it, with the Palworld build of UE4SS that Nexus mods expect.
-- **UE4SS installs with one click when a mod needs it.** The mod list shows an Install UE4SS button as soon as an enabled mod uses UE4SS, and plain pak mods never ask for it.
-- **BepInEx installs with one click when a mod needs it.** Unity games get the official BepInEx 5 release the same way UE4SS works for Unreal games.
-- **Pick which loader build a game uses.** A BepInEx or UE4SS build from Nexus or Thunderstore counts just like the official one, and the setup check lets you switch between the copies in your mods.
-- **UE4SS is a mod like any other.** Gobbo keeps it in your mods and the overlay gives it to the game, so the game folder stays clean; dropping the UE4SS download onto Gobbo adds it the same way.
-- **Games from GOG, Epic, Heroic, Legendary and Lutris are found where they are installed.** Gobbo reads each launcher's own list, including the Flatpak versions of Heroic and Lutris and minigalaxy's folder.
-- **A GOG or Epic game installed through Heroic or Lutris is recognised by its store.** It needs no extra setup in the game definition.
-- **A GOG game with DLC is found again, and Epic skips unfinished downloads.** An installed DLC no longer hides its game, and a half-downloaded Epic game is not offered.
-- **A Windows game from GOG, Epic or a plain folder now starts on Linux too.** Gobbo runs it through Proton with a prefix it creates itself, so the game's own saves and settings work.
-- **The Proton tab works for non-Steam games too.** A Windows game from GOG or Epic lets you pick the Proton build it starts with, the newest one by default.
-- **The Games page now shows where a game is installed.** A badge names the store: Steam, GOG, Epic, Heroic, Legendary, Lutris or a manual folder.
-- **A game found in several stores lets you pick the install.** A game on both Steam and GOG, for example, offers both folders when you add it.
-- **New games without an app update.** The Games page offers new and updated definitions from the repository, and
-  you pick what to download. The check runs once per launch and can be turned off in settings.
-- **Clear version requirements.** A definition that needs a newer Gobbo shows the version it needs and cannot be picked.
-- **Downloads never hide newer built-in games.** After an app update, downloaded copies the app now ships are removed.
-- **Closing Gobbo now asks what to do.** Pick quit, minimize to the taskbar or hide in the tray, and save the choice in settings.
-- **System notifications for background work.** While the window is hidden, Gobbo reports finished and failed tasks;
-  each kind of task can be turned on or off on its own in settings.
+- **GOG, Epic, Heroic, Legendary and Lutris games are found where they are installed.** Flatpak installs of Heroic and Lutris and minigalaxy's folder count too, and Epic games that are still downloading are left out.
+- **The Witcher 3, Cyberpunk 2077 and Tainted Grail are found from GOG too.** A GOG copy appears on the Games page like a Steam copy.
+- **Windows games from GOG, Epic and plain folders start on Linux through Proton.** Heroic and Lutris games use the prefix you play in, and other games keep one of their own, so mods and saves stay in one place.
+- **The Proton tab works for games outside Steam too.** A Windows game from GOG or Epic lets you pick its Proton build, the newest one by default, and Heroic or Lutris games can use another prefix.
+- **A game with a native Linux build starts without Proton.** Valheim's Linux install is found and started directly, and a Windows copy still runs through Proton.
+- **The Games page names each game's store and lets you pick its install.** A badge shows Steam, GOG, Epic, Heroic, Legendary, Lutris or a manual folder, and a game on both Steam and GOG offers both folders when you add it.
+- **UE4SS and BepInEx install with one click when a mod needs them.** The mod list offers the official release as soon as an enabled mod needs one, and plain pak mods never ask for UE4SS.
+- **Pick which loader build a game uses.** A BepInEx or UE4SS build from Nexus or Thunderstore counts like the official one, and the setup check lets you switch between your copies.
+- **Unreal Engine games can load pak, IoStore and UE4SS mods.** Palworld is the first game with this support, and UE4SS sits in your mods like any other mod, so the game folder stays clean.
+- **A load order window sets the order the game loads your mods in.** Only the mods you add get a number, and UE4SS mods follow the same order.
 - **Hide Gobbo when a game starts.** A setting, off by default, moves the window to the tray once the game is running.
-- **A game with a native Linux build starts it directly.** A Valheim install with the Linux binary is found and started without Proton, and a Windows copy still runs through Proton.
-- **Heroic and Lutris games use the prefix you play in.** Mods and saves land in the prefix the launcher already uses, and the Proton tab lets you pick another one.
-- **Mods of a Windows game outside Steam stay in one place.** Gobbo waits for the game's first start instead of using a folder that changes after it.
-- **The Witcher 3, Cyberpunk 2077 and Tainted Grail are found from a GOG install too.** A GOG copy of these games appears on the Games page like a Steam copy.
-- **Locate finds the game inside the folder you pick.** When the game sits one level down, Gobbo uses that folder, and a game added that way before is repaired once.
+- **New games arrive without an app update.** The Games page offers new and updated definitions from the repository, checked at each start unless settings turn that off, and you choose what to download; an app update also removes downloaded copies of games the app now ships.
+- **A definition that needs a newer Gobbo says so.** It shows the version it needs and cannot be picked.
+- **Adding a game recognises its engine.** Gobbo spots Unity and Unreal Engine games and picks the matching BepInEx or UE4SS setup.
+
+### Changed
+
+- **Closing the window asks what to do.** The closing dialog offers quit, minimize to the taskbar and hide in the tray, and a choice saved in settings skips it.
+- **Background notifications also report finished tasks.** While the window is hidden, each kind of task has its own switch for finished and failed results in settings.
+- **Mod priority moved to the load order window.** The priority field in a mod's details is gone, and the window numbers the mods you put in the order.
+- **The load order has one name everywhere.** The mod table column and the game editor now say Load order instead of Load priority or Mod order.
+- **Locate names the files a game folder must hold.** The message for a folder that is not the game's lists them, and a native Linux folder shows the file that found it.
+- **An archive Gobbo can't place says what to do.** The message names the folders a mod has to be in, so you know what to repack.
+- **A clash between two mods names both mods.** The deployment message says which mod puts a file where the other puts files inside it, so you know which one to turn off.
 
 ### Fixed
 
 - **Mods reach a game whose mod folder is inside the game folder.** The game now sees them, and a mod loader among them, at the paths it reads them from.
+- **Locate and Add accept the folder that holds a game.** When the game sits one folder down, Gobbo uses that folder, and a game saved with the wrong folder is repaired on start.
+- **A GOG game with installed DLC is found.** An installed DLC no longer hides its base game.
 - **The same community profile folder can be imported twice.** The second import gets its own profile name instead of failing.
-- **Community profiles from Unreal games keep their UE4SS config.** The import now finds the loader's own config folder as well as the plain one.
 - **The download button no longer names one mod site.** It invites you to get mods online from any supported source.
+- **A readme with a name Windows can't store no longer blocks its mod.** Gobbo skips that file like any other file it doesn't need, and the mod imports.
+- **An archive with several mods named in other alphabets imports.** Mods without Latin letters used to share one folder name, so the import failed.
+- **A game parameter in quotation marks stays one parameter.** A value with spaces, such as a path, reaches the game whole instead of being split at each space.
+- **A game, settings or mods folder typed with a leading ~ is found.** It means your home folder, and Gobbo saves the full path.
+- **The newest Proton is the one with the highest version.** When Steam names no build for a game, Proton 10 is no longer passed over for Proton 9.
+- **A game with a program path past 260 characters starts when no mods are applied.** Windows refused such a path, so the game did not start.
+- **Adding a game offers the program that is the game.** A large data folder no longer hides the programs near the top of the game folder, and a checksum or crash tool ranks after the game.
+- **The program field lists every program Gobbo found.** Typing a path no longer narrows the list to that one program, and Browse picks a file in the game folder.
+- **Typing in the game editor keeps the cursor in its field.** Rows for programs, folders, aliases, tools and providers no longer lose focus after each letter.
+- **The game id follows the name as you type it.** It used to keep the first letter you typed.
+- **A folder pasted with its quotation marks is accepted.** Gobbo removes the quotes that Windows' Copy as path adds.
+- **A slow folder scan cannot show the programs of an earlier folder.** The list always belongs to the folder on screen.
+- **The programs of a game folder stay listed while you edit the path.** A space typed and removed used to empty the list.
+- **A folder name with two dots is accepted.** `Team..Saves` no longer counts as a path that leaves the game.
+- **Extensions typed in capitals are accepted.** They are saved in lower case, the way the game's files name them.
+- **A move target with a final slash or backslashes is accepted.** Gobbo writes it with `/` and no final slash.
+- **Every problem of a game definition is listed.** The check used to show only the first eight.
