@@ -1,8 +1,8 @@
 //! Stage 0 logic, shared by the DLLs that run in the child (`lib.rs` in this folder, built for x64 and x86) and by the
 //! launcher's tests. It uses `core` only: no allocation, no locks, no thread-local storage, no imports.
 //!
-//! A call of one of the four loader functions is redirected when its `OBJECT_ATTRIBUTES` names a file under the game
-//! folder, the layer holds the same relative path as a file (not a folder), and the call only reads. The redirected
+//! A call of one of the four loader functions is redirected when its `OBJECT_ATTRIBUTES` names a path under the game
+//! folder (a read, when the layer holds a file) or under the layer (a write, which goes to `upper`). The redirected
 //! attributes point into the work area that the shim's frame holds, so they live as long as the call.
 //!
 //! Pointers are `usize` so one layout serves both architectures: `repr(C)` gives the 64-bit and the 32-bit layouts.
@@ -83,13 +83,16 @@ pub struct Config {
     pub game_units: u32,
     /// The length of `layer`, in UTF-16 units, without the terminating zero.
     pub layer_units: u32,
-    pub reserved: u32,
+    /// The length of `upper`, in UTF-16 units, without the terminating zero.
+    pub upper_units: u32,
     /// The trampolines of the four stubs, in `STUBS` order of the launcher: open, create, query, query full.
     pub trampolines: [u64; 4],
     /// `\??\` and the game folder, for example `\??\C:\Games\Lethal Company`. No trailing separator.
     pub game: [u16; PREFIX_UNITS],
     /// `\??\` and the mod layer folder of the same program. No trailing separator.
     pub layer: [u16; PREFIX_UNITS],
+    /// `\??\` and the write layer of the same program. No trailing separator.
+    pub upper: [u16; PREFIX_UNITS],
     /// The shims of the four stubs, in the same order. A 32-bit stub jumps through its slot here.
     pub shims: [u64; 4],
 }
@@ -100,10 +103,11 @@ impl Config {
         enabled: 0,
         game_units: 0,
         layer_units: 0,
-        reserved: 0,
+        upper_units: 0,
         trampolines: [0; 4],
         game: [0; PREFIX_UNITS],
         layer: [0; PREFIX_UNITS],
+        upper: [0; PREFIX_UNITS],
         shims: [0; 4],
     };
 }
@@ -172,6 +176,26 @@ fn fold(unit: u16) -> u16 {
     }
 }
 
+/// The path without its namespace: `\??\`, a Win32 `\\?\` prefix or a plain drive path. `None` for a relative path,
+/// an NT-relative name or a device namespace this redirect must not touch.
+fn without_namespace(path: &[u16]) -> Option<&[u16]> {
+    if starts_with_ascii_ignore_case(path, &NT_PREFIX) {
+        return Some(&path[NT_PREFIX.len()..]);
+    }
+    if path.len() >= 4
+        && path[0] == b'\\' as u16
+        && path[1] == b'\\' as u16
+        && path[2] == b'?' as u16
+        && path[3] == b'\\' as u16
+    {
+        return Some(&path[4..]);
+    }
+    if path.len() >= 3 && path[1] == b':' as u16 && path[2] == b'\\' as u16 {
+        return Some(path);
+    }
+    None
+}
+
 /// The relative part of a game path: what follows the game folder, which is empty or starts with a separator.
 /// `None` when the path is not under the game folder.
 pub fn relative_under<'a>(path: &'a [u16], folder: &[u16]) -> Option<&'a [u16]> {
@@ -234,10 +258,6 @@ pub unsafe fn redirect(
     if original.root != 0 || original.name == 0 {
         return None;
     }
-
-    if !reads_only(kind, work.access, work.disposition) {
-        return None;
-    }
     // SAFETY: `name` is a valid `UNICODE_STRING` of the caller, and its buffer holds `length` bytes.
     let name = unsafe { *(original.name as *const UnicodeString) };
     let units = usize::from(name.length) / 2;
@@ -249,22 +269,68 @@ pub unsafe fn redirect(
     let path = unsafe { core::slice::from_raw_parts(name.buffer as *const u16, units) };
     let game = config.game.get(..config.game_units as usize)?;
     let layer = config.layer.get(..config.layer_units as usize)?;
+    let upper = config.upper.get(..config.upper_units as usize)?;
 
-    if !starts_with_ascii_ignore_case(path, &NT_PREFIX) {
-        return None;
+    // The loader's names carry `\??\`; a Win32 call may pass a plain DOS path. Both name the same folder, so the
+    // prefixes are compared without that namespace.
+    let under = without_namespace(path)?;
+    let game_prefix = without_namespace(game)?;
+    let layer_prefix = without_namespace(layer)?;
+    let reading = reads_only(kind, work.access, work.disposition);
+    // A read under the game folder comes from the layer. A write under the layer itself (its own module path) goes to
+    // upper, so a loader that opens its log before the hook cannot change a mod file. A read under the layer is already
+    // the physical file; a write under the game folder still passes through, because stage 0 cannot copy a game file up.
+    let (prefix, rel, must_exist) = match (
+        relative_under(under, game_prefix),
+        relative_under(under, layer_prefix),
+    ) {
+        (Some(rel), _) if reading => (layer, rel, true),
+        (None, Some(rel)) if !reading => {
+            let may_create = kind == Kind::Create && work.disposition != FILE_OPEN;
+            (upper, rel, !may_create)
+        }
+        _ => return None,
+    };
+    let name_address = candidate_name(work, prefix, rel)?;
+
+    if must_exist {
+        // SAFETY: the probe and the information buffer are valid for the call; `query` is the loader's own stub.
+        let status = unsafe {
+            query(
+                &raw const work.probe as usize,
+                work.information.as_mut_ptr() as usize,
+            )
+        };
+
+        if status != 0 {
+            return None;
+        }
+        // A folder is not redirected for a read: the game keeps its own listing.
+        let file_attributes = (work.information[4] & 0xFFFF_FFFF) as u32;
+
+        if reading && file_attributes & FILE_ATTRIBUTE_DIRECTORY != 0 {
+            return None;
+        }
     }
 
-    let under = &path[NT_PREFIX.len()..];
-    let rel = relative_under(under, &game[NT_PREFIX.len()..])?;
-    // The candidate: the layer's prefix (`\??\` and the layer folder) and the relative path.
-    let length = candidate(layer, rel, &mut work.units)?;
-    let Some(bytes) = length
-        .checked_mul(2)
-        .and_then(|bytes| u16::try_from(bytes).ok())
-    else {
-        // A name whose byte count does not fit a `UNICODE_STRING` must not be truncated; leave the call to the loader.
-        return None;
+    work.redirected = ObjectAttributes {
+        length: original.length,
+        root: 0,
+        name: name_address,
+        attributes: original.attributes,
+        security_descriptor: original.security_descriptor,
+        security_quality_of_service: original.security_quality_of_service,
     };
+    Some(&raw const work.redirected as usize)
+}
+
+/// Writes `prefix` + `rel` into the work area and points `work.name`/`work.probe` at it. Returns the name address, or
+/// `None` when the path does not fit a `UNICODE_STRING`.
+fn candidate_name(work: &mut Work, prefix: &[u16], rel: &[u16]) -> Option<usize> {
+    let length = candidate(prefix, rel, &mut work.units)?;
+    let bytes = length
+        .checked_mul(2)
+        .and_then(|bytes| u16::try_from(bytes).ok())?;
     let name_address = &raw const work.name as usize;
     work.name = UnicodeString {
         length: bytes,
@@ -279,30 +345,7 @@ pub unsafe fn redirect(
         security_descriptor: 0,
         security_quality_of_service: 0,
     };
-    let probe_address = &raw const work.probe as usize;
-    let information_address = work.information.as_mut_ptr() as usize;
-    // SAFETY: the probe and the information buffer are valid for the call; `query` is the loader's own stub.
-    let status = unsafe { query(probe_address, information_address) };
-
-    if status != 0 {
-        return None;
-    }
-    // A folder is not redirected: the game keeps its own listing.
-    let file_attributes = (work.information[4] & 0xFFFF_FFFF) as u32;
-
-    if file_attributes & FILE_ATTRIBUTE_DIRECTORY != 0 {
-        return None;
-    }
-
-    work.redirected = ObjectAttributes {
-        length: original.length,
-        root: 0,
-        name: name_address,
-        attributes: original.attributes,
-        security_descriptor: original.security_descriptor,
-        security_quality_of_service: original.security_quality_of_service,
-    };
-    Some(&raw const work.redirected as usize)
+    Some(name_address)
 }
 
 #[cfg(test)]
@@ -380,6 +423,80 @@ mod tests {
     }
 
     #[test]
+    fn a_write_path_is_under_the_layer_prefix() {
+        let path = wide(r"\??\C:\Mods\early.log");
+        let layer = wide(r"\??\C:\Mods");
+        let path = without_namespace(&path).unwrap();
+        let layer = without_namespace(&layer).unwrap();
+        assert_eq!(relative_under(path, layer), Some(&wide(r"\early.log")[..]));
+    }
+
+    #[test]
+    fn a_write_under_the_layer_names_the_upper_copy() {
+        let game = wide(r"\??\C:\Game");
+        let layer = wide(r"\??\C:\Mods");
+        let upper = wide(r"\??\C:\Writes");
+        let mut config = Config::OFF;
+        config.enabled = 1;
+        config.game[..game.len()].copy_from_slice(&game);
+        config.game_units = game.len() as u32;
+        config.layer[..layer.len()].copy_from_slice(&layer);
+        config.layer_units = layer.len() as u32;
+        config.upper[..upper.len()].copy_from_slice(&upper);
+        config.upper_units = upper.len() as u32;
+        let path = wide(r"\??\C:\Mods\early.log");
+        let name = UnicodeString {
+            length: (path.len() * 2) as u16,
+            maximum_length: (path.len() * 2) as u16,
+            buffer: path.as_ptr() as usize,
+        };
+        let attributes = ObjectAttributes {
+            length: size_of::<ObjectAttributes>() as u32,
+            root: 0,
+            name: &name as *const UnicodeString as usize,
+            attributes: OBJ_CASE_INSENSITIVE,
+            security_descriptor: 0,
+            security_quality_of_service: 0,
+        };
+        let mut work: Work = unsafe { core::mem::zeroed() };
+        work.kind = Kind::Create.code();
+        work.access = 0x4000_0000;
+        work.disposition = 5;
+        assert!(!reads_only(Kind::Create, work.access, work.disposition));
+        assert_eq!(config.game_units as usize, game.len());
+        assert_eq!(config.layer_units as usize, layer.len());
+        assert_eq!(config.upper_units as usize, upper.len());
+        let under = without_namespace(&path).unwrap();
+        let game_prefix = without_namespace(&game).unwrap();
+        let layer_prefix = without_namespace(&layer).unwrap();
+        assert!(relative_under(under, layer_prefix).is_some());
+        assert!(relative_under(under, game_prefix).is_none());
+        let query: QueryAttributes = {
+            unsafe extern "system" fn query(_attributes: usize, _information: usize) -> i32 {
+                1
+            }
+            query
+        };
+
+        let redirected = unsafe {
+            redirect(
+                &config,
+                &attributes as *const ObjectAttributes as usize,
+                &mut work,
+                query,
+            )
+        }
+        .expect("the write is redirected");
+        let redirected = unsafe { &*(redirected as *const ObjectAttributes) };
+        let target = unsafe { &*(redirected.name as *const UnicodeString) };
+        let units = unsafe {
+            core::slice::from_raw_parts(target.buffer as *const u16, target.length as usize / 2)
+        };
+
+        assert_eq!(String::from_utf16_lossy(units), r"\??\C:\Writes\early.log");
+    }
+
+    #[test]
     fn the_kind_codes_round_trip() {
         for kind in [Kind::Open, Kind::Create, Kind::Query] {
             assert_eq!(Kind::from_code(kind.code()), Some(kind));
@@ -392,7 +509,7 @@ mod tests {
     fn the_config_offsets_are_the_ones_the_launcher_writes() {
         assert_eq!(core::mem::offset_of!(Config, trampolines), 16);
         assert_eq!(core::mem::offset_of!(Config, game), 48);
-        assert_eq!(core::mem::offset_of!(Config, shims), 48 + 4 * PREFIX_UNITS);
+        assert_eq!(core::mem::offset_of!(Config, shims), 48 + 6 * PREFIX_UNITS);
     }
 
     #[cfg(target_pointer_width = "64")]

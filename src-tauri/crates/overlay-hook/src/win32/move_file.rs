@@ -5,6 +5,7 @@
 use std::ffi::c_void;
 
 use gobbo_overlay_core::wide;
+use gobbo_overlay_decisions::{Kind, Layer};
 use windows_sys::Win32::Foundation::{
     ERROR_ACCESS_DENIED, ERROR_ALREADY_EXISTS, ERROR_INVALID_FUNCTION, ERROR_INVALID_PARAMETER,
     ERROR_NOT_SUPPORTED,
@@ -15,8 +16,9 @@ use windows_sys::Win32::Storage::FileSystem::{
 
 use super::source::{full_name, source_path};
 use super::{PreserveLastError, fail};
+use crate::diag::record_decision;
 use crate::guard::enter_session;
-use crate::paths::{in_lower, make_write_target, name_taken, place, shown, unsafe_name};
+use crate::paths::{Place, in_lower, make_write_target, name_taken, place, shown, unsafe_name};
 use crate::text::display_name;
 use crate::trace::trace_call;
 use crate::whiteouts::hide;
@@ -36,7 +38,11 @@ unsafe fn move_file_common(
 ) -> i32 {
     unsafe { trace_call(operation, from) };
 
-    if let Some(_guard) = enter_session()
+    // The guard stays alive across the original call too: `MoveFileExW` reaches `NtSetInformationFile`, which the hook
+    // also covers. If the guard were dropped here, the internal rename of a real layer path would be refused as a
+    // lower-layer write instead of passing through.
+    let guard = enter_session();
+    if guard.is_some()
         && let Some(result) = unsafe { move_in_game(from, to, flags, mover) }
     {
         return result;
@@ -48,6 +54,9 @@ unsafe fn move_file_common(
         crate::trace::log(&format!(
             "pass-through {operation} {from} -> {to} flags=0x{flags:x}"
         ));
+        record_decision(Kind::PassThrough, Layer::None, 0, || {
+            format!("{from} -> {to}")
+        });
     }
 
     let moved = original();
@@ -139,6 +148,16 @@ fn hide_below_on_replace<E>(below: Option<Result<bool, E>>) -> bool {
     matches!(below, Some(Ok(true)) | Some(Err(_)))
 }
 
+/// Records a refusal for the mount a classified path belongs to, then returns the API's failure value.
+fn refuse(place: Option<&Place>, code: u32) -> i32 {
+    if let Some(place) = place {
+        record_decision(Kind::Refuse, Layer::None, code, || {
+            place.mount.decision_path(&place.rel)
+        });
+    }
+    fail(code)
+}
+
 /// The move, when one of the two paths is inside the game folder. `None` means neither is, and the call goes ahead.
 ///
 /// # Safety
@@ -164,17 +183,22 @@ unsafe fn move_in_game(
         && !std::ptr::eq(source.mount, target.mount)
     {
         // A move between two mounts would copy between two profile layers. Refuse rather than guess.
-        return Some(fail(ERROR_ACCESS_DENIED));
+        return Some(refuse(
+            from_place.as_ref().or(to_place.as_ref()),
+            ERROR_ACCESS_DENIED,
+        ));
     }
 
     if let Some(code) = move_refusal(flags) {
         // A move at reboot is stored in the registry for a real path; a layer path would be gone by then.
-        return Some(fail(code));
+        return Some(refuse(from_place.as_ref().or(to_place.as_ref()), code));
     }
 
     let (source, below) = match unsafe { source_path(from, from_place.as_ref()) } {
         Ok(found) => found,
-        Err(code) => return Some(fail(code)),
+        Err(code) => {
+            return Some(refuse(from_place.as_ref().or(to_place.as_ref()), code));
+        }
     };
 
     let dest = match &to_place {
@@ -186,16 +210,16 @@ unsafe fn move_in_game(
             let replace = flags & MOVEFILE_REPLACE_EXISTING != 0;
             let target_shown = match shown(place.mount, &place.rel) {
                 Ok(shown) => shown.is_some(),
-                Err(failure) => return Some(fail(failure.win32())),
+                Err(failure) => return Some(refuse(to_place.as_ref(), failure.win32())),
             };
 
             if name_taken(same_entry, replace, || target_shown) {
-                return Some(fail(ERROR_ALREADY_EXISTS));
+                return Some(refuse(to_place.as_ref(), ERROR_ALREADY_EXISTS));
             }
 
             match make_write_target(place.mount, &place.rel) {
                 Ok(path) => path,
-                Err(failure) => return Some(fail(failure.win32())),
+                Err(failure) => return Some(refuse(to_place.as_ref(), failure.win32())),
             }
         }
         None => match unsafe { full_name(to) } {
@@ -258,5 +282,26 @@ mod tests {
         assert!(hide_below_on_replace(Some(Ok::<bool, u32>(true))));
         assert!(!hide_below_on_replace(Some(Ok::<bool, u32>(false))));
         assert!(!hide_below_on_replace(None::<Result<bool, u32>>));
+    }
+
+    #[test]
+    fn the_guard_stays_alive_across_the_pass_through_original() {
+        let from: Vec<u16> = "C:\\outside\\probe.tmp\0".encode_utf16().collect();
+        let to: Vec<u16> = "C:\\outside\\probe.sav\0".encode_utf16().collect();
+        let result = unsafe {
+            move_file_common(
+                "test-move",
+                from.as_ptr(),
+                to.as_ptr(),
+                0,
+                |_, _| 0,
+                || {
+                    // The original `MoveFileExW` reaches `NtSetInformationFile`, so the guard must still be held.
+                    assert!(enter_session().is_none(), "the guard was dropped early");
+                    7
+                },
+            )
+        };
+        assert_eq!(result, 7);
     }
 }

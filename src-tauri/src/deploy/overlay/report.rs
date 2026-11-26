@@ -32,6 +32,9 @@ pub struct LaunchTimings {
 /// `.ring`; the app reads the files while the game runs.
 pub const DECISIONS_BASE: &str = BASE_STEM;
 
+/// The hook's report of the installed hooks, the mounts and the switches, written once at start.
+pub const SESSION_FILE: &str = "session.json";
+
 /// The file that names the last out-of-process crash dump of a session.
 pub const LAST_DUMP_FILE: &str = gobbo_overlay_decisions::LAST_DUMP_FILE;
 

@@ -14,7 +14,10 @@ The path layer is the most important part of the crate. Do not add another ad-ho
   every layer handle look external. `MountPaths` still caches the 8.3 alias so both incoming spellings classify.
 - `MountPaths` (`paths/session.rs`) - the cached guest path of one mount plus `guest_utf16` (without a trailing
   separator, compared case-insensitively by the fast path) and `short_guest_utf16` (the 8.3 form when Windows gives one
-  that differs). Built during install and never rebuilt.
+  that differs), and one `LayerPrefix` for each real `root`, `staging` and `upper` layer. Built during install and never
+  rebuilt.
+- `LayerPrefix` (`paths/session.rs`) - the text and UTF-16 forms of one real layer path. `alias_layers()` lists them in
+  classification order after the guest: `root`, `staging`, `upper`.
 - `Place` (`paths/names.rs`) - the `Mount` a name belongs to and the path relative to its guest. `place`/`place_units`
   replace the old single-root `relative_in`.
 - `Probe` (`paths/probe.rs`) - the result of one `GetFileAttributesW`: `Found { attributes }`, `Missing(Missing)` or
@@ -33,10 +36,12 @@ The path layer is the most important part of the crate. Do not add another ad-ho
 1. Null or empty -> `None`; the caller passes the call through or fails it.
 2. Absolute drive/UNC path -> compare the UTF-16 prefix of each `guest` case-insensitively, without allocating. A prefix
    match followed by `\` or the end is inside; the game mount is tried first, then the redirects. A name outside every
-   mount returns `None` with no allocation. The 8.3 guest alias is tried after the long form. A short name with `..`,
-   `.` or a trailing separator still takes the slow path and is not remapped; that remains a known edge case. `\\?\`
-   drive paths are compared without the prefix; `\\?\UNC\`, dotted paths and names with `/` fall back to the full path
-   code.
+   mount returns `None` with no allocation. The 8.3 guest alias is tried after the long form. A path under the mount's
+   real `root`, `staging` or `upper` prefix is then aliased to the same guest-relative path, in that order, so a loader
+   that learned its own layer path reads, lists and writes through the virtual view; a write still resolves to `upper`
+   and the layer file itself is not changed. A short name with `..`, `.` or a trailing separator still takes the slow
+   path and is not remapped; that remains a known edge case. `\\?\` drive paths are compared without the prefix;
+   `\\?\UNC\`, dotted paths and names with `/` fall back to the full path code.
 3. Relative, rooted or drive-relative path -> `GetFullPathNameW` once (stack buffer, grown if needed), then the same
    comparison. Do not use `current_dir().join`: it gets `/foo`, `C:foo` and deleted current directories wrong.
 4. `is_plain` keeps the fast path to names `normal` would return unchanged: no empty component, no `.`/`..`, no trailing

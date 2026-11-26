@@ -47,8 +47,8 @@ pub use report::clear_decisions;
     reason = "the report names read only by the Windows hook have no reader in a Linux build"
 )]
 pub use report::{
-    CRASH_DUMP_FILE, DllReport, InjectedDll, LaunchTimings, decisions, decisions_base, latest_dump,
-    session_layer_dlls,
+    CRASH_DUMP_FILE, DllReport, InjectedDll, LaunchTimings, SESSION_FILE, decisions,
+    decisions_base, latest_dump, session_layer_dlls,
 };
 #[cfg(test)]
 pub use run::run;
@@ -56,7 +56,7 @@ pub use run::run;
     unused_imports,
     reason = "`execute` is read only by the overlay tests; the run façade lists its names once for production and tests"
 )]
-pub use run::{Launcher, clear_outputs, execute, run_step, run_with_output};
+pub use run::{Launcher, clear_outputs, execute, run_step, run_with_env, run_with_output};
 #[cfg(test)]
 pub(super) use session::matches_plan;
 pub use session::{

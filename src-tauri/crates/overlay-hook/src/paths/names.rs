@@ -71,6 +71,74 @@ pub(crate) struct Place {
     pub(crate) rel: String,
 }
 
+/// Classifies one mount's guest and real layer prefixes against absolute UTF-16 units. A real layer path is aliased to
+/// the guest path: a loader that learned its own staging path (UE4SS, a proxy DLL) then reads, lists and writes through
+/// the virtual view instead of the physical layer. `false` means no prefix needed the slow path; `true` means one did.
+fn fast_place(
+    mount: &'static Mount,
+    path: &session::MountPaths,
+    units: &[u16],
+    alias: bool,
+) -> (Option<Place>, bool) {
+    let mut fallback = false;
+    match fast_relative(&path.guest_utf16, &path.short_guest_utf16, units) {
+        Fast::Inside(rel) => return (Some(Place { mount, rel }), false),
+        Fast::Outside => {}
+        Fast::Fallback => fallback = true,
+    }
+
+    if !alias {
+        return (None, fallback);
+    }
+
+    for layer in path.alias_layers() {
+        match fast_relative(&layer.utf16, &layer.short_utf16, units) {
+            Fast::Inside(rel) => return (Some(Place { mount, rel }), false),
+            Fast::Outside => {}
+            Fast::Fallback => fallback = true,
+        }
+    }
+
+    (None, fallback)
+}
+
+/// The text form of `fast_place`, for a name that needed the full-path pass.
+fn slow_place(
+    mount: &'static Mount,
+    path: &session::MountPaths,
+    text: &str,
+    alias: bool,
+) -> Option<Place> {
+    if let Some(rel) = relative_to(&path.guest_text, text) {
+        return Some(Place { mount, rel });
+    }
+
+    if !alias {
+        return None;
+    }
+
+    for layer in path.alias_layers() {
+        if let Some(rel) = relative_to(&layer.text, text) {
+            return Some(Place { mount, rel });
+        }
+    }
+
+    None
+}
+
+/// Whether real layer paths are aliased to the guest view. A dev-only switch lets `overlay-probe` inspect the physical
+/// layers directly; release builds always alias.
+fn aliases_enabled() -> bool {
+    #[cfg(debug_assertions)]
+    {
+        !crate::diag::settings().no_alias
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        true
+    }
+}
+
 /// The mount and its relative path for a name the program gave, when the name is inside one of the session's guest
 /// paths. A name outside every mount gives `None` without allocating on the fast path.
 ///
@@ -95,14 +163,15 @@ pub(crate) fn place_path(path: &str) -> Option<Place> {
 pub(crate) fn place_units(units: &[u16]) -> Option<Place> {
     let mounts = mounts()?;
     let paths = session::paths()?;
+    let alias = aliases_enabled();
     let mut fallback = false;
 
     for (mount, path) in mounts.all().zip(paths.all()) {
-        match fast_relative(&path.guest_utf16, &path.short_guest_utf16, units) {
-            Fast::Inside(rel) => return Some(Place { mount, rel }),
-            Fast::Outside => {}
-            Fast::Fallback => fallback = true,
+        let (place, saw_fallback) = fast_place(mount, path, units, alias);
+        if let Some(place) = place {
+            return Some(place);
         }
+        fallback |= saw_fallback;
     }
 
     if !fallback {
@@ -122,17 +191,15 @@ pub(crate) fn place_units(units: &[u16]) -> Option<Place> {
     };
 
     if let Some(full) = full {
-        for (mount, path) in mounts.all().zip(paths.all()) {
-            match fast_relative(&path.guest_utf16, &path.short_guest_utf16, full) {
-                Fast::Inside(rel) => return Some(Place { mount, rel }),
-                Fast::Outside => {}
-                Fast::Fallback => {
-                    let text = String::from_utf16_lossy(full);
+        let text = String::from_utf16_lossy(full);
 
-                    if let Some(rel) = relative_to(&path.guest_text, &text) {
-                        return Some(Place { mount, rel });
-                    }
-                }
+        for (mount, path) in mounts.all().zip(paths.all()) {
+            let (place, _) = fast_place(mount, path, full, alias);
+            if let Some(place) = place {
+                return Some(place);
+            }
+            if let Some(place) = slow_place(mount, path, &text, alias) {
+                return Some(place);
             }
         }
 
@@ -143,8 +210,8 @@ pub(crate) fn place_units(units: &[u16]) -> Option<Place> {
     let path = absolute(&text)?;
 
     for (mount, paths) in mounts.all().zip(paths.all()) {
-        if let Some(rel) = relative_to(&paths.guest_text, &path) {
-            return Some(Place { mount, rel });
+        if let Some(place) = slow_place(mount, paths, &path, alias) {
+            return Some(place);
         }
     }
 

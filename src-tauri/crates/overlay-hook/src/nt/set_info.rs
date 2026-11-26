@@ -4,6 +4,7 @@
 
 use std::ffi::c_void;
 
+use gobbo_overlay_decisions::{Kind, Layer};
 use windows_sys::Win32::Foundation::{
     STATUS_ACCESS_DENIED, STATUS_DIRECTORY_NOT_EMPTY, STATUS_INVALID_PARAMETER,
     STATUS_NOT_SUPPORTED, STATUS_OBJECT_NAME_COLLISION, STATUS_UNSUCCESSFUL,
@@ -15,6 +16,7 @@ use super::layout::{
 };
 use super::names::{join_root, nt_name_units};
 use super::rename_info::{RenameInfo, build_rename, parse_rename};
+use crate::diag::record_decision;
 use crate::guard::enter_session;
 use crate::handles::{self, LayerKind};
 use crate::paths::{in_lower, make_write_target, name_taken, place_path, shown, unsafe_units};
@@ -140,9 +142,16 @@ unsafe fn rename_in_game(
     let real = handles::layer_path(handle)?;
     let Some((mount, source_rel)) = handles::relative_in_upper(&real) else {
         // A file of a lower layer: renaming it would write to that layer.
-        return handles::relative_in_lower_layers(&real)
-            .is_some()
-            .then_some(Err(STATUS_ACCESS_DENIED));
+        if let Some((mount, rel)) = handles::relative_in_lower_layers(&real) {
+            record_decision(
+                Kind::Refuse,
+                Layer::None,
+                STATUS_ACCESS_DENIED as u32,
+                || mount.decision_path(&rel),
+            );
+            return Some(Err(STATUS_ACCESS_DENIED));
+        }
+        return None;
     };
     let target = if root == 0 {
         name.strip_prefix(r"\??\")?.to_string()
@@ -297,7 +306,13 @@ unsafe fn deletion_whiteout_for(
             }
         }
         None => {
-            if handles::relative_in_lower_layers(&real).is_some() {
+            if let Some((mount, rel)) = handles::relative_in_lower_layers(&real) {
+                record_decision(
+                    Kind::Refuse,
+                    Layer::None,
+                    STATUS_ACCESS_DENIED as u32,
+                    || mount.decision_path(&rel),
+                );
                 DeletedPlace::Lower
             } else {
                 DeletedPlace::Elsewhere

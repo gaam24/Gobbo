@@ -93,6 +93,7 @@ All notable changes to this project are documented in this file. The format foll
 
 ### Fixed
 
+- **A mod loader that uses its own folder now stays inside Gobbo.** UE4SS starts its mods, and its log and mod data no longer appear in the game folder.
 - **The health check shows readable text for mods that need a turned-off mod.** It showed a raw text code before.
 - **The applied notice no longer shows stray asterisks.** It also no longer points to a Play button while the game runs.
 - **The details panel no longer says "Applied" while changes are waiting.**

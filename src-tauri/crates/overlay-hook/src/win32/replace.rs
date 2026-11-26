@@ -28,7 +28,10 @@ pub(crate) unsafe extern "system" fn replace_file(
     exclude: *mut c_void,
     reserved: *mut c_void,
 ) -> i32 {
-    if let Some(_guard) = enter_session()
+    // The guard stays alive across the original call: `ReplaceFileW` also reaches `NtSetInformationFile`, which the
+    // hook covers. Dropping it here would let the internal rename be refused as a lower-layer write.
+    let guard = enter_session();
+    if guard.is_some()
         && let Some(result) =
             unsafe { replace_in_game(replaced, replacement, backup, flags, exclude, reserved) }
     {

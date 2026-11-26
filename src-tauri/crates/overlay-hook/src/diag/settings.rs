@@ -40,6 +40,10 @@ pub(crate) struct Settings {
     pub(crate) pass_writes: bool,
     /// Whether every call passes through (`GOBBO_OVERLAY_TEST_PASSTHROUGH`).
     pub(crate) passthrough: bool,
+    /// Whether real layer paths keep their old pass-through meaning (`GOBBO_OVERLAY_TEST_NO_ALIAS`). A dev-only switch
+    /// for `overlay-probe`, which checks the physical layers directly; release builds always alias.
+    #[cfg(debug_assertions)]
+    pub(crate) no_alias: bool,
     /// Whether a child that could not receive the hook is allowed to run (`GOBBO_OVERLAY_ALLOW_UNHOOKED_CHILDREN`).
     /// Off by default: a child that may touch the game folder must not run unhooked.
     pub(crate) allow_unhooked_children: bool,
@@ -78,6 +82,8 @@ pub(crate) fn settings() -> &'static Settings {
         calls: flag(ENV_CALLS),
         pass_writes: flag(ENV_PASS),
         passthrough: flag(ENV_TEST_PASSTHROUGH),
+        #[cfg(debug_assertions)]
+        no_alias: flag("GOBBO_OVERLAY_TEST_NO_ALIAS"),
         allow_unhooked_children: flag(ENV_ALLOW_UNHOOKED_CHILDREN),
         safe_threads: flag(ENV_SAFE_THREADS),
     })

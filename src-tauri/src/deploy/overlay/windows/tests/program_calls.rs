@@ -3,7 +3,7 @@
 use std::fs;
 
 use super::*;
-use crate::deploy::overlay::run;
+use crate::deploy::overlay::{run, run_with_env};
 use crate::deploy::undo;
 use crate::domain::user_data::{Kind, Mode, Set as UserDataSet};
 use crate::test_support::scratch;
@@ -198,10 +198,12 @@ fn the_overlay_probe_reports_a_clean_session() {
         return;
     };
     let report = target.state.join("probe.json");
-    let code = run(
+    let code = run_with_env(
         &session,
         &probe.display().to_string(),
         &["--report".to_string(), report.display().to_string()],
+        &[("GOBBO_OVERLAY_TEST_NO_ALIAS".to_string(), "1".to_string())],
+        None,
     )
     .unwrap();
     assert_eq!(code, 0, "the probe reported a failure");
@@ -222,10 +224,12 @@ fn the_32_bit_overlay_probe_reports_a_clean_session() {
         return;
     };
     let report = target.state.join("probe32.json");
-    let code = run(
+    let code = run_with_env(
         &session,
         &probe.display().to_string(),
         &["--report".to_string(), report.display().to_string()],
+        &[("GOBBO_OVERLAY_TEST_NO_ALIAS".to_string(), "1".to_string())],
+        None,
     )
     .unwrap();
     assert_eq!(code, 0, "the 32-bit probe reported a failure");

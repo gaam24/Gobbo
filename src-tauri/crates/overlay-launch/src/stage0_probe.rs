@@ -34,6 +34,14 @@ fn main() {
 }
 "#;
 
+/// A program that writes one file named by its argument, through the ordinary Win32 file API.
+const WRITER: &str = r#"
+fn main() {
+    let path = std::env::args().nth(1).expect("a path");
+    std::fs::write(path, "early\r\n").expect("the write");
+}
+"#;
+
 /// Compiles one of the fixture sources. `def` is the `.def` file that maps the stdcall export of the 32-bit layer DLL
 /// to the undecorated system name.
 fn rustc(source: &Path, output: &Path, target: &str, dll: bool, native: &Path, def: Option<&Path>) {
@@ -59,6 +67,14 @@ fn rustc(source: &Path, output: &Path, target: &str, dll: bool, native: &Path, d
         .status()
         .expect("rustc runs");
     assert!(status.success(), "{} did not build", output.display());
+}
+
+/// Creates an empty upper folder beside `folder` and returns it. The read tests do not write, but the configuration
+/// always carries the three layers.
+fn upper_beside(folder: &Path) -> PathBuf {
+    let upper = folder.parent().unwrap().join("upper");
+    fs::create_dir_all(&upper).unwrap();
+    upper
 }
 
 /// Builds the game folder with the game DLL and the program, and the mod layer with a `version.dll` made from
@@ -126,9 +142,10 @@ pub(super) mod m2_redirect {
         STARTUPINFOW, TerminateProcess, WaitForSingleObject,
     };
 
-    use super::{Bits, install, redirect_config};
+    use super::{Bits, install, redirect_config, upper_beside};
     #[cfg(target_arch = "x86_64")]
     use super::{STUBS, ntdll_export};
+    use super::{WRITER, rustc};
     use crate::wide;
 
     /// A suspended child, terminated when dropped.
@@ -192,7 +209,7 @@ pub(super) mod m2_redirect {
         );
         let child = spawn_suspended(&command);
         let process = child.0.hProcess;
-        let config = redirect_config(&game, &layer).unwrap();
+        let config = redirect_config(&game, &layer, &upper_beside(&game)).unwrap();
         let _patched = install(process, config, bits).expect("the stage 0 DLL is patched in");
         assert_ne!(unsafe { ResumeThread(child.0.hThread) }, u32::MAX);
         assert_eq!(
@@ -230,6 +247,101 @@ pub(super) mod m2_redirect {
         reads_the_layer_copy("x86-read", r"C:\Windows\SysWOW64\cmd.exe", Bits::X86);
     }
 
+    /// A loader DLL runs before the hook when the loader resolves the import tree. A write it makes under its own layer
+    /// path must land in `upper`, not in the mod file; a read of the same path still sees the layer.
+    fn writes_to_upper(name: &str, cmd: &str, bits: Bits) {
+        let (game, layer) = folders(name);
+        let upper = upper_beside(&game);
+        let log = layer.join("early.log");
+        fs::write(&log, "old\r\n").unwrap();
+        let command = format!(r#"{cmd} /c echo early> "{}""#, log.display());
+        let child = spawn_suspended(&command);
+        let process = child.0.hProcess;
+        let config = redirect_config(&game, &layer, &upper).unwrap();
+        let _patched = install(process, config, bits).expect("the stage 0 DLL is patched in");
+        assert_ne!(unsafe { ResumeThread(child.0.hThread) }, u32::MAX);
+        assert_eq!(
+            unsafe { WaitForSingleObject(process, 30_000) },
+            WAIT_OBJECT_0
+        );
+        let mut code = 0;
+
+        unsafe { GetExitCodeProcess(process, &mut code) };
+        assert_eq!(code, 0, "the redirected child failed");
+        assert_eq!(
+            fs::read_to_string(upper.join("early.log")).unwrap(),
+            "early\r\n"
+        );
+        assert_eq!(
+            fs::read_to_string(&log).unwrap(),
+            "old\r\n",
+            "the write changed the layer file"
+        );
+        assert!(
+            !game.join("early.log").exists(),
+            "the game folder was written"
+        );
+    }
+
+    /// A writer program, so the test also covers a Win32 call whose path is not built by `cmd`.
+    fn writer_program(game: &std::path::Path) -> std::path::PathBuf {
+        let work = game.parent().unwrap().join("work");
+        fs::create_dir_all(&work).unwrap();
+        let source = work.join("writer.rs");
+        fs::write(&source, WRITER).unwrap();
+        let output = game.join("writer.exe");
+        rustc(
+            &source,
+            &output,
+            "x86_64-pc-windows-msvc",
+            false,
+            &work,
+            None,
+        );
+        output
+    }
+
+    #[test]
+    #[cfg(target_arch = "x86_64")]
+    fn m2_a_write_under_the_layer_goes_to_the_upper_layer() {
+        writes_to_upper("write", r"C:\Windows\System32\cmd.exe", Bits::X64);
+    }
+
+    #[test]
+    fn m2_x86_a_write_under_the_layer_goes_to_the_upper_layer() {
+        writes_to_upper("x86-write", r"C:\Windows\SysWOW64\cmd.exe", Bits::X86);
+    }
+
+    #[test]
+    #[cfg(target_arch = "x86_64")]
+    fn m2_a_win32_write_under_the_layer_goes_to_the_upper_layer() {
+        let (game, layer) = folders("writer");
+        let upper = upper_beside(&game);
+        let log = layer.join("early.log");
+        fs::write(&log, "old\r\n").unwrap();
+        let writer = writer_program(&game);
+        let command = format!("\"{}\" \"{}\"", writer.display(), log.display());
+        let child = spawn_suspended(&command);
+        let process = child.0.hProcess;
+        let config = redirect_config(&game, &layer, &upper).unwrap();
+        let _patched = install(process, config, Bits::X64).expect("the stage 0 DLL is patched in");
+        assert_ne!(unsafe { ResumeThread(child.0.hThread) }, u32::MAX);
+        assert_eq!(
+            unsafe { WaitForSingleObject(process, 30_000) },
+            WAIT_OBJECT_0
+        );
+        let mut code = 0;
+
+        unsafe { GetExitCodeProcess(process, &mut code) };
+        assert_eq!(code, 0, "the writer failed");
+        assert_eq!(
+            fs::read_to_string(upper.join("early.log")).unwrap(),
+            "early\r\n"
+        );
+        assert_eq!(fs::read_to_string(&log).unwrap(), "old\r\n");
+        assert!(!game.join("early.log").exists());
+    }
+
     #[test]
     #[cfg(target_arch = "x86_64")]
     fn m2_restore_puts_the_stubs_back_and_turns_the_redirect_off() {
@@ -243,8 +355,12 @@ pub(super) mod m2_redirect {
                 (address, read_bytes(process, address, 22))
             })
             .collect();
-        let patched =
-            install(process, redirect_config(&game, &layer).unwrap(), Bits::X64).expect("patched");
+        let patched = install(
+            process,
+            redirect_config(&game, &layer, &upper_beside(&game)).unwrap(),
+            Bits::X64,
+        )
+        .expect("patched");
         for (address, original) in &originals {
             assert_ne!(
                 &read_bytes(process, *address, 22),
@@ -300,7 +416,7 @@ pub(super) mod m2_redirect {
 /// It builds and starts an x64 program, so it only runs in an x64 test binary; X5 covers the x86 case.
 #[cfg(all(test, target_arch = "x86_64"))]
 mod m3_system_name {
-    use super::{Bits, binding_fixture, install, redirect_config};
+    use super::{Bits, binding_fixture, install, redirect_config, upper_beside};
 
     use super::m2_redirect::{resume_and_wait, spawn_suspended};
 
@@ -319,8 +435,12 @@ pub unsafe extern "system" fn GetFileVersionInfoSizeW(_name: *const u16, _handle
         let command = format!("\"{}\"", program.display());
         let child = spawn_suspended(&command);
         let process = child.0.hProcess;
-        let _patched =
-            install(process, redirect_config(&game, &layer).unwrap(), Bits::X64).expect("patched");
+        let _patched = install(
+            process,
+            redirect_config(&game, &layer, &upper_beside(&game)).unwrap(),
+            Bits::X64,
+        )
+        .expect("patched");
         let code = resume_and_wait(&child);
         assert_eq!(
             code, 0,
@@ -346,7 +466,7 @@ pub unsafe extern "system" fn GetFileVersionInfoSizeW(_name: *const u16, _handle
 /// system `version.dll` exports.
 #[cfg(test)]
 mod x5_system_name32 {
-    use super::{Bits, binding_fixture, install, redirect_config};
+    use super::{Bits, binding_fixture, install, redirect_config, upper_beside};
 
     use super::m2_redirect::{resume_and_wait, spawn_suspended};
 
@@ -369,7 +489,7 @@ pub unsafe extern "system" fn layer_size(_name: *const u16, _handle: *mut u32) -
         let child = spawn_suspended(&format!("\"{}\"", program.display()));
         let _patched = install(
             child.0.hProcess,
-            redirect_config(&game, &layer).unwrap(),
+            redirect_config(&game, &layer, &upper_beside(&game)).unwrap(),
             Bits::X86,
         )
         .expect("patched");

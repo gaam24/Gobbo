@@ -12,6 +12,27 @@ use windows_sys::Win32::Storage::FileSystem::{GetLongPathNameW, GetShortPathName
 
 use crate::state::mounts;
 
+/// One real layer path and its cached spellings. A program that learned a layer path (a loader's own module path, a
+/// config override) is classified as if it had used the guest path, so its reads and writes stay in the virtual view.
+pub(crate) struct LayerPrefix {
+    /// The layer path as text, built once for the slow path.
+    pub(crate) text: String,
+    /// The prefix the fast path compares against, without a trailing separator.
+    pub(crate) utf16: Vec<u16>,
+    /// The 8.3 form, when Windows gives one that differs from the long form.
+    pub(crate) short_utf16: Vec<u16>,
+}
+
+impl LayerPrefix {
+    fn new(path: &Path) -> Self {
+        Self {
+            text: path.to_string_lossy().into_owned(),
+            utf16: root_units(path).unwrap_or_default(),
+            short_utf16: short_path_units(path).unwrap_or_default(),
+        }
+    }
+}
+
 /// One guest path of the session and the layers that serve it.
 pub(crate) struct MountPaths {
     /// The guest path as text, built once for the slow path.
@@ -20,6 +41,12 @@ pub(crate) struct MountPaths {
     pub(crate) guest_utf16: Vec<u16>,
     /// The 8.3 form of the guest, when Windows gives one that differs from the long form.
     pub(crate) short_guest_utf16: Vec<u16>,
+    /// The real lower layer the game folder reads.
+    pub(crate) root: LayerPrefix,
+    /// The real mod layer, when the mount has one.
+    pub(crate) staging: Option<LayerPrefix>,
+    /// The real layer the game's writes go to.
+    pub(crate) upper: LayerPrefix,
 }
 
 /// The guest paths of one overlay session. The game is always first.
@@ -56,7 +83,17 @@ impl MountPaths {
             guest_text: mount.guest.to_string_lossy().into_owned(),
             guest_utf16: root_units(&mount.guest).unwrap_or_default(),
             short_guest_utf16: short_path_units(&mount.guest).unwrap_or_default(),
+            root: LayerPrefix::new(&mount.layers.root),
+            staging: mount.layers.staging.as_deref().map(LayerPrefix::new),
+            upper: LayerPrefix::new(&mount.layers.upper),
         }
+    }
+
+    /// The real lower and write layers of this mount, in the order a name is checked after the guest prefix.
+    pub(crate) fn alias_layers(&self) -> impl Iterator<Item = &LayerPrefix> {
+        std::iter::once(&self.root)
+            .chain(self.staging.iter())
+            .chain(std::iter::once(&self.upper))
     }
 }
 

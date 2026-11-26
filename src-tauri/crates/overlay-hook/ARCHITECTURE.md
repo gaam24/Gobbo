@@ -21,8 +21,10 @@ diagnostics contract and platform notes live in `docs/` and are linked from sect
 
 Each mount has the same three roles: a read sees the top-most visible layer, a write goes to `upper` (copy-up first when
 the old contents must be kept), a deletion or a rename away from a lower layer leaves a whiteout, and a directory listing
-shows the merged layers. The game mount has a `staging` layer; a user-data mount has none. Outside every guest path a
-call passes through unchanged.
+shows the merged layers. The game mount has a `staging` layer; a user-data mount has none. A path under the mount's real
+`root`, `staging` or `upper` prefix is an **alias** of the guest path: a loader that learned its own layer path (UE4SS,
+a proxy DLL) still reads, lists and writes through the virtual view, and a write still goes to `upper`. The layer files
+themselves are never changed. Outside every guest path and every current layer prefix a call passes through unchanged.
 
 The launcher also rewrites the executable's **static import descriptors** before it resumes the program
 (`overlay-launch/src/static_imports.rs`). The Windows loader resolves those imports before the hook's detours are
@@ -85,9 +87,13 @@ These are not suggestions. A change that breaks one of them is a bug, even if th
       `NtQueryFullAttributesFile`) with a jump into it. A shim serves a read of a file under the game folder from the
       mod layer when the layer holds it, and otherwise calls a trampoline (a copy of the original stub). So the import
       tree binds the layer copy, also for a system name such as `version.dll` (test
-      `m3_the_layer_copy_of_a_system_name_is_the_one_bound`). The launcher writes a handover file (`early-redirect.txt`,
-      named by `GOBBO_OVERLAY_EARLY`) with the original bytes; this hook restores them before it creates its detours, and
-      then switches the redirect off. Folders, writes and creates pass through.
+      `m3_the_layer_copy_of_a_system_name_is_the_one_bound`). A write under the **layer** itself (a loader opening its
+      own log before the hook) goes to `upper`, so it cannot change a mod file or the library; a create-capable write
+      makes the file, and an open-existing write falls back to the layer when `upper` has no copy yet. The launcher
+      creates the `upper` folders that hold a layer DLL and their parents before the child starts, so that early write
+      has a parent. Writes under the game folder still pass through: stage 0 cannot copy a game file up. The launcher
+      writes a handover file (`early-redirect.txt`, named by `GOBBO_OVERLAY_EARLY`) with the original bytes; this hook
+      restores them before it creates its detours, and then switches the redirect off.
     - **32-bit children** take the x86 build: the stubs of the WOW64 ntdll are `mov eax, N; mov edx, target; call edx; ret M`,
       patched with `jmp dword ptr [slot]`, where the slot is the shim address in the configuration. The 32-bit ntdll is
       found by scanning the child's image regions. The redirect is tested with a 32-bit `cmd.exe` and a 32-bit game DLL
@@ -101,6 +107,7 @@ These are not suggestions. A change that breaks one of them is a bug, even if th
 ```text
 CreateProcessW (launcher, CREATE_SUSPENDED)
   -> map the stage 0 DLL, write its configuration, patch the four loader stubs to its shims (64-bit programs)
+  -> prepare the `upper` folders that hold a layer DLL, for an early loader write
   -> write the handover file (`early-redirect.txt`)
   -> inject stub (SetThreadContext on the main thread)
   -> rewrite the static import descriptors whose DLL is in a layer

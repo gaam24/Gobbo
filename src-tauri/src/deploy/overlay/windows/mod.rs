@@ -12,11 +12,11 @@ use std::time::Instant;
 
 use gobbo_overlay_core::early::{ENV, FILE_NAME};
 use gobbo_overlay_core::{ENV_MOUNTS, Layer, Layers, join_rel, relative_to};
-use gobbo_overlay_decisions::ENV_RING;
+use gobbo_overlay_decisions::{ENV_RING, ENV_SESSION};
 use gobbo_overlay_launch::{Hooked, stage0};
 
 use super::{
-    CRASH_DUMP_FILE, DllReport, InjectedDll, LaunchTimings, Session, clear_decisions,
+    CRASH_DUMP_FILE, DllReport, InjectedDll, LaunchTimings, SESSION_FILE, Session, clear_decisions,
     decisions_base,
 };
 use crate::deploy::error::DeployError;
@@ -74,14 +74,21 @@ pub fn start(
     // variable that names it are shared with the hook through `gobbo_overlay_core::early`.
     let handover = session.state.join(FILE_NAME);
     let _ = std::fs::remove_file(&handover);
-    let early = early_config(&layers)?;
+    let early = early::config(&layers)?;
     let mut mount_env = vec![(ENV_MOUNTS.to_string(), mounts_path.display().to_string())];
     mount_env.push((ENV.to_string(), handover.display().to_string()));
     // A DLL the executable imports statically is loaded before any program code. The launcher points those imports at
     // the mod layer, because the hook is not installed early enough for the loader's own import lookup.
     let imports = static_imports_for(&layers, Path::new(program));
-    // Each launch starts a fresh decision ring and a fresh dump slot; the app reads the files while this launch runs.
+    // A loader DLL may open its log before the hook is installed. Stage 0 sends that write to `upper`, whose folders must
+    // exist first. Only the folders that hold a layer DLL (and their parents) are needed for that early window.
+    if early.is_some() {
+        early::seed_directories(session);
+    }
+    // Each launch starts a fresh decision ring, session report and dump slot; the app reads the files while this
+    // launch runs. A report left by an earlier launch describes a process that is gone.
     clear_decisions(&session.state);
+    let _ = std::fs::remove_file(session.state.join(SESSION_FILE));
     sweep_stale_copies(session);
     dump::clear_previous(&session.state);
     let decisions = decisions_base(&session.state);
@@ -96,6 +103,10 @@ pub fn start(
         .collect();
     vars.append(&mut mount_env);
     vars.push((ENV_RING.to_string(), decisions.display().to_string()));
+    vars.push((
+        ENV_SESSION.to_string(),
+        session.state.join(SESSION_FILE).display().to_string(),
+    ));
 
     if let Some(monitor) = &monitor {
         vars.push((
@@ -284,16 +295,6 @@ fn resolved_imports(layers: &Layers, program: &Path) -> (Vec<ResolvedImport>, Ve
     (imports, reserved)
 }
 
-/// The early redirect of a session: the game folder served from the mod layer. `None` when the session has no layer.
-fn early_config(layers: &Layers) -> Result<Option<stage0::logic::Config>, DeployError> {
-    let Some(staging) = layers.staging.as_ref() else {
-        return Ok(None);
-    };
-    stage0::redirect_config(&layers.root, staging)
-        .map(Some)
-        .map_err(|error| FileError::new(&layers.root, error).into())
-}
-
 /// The static imports that will be patched, with the warning for a reserved name when a mod provides one.
 fn static_imports_for(layers: &Layers, program: &Path) -> Vec<(String, PathBuf)> {
     let (imports, reserved) = resolved_imports(layers, program);
@@ -387,6 +388,7 @@ fn remove_copy_temps(folder: &Path) {
 
 mod dump;
 mod dump32;
+mod early;
 mod mounts;
 mod placement;
 

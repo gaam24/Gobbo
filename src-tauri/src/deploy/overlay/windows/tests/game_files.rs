@@ -1,8 +1,11 @@
 //! The game's files through the layers: what it reads, lists, writes and deletes while it runs in the overlay.
 
 use super::Session;
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
+
+use sha2::{Digest, Sha256};
 
 use super::*;
 use crate::deploy::overlay::run;
@@ -35,6 +38,29 @@ fn a_run_through_the_overlay_leaves_the_game_folder_unchanged() {
             .is_file()
     );
     undo(&target.journal_roots()).unwrap();
+}
+
+/// A loader can write under its own layer folder before the hook exists. Stage 0 sends that write to `upper`, so the
+/// folders that hold a layer DLL (and their parents) must be there first.
+#[test]
+fn the_upper_layer_gets_the_folders_of_a_layer_dll() {
+    let base = scratch!("seed-upper");
+    let root = base.join("game");
+    let state = base.join("state");
+    fs::create_dir_all(&root).unwrap();
+    fs::create_dir_all(&state).unwrap();
+    let session = Session::at(&state, &root);
+    write(&session.mods.join("loaders/early/UE4SS.dll"), "dll");
+    write(&session.mods.join("loaders/other.txt"), "text");
+
+    super::super::early::seed_directories(&session);
+
+    assert!(session.overwrite.join("loaders").is_dir());
+    assert!(session.overwrite.join("loaders/early").is_dir());
+    assert!(
+        !session.overwrite.join("loaders/other.txt").exists(),
+        "only the folders are prepared, never a file"
+    );
 }
 
 #[test]
@@ -956,5 +982,177 @@ fn a_move_that_replaces_a_game_file_shows_the_programs_spelling() {
         .collect();
     assert!(list.contains(&"B.ARCHIVE".to_string()), "{list:?}");
     assert!(!list.contains(&"b.archive".to_string()), "{list:?}");
+    undo(&target.journal_roots()).unwrap();
+}
+
+/// A content snapshot of a folder: relative path with `/` separators, whether the entry is a folder, its byte count and
+/// the SHA-256 of its bytes (folders hash empty). A hash catches a write that leaves both size and time unchanged. An
+/// unreadable entry is skipped, as the game-folder watcher skips one it cannot read.
+fn snapshot_folder(root: &Path) -> BTreeMap<String, (bool, u64, [u8; 32])> {
+    fn visit(dir: &Path, prefix: &str, entries: &mut BTreeMap<String, (bool, u64, [u8; 32])>) {
+        let Ok(read) = fs::read_dir(dir) else {
+            // A folder that cannot be read is skipped with everything under it.
+            return;
+        };
+
+        for entry in read.flatten() {
+            let Ok(meta) = fs::symlink_metadata(entry.path()) else {
+                // An entry that vanished while walking is not a stable part of the snapshot.
+                continue;
+            };
+            let name = entry.file_name().to_string_lossy().into_owned();
+            let key = if prefix.is_empty() {
+                name
+            } else {
+                format!("{prefix}/{name}")
+            };
+            let is_dir = meta.file_type().is_dir();
+            let bytes = if is_dir { 0 } else { meta.len() };
+
+            if is_dir {
+                entries.insert(key.clone(), (true, bytes, [0; 32]));
+                visit(&entry.path(), &key, entries);
+            } else {
+                let Ok(content) = fs::read(entry.path()) else {
+                    // An unreadable file has no known hash, so it is skipped.
+                    continue;
+                };
+                let digest = Sha256::digest(&content);
+                let mut hash = [0; 32];
+                hash.copy_from_slice(&digest);
+                entries.insert(key, (false, bytes, hash));
+            }
+        }
+    }
+
+    let mut entries = BTreeMap::new();
+    visit(root, "", &mut entries);
+    entries
+}
+
+/// A program that learned the real staging path (a loader's own module directory) gets the virtual view: the rename is
+/// routed through the guest path, copies the source up and writes the target into `overwrite`. The lower source stays
+/// where it was and the game folder does not change.
+#[test]
+fn a_rename_in_the_real_staging_layer_goes_to_the_upper_layer() {
+    let (library, root, target) = fixture("staging-rename");
+    deploy_mod_a(&library, &target);
+    let session = Session::at(&target.state, &root);
+
+    let source = session.mods.join("probe.tmp");
+    let dest = session.mods.join("probe.sav");
+    write(&source, "staged bytes");
+
+    let before = snapshot_folder(&root);
+    let watch_before = watch::take(&root);
+    let out = scratch!("staging-rename-out");
+    run_batch(
+        &session,
+        &out,
+        &[format!(
+            "move /Y \"{}\" \"{}\"",
+            source.display(),
+            dest.display()
+        )],
+    );
+    let after = snapshot_folder(&root);
+    let changes = watch::changes(&watch_before, &watch::take(&root));
+
+    assert_eq!(
+        fs::read_to_string(session.overwrite.join("probe.sav")).unwrap(),
+        "staged bytes"
+    );
+    assert!(!session.mods.join("probe.sav").exists());
+    assert!(source.is_file(), "the lower source is still there");
+    assert_eq!(after, before, "the rename touched the game folder");
+    assert!(changes.is_empty(), "{changes:?}");
+    undo(&target.journal_roots()).unwrap();
+}
+
+/// A loader that appends to a log under its real staging path must reach `overwrite`, not the mod layer. This is the
+/// exact path UE4SS takes for `UE4SS.log` and a Lua mod takes for its own log.
+#[test]
+fn a_log_written_in_the_real_staging_layer_lands_in_the_upper_layer() {
+    let (library, root, target) = fixture("staging-log");
+    deploy_mod_a(&library, &target);
+    let session = Session::at(&target.state, &root);
+    let log = session.mods.join(r"ue4ss\UE4SS.log");
+    fs::create_dir_all(log.parent().unwrap()).unwrap();
+    fs::write(&log, "old\n").unwrap();
+
+    let before = snapshot_folder(&root);
+    let out = scratch!("staging-log-out");
+    run_batch(
+        &session,
+        &out,
+        &[format!("echo new >> \"{}\"", log.display())],
+    );
+
+    let upper = session.overwrite.join(r"ue4ss\UE4SS.log");
+    let text = fs::read_to_string(&upper).unwrap();
+    assert!(text.contains("old"), "{text:?}");
+    assert!(text.contains("new"), "{text:?}");
+    assert_eq!(fs::read_to_string(&log).unwrap(), "old\n");
+    assert_eq!(snapshot_folder(&root), before, "the game folder changed");
+    undo(&target.journal_roots()).unwrap();
+}
+
+/// The hook leaves a session report in the state folder, so a later read tells which hooks the launch installed.
+#[test]
+fn the_overlay_writes_its_session_report() {
+    let (library, root, target) = fixture("session-report");
+    deploy_mod_a(&library, &target);
+    let session = Session::at(&target.state, &root);
+    let out = scratch!("session-report-out");
+    run_batch(&session, &out, &["echo ok".to_string()]);
+
+    let path = target.state.join(crate::deploy::overlay::SESSION_FILE);
+    assert!(path.is_file(), "{} is missing", path.display());
+    let json: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+    assert_eq!(json["format"], 3);
+    let hooks = json["hooks"].as_array().expect("hooks is an array");
+    assert!(!hooks.is_empty(), "{hooks:?}");
+    assert!(
+        hooks
+            .iter()
+            .any(|hook| hook["state"].as_str() == Some("enabled")),
+        "{hooks:?}"
+    );
+    undo(&target.journal_roots()).unwrap();
+}
+
+/// A save written under a temporary name and renamed through the overlay changes no byte of the game folder. The size
+/// and time watcher cannot see a same-size rewrite, so the content hash is the proof.
+#[test]
+fn a_temporary_save_renamed_through_the_overlay_leaves_the_game_folder_byte_identical() {
+    let (library, root, target) = fixture("tmp-rename-clean");
+    let session = deploy_mod_a(&library, &target);
+    let before = snapshot_folder(&root);
+    let folder = root.join(r"archive\pc\mod");
+    let out = scratch!("tmp-rename-clean-out");
+
+    run_batch(
+        &session,
+        &out,
+        &[
+            format!("echo saved > \"{}\"", folder.join("save.tmp").display()),
+            format!(
+                "move /Y \"{}\" \"{}\"",
+                folder.join("save.tmp").display(),
+                folder.join("save.sav").display()
+            ),
+        ],
+    );
+
+    let after = snapshot_folder(&root);
+    assert_eq!(after, before, "the game folder changed");
+    assert!(
+        !after
+            .keys()
+            .any(|path| path.ends_with("save.tmp") || path.ends_with("save.sav")),
+        "a temporary save reached the physical game folder: {after:?}"
+    );
+    assert!(session.overwrite.join("archive/pc/mod/save.sav").is_file());
     undo(&target.journal_roots()).unwrap();
 }

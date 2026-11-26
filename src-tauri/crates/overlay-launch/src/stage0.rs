@@ -165,17 +165,24 @@ impl Patched {
     }
 }
 
-/// The configuration for a session: the game folder is redirected to the mod layer of the same program. Both are
-/// absolute Windows paths; the redirect starts with the NT prefix that the loader's names carry.
-pub fn redirect_config(game_root: &Path, layer_root: &Path) -> io::Result<logic::Config> {
+/// The configuration for a session: the game folder reads from the mod layer and writes under the layer go to `upper`.
+/// All three are absolute Windows paths; the redirect starts with the NT prefix that the loader's names carry.
+pub fn redirect_config(
+    game_root: &Path,
+    layer_root: &Path,
+    upper_root: &Path,
+) -> io::Result<logic::Config> {
     let mut config = logic::Config::OFF;
     config.enabled = 1;
     let game = nt_prefix(game_root)?;
     let layer = nt_prefix(layer_root)?;
+    let upper = nt_prefix(upper_root)?;
     config.game[..game.len()].copy_from_slice(&game);
     config.game_units = game.len() as u32;
     config.layer[..layer.len()].copy_from_slice(&layer);
     config.layer_units = layer.len() as u32;
+    config.upper[..upper.len()].copy_from_slice(&upper);
+    config.upper_units = upper.len() as u32;
     Ok(config)
 }
 
@@ -1727,7 +1734,12 @@ mod tests {
 
     #[test]
     fn the_configuration_starts_with_the_enabled_flag_it_is_read_with() {
-        let config = redirect_config(Path::new(r"C:\Game"), Path::new(r"C:\Mods")).unwrap();
+        let config = redirect_config(
+            Path::new(r"C:\Game"),
+            Path::new(r"C:\Mods"),
+            Path::new(r"C:\Writes"),
+        )
+        .unwrap();
         assert_eq!(config.enabled, 1);
         assert_eq!(
             config_bytes(&config).len(),
