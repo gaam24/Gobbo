@@ -59,10 +59,9 @@ All notable changes to this project are documented in this file. The format foll
 
 ## v0.2.1 (Unreleased)
 
-### Added
+### New Supported Games
 
-- **Hell is Us mods work in Gobbo.** Pak, IoStore and UE4SS mods install and deploy.
-- **A game that needs administrator rights offers to restart Gobbo with them.** Windows asks for permission, and after the restart the game starts with mods; Gobbo says when to restart it normally again.
+- **Hell is Us**
 
 ### Changed
 
@@ -109,6 +108,7 @@ All notable changes to this project are documented in this file. The format foll
 - **Gobbo waits briefly if its data folders are busy at startup.** A short lock from another window no longer stops the app from opening.
 - **A deleted mod file stays deleted after the next launch.** The overlay no longer loses a deletion when two changes reach the same folder together.
 - **A delete Windows refuses no longer hides the mod file.** The game gets the real error and the file stays visible.
+- **A game that needs administrator rights starts with mods on Windows.** Gobbo offers to restart with permission and says when to restart normally again.
 - **A game that fails to start with mods reports it right away.** Gobbo no longer waits the full start timeout for a child process that has already exited.
 - **A 32-bit game no longer stays stuck when its start helper hangs.** Gobbo stops it after 20 seconds and reports the failure.
 - **A game with hundreds of folders keeps the modded view.** The overlay no longer stops merging after 128 folders.
