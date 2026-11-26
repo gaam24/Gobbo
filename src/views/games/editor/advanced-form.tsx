@@ -62,7 +62,7 @@ export function MoreOptions({
 
 	return (
 		<div className="grid gap-2">
-			<p className="text-muted-foreground mb-4 text-sm text-pretty">{t("editor.more.hint")}</p>
+			<p className="text-muted-foreground mt-1 mb-4 text-sm text-pretty">{t("editor.more.hint")}</p>
 			{groups.map((group) => (
 				<section key={group.id} id={`editor-${group.id}`} className="grid scroll-mt-6 gap-1 border-t py-4">
 					<Disclosure title={<span className="text-base font-semibold">{group.title}</span>}>
@@ -94,7 +94,7 @@ export function DefinitionSource({
 }) {
 	const { t } = useTranslation();
 	return (
-		<section id="editor-source" className="grid gap-3">
+		<section id="editor-source" className="mt-1 grid gap-3">
 			<div className="flex items-start justify-between gap-3">
 				<p className="text-muted-foreground text-sm text-pretty">{t("editor.source.hint")}</p>
 				<Button type="button" variant="outline" size="sm" disabled={!sourceDirty} onClick={() => void onApplySource()}>

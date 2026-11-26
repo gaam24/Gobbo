@@ -36,6 +36,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useTranslation } from "@/i18n";
 import { formatModList, type ListFormat } from "@/lib/mods";
+import { shortcutHint } from "@/lib/shortcuts";
 import { useSourceName } from "@/sources/source-name";
 import { updateTargets } from "@/sources/update-targets";
 import { HistoryMenu } from "@/views/history/history-menu";
@@ -142,7 +143,7 @@ export function ModsToolbar({
 				<Button
 					variant="outline"
 					aria-label={t("mods.import")}
-					title={t("mods.import")}
+					title={t("shortcuts.withKey", { label: t("mods.import"), key: shortcutHint("import") })}
 					className="@max-5xl:px-2.5"
 					onClick={() => void onImport()}
 				>

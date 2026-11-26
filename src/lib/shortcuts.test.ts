@@ -15,7 +15,7 @@ import {
 const EXPECTED: Record<ShortcutId, { keys: string[][]; hint: string }> = {
 	palette: { keys: [["Ctrl", "K"]], hint: "Ctrl+K" },
 	help: { keys: [["?"], ["F1"]], hint: "?" },
-	search: { keys: [["Ctrl", "F"]], hint: "Ctrl+F" },
+	search: { keys: [["Ctrl", "F"], ["/"]], hint: "Ctrl+F" },
 	details: { keys: [["Ctrl", "I"]], hint: "Ctrl+I" },
 	console: { keys: [["Ctrl", "J"]], hint: "Ctrl+J" },
 	rescan: { keys: [["F5"]], hint: "F5" },
@@ -41,6 +41,20 @@ const EXPECTED: Record<ShortcutId, { keys: string[][]; hint: string }> = {
 		],
 		hint: "Ctrl+Y",
 	},
+	back: {
+		keys: [["Alt", "←"], ["MouseBack"], ["Esc"]],
+		hint: "Alt+←",
+	},
+	forward: {
+		keys: [["Alt", "→"], ["MouseForward"]],
+		hint: "Alt+→",
+	},
+	game: { keys: [["Ctrl", "1–9"]], hint: "Ctrl+1–9" },
+	settings: { keys: [["Ctrl", ","]], hint: "Ctrl+," },
+	import: { keys: [["Ctrl", "O"]], hint: "Ctrl+O" },
+	save: { keys: [["Ctrl", "S"]], hint: "Ctrl+S" },
+	apply: { keys: [["Ctrl", "Enter"]], hint: "Ctrl+Enter" },
+	remove: { keys: [["Del"]], hint: "Del" },
 };
 
 test("every shortcut keeps its keys and its palette hint", () => {

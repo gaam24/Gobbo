@@ -150,8 +150,10 @@ const pl = {
 		button: "Skróty",
 		hint: "Klawisze działają, gdy kursor nie jest w polu tekstowym.",
 		or: "lub",
+		withKey: "{{label}} ({{key}})",
 		sections: {
 			general: "Wszędzie",
+			navigation: "Poruszanie się",
 			list: "Lista modów",
 			mouse: "Myszą",
 		},
@@ -172,11 +174,21 @@ const pl = {
 			clear: "Wyczyść zaznaczenie lub wyszukiwanie",
 			undo: "Cofnij ostatnią zmianę listy",
 			redo: "Ponów",
+			back: "Wróć do poprzedniego ekranu",
+			forward: "Przejdź dalej",
+			game: "Otwórz grę z tego miejsca po lewej",
+			settings: "Otwórz ustawienia Gobbo",
+			import: "Importuj archiwa modów",
+			save: "Zapisz edytowaną grę",
+			apply: "Przejrzyj i zastosuj zmiany",
+			remove: "Usuń zaznaczony mod (najpierw pyta)",
 		},
 		keys: {
 			shift: "Shift",
 			esc: "Esc",
 			click: "Klik",
+			mouseBack: "Boczny przycisk myszy „wstecz”",
+			mouseForward: "Boczny przycisk myszy „dalej”",
 		},
 		mouse: {
 			rightClick: "Prawy przycisk na modzie, separatorze, nagłówku kolumny lub pustej liście otwiera jego menu.",
@@ -1543,6 +1555,9 @@ const pl = {
 			profiles: "Profile",
 			extras: "Serwisy, wymagane pliki, logi i kolejność",
 			tools: "Narzędzia i kroki",
+		},
+		partHints: {
+			basics: "Wystarcza dla większości gier. Gobbo uzupełnia, co może, z folderu gry.",
 		},
 		parts: {
 			label: "Części definicji",

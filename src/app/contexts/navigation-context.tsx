@@ -9,6 +9,9 @@ interface Navigation {
 	/// Goes to the screen before this one. A screen opened from another has a way back without a URL router.
 	back: () => void;
 	canGoBack: boolean;
+	/// Goes to the screen the last `back` left, like a browser's forward button. A new screen clears it.
+	forward: () => void;
+	canGoForward: boolean;
 	openMods: () => void;
 	openGameSettings: () => void;
 	openGames: () => void;
@@ -43,6 +46,7 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
 	const { requestLeave } = useUnsavedChanges();
 	const [view, setView] = useState<AppView>(() => readPref<MainView>(VIEW_PREF, "mods", isMainView));
 	const [history, setHistory] = useState<AppView[]>([]);
+	const [future, setFuture] = useState<AppView[]>([]);
 	/// The current view for `navigate`, so it keeps one identity across screens. It is read in event handlers, never
 	/// during render; the effect keeps it in step when `setView` is called from somewhere else.
 	const viewRef = useRef(view);
@@ -64,22 +68,36 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
 			requestLeave(() => {
 				viewRef.current = next;
 				setHistory((previous) => [...previous, current]);
+				setFuture([]);
 				setView(next);
 			});
 		},
 		[requestLeave],
 	);
-	/// Back pops the last screen. The forward history is not kept: this is a desktop tool, not a browser.
+	/// Back pops the last screen and keeps the one it leaves for `forward`, so the mouse's back and forward buttons and
+	/// Alt+arrows move through the screens the way they do in a browser.
 	const back = useCallback(() => {
 		const previous = history.at(-1);
 
 		if (previous === undefined) return;
 		requestLeave(() => {
+			setFuture((next) => [...next, viewRef.current]);
 			viewRef.current = previous;
 			setHistory(history.slice(0, -1));
 			setView(previous);
 		});
 	}, [history, requestLeave]);
+	const forward = useCallback(() => {
+		const next = future.at(-1);
+
+		if (next === undefined) return;
+		requestLeave(() => {
+			setHistory((previous) => [...previous, viewRef.current]);
+			viewRef.current = next;
+			setFuture(future.slice(0, -1));
+			setView(next);
+		});
+	}, [future, requestLeave]);
 	const openMods = useCallback(() => navigate("mods"), [navigate]);
 	const openGameSettings = useCallback(() => navigate("settings"), [navigate]);
 	const openGames = useCallback(() => navigate("games"), [navigate]);
@@ -94,6 +112,8 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
 			navigate,
 			back,
 			canGoBack: history.length > 0,
+			forward,
+			canGoForward: future.length > 0,
 			openMods,
 			openGameSettings,
 			openGames,
@@ -104,6 +124,8 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
 		}),
 		[
 			back,
+			forward,
+			future.length,
 			history.length,
 			navigate,
 			openAppSettings,

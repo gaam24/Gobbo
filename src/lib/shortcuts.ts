@@ -18,9 +18,17 @@ export type ShortcutId =
 	| "reorder"
 	| "clear"
 	| "undo"
-	| "redo";
+	| "redo"
+	| "back"
+	| "forward"
+	| "settings"
+	| "game"
+	| "import"
+	| "save"
+	| "apply"
+	| "remove";
 
-export type ShortcutContext = "general" | "list";
+export type ShortcutContext = "general" | "navigation" | "list";
 export type ShortcutModifier = "Ctrl" | "Shift" | "Alt";
 
 export interface ShortcutCombo {
@@ -55,7 +63,10 @@ const definitions: Record<ShortcutId, ShortcutDefinition> = {
 	search: {
 		context: "general",
 		labelKey: "shortcuts.items.search",
-		keys: [{ modifiers: ["Ctrl"], key: "F" }],
+		keys: [
+			{ modifiers: ["Ctrl"], key: "F" },
+			{ modifiers: [], key: "/" },
+		],
 	},
 	details: {
 		context: "general",
@@ -135,6 +146,53 @@ const definitions: Record<ShortcutId, ShortcutDefinition> = {
 			{ modifiers: ["Ctrl"], key: "Y" },
 		],
 	},
+	back: {
+		context: "navigation",
+		labelKey: "shortcuts.items.back",
+		keys: [
+			{ modifiers: ["Alt"], key: "←" },
+			{ modifiers: [], key: "MouseBack" },
+			{ modifiers: [], key: "Esc" },
+		],
+	},
+	forward: {
+		context: "navigation",
+		labelKey: "shortcuts.items.forward",
+		keys: [
+			{ modifiers: ["Alt"], key: "→" },
+			{ modifiers: [], key: "MouseForward" },
+		],
+	},
+	game: {
+		context: "navigation",
+		labelKey: "shortcuts.items.game",
+		keys: [{ modifiers: ["Ctrl"], key: "1–9" }],
+	},
+	settings: {
+		context: "navigation",
+		labelKey: "shortcuts.items.settings",
+		keys: [{ modifiers: ["Ctrl"], key: "," }],
+	},
+	import: {
+		context: "general",
+		labelKey: "shortcuts.items.import",
+		keys: [{ modifiers: ["Ctrl"], key: "O" }],
+	},
+	save: {
+		context: "general",
+		labelKey: "shortcuts.items.save",
+		keys: [{ modifiers: ["Ctrl"], key: "S" }],
+	},
+	apply: {
+		context: "general",
+		labelKey: "shortcuts.items.apply",
+		keys: [{ modifiers: ["Ctrl"], key: "Enter" }],
+	},
+	remove: {
+		context: "list",
+		labelKey: "shortcuts.items.remove",
+		keys: [{ modifiers: [], key: "Del" }],
+	},
 };
 
 export const shortcutIds: readonly ShortcutId[] = [
@@ -144,6 +202,13 @@ export const shortcutIds: readonly ShortcutId[] = [
 	"details",
 	"console",
 	"rescan",
+	"import",
+	"apply",
+	"save",
+	"back",
+	"forward",
+	"game",
+	"settings",
 	"move",
 	"edge",
 	"select",
@@ -152,6 +217,7 @@ export const shortcutIds: readonly ShortcutId[] = [
 	"toggle",
 	"reorder",
 	"clear",
+	"remove",
 	"undo",
 	"redo",
 ];
@@ -172,6 +238,8 @@ export function comboHasModifier(combo: ShortcutCombo, modifier: ShortcutModifie
 const EVENT_KEYS: Record<string, string> = {
 	Space: " ",
 	Esc: "Escape",
+	Del: "Delete",
+	Enter: "Enter",
 	F1: "F1",
 	F5: "F5",
 	Home: "Home",
@@ -180,6 +248,9 @@ const EVENT_KEYS: Record<string, string> = {
 	"↓": "ArrowDown",
 	"←": "ArrowLeft",
 	"→": "ArrowRight",
+	// The mouse's side buttons have no key; the handler reads `MouseEvent.button` (3 and 4) instead.
+	MouseBack: "MouseBack",
+	MouseForward: "MouseForward",
 };
 
 /// The `KeyboardEvent.key` of a combo's main key, in the exact form the handlers compare it. Letters are lowercased

@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useTranslation } from "@/i18n";
+import { shortcutHint } from "@/lib/shortcuts";
 import { CollectionBadge } from "@/views/mods/collection-badge";
 import { ProfileActions, ProfileSwitcher } from "@/views/profile-tabs";
 
@@ -276,7 +277,10 @@ export function GameHeader({ gameId, status }: { gameId: string; status: Status 
 				variant="ghost"
 				size="icon"
 				aria-label={t(inspectorCollapsed ? "header.showInspector" : "header.hideInspector")}
-				title={t(inspectorCollapsed ? "header.showInspector" : "header.hideInspector")}
+				title={t("shortcuts.withKey", {
+					label: t(inspectorCollapsed ? "header.showInspector" : "header.hideInspector"),
+					key: shortcutHint("details"),
+				})}
 				aria-expanded={!inspectorCollapsed}
 				onClick={() => void toggleInspector()}
 			>

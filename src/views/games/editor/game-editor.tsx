@@ -1,6 +1,6 @@
 import { ArrowLeft, Download, FileCode, FolderOpen, Rocket, Save, SlidersHorizontal, Terminal } from "lucide-react";
-import { useState } from "react";
-import { SettingsLayout } from "@/components/app/page-layout";
+import { useEffect, useRef, useState } from "react";
+import { PageBody, PageHeader, SettingsLayout } from "@/components/app/page-layout";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -10,6 +10,7 @@ import { AdvancedLinux } from "@/views/games/editor/advanced-linux";
 import { ArchiveCheck } from "@/views/games/editor/archive-check";
 import { QuickSetup } from "@/views/games/editor/quick-setup";
 import { useGameEditor } from "@/views/games/editor/use-game-editor";
+import { Section } from "@/views/settings/controls";
 
 type EditorPart = "basics" | "more" | "linux" | "source";
 
@@ -21,6 +22,39 @@ export function GameEditor({ id, onClose }: { id: string | null; onClose: () => 
 	const { t } = useTranslation();
 	const editor = useGameEditor(id, onClose);
 	const [part, setPart] = useState<EditorPart>("basics");
+	const leave = () => editor.requestLeave(editor.onClose);
+	const latest = useRef({ leave, save: editor.save, blocked: editor.blocked });
+	useEffect(() => {
+		latest.current = { leave, save: editor.save, blocked: editor.blocked };
+	});
+
+	// The editor owns back and save while it is open: Ctrl+S saves, and Alt+← or the mouse's back button leaves through
+	// the same unsaved-changes question as the back arrow. The global shortcuts step aside while the editor is open.
+	useEffect(() => {
+		const onKey = (event: KeyboardEvent) => {
+			if (document.querySelector("[role='dialog'], [role='alertdialog']")) return;
+
+			if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+				event.preventDefault();
+
+				if (!latest.current.blocked) void latest.current.save();
+			} else if (event.altKey && event.key === "ArrowLeft") {
+				event.preventDefault();
+				latest.current.leave();
+			}
+		};
+		const onMouseUp = (event: MouseEvent) => {
+			if (event.button !== 3 || document.querySelector("[role='dialog'], [role='alertdialog']")) return;
+			event.preventDefault();
+			latest.current.leave();
+		};
+		window.addEventListener("keydown", onKey);
+		window.addEventListener("mouseup", onMouseUp);
+		return () => {
+			window.removeEventListener("keydown", onKey);
+			window.removeEventListener("mouseup", onMouseUp);
+		};
+	}, []);
 
 	if (!editor.loaded) {
 		return (
@@ -50,37 +84,34 @@ export function GameEditor({ id, onClose }: { id: string | null; onClose: () => 
 	else if (editor.check?.ok) footerStatus = t("editor.ready");
 	const titleName = editor.draft.name.trim() !== "" ? editor.draft.name : (id ?? "");
 
+	const title = editor.editing ? t("editor.editTitle", { name: titleName }) : t("editor.newTitle");
+
+	// The same frame as Gobbo's and a game's settings: the header with its way back, the parts on the left and the
+	// chosen part in the same column. Only the footer is the editor's own, because a draft is saved on purpose.
 	return (
 		<div className="flex min-h-0 flex-1 flex-col">
-			<div className="min-h-0 flex-1 overflow-y-auto">
-				<div className="mx-auto grid w-full max-w-6xl gap-8 px-6 pt-6 pb-10">
-					<header className="grid gap-2">
-						<div className="flex flex-wrap items-center justify-between gap-3">
-							<Button variant="ghost" size="sm" className="-ml-2 w-fit" onClick={() => editor.requestLeave(editor.onClose)}>
-								<ArrowLeft /> {t("common.back")}
-							</Button>
-							{editor.editing && editor.origin === "user" && (
-								<Button variant="outline" size="sm" onClick={() => void editor.exportDefinition()}>
-									<Download /> {t("settings.game.exportDefinition")}
-								</Button>
-							)}
-						</div>
-						<h1 className="text-xl font-semibold">{editor.editing ? t("editor.editTitle", { name: titleName }) : t("editor.newTitle")}</h1>
-						<p className="text-muted-foreground text-sm text-pretty">{t("editor.hint")}</p>
-						{/* The folder path is in the button's tooltip: a full AppData path was a line of noise under the title. */}
+			<PageHeader
+				title={title}
+				hint={t("editor.hint")}
+				onBack={leave}
+				actions={
+					<>
+						{/* The folder path is in the tooltip: a full AppData path was a line of noise under the title. */}
 						{editor.definitionsFolder && editor.hasUserDefinitions && (
-							<Button
-								variant="ghost"
-								size="sm"
-								className="-ml-2 w-fit"
-								title={editor.definitionsFolder}
-								onClick={editor.openDefinitionsFolder}
-							>
+							<Button variant="ghost" size="sm" title={editor.definitionsFolder} onClick={editor.openDefinitionsFolder}>
 								<FolderOpen /> {t("editor.openUserFolder")}
 							</Button>
 						)}
-					</header>
-
+						{editor.editing && editor.origin === "user" && (
+							<Button variant="outline" size="sm" onClick={() => void editor.exportDefinition()}>
+								<Download /> {t("settings.game.exportDefinition")}
+							</Button>
+						)}
+					</>
+				}
+			/>
+			<PageBody padded>
+				<div className="grid gap-6">
 					{editor.presetError && (
 						<Alert variant="destructive">
 							<AlertTitle>{t("editor.presetsFailed")}</AlertTitle>
@@ -103,26 +134,28 @@ export function GameEditor({ id, onClose }: { id: string | null; onClose: () => 
 								label: t("editor.parts.basics"),
 								icon: Rocket,
 								content: (
-									<div className="grid gap-8">
-										<QuickSetup
-											draft={editor.draft}
-											onChange={editor.update}
-											folder={editor.folder}
-											onFolderChange={editor.setFolder}
-											onBrowse={() => void editor.browse()}
-											inspection={editor.inspection}
-											inspecting={editor.inspecting}
-											inspectError={editor.inspectError}
-											presets={editor.presets}
-											layout={editor.layout}
-											onLayoutChange={editor.chooseLayout}
-											check={editor.check}
-											issues={editor.issues}
-											editing={editor.editing}
-											idWarning={editor.idWarning}
-										/>
-										<ArchiveCheck text={editor.activeText} />
-									</div>
+									<Section id="editor-part-basics" title={t("editor.parts.basics")} hint={t("editor.partHints.basics")}>
+										<div className="mt-6 grid gap-8">
+											<QuickSetup
+												draft={editor.draft}
+												onChange={editor.update}
+												folder={editor.folder}
+												onFolderChange={editor.setFolder}
+												onBrowse={() => void editor.browse()}
+												inspection={editor.inspection}
+												inspecting={editor.inspecting}
+												inspectError={editor.inspectError}
+												presets={editor.presets}
+												layout={editor.layout}
+												onLayoutChange={editor.chooseLayout}
+												check={editor.check}
+												issues={editor.issues}
+												editing={editor.editing}
+												idWarning={editor.idWarning}
+											/>
+											<ArchiveCheck text={editor.activeText} />
+										</div>
+									</Section>
 								),
 							},
 							{
@@ -130,13 +163,15 @@ export function GameEditor({ id, onClose }: { id: string | null; onClose: () => 
 								label: t("editor.parts.more"),
 								icon: SlidersHorizontal,
 								content: (
-									<MoreOptions
-										draft={editor.draft}
-										onChange={editor.update}
-										directories={editor.inspection?.directories ?? []}
-										programs={editor.inspection?.executables.map((executable) => executable.path) ?? []}
-										folder={editor.folder}
-									/>
+									<Section id="editor-part-more" title={t("editor.parts.more")}>
+										<MoreOptions
+											draft={editor.draft}
+											onChange={editor.update}
+											directories={editor.inspection?.directories ?? []}
+											programs={editor.inspection?.executables.map((executable) => executable.path) ?? []}
+											folder={editor.folder}
+										/>
+									</Section>
 								),
 							},
 							{
@@ -144,10 +179,11 @@ export function GameEditor({ id, onClose }: { id: string | null; onClose: () => 
 								label: t("editor.parts.linux"),
 								icon: Terminal,
 								content: (
-									<div className="grid gap-6">
-										<p className="text-muted-foreground text-sm text-pretty">{t("editor.linux.hint")}</p>
-										<AdvancedLinux draft={editor.draft} onChange={editor.update} />
-									</div>
+									<Section id="editor-part-linux" title={t("editor.parts.linux")} hint={t("editor.linux.hint")}>
+										<div className="mt-6">
+											<AdvancedLinux draft={editor.draft} onChange={editor.update} />
+										</div>
+									</Section>
 								),
 							},
 							{
@@ -155,20 +191,22 @@ export function GameEditor({ id, onClose }: { id: string | null; onClose: () => 
 								label: t("editor.parts.source"),
 								icon: FileCode,
 								content: (
-									<DefinitionSource
-										source={editor.source}
-										sourceDirty={editor.sourceDirty}
-										formText={editor.formText}
-										sourceError={editor.sourceError}
-										onSourceChange={editor.changeSource}
-										onApplySource={editor.applySource}
-									/>
+									<Section id="editor-part-source" title={t("editor.parts.source")}>
+										<DefinitionSource
+											source={editor.source}
+											sourceDirty={editor.sourceDirty}
+											formText={editor.formText}
+											sourceError={editor.sourceError}
+											onSourceChange={editor.changeSource}
+											onApplySource={editor.applySource}
+										/>
+									</Section>
 								),
 							},
 						]}
 					/>
 				</div>
-			</div>
+			</PageBody>
 
 			<footer className="bg-background flex items-center justify-between gap-3 border-t px-6 py-3">
 				<span className="text-muted-foreground text-sm" role="status">

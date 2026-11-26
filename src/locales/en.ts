@@ -149,8 +149,10 @@ const en = {
 		button: "Shortcuts",
 		hint: "These keys work when you're not typing in a text field.",
 		or: "or",
+		withKey: "{{label}} ({{key}})",
 		sections: {
 			general: "Everywhere",
+			navigation: "Moving around",
 			list: "Mod list",
 			mouse: "With the mouse",
 		},
@@ -171,11 +173,21 @@ const en = {
 			clear: "Clear the selection or the search",
 			undo: "Undo the last list change",
 			redo: "Redo",
+			back: "Go back to the previous screen",
+			forward: "Go forward again",
+			game: "Open the game in that spot on the left",
+			settings: "Open Gobbo settings",
+			import: "Import mod archives",
+			save: "Save the game you are editing",
+			apply: "Review and apply the changes",
+			remove: "Delete the selected mod (asks first)",
 		},
 		keys: {
 			shift: "Shift",
 			esc: "Esc",
 			click: "Click",
+			mouseBack: "Mouse back button",
+			mouseForward: "Mouse forward button",
 		},
 		mouse: {
 			rightClick: "Right-click a mod, a separator, a column header or an empty spot in the list to open its menu.",
@@ -1459,6 +1471,9 @@ const en = {
 			profiles: "Profiles",
 			extras: "Services, required files, logs and order",
 			tools: "Tools and steps",
+		},
+		partHints: {
+			basics: "Enough for most games. Gobbo fills in what it can from the game folder.",
 		},
 		parts: {
 			label: "Parts of the definition",

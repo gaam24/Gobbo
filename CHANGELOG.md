@@ -80,6 +80,10 @@ All notable changes to this project are documented in this file. The format foll
 - **The Games page shows only the actions you use.** Search again and Add your own game stay in view; importing a definition and checking the catalog moved to the menu.
 - **Adding your own game is split into four parts.** Basics holds what most games need, More options folds the rarer rules under one line each, Linux gathers every Linux-only field, and the definition file has its own page.
 - **The game editor lists what's still missing as steps to do.** Empty fields no longer show up as red errors before you start.
+- **Gobbo settings, game settings and the game editor share one layout.** The same header, the same section list and a centred column on wide windows.
+- **The mouse's back and forward buttons move between screens.** Alt+← and Alt+→ do the same, and Esc leaves a settings or side page.
+- **More keyboard shortcuts.** Ctrl+1–9 opens a game from the rail, Ctrl+, opens settings, Ctrl+O imports archives, Ctrl+Enter reviews the changes to apply, Delete removes the selected mod after asking, / jumps to the search, and Ctrl+S saves in the game editor.
+- **Buttons show their shortcut in the tooltip.** The shortcut list has a new Moving around section.
 - **Storage shows each game's share of the space.** The folder path moved to the folder button.
 - **Settings say what each switch does instead of repeating its name.** The notification grid uses checkboxes.
 - **The interface uses the same words for shared files everywhere.** A mod overrides another; "wins" and "loses" are gone.

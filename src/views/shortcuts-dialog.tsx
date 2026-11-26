@@ -6,7 +6,7 @@ import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { useTranslation } from "@/i18n";
 import { comboTokens, type ShortcutContext, shortcut, shortcutIds } from "@/lib/shortcuts";
 
-const SECTIONS: readonly ShortcutContext[] = ["general", "list"];
+const SECTIONS: readonly ShortcutContext[] = ["general", "navigation", "list"];
 
 const MOUSE_TIPS = ["rightClick", "doubleClick", "drag", "columns", "separator", "drop"] as const;
 
@@ -18,6 +18,8 @@ const KEY_LABELS = {
 	Space: "bar.keys.space",
 	Esc: "shortcuts.keys.esc",
 	Click: "shortcuts.keys.click",
+	MouseBack: "shortcuts.keys.mouseBack",
+	MouseForward: "shortcuts.keys.mouseForward",
 } as const;
 
 const isNamed = (key: string): key is keyof typeof KEY_LABELS => key in KEY_LABELS;

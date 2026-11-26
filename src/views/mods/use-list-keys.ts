@@ -9,6 +9,7 @@ const TABLE_ARROWS: readonly string[] = shortcutKeys("move");
 const GRID_ARROWS: readonly string[] = [...TABLE_ARROWS, "ArrowLeft", "ArrowRight"];
 
 const SEARCH_KEY = shortcutKey("search");
+const SEARCH_SLASH_KEY = shortcutKey("search", 1);
 const RESCAN_KEY = shortcutKey("rescan");
 const SELECT_ALL_KEY = shortcutKey("all");
 const UNDO_KEYS = shortcutKeys("undo");
@@ -26,6 +27,8 @@ const EDGE_KEYS = shortcutKeys("edge");
 const LAST_EDGE_KEY = shortcutKey("edge", 1);
 const CLEAR_KEY = shortcutKey("clear");
 const TOGGLE_KEY = shortcutKey("toggle");
+const REMOVE_KEY = shortcutKey("remove");
+const APPLY_KEY = shortcutKey("apply");
 
 /// The keyboard of the mod list: search, history, selection, moving and toggling mods. It listens to the window.
 export function useListKeys({
@@ -44,6 +47,8 @@ export function useListKeys({
 	onUndoList,
 	onRedoList,
 	onRescan,
+	onRemove,
+	onApply,
 }: {
 	searchRef: RefObject<HTMLInputElement | null>;
 	tableRef: RefObject<HTMLDivElement | null>;
@@ -61,6 +66,10 @@ export function useListKeys({
 	onUndoList: () => void | Promise<void>;
 	onRedoList: () => void | Promise<void>;
 	onRescan: () => void | Promise<void>;
+	/// Asks before deleting the focused mod. Delete never removes anything without the confirmation dialog.
+	onRemove?: (id: string) => void;
+	/// Opens the apply preview. Nothing is written until the user confirms there.
+	onApply?: () => void;
 }) {
 	/// Shortcuts: Ctrl+F searches, F5 rescans, arrows move the selection, Alt+arrows move a mod, Space toggles.
 	/// Typing in a field keeps its keys, and the arrows only act when the focus is in the list.
@@ -177,7 +186,10 @@ export function useListKeys({
 
 			if (inOverlay(target)) return false;
 
-			if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === SEARCH_KEY) {
+			// "/" focuses the search too, as in most apps with a list; in a field it stays a slash.
+			const slash = event.key === SEARCH_SLASH_KEY && !event.ctrlKey && !event.metaKey && !event.altKey && !typingTarget(event.target);
+
+			if (slash || ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === SEARCH_KEY)) {
 				event.preventDefault();
 				searchRef.current?.focus();
 				return true;
@@ -186,6 +198,12 @@ export function useListKeys({
 			if (event.key === RESCAN_KEY) {
 				event.preventDefault();
 				void onRescan();
+				return true;
+			}
+
+			if ((event.ctrlKey || event.metaKey) && event.key === APPLY_KEY && onApply && !typingTarget(event.target)) {
+				event.preventDefault();
+				onApply();
 				return true;
 			}
 
@@ -234,6 +252,12 @@ export function useListKeys({
 			if (event.key === TOGGLE_KEY && focused) {
 				event.preventDefault();
 				toggleFocused();
+				return;
+			}
+
+			if (event.key === REMOVE_KEY && focused && onRemove && mods.some((mod) => mod.id === focused)) {
+				event.preventDefault();
+				onRemove(focused);
 			}
 		};
 
@@ -291,6 +315,8 @@ export function useListKeys({
 		onMoveMod,
 		onRedoList,
 		onRescan,
+		onRemove,
+		onApply,
 		onSetEnabled,
 		onSelect,
 		onUndoList,

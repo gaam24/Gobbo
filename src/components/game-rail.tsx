@@ -18,6 +18,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useTranslation } from "@/i18n";
 import { type Notice, unreadSummary } from "@/lib/notices";
+import { shortcutHint } from "@/lib/shortcuts";
 
 /// What the downloads button shows: see `downloadSummary`.
 interface DownloadsBadge {
@@ -158,7 +159,11 @@ export function GameRail({
 				<RailButton label={t("storage.title")} current={view === "storage"} onClick={() => onView("storage")}>
 					<HardDrive className="size-5" aria-hidden />
 				</RailButton>
-				<RailButton label={t("app.settings")} current={view === "app"} onClick={() => onView("app")}>
+				<RailButton
+					label={t("shortcuts.withKey", { label: t("app.settings"), key: shortcutHint("settings") })}
+					current={view === "app"}
+					onClick={() => onView("app")}
+				>
 					<Settings className="size-5" aria-hidden />
 				</RailButton>
 			</div>

@@ -23,9 +23,13 @@ export function PageHeader({
 	hint,
 	meta,
 	actions,
+	onBack,
 	children,
 }: {
 	title: ReactNode;
+	/// A way back that is not a navigation step, such as leaving the game editor. It shows the same arrow as a screen
+	/// opened from another, so every screen goes back from the same spot.
+	onBack?: () => void;
 	/// Why the screen exists or how it behaves. It sits behind the question mark, not in a paragraph under the title.
 	hint?: ReactNode;
 	/// A short fact next to the title, such as a count or a store id.
@@ -39,14 +43,14 @@ export function PageHeader({
 	return (
 		<header className="flex min-h-12 shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b px-6 py-2">
 			<div className="flex max-w-full min-w-0 shrink items-center gap-3">
-				{navigation?.canGoBack && !ROOTS.has(navigation.view) && (
+				{(onBack !== undefined || (navigation?.canGoBack && !ROOTS.has(navigation.view))) && (
 					<Button
 						variant="ghost"
 						size="icon-sm"
 						className="-ml-2"
 						aria-label={t("common.back")}
 						title={t("common.back")}
-						onClick={navigation.back}
+						onClick={onBack ?? navigation?.back}
 					>
 						<ArrowLeft />
 					</Button>
@@ -146,7 +150,9 @@ export function SettingsLayout<Id extends string>({
 				if (found) onValueChange(found.id);
 			}}
 			orientation="vertical"
-			className="flex flex-col gap-8 md:flex-row"
+			// The section list and the readable column move as one centred block: left-aligned, a wide window left half
+			// the screen empty beside a 48rem column. 64rem is the list (14rem), the gap (2rem) and the column (48rem).
+			className="mx-auto flex w-full max-w-5xl flex-col gap-8 md:flex-row"
 		>
 			<TabsList aria-label={label} className="w-full shrink-0 items-stretch justify-start p-1 md:sticky md:top-0 md:w-56 md:self-start">
 				{sections.map((section) => {

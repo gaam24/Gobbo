@@ -111,7 +111,8 @@ Use the semantic tokens in `src/index.css`. Never use raw colours in components.
   - `ListRow` (an `Item`, full width, bottom border, 56 px) for every list row, and `ListGroupHeader` for a group
     heading, drawn like a mod list separator with its count. No outlined card per row.
   - `PageEmpty`: the centred empty state of a screen or list.
-  - `SettingsLayout`: the section list and a `max-w-3xl` content column; both settings screens use it.
+  - `SettingsLayout`: the section list and a `max-w-3xl` content column, centred together on a wide window. Both
+    settings screens and the game editor use it; the editor's parts start with the same `Section` heading.
   - `PageFrame` composes the header, the toolbar and the body for a screen that needs nothing else.
 - Inside a dialog or the details panel, use the parts in `content-blocks.tsx`:
   - `SectionHeading` for a block heading (with its count and actions).
@@ -149,6 +150,9 @@ Use the semantic tokens in `src/index.css`. Never use raw colours in components.
 - A group header (a page of parts, a separator) shows only what its rows share or add up to. An empty cell in a header
   stays blank; the dash `—` marks an empty value in a row, not in a header.
 - Put advanced and destructive actions behind a menu or in the last section, never next to the everyday controls.
+- Every screen goes back the same way: the arrow in the header, Alt+←, the mouse's back button, and Esc on a page
+  opened over the main screens. A shortcut is registered once in `src/lib/shortcuts.ts`, listed in the shortcut list
+  and named in the tooltip of the button it stands for.
 - One number, one place. A count the header or the filter bar already shows is not repeated in the inspector.
 - A problem carries its fix. When the fix is one known action ("Turn on X", "Install the loader"), its button sits
   right next to the message instead of in a separate dialog.

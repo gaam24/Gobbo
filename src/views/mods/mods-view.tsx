@@ -58,6 +58,7 @@ export function ModsView({ gameId, status }: ModsViewProps) {
 		gameActions,
 		modUpdates,
 		pickArchives: onImport,
+		deploy: onDeploy,
 		launch: onLaunch,
 		openSource: onOpenSource,
 		openFolderPath: onOpenFolder,
@@ -174,6 +175,11 @@ export function ModsView({ gameId, status }: ModsViewProps) {
 		onUndoList,
 		onRedoList,
 		onRescan,
+		onRemove: (modId) => onRemoveFromLibrary(modId),
+		// Ctrl+Enter reviews the changes only when there is something to apply and the game is not running.
+		onApply: () => {
+			if (!gameRunning && (status.draft_changes > 0 || !status.deployed)) onDeploy();
+		},
 	});
 
 	const {
