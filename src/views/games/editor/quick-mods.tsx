@@ -19,7 +19,8 @@ export function QuickMods({ draft, onChange, inspection, presets, layout, onLayo
 	const detected = inspection?.loaders.find((loader) => loader.id === selectedPreset?.id);
 	const directories = inspection?.directories ?? [];
 	const places = check?.summary?.game.places ?? placeSummary(draft);
-	const layoutPlaces = draft.deploy.full_root ? t("editor.quick.fullRoot") : places.join(", ") || "—";
+	// The summary speaks only once there is a place to name; "A mod reaches: —." told the user nothing.
+	const layoutPlaces = draft.deploy.full_root ? t("editor.quick.fullRoot") : places.join(", ");
 
 	return (
 		<QuickSection number={2} title={t("editor.quick.modsTitle")} hint={t("editor.quick.modsHint")}>
@@ -261,7 +262,7 @@ export function QuickMods({ draft, onChange, inspection, presets, layout, onLayo
 
 			{layout === "custom" && <p className="text-muted-foreground text-sm">{t("editor.quick.customHint")}</p>}
 
-			<p className="text-muted-foreground text-sm">{t("editor.quick.layoutSummary", { places: layoutPlaces })}</p>
+			{layoutPlaces !== "" && <p className="text-muted-foreground text-sm">{t("editor.quick.layoutSummary", { places: layoutPlaces })}</p>}
 		</QuickSection>
 	);
 }

@@ -1,6 +1,7 @@
+import { ArrowUpDown, FileStack, Files, Minus, Plus, RefreshCw } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { commands, type DeployPreview } from "@/bindings";
-import { BoxList, BoxListRow, Disclosure } from "@/components/app/content-blocks";
+import { BoxList, BoxListRow, Disclosure, OutcomeRow } from "@/components/app/content-blocks";
 import { ModalDialog } from "@/components/modal-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -71,28 +72,37 @@ function PreviewBody({ preview }: { preview: DeployPreview }) {
 
 	return (
 		<>
-			<dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5">
-				<dt className="text-muted-foreground">{t("preview.files")}</dt>
-				<dd className="tabular-nums">{preview.files}</dd>
-				<dt className="text-muted-foreground">{t("preview.conflicts")}</dt>
-				<dd className="tabular-nums">{preview.conflicts}</dd>
-				{preview.moved > 0 && (
-					<>
-						<dt className="text-muted-foreground">{t("preview.moved")}</dt>
-						<dd className="tabular-nums">{preview.moved}</dd>
-					</>
+			{/* What the apply means for the game, one outcome per row; the names follow in the folds below. */}
+			<BoxList>
+				{preview.added.length > 0 && (
+					<OutcomeRow icon={Plus} tone="primary" title={t("preview.outcome.added", { count: preview.added.length })} />
 				)}
+				{preview.removed.length > 0 && <OutcomeRow icon={Minus} title={t("preview.outcome.removed", { count: preview.removed.length })} />}
+				{preview.updated.length > 0 && (
+					<OutcomeRow icon={RefreshCw} title={t("preview.outcome.updated", { count: preview.updated.length })} />
+				)}
+				<OutcomeRow
+					icon={FileStack}
+					title={t("preview.outcome.files", { count: preview.files })}
+					detail={t("preview.outcome.filesDetail")}
+				/>
+				{preview.conflicts > 0 && (
+					<OutcomeRow
+						icon={Files}
+						tone="warning"
+						title={t("preview.outcome.conflicts", { count: preview.conflicts })}
+						detail={t("preview.outcome.conflictsDetail")}
+					/>
+				)}
+				{preview.moved > 0 && <OutcomeRow icon={ArrowUpDown} title={t("preview.outcome.moved", { count: preview.moved })} />}
 				{preview.winners_changed > 0 && (
-					<>
-						<dt className="text-muted-foreground">{t("preview.winners")}</dt>
-						<dd className="tabular-nums">{preview.winners_changed}</dd>
-					</>
+					<OutcomeRow icon={Files} title={t("preview.outcome.winners", { count: preview.winners_changed })} />
 				)}
-			</dl>
+			</BoxList>
 			{preview.replaces && <p className="text-muted-foreground">{t("preview.replaces")}</p>}
 			{lists.map(({ key, names }) =>
 				names.length > 0 ? (
-					<Disclosure key={key} title={t(`preview.${key}`)} count={names.length} defaultOpen={names.length <= 8}>
+					<Disclosure key={key} title={t(`preview.${key}`)} count={names.length} defaultOpen={names.length <= 5}>
 						<BoxList scroll>
 							{names.map((name) => (
 								<BoxListRow key={name}>

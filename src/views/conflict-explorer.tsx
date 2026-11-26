@@ -86,7 +86,8 @@ export function ConflictExplorerDialog({ gameId, onClose }: { gameId: string; on
 		body = <p className="text-muted-foreground text-sm">{t("conflicts.noMatch")}</p>;
 	} else {
 		body = (
-			<div ref={viewport} className="h-[55vh] overflow-y-auto rounded-lg border">
+			// The box is as tall as its rows, up to 55% of the window: one shared file no longer floats in an empty frame.
+			<div ref={viewport} className="overflow-y-auto rounded-lg border" style={{ height: `min(55vh, ${totalSize + 2}px)` }}>
 				<div className="relative" style={{ height: totalSize }}>
 					{virtualRows.map((item) => {
 						const entry = filtered[item.index];
@@ -111,10 +112,12 @@ export function ConflictExplorerDialog({ gameId, onClose }: { gameId: string; on
 											{t("conflicts.overrides", {
 												winner: nameOf(entry.winner),
 												losers: entry.losers.map(nameOf).join(", "),
-												size: formatSize(Math.ceil(entry.bytes / 1024), i18n.language),
 											})}
 										</span>
 									</div>
+									<span className="text-subtle-foreground shrink-0 font-mono text-xs tabular-nums">
+										{formatSize(Math.ceil(entry.bytes / 1024), i18n.language)}
+									</span>
 									<Button
 										variant="ghost"
 										size="icon"
@@ -189,12 +192,15 @@ export function ConflictExplorerDialog({ gameId, onClose }: { gameId: string; on
 								<SelectItem value="more">{t("conflicts.moreCopies")}</SelectItem>
 							</SelectContent>
 						</Select>
-						<span className="text-muted-foreground text-sm tabular-nums">
-							{t("conflicts.showing", {
-								shown: filtered.length,
-								total: explorer?.total ?? 0,
-							})}
-						</span>
+						{/* A count is only useful while a filter narrows the list. */}
+						{(needle !== "" || copies !== "all") && (
+							<span className="text-muted-foreground text-sm tabular-nums">
+								{t("conflicts.showing", {
+									shown: filtered.length,
+									total: explorer?.total ?? 0,
+								})}
+							</span>
+						)}
 					</div>
 				)}
 				{body}

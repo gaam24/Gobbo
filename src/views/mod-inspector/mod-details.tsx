@@ -186,7 +186,7 @@ export function ModDetails({
 					</DropdownMenu>
 				</div>
 
-				<div className="bg-muted flex items-center justify-between gap-3 rounded-lg px-3.5 py-3">
+				<div className="flex items-center justify-between gap-3 rounded-lg border px-3.5 py-2.5">
 					<div className="grid gap-0.5">
 						<span className="font-medium">{t("mods.enabledHere")}</span>
 						<span className="text-muted-foreground text-xs">{t("mods.enabledHint")}</span>
@@ -229,7 +229,6 @@ export function ModDetails({
 					onSetInfo={onSetInfo}
 					onSetSteps={onSetSteps}
 					steps={details?.folder === mod.folder ? details.steps : null}
-					onRemove={onRemoveFromLibrary}
 					onIgnoreVersion={onIgnoreVersion}
 					onUnignoreVersion={onUnignoreVersion}
 				/>

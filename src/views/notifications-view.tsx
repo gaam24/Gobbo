@@ -1,13 +1,13 @@
-import { Bell, X } from "lucide-react";
+import { Bell, CircleCheck, CircleX, X } from "lucide-react";
 import { useEffect } from "react";
 import { Disclosure } from "@/components/app/content-blocks";
-import { ListRow, PageEmpty } from "@/components/app/page-layout";
+import { ListGroupHeader, ListRow, PageEmpty } from "@/components/app/page-layout";
 import { PageFrame } from "@/components/page-frame";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ItemActions, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item";
+import { ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { useTranslation } from "@/i18n";
-import { formatDateTime } from "@/lib/mods";
+import { formatDate, formatTime, isToday } from "@/lib/mods";
 import { dismissGroup, groupNotices, type Notice, type NoticeGroup } from "@/lib/notices";
 
 /// Every notice of the list, newest first. Notices that repeat one after another show once with a count; an error has
@@ -35,6 +35,16 @@ export function NotificationsView({
 	}, [notices, onRead]);
 
 	const groups = groupNotices(notices);
+	const days: Array<{ label: string; groups: NoticeGroup[] }> = [];
+
+	for (const group of groups) {
+		const date = formatDate(group.notice.at, locale);
+		const label = isToday(group.notice.at) ? t("notifications.today") : date;
+		const last = days.at(-1);
+
+		if (last?.label === label) last.groups.push(group);
+		else days.push({ label, groups: [group] });
+	}
 
 	return (
 		<PageFrame
@@ -52,11 +62,17 @@ export function NotificationsView({
 			{groups.length === 0 ? (
 				<PageEmpty icon={Bell} title={t("notifications.empty")} />
 			) : (
-				<ul>
-					{groups.map((group) => (
-						<NoticeRow key={group.notice.id} group={group} locale={locale} onDismiss={onDismiss} />
-					))}
-				</ul>
+				// One header per day, so each row only needs its time.
+				days.map((day) => (
+					<section key={day.label} aria-label={day.label}>
+						<ListGroupHeader title={day.label} count={day.groups.length} />
+						<ul>
+							{day.groups.map((group) => (
+								<NoticeRow key={group.notice.id} group={group} locale={locale} onDismiss={onDismiss} />
+							))}
+						</ul>
+					</section>
+				))
 			)}
 		</PageFrame>
 	);
@@ -75,16 +91,19 @@ function NoticeRow({ group, locale, onDismiss }: NoticeRowProps) {
 	return (
 		<ListRow asChild className="items-start py-3">
 			<li>
+				<ItemMedia className="mt-0.5">
+					{notice.kind === "error" ? (
+						<CircleX className="text-destructive size-4" aria-hidden />
+					) : (
+						<CircleCheck className="text-muted-foreground size-4" aria-hidden />
+					)}
+				</ItemMedia>
 				<ItemContent className="gap-1">
 					<ItemTitle className="line-clamp-none w-full font-normal wrap-break-word whitespace-pre-line">{notice.text}</ItemTitle>
-					<ItemDescription className="line-clamp-none flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-xs tabular-nums">
-						{notice.kind === "error" && <span className="text-destructive font-sans font-semibold">{t("app.actionFailed")}</span>}
-						<span>{formatDateTime(notice.at, locale)}</span>
-						{count > 1 && (
-							<Badge variant="outline" className="font-sans">
-								{t("notifications.repeated", { count })}
-							</Badge>
-						)}
+					<ItemDescription className="line-clamp-none flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+						{notice.kind === "error" && <span className="text-destructive font-medium">{t("app.actionFailed")}</span>}
+						<span>{formatTime(notice.at, locale)}</span>
+						{count > 1 && <Badge variant="outline">{t("notifications.repeated", { count })}</Badge>}
 					</ItemDescription>
 					{notice.detail && (
 						<Disclosure

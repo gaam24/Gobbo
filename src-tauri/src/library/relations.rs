@@ -221,9 +221,11 @@ fn unmet_message(library: &Library, family: &Family, unmet: &Unmet<'_>) -> Messa
         Unmet::RequiredMissing(required) => Message::new("relations.requires_missing")
             .with("mod", &family.name)
             .with("requirement", required),
+        // `requirement_id` lets the window offer "Turn on" right next to the message.
         Unmet::RequiredDisabled(required) => Message::new("relations.requires_disabled")
             .with("mod", &family.name)
-            .with("requirement", family_name(library, required)),
+            .with("requirement", family_name(library, required))
+            .with("requirement_id", *required),
         Unmet::Alternatives {
             alternatives,
             state,

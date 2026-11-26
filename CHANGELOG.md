@@ -68,9 +68,30 @@ All notable changes to this project are documented in this file. The format foll
 
 - **Profile comparison names a mod by its family name.** A mod with several versions now shows the same name in the comparison as in the list history.
 - **The closing dialog shows which choice keeps Gobbo running and which ends it.** Hiding to the tray has a green icon and Exit has a red one.
+- **Game tools have their own menu.** File conflicts, load order, snapshots and the checks moved out of the Play button's menu into Tools.
+- **Import is a button in the mod toolbar.** Update all appears only when there is something to update.
+- **A warning about a turned-off requirement has a Turn on button.** One click enables the mod another mod needs.
+- **The apply preview says what happens to the game.** Each row names an outcome, such as mods going in or files several mods share.
+- **The mod list stays quiet about versions that need nothing.** "Up to date" and "No source" no longer repeat under every row.
+- **The mod details show each fact once.** Facts from the mod page have their own heading, and names that repeat the title are left out.
+- **The game's state shows on its rail tile.** A dot marks a running game or one with changes waiting.
+- **Notifications are grouped by day and show what kind they are.** Import notices name the mods instead of the archive files.
+- **The setup check puts what needs a look first.** Checks that pass fold away.
+- **The Games page shows only the actions you use.** Search again and Add your own game stay in view; importing a definition and checking the catalog moved to the menu.
+- **Adding your own game is split into four parts.** Basics holds what most games need, More options folds the rarer rules under one line each, Linux gathers every Linux-only field, and the definition file has its own page.
+- **The game editor lists what's still missing as steps to do.** Empty fields no longer show up as red errors before you start.
+- **Storage shows each game's share of the space.** The folder path moved to the folder button.
+- **Settings say what each switch does instead of repeating its name.** The notification grid uses checkboxes.
+- **The interface uses the same words for shared files everywhere.** A mod overrides another; "wins" and "loses" are gone.
 
 ### Fixed
 
+- **The health check shows readable text for mods that need a turned-off mod.** It showed a raw text code before.
+- **The applied notice no longer shows stray asterisks.** It also no longer points to a Play button while the game runs.
+- **The details panel no longer says "Applied" while changes are waiting.**
+- **Discarding changes has its own icon.** It no longer shares the Play icon.
+- **The file conflicts window fits its list.** A short list no longer sits in a tall empty frame, and the count shows only while a filter is on.
+- **Dates and times read normally.** They no longer show spaced-out punctuation such as "03 : 08".
 - **A manual Proton install keeps its saves in one place before the first launch.** Gobbo no longer treats a save folder as two separate paths to copy.
 - **A partial game settings file no longer resets every folder.** Gobbo keeps the folders the file still has and fills the missing ones with empty defaults.
 - **Too many profile redirects stop the launch before the game starts.** Gobbo reports the problem instead of starting the game without the redirects.

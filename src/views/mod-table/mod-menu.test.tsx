@@ -117,14 +117,14 @@ test("a grouped mod's menu opens with a group section above the single-mod actio
 test("a translation group's menu offers the translation winner action", () => {
 	const html = menuFor(beta, translation);
 	expect(html).toContain("German pack");
-	expect(html).toContain("Set translation as winner");
+	expect(html).toContain("Let the translation override the base");
 });
 
 test("a mod outside a group keeps the single-mod menu", () => {
 	const html = menuFor(alpha, []);
 	expect(html).not.toContain("Rename group");
 	expect(html).not.toContain("Remove from group");
-	expect(html).not.toContain("Set translation as winner");
+	expect(html).not.toContain("Let the translation override the base");
 	expect(html).not.toContain("menuitemcheckbox");
 	expect(html).toContain("Show details");
 });

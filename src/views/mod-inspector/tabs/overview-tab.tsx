@@ -1,7 +1,5 @@
-import { Trash2 } from "lucide-react";
 import type { StepChoices, UpdateReport, VersionView } from "@/bindings";
-import { Disclosure } from "@/components/app/content-blocks";
-import { Button } from "@/components/ui/button";
+import { Disclosure, SectionHeading } from "@/components/app/content-blocks";
 import { useTranslation } from "@/i18n";
 import { authorOf, choicesText, type FullMod, formatCount, formatDate, formatSize, type Mod } from "@/lib/mods";
 import { usePageStatus } from "@/sources/status";
@@ -39,7 +37,6 @@ interface OverviewTabProps
 	mods: Mod[];
 	/// The steps of the game and this mod's choices; null while the details load.
 	steps: StepChoices | null;
-	onRemove: (modId: string) => void;
 }
 
 /// The everyday settings of a mod: its version, what it is about, and the user's note.
@@ -61,7 +58,6 @@ export function OverviewTab({
 	onIgnoreVersion,
 	onUnignoreVersion,
 	steps,
-	onRemove,
 }: OverviewTabProps) {
 	const { t, i18n } = useTranslation();
 	const author = authorOf(mod);
@@ -71,10 +67,39 @@ export function OverviewTab({
 	const dateText = (seconds: number | null | undefined) => (seconds == null ? null : formatDate(seconds * 1000, i18n.language));
 	const countText = (value: number | null | undefined) => (value == null ? null : formatCount(value, i18n.language));
 
+	/// A page name, a source name and a part name are often the mod's own name again. A value that repeats the title or
+	/// a line above it says nothing new, so it gets no line.
+	const seen = new Set([mod.info.name.trim().toLowerCase()]);
+	const distinct = (value: string | null | undefined) => {
+		if (value == null) return null;
+		const key = value.trim().toLowerCase();
+
+		if (seen.has(key) || mod.info.name.trim().toLowerCase().startsWith(key)) return null;
+		seen.add(key);
+		return value;
+	};
+
+	/// What Gobbo knows about the installed copy.
 	const facts = [
 		fact(t("mods.info.author"), author ?? t("common.none"), {
 			className: "truncate",
 		}),
+		fact(t("mods.info.size"), formatSize(mod.size_kb, i18n.language), {
+			className: "font-mono tabular-nums",
+		}),
+		fact(t("mods.info.page"), distinct(mod.page_name ?? mod.page_id), {
+			className: "truncate",
+		}),
+		fact(t("mods.info.part"), distinct(mod.part_name), { className: "truncate" }),
+		fact(t("mods.info.partCategory"), mod.part_category),
+		fact(t("mods.col.installed"), dateText(installedAt)),
+		fact(t("mods.col.choices"), mod.fomod.length > 0 ? choicesText(mod.fomod) : null, { className: "truncate" }),
+		fact(t("mods.col.profiles"), mod.profiles.join(", ")),
+	];
+
+	/// What the mod page says. The summary is left out when the description above already says it.
+	const pageFacts = [
+		fact(t("mods.col.sourceName"), distinct(source?.name), { className: "truncate" }),
 		source?.uploader !== author
 			? fact(t("mods.info.uploader"), source?.uploader, {
 					className: "truncate",
@@ -87,36 +112,16 @@ export function OverviewTab({
 		fact(t("mods.info.downloads"), countText(source?.downloads), {
 			className: "tabular-nums",
 		}),
-		fact(t("mods.info.size"), formatSize(mod.size_kb, i18n.language), {
-			className: "font-mono tabular-nums",
-		}),
-		fact(t("mods.col.sourceName"), source?.name, { className: "truncate" }),
-		fact(t("mods.info.page"), mod.page_name ?? mod.page_id, {
-			className: "truncate",
-		}),
-		fact(t("mods.info.part"), mod.part_name, { className: "truncate" }),
-		fact(t("mods.info.partCategory"), mod.part_category),
 		fact(t("mods.col.uniqueDownloads"), countText(source?.unique_downloads), {
 			className: "tabular-nums",
 		}),
 		fact(t("mods.col.adult"), source?.adult ? t("mods.col.adultYes") : null),
 		fact(t("mods.col.sourceStatus"), source?.status ? statusWord(source.status) : null),
-		fact(t("mods.col.sourceCreated"), dateText(source?.created_at), {
-			className: "tabular-nums",
-		}),
-		fact(t("mods.col.sourceUpdated"), dateText(source?.updated_at), {
-			className: "tabular-nums",
-		}),
-		fact(t("mods.col.checked"), dateText(source?.checked_at), {
-			className: "tabular-nums",
-		}),
+		fact(t("mods.col.sourceCreated"), dateText(source?.created_at)),
+		fact(t("mods.col.sourceUpdated"), dateText(source?.updated_at)),
+		fact(t("mods.col.checked"), dateText(source?.checked_at)),
 		fact(t("mods.col.sourceTags"), source?.tags.join(", ")),
-		fact(t("mods.col.summary"), source?.summary),
-		fact(t("mods.col.installed"), dateText(installedAt), {
-			className: "tabular-nums",
-		}),
-		fact(t("mods.col.choices"), mod.fomod.length > 0 ? choicesText(mod.fomod) : null, { className: "truncate" }),
-		fact(t("mods.col.profiles"), mod.profiles.join(", ")),
+		mod.info.description || mod.page_description ? null : fact(t("mods.col.summary"), source?.summary),
 	];
 
 	/// Where the files live on disk and the identifiers Gobbo uses. They help when something goes wrong, so they sit
@@ -139,7 +144,7 @@ export function OverviewTab({
 		fact(t("mods.col.slot"), mod.slot, {
 			className: "truncate font-mono text-xs",
 		}),
-		fact(t("mods.col.requirementsRead"), dateText(mod.source_sync[0]?.checked_at), { className: "tabular-nums" }),
+		fact(t("mods.col.requirementsRead"), dateText(mod.source_sync[0]?.checked_at)),
 		fact(t("mods.col.id"), mod.id, {
 			className: "truncate font-mono text-xs",
 			title: mod.id,
@@ -171,6 +176,13 @@ export function OverviewTab({
 
 			<FactList facts={facts} />
 
+			{pageFacts.some((item) => item !== null) && (
+				<section className="grid gap-2">
+					<SectionHeading title={t("mods.info.fromPage")} />
+					<FactList facts={pageFacts} />
+				</section>
+			)}
+
 			{technicalFacts.some((item) => item !== null) && (
 				<Disclosure title={t("common.details")}>
 					<FactList facts={technicalFacts} />
@@ -193,16 +205,6 @@ export function OverviewTab({
 			<NoteSection key={`note-${mod.folder}-${mod.notes}`} mod={mod} onSetNote={onSetNote} />
 			<InstructionsSection key={`instructions-${mod.instructions}`} mod={mod} onSetInstructions={onSetInstructions} />
 			<RelationsSection mod={mod} mods={mods} onSave={(relations) => onSetRelations(mod.id, relations)} />
-			<section>
-				<Button
-					variant="ghost"
-					size="sm"
-					className="text-destructive hover:text-destructive justify-self-start"
-					onClick={() => onRemove(mod.id)}
-				>
-					<Trash2 /> {t("mods.deleteMod")}
-				</Button>
-			</section>
 		</>
 	);
 }

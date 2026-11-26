@@ -65,19 +65,9 @@ export function AdvancedDeploy({
 
 	return (
 		<div className="grid gap-8">
-			<div className="grid gap-4 md:grid-cols-2">
-				<EditorField id="editor-root" label={t("editor.deploy.root")} hint={t("editor.deploy.rootHint")}>
-					<TextInput id="editor-root" value={deploy.root ?? ""} onChange={(root) => update({ root })} placeholder="{game}" />
-				</EditorField>
-				<EditorField id="editor-root-linux" label={t("editor.deploy.rootLinux")} hint={t("editor.deploy.rootLinuxHint")}>
-					<TextInput
-						id="editor-root-linux"
-						value={deploy.root_linux ?? ""}
-						onChange={(root_linux) => update({ root_linux })}
-						placeholder="{local_appdata}/Game"
-					/>
-				</EditorField>
-			</div>
+			<EditorField id="editor-root" label={t("editor.deploy.root")} hint={t("editor.deploy.rootHint")}>
+				<TextInput id="editor-root" value={deploy.root ?? ""} onChange={(root) => update({ root })} placeholder="{game}" />
+			</EditorField>
 			<LinesField
 				id="editor-root-files"
 				label={t("editor.deploy.rootFiles")}

@@ -83,7 +83,7 @@ export function LaunchBody({ report, gameId }: { report: RunReport; gameId: stri
 				<TabsContent value="summary" className="grid gap-4">
 					<dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1">
 						<dt className="text-muted-foreground">{report.finished_at ? t("runs.finished") : t("runs.running")}</dt>
-						<dd className="tabular-nums">{formatTime(report.started_at * 1000, i18n.language)}</dd>
+						<dd>{formatTime(report.started_at * 1000, i18n.language)}</dd>
 						<dt className="text-muted-foreground">{t("runs.game")}</dt>
 						<dd>{gameState}</dd>
 					</dl>

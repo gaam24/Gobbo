@@ -92,17 +92,6 @@ export function AdvancedProfiles({ draft, onChange }: { draft: GameDraft; onChan
 									placeholder="{documents}/Example Game"
 								/>
 							</EditorField>
-							<EditorField
-								id={`editor-user-data-linux-${index}`}
-								label={t("editor.profiles.pathLinux")}
-								hint={t("editor.profiles.pathLinuxHint")}
-							>
-								<TextInput
-									id={`editor-user-data-linux-${index}`}
-									value={set.path_linux ?? ""}
-									onChange={(path_linux) => update(index, { path_linux })}
-								/>
-							</EditorField>
 							<EditorField id={`editor-user-data-mode-${index}`} label={t("editor.profiles.mode")} hint={t("editor.profiles.modeHint")}>
 								<Select value={set.mode ?? "redirect"} onValueChange={(mode) => update(index, { mode })}>
 									<SelectTrigger id={`editor-user-data-mode-${index}`} className="w-full">

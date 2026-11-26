@@ -145,7 +145,9 @@ describe("the game definition draft", () => {
 	});
 
 	test("the form names the fields that block a save", () => {
-		expect(localIssues(EMPTY_DRAFT)).toEqual(["name", "id", "executable", "layout"]);
+		// An empty name hides the id line: the id is made from the name.
+		expect(localIssues(EMPTY_DRAFT)).toEqual(["name", "executable", "layout"]);
+		expect(localIssues({ ...EMPTY_DRAFT, name: "Game", id: "Not An Id" })).toContain("id");
 		const draft = {
 			...EMPTY_DRAFT,
 			id: "example",

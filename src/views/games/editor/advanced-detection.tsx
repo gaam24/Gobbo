@@ -6,7 +6,8 @@ import { AddRowButton, EditorField, LinesField, RepeatRow, SwitchField, TextInpu
 import { FoundPicker } from "@/views/games/editor/found-picker";
 import { relativeToFolder } from "@/views/games/editor/game-path";
 
-/// The detection fields: how Gobbo finds the folder again on this computer and on another one. The quick step fills
+/// The detection fields: how Gobbo finds the folder again on this computer and on another one. The Linux-only values
+/// (Heroic and Lutris, native Linux files and programs) live in `AdvancedLinux`. The quick step fills
 /// the marker and the Steam values from the folder; this section is for the rest and for a second store. `programs` are
 /// the programs Gobbo found in the game folder, and a program browsed for is made relative to `folder`.
 export function AdvancedDetection({
@@ -81,20 +82,6 @@ export function AdvancedDetection({
 					onChange={(epic_ids) => update({ epic_ids })}
 					rows={1}
 				/>
-				<LinesField
-					id="editor-heroic-slugs"
-					label={t("editor.detection.heroicSlugs")}
-					value={detect.heroic_slugs}
-					onChange={(heroic_slugs) => update({ heroic_slugs })}
-					rows={1}
-				/>
-				<LinesField
-					id="editor-lutris-slugs"
-					label={t("editor.detection.lutrisSlugs")}
-					value={detect.lutris_slugs}
-					onChange={(lutris_slugs) => update({ lutris_slugs })}
-					rows={1}
-				/>
 			</div>
 			<LinesField
 				id="editor-markers"
@@ -104,15 +91,6 @@ export function AdvancedDetection({
 				onChange={(markers) => update({ markers })}
 				rows={3}
 				placeholder={"bin/game.exe\ncontent/base"}
-			/>
-			<LinesField
-				id="editor-linux-markers"
-				label={t("editor.detection.linuxMarkers")}
-				hint={t("editor.detection.linuxMarkersHint")}
-				value={detect.linux_markers}
-				onChange={(linux_markers) => update({ linux_markers })}
-				rows={3}
-				placeholder="GameName.x86_64"
 			/>
 			<SwitchField
 				id="editor-any-marker"
@@ -168,17 +146,6 @@ export function AdvancedDetection({
 										onBrowse={folder.trim() === "" ? undefined : () => void browseProgram(index)}
 									/>
 									{outsideRow === index && <p className="text-destructive text-sm">{t("editor.quick.programOutside")}</p>}
-								</EditorField>
-								<EditorField
-									id={`editor-exe-linux-${index}`}
-									label={t("editor.detection.executableLinux")}
-									hint={t("editor.detection.executableLinuxHint")}
-								>
-									<TextInput
-										id={`editor-exe-linux-${index}`}
-										value={executable.path_linux ?? ""}
-										onChange={(path_linux) => updateExecutable(index, { path_linux })}
-									/>
 								</EditorField>
 								<LinesField
 									id={`editor-exe-args-${index}`}

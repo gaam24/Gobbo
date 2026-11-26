@@ -235,7 +235,11 @@ export function useImport({
 		(gameId: string, fresh: Status, imported: string[], added: ImportedModView[], fromSource: boolean) => {
 			onStatus(gameId, fresh);
 
-			if (imported.length > 0) notify(t("import.added", { list: imported.join(", ") }));
+			// `imported` holds folder names, which carry the archive's version, date and hash. The notice is read later, so it
+			// shows the mod names the list shows.
+			const names = imported.map((folder) => fresh.mods.find((mod) => mod.folder === folder)?.info.name ?? folder);
+
+			if (names.length > 0) notify(t("import.added", { list: names.join(", ") }));
 			// A version added to a family that already has a selected one waits for the user: an import must not silently
 			// replace the version the profile uses.
 			const versions = added.filter((item) => fresh.mods.some((mod) => mod.id === item.family && mod.folder !== item.folder));

@@ -1,9 +1,9 @@
 import { cn } from "cn";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, type LucideIcon } from "lucide-react";
 import { type ComponentProps, type ReactNode, useState } from "react";
 import { HelpHint } from "@/components/app/help-hint";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Item } from "@/components/ui/item";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "@/components/ui/item";
 
 /// The building blocks inside a dialog or the details panel, so every list, heading and fold there looks the same.
 
@@ -107,5 +107,45 @@ export function Disclosure({
 			</CollapsibleTrigger>
 			<CollapsibleContent className="grid gap-2">{children}</CollapsibleContent>
 		</Collapsible>
+	);
+}
+
+/// One outcome in a `BoxList`: an icon, what happens and, in one sentence, what that means for the user. It is the
+/// pattern of the closing dialog, for dialogs that report instead of ask (an apply preview, a check, a delete).
+/// The icon colour carries the outcome (`primary` for the good result, `warning` for what needs a look, `destructive`
+/// for what is lost); the text always says the same thing, so colour never works alone.
+export function OutcomeRow({
+	icon: Icon,
+	title,
+	detail,
+	tone,
+	action,
+}: {
+	icon: LucideIcon;
+	title: ReactNode;
+	detail?: ReactNode;
+	tone?: "primary" | "warning" | "destructive";
+	/// The button that acts on this outcome, such as "Show" or "Turn on".
+	action?: ReactNode;
+}) {
+	return (
+		<BoxListRow className="items-start py-2.5">
+			<ItemMedia className="mt-0.5">
+				<Icon
+					className={cn(
+						"text-muted-foreground size-4",
+						tone === "primary" && "text-primary",
+						tone === "warning" && "text-draft",
+						tone === "destructive" && "text-destructive",
+					)}
+					aria-hidden
+				/>
+			</ItemMedia>
+			<ItemContent className="min-w-0 gap-0.5">
+				<ItemTitle className="w-full font-normal whitespace-normal">{title}</ItemTitle>
+				{detail && <ItemDescription className="text-xs">{detail}</ItemDescription>}
+			</ItemContent>
+			{action && <ItemActions>{action}</ItemActions>}
+		</BoxListRow>
 	);
 }

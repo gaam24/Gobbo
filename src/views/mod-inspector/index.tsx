@@ -79,7 +79,6 @@ export function ModInspector({
 		<>
 			{selection.length === 0 && (
 				<DeploymentSummary
-					gameName={gameName}
 					status={status}
 					updates={updates}
 					gameRunning={gameRunning}

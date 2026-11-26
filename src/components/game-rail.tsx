@@ -1,5 +1,5 @@
 import { cn } from "cn";
-import { Bell, Download, HardDrive, Plus, Settings2 } from "lucide-react";
+import { Bell, Download, HardDrive, Plus, Settings } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import type { AppView } from "@/app/prefs";
 import type { GameView, ManagedGame } from "@/bindings";
@@ -33,6 +33,7 @@ export function GameRail({
 	games,
 	managed,
 	activeId,
+	activeState = null,
 	view,
 	paths,
 	notices,
@@ -47,6 +48,8 @@ export function GameRail({
 	games: GameView[];
 	managed: ManagedGame[];
 	activeId: string | undefined;
+	/// What the active game is doing, for the dot on its tile: it runs, or its list has changes waiting.
+	activeState?: "running" | "draft" | null;
 	view: AppView;
 	/// The active game's folders, because `Status` loads on its change; the other games have no paths.
 	paths: {
@@ -97,6 +100,7 @@ export function GameRail({
 							managedRoot={entry?.game_root ?? ""}
 							ready={entry?.ready ?? false}
 							active={game.id === activeId && (view === "mods" || view === "settings")}
+							state={game.id === activeId ? activeState : null}
 							paths={game.id === activeId ? paths : null}
 							onSelect={() => onSelect(game.id)}
 							onOpen={(path) => onOpen(game.id, path)}
@@ -107,7 +111,7 @@ export function GameRail({
 				})}
 				<RailButton
 					label={t("app.addGame")}
-					current={view === "games"}
+					current={false}
 					className="border-subtle-foreground border border-dashed"
 					onClick={() => onView("games")}
 				>
@@ -155,7 +159,7 @@ export function GameRail({
 					<HardDrive className="size-5" aria-hidden />
 				</RailButton>
 				<RailButton label={t("app.settings")} current={view === "app"} onClick={() => onView("app")}>
-					<Settings2 className="size-5" aria-hidden />
+					<Settings className="size-5" aria-hidden />
 				</RailButton>
 			</div>
 		</nav>
@@ -203,6 +207,7 @@ function GameTile({
 	managedRoot,
 	ready,
 	active,
+	state,
 	paths,
 	onSelect,
 	onOpen,
@@ -215,6 +220,7 @@ function GameTile({
 	/// Whether the folder still exists.
 	ready: boolean;
 	active: boolean;
+	state: "running" | "draft" | null;
 	paths: {
 		library: string;
 		archives: string;
@@ -228,19 +234,33 @@ function GameTile({
 }) {
 	const { t } = useTranslation();
 	const [confirmRemove, setConfirmRemove] = useState(false);
+	let label = game.name;
+
+	if (state === "running") label = t("app.railRunning", { name: game.name });
+	else if (state === "draft") label = t("app.railDraft", { name: game.name });
 
 	return (
 		<ContextMenu>
 			<ContextMenuTrigger asChild>
 				<Button
 					variant="ghost"
-					aria-label={game.name}
+					aria-label={label}
 					aria-current={active ? "page" : undefined}
-					title={game.name}
-					className={cn("size-12", active && "bg-muted ring-muted-foreground ring-1")}
+					title={label}
+					className={cn("relative size-12", active && "bg-muted ring-foreground/60 ring-1")}
 					onClick={onSelect}
 				>
 					<GameIcon id={game.id} name={game.name} className="size-7 rounded-md" />
+					{/* The dot repeats what the label says: the game runs (green) or has changes waiting. */}
+					{state && (
+						<span
+							aria-hidden
+							className={cn(
+								"ring-card absolute right-1.5 bottom-1.5 size-2.5 rounded-full ring-2",
+								state === "running" ? "bg-primary" : "bg-draft",
+							)}
+						/>
+					)}
 				</Button>
 			</ContextMenuTrigger>
 			<ContextMenuContent>

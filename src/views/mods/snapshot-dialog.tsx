@@ -155,14 +155,14 @@ export function SnapshotDialog({ gameId, onClose }: { gameId: string; onClose: (
 	return (
 		<>
 			<ModalDialog title={t("snapshots.title")} description={t("snapshots.hint")} width="xl" onClose={onClose}>
-				<div className="flex flex-wrap items-center gap-2">
+				{/* The button names the profile it saves, and the reason it waits sits right under it. */}
+				<div className="grid justify-items-start gap-1.5">
 					<Button disabled={!active || gameRunning || busy !== null} onClick={create}>
 						<ArchiveRestore aria-hidden />
-						{busy === "create" ? t("snapshots.creating") : t("snapshots.create")}
+						{busy === "create" ? t("snapshots.creating") : t("snapshots.createFor", { name: active?.name ?? "" })}
 					</Button>
-					{active && <span className="text-muted-foreground text-sm">{t("snapshots.forProfile", { name: active.name })}</span>}
+					{gameRunning && <p className="text-muted-foreground text-xs">{t("snapshots.gameRunning")}</p>}
 				</div>
-				{gameRunning && <p className="text-muted-foreground text-sm">{t("snapshots.gameRunning")}</p>}
 
 				{pending && (
 					<div className="bg-muted/40 grid gap-2 rounded-lg border p-3">

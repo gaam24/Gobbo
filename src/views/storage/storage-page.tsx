@@ -7,7 +7,8 @@ import { GameIcon } from "@/components/game-icon";
 import { PageFrame } from "@/components/page-frame";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "@/components/ui/item";
+import { ItemActions, ItemContent, ItemMedia, ItemTitle } from "@/components/ui/item";
+import { Progress } from "@/components/ui/progress";
 import { Spinner } from "@/components/ui/spinner";
 import { useTranslation } from "@/i18n";
 import { formatSize } from "@/lib/mods";
@@ -60,9 +61,13 @@ export function StorageView({
 						<ItemTitle className="w-full">
 							<span className="truncate">{name}</span>
 						</ItemTitle>
-						<ItemDescription className="line-clamp-none font-mono text-xs break-all" title={entry.path}>
-							{entry.path}
-						</ItemDescription>
+						{/* Every game's folder sits under the same data folder, so the path repeated the same prefix on each row. The
+						    share of the total says which game to look at; the path is on the folder button. */}
+						<Progress
+							value={total > 0 ? (entry.size_kb / total) * 100 : 0}
+							aria-label={t("storage.share", { name })}
+							className="mt-1 h-1.5 max-w-80"
+						/>
 					</ItemContent>
 					<span className="text-muted-foreground shrink-0 font-mono text-xs tabular-nums">{formatSize(entry.size_kb, locale)}</span>
 					<ItemActions className="shrink-0">

@@ -1,5 +1,5 @@
 import { cn } from "cn";
-import { FileUp, RefreshCw, Search, SearchCheck } from "lucide-react";
+import { EllipsisVertical, FileUp, Plus, RefreshCw, Search, SearchCheck } from "lucide-react";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useUiActions } from "@/app/contexts/ui-context";
 import { CatalogDialog } from "@/app/lazy-views";
@@ -9,6 +9,13 @@ import { ConfirmRemoveGame } from "@/components/confirm-remove-game";
 import { PageFrame } from "@/components/page-frame";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { useTranslation } from "@/i18n";
 import { ARCHIVE_EXTENSIONS } from "@/lib/archives";
@@ -125,25 +132,29 @@ export function GamesPanel({
 				meta={scanTime ? t("games.searchedAt", { time: scanTime }) : null}
 				action={
 					<>
-						<Button variant="outline" onClick={onCreate}>
-							{t("games.addOwn")}
-						</Button>
-						<Button variant="outline" onClick={() => void importDefinition()}>
-							<FileUp /> {t("editor.import.button")}
-						</Button>
 						<Button variant="outline" onClick={onScan} disabled={scanning}>
 							<RefreshCw /> {t("games.rescan")}
 						</Button>
-						<Button
-							variant="ghost"
-							size="icon-sm"
-							aria-label={t("catalog.checkNow")}
-							title={t("catalog.checkNow")}
-							onClick={() => void check(false)}
-							disabled={checking}
-						>
-							<SearchCheck aria-hidden />
+						<Button variant="outline" onClick={onCreate}>
+							<Plus /> {t("games.addOwn")}
 						</Button>
+						{/* Importing a definition and checking the catalog are rarer, so they wait in the menu. */}
+						<DropdownMenu>
+							<DropdownMenuTrigger asChild>
+								<Button variant="ghost" size="icon" aria-label={t("mods.more")} title={t("mods.more")}>
+									<EllipsisVertical aria-hidden />
+								</Button>
+							</DropdownMenuTrigger>
+							<DropdownMenuContent align="end" className="w-64">
+								<DropdownMenuItem onSelect={() => void importDefinition()}>
+									<FileUp /> {t("games.importDefinition")}
+								</DropdownMenuItem>
+								<DropdownMenuSeparator />
+								<DropdownMenuItem disabled={checking} onSelect={() => void check(false)}>
+									<SearchCheck /> {t("catalog.checkNow")}
+								</DropdownMenuItem>
+							</DropdownMenuContent>
+						</DropdownMenu>
 					</>
 				}
 				toolbar={

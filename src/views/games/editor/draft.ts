@@ -222,7 +222,8 @@ export function localIssues(draft: GameDraft): DraftIssue[] {
 
 	if (draft.name.trim() === "") issues.push("name");
 
-	if (!ID_PATTERN.test(draft.id.trim())) issues.push("id");
+	// The id is made from the name, so an empty name is the one thing to fix; a second line about the id adds nothing.
+	if (draft.name.trim() !== "" && !ID_PATTERN.test(draft.id.trim())) issues.push("id");
 
 	if (!draft.executables.some((executable) => executable.path.trim() !== "")) issues.push("executable");
 

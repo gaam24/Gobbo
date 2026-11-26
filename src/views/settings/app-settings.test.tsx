@@ -103,7 +103,7 @@ test("the closing choice is editable in the interface settings", () => {
 
 test("the catalog check toggle renders next to the collection check", () => {
 	const html = renderToString(settings(true));
-	expect(html).toContain("Check for new game definitions when the app starts");
+	expect(html).toContain("Once per launch, from the official catalog.");
 	expect(html).toContain('id="check-catalog-on-launch"');
 	expect(html).toContain("Check when a game opens");
 });

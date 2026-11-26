@@ -10,7 +10,7 @@ import { DialogCloseFooter, ModalDialog } from "@/components/modal-dialog";
 import { Button } from "@/components/ui/button";
 import { ItemActions, ItemContent, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { type TranslationKey, useTranslation } from "@/i18n";
-import { translateCode, unwrap } from "@/lib/ipc";
+import { translate, unwrap } from "@/lib/ipc";
 import { useLoad } from "@/lib/use-load";
 
 const ACTION_LABEL: Record<HealthActionKind, TranslationKey> = {
@@ -76,7 +76,7 @@ function HealthRow({ item, onRun }: { item: HealthItem; onRun: (kind: HealthActi
 				<Icon className={item.severity === "problem" ? "text-destructive size-4" : "text-muted-foreground size-4"} aria-hidden />
 			</ItemMedia>
 			<ItemContent className="min-w-0">
-				<ItemTitle className="w-full text-sm font-normal">{translateCode(item.message.code, item.message.params)}</ItemTitle>
+				<ItemTitle className="w-full text-sm font-normal">{translate(item.message)}</ItemTitle>
 			</ItemContent>
 			{action && (
 				<ItemActions>

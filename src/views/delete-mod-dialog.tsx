@@ -1,6 +1,7 @@
+import { Info, OctagonX, Undo2 } from "lucide-react";
 import { useState } from "react";
 import { commands, type Status } from "@/bindings";
-import { BoxList, BoxListRow, SectionHeading } from "@/components/app/content-blocks";
+import { BoxList, BoxListRow, OutcomeRow, SectionHeading } from "@/components/app/content-blocks";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ItemActions, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -145,7 +146,7 @@ export function DeleteModDialog({
 			<p>{body}</p>
 
 			{target && (
-				<div className="bg-muted/50 grid gap-0.5 rounded-md border px-2.5 py-2">
+				<div className="grid gap-0.5 rounded-lg border px-3 py-2">
 					<VersionFacts version={target} />
 				</div>
 			)}
@@ -212,10 +213,22 @@ export function DeleteModDialog({
 				</div>
 			)}
 
-			{onlyVersion && <p>{t("mods.confirmDelete.onlyVersion")}</p>}
-			{prepared && page === null && <p>{t("mods.confirmDelete.prepared")}</p>}
-			{running && <p className="text-destructive">{t("mods.confirmDelete.running")}</p>}
+			<DeleteOutcomes onlyVersion={onlyVersion} prepared={prepared && page === null} running={running} />
 		</ConfirmDialog>
+	);
+}
+
+/// What else happens, as outcomes: the same rows as the apply preview, so a warning is not lost in the prose.
+function DeleteOutcomes({ onlyVersion, prepared, running }: { onlyVersion: boolean; prepared: boolean; running: boolean }) {
+	const { t } = useTranslation();
+
+	if (!(onlyVersion || prepared || running)) return null;
+	return (
+		<BoxList>
+			{onlyVersion && <OutcomeRow icon={Info} tone="warning" title={t("mods.confirmDelete.onlyVersion")} />}
+			{prepared && <OutcomeRow icon={Undo2} title={t("mods.confirmDelete.prepared")} />}
+			{running && <OutcomeRow icon={OctagonX} tone="destructive" title={t("mods.confirmDelete.running")} />}
+		</BoxList>
 	);
 }
 
@@ -228,8 +241,11 @@ function PageDeleteDetails({ parts, prepared }: { parts: ReadonlyArray<Pick<Mod,
 				<SectionHeading title={t("mods.confirmDelete.pageParts")} count={parts.length} />
 				<DeletePageParts parts={parts} />
 			</section>
-			{prepared && <p>{t("mods.confirmDelete.pagePrepared")}</p>}
-			{prepared && <p>{t("mods.confirmDelete.pageRunning")}</p>}
+			{prepared && (
+				<BoxList>
+					<OutcomeRow icon={Undo2} title={t("mods.confirmDelete.pagePrepared")} detail={t("mods.confirmDelete.pageRunning")} />
+				</BoxList>
+			)}
 		</>
 	);
 }

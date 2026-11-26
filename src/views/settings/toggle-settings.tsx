@@ -1,5 +1,5 @@
 import { APP_NOTIFICATIONS, NOTIFICATION_OUTCOMES, type SourceProviderInfo, TASK_KINDS } from "@/bindings";
-import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useTranslation } from "@/i18n";
 import { taskNotification } from "@/lib/notifications";
@@ -96,9 +96,9 @@ export function HideWhenGameLaunchesSetting({ on, onChange }: { on: boolean; onC
 	);
 }
 
-/// The main switch, then one switch per task kind and outcome, and one per app event. The codes come from the generated
-/// bindings, so a new task kind adds a row here; `t` only accepts keys that exist in both locales, so a missing label
-/// fails the type check.
+/// The main switch, then one checkbox per task kind and outcome, and one per app event: a grid of twenty switches read
+/// as noise. The codes come from the generated bindings, so a new task kind adds a row here; `t` only accepts keys that
+/// exist in both locales, so a missing label fails the type check.
 export function SystemNotificationsSetting({
 	on,
 	muted,
@@ -144,14 +144,14 @@ export function SystemNotificationsSetting({
 											const code = taskNotification(kind, outcome);
 											return (
 												<TableCell key={outcome} className="text-center">
-													<Switch
+													<Checkbox
 														id={`notification-${code}`}
 														aria-label={t("settings.notifications.switchLabel", {
 															task,
 															outcome: t(`settings.notifications.outcomes.${outcome}`),
 														})}
 														checked={!muted.includes(code)}
-														onCheckedChange={(checked) => void onNotification(code, checked)}
+														onCheckedChange={(checked) => void onNotification(code, checked === true)}
 													/>
 												</TableCell>
 											);
@@ -159,17 +159,17 @@ export function SystemNotificationsSetting({
 									</TableRow>
 								);
 							})}
-							{/* An app event has one switch; it sits in the last column so every switch lines up. */}
+							{/* An app event has one checkbox; it sits in the last column so every checkbox lines up. */}
 							{APP_NOTIFICATIONS.map((code) => (
 								<TableRow key={code}>
 									<TableCell colSpan={NOTIFICATION_OUTCOMES.length} className="whitespace-normal">
 										<label htmlFor={`notification-${code}`}>{t(`settings.notifications.app.${code}`)}</label>
 									</TableCell>
 									<TableCell className="text-center">
-										<Switch
+										<Checkbox
 											id={`notification-${code}`}
 											checked={!muted.includes(code)}
-											onCheckedChange={(checked) => void onNotification(code, checked)}
+											onCheckedChange={(checked) => void onNotification(code, checked === true)}
 										/>
 									</TableCell>
 								</TableRow>

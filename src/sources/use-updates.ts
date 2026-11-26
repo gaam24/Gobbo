@@ -125,7 +125,9 @@ export function useModUpdates({ gameId, status, onStatus, nameOf, notify, notify
 				if (report.latest_installed) notify(t("mods.version.installed", { version: report.latest }));
 				else notify(t("mods.version.updateAvailable", { version: report.latest }));
 			} else {
-				notify(t("mods.version.upToDate"));
+				// A notice is read later, away from the row, so it names the mod.
+				const name = status?.mods.find((mod) => mod.id === modId)?.info.name;
+				notify(name ? t("mods.version.upToDateNamed", { name }) : t("mods.version.upToDate"));
 			}
 		} catch (failure) {
 			notifyError(messageOf(failure), detailOf(failure));

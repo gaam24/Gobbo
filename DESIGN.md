@@ -15,8 +15,10 @@ This file is the design contract for the Gobbo frontend. Read it before changing
 ## Typography
 
 - UI: **Schibsted Grotesk Variable**. It is the product voice and is deliberately not Inter or Geist.
-- Data: **IBM Plex Mono** for paths, IDs, versions, sizes, counts, dates and code. Not for labels, buttons or
+- Data: **IBM Plex Mono** for paths, IDs, versions, sizes, counts and code. Not for labels, buttons, prose or
   keyboard keys.
+- Dates and times use the UI font without `tabular-nums`: tabular figures in Schibsted Grotesk widen `:` and `,`, so
+  "03:08" reads as "03 : 08". Keep `tabular-nums` for numbers that line up in a column.
 - Scale and roles:
 
 | Role                        | Class       | Size / line-height | Weight    |
@@ -116,6 +118,9 @@ Use the semantic tokens in `src/index.css`. Never use raw colours in components.
   - `BoxList` + `BoxListRow` for every list of records: one bordered box with dividers, capped with `scroll` when it
     can be long. No outlined card per item and no bare `grid gap-1` list.
   - `Disclosure` for anything that opens and closes. Never the browser's `<details>`.
+  - `OutcomeRow` inside a `BoxList` for a dialog that reports what will happen (an apply preview, a check, a delete):
+    an icon, what happens and one sentence on what it means. It is the closing dialog's pattern: the icon colour
+    carries the outcome (`primary` good, `warning` worth a look, `destructive` lost) and the text says the same.
   - `ModalDialog` spaces its body 16 px apart and keeps `DialogFooter` (secondary button first, primary last) outside
     the scroll; a dialog does not add its own spacing wrapper.
 - A custom component is allowed only when it encodes a domain concept or a repeatable rule and cannot be
@@ -144,6 +149,13 @@ Use the semantic tokens in `src/index.css`. Never use raw colours in components.
 - A group header (a page of parts, a separator) shows only what its rows share or add up to. An empty cell in a header
   stays blank; the dash `—` marks an empty value in a row, not in a header.
 - Put advanced and destructive actions behind a menu or in the last section, never next to the everyday controls.
+- One number, one place. A count the header or the filter bar already shows is not repeated in the inspector.
+- A problem carries its fix. When the fix is one known action ("Turn on X", "Install the loader"), its button sits
+  right next to the message instead of in a separate dialog.
+- A list that needs the user puts those rows first. Rows that only confirm that something is fine fold away once
+  something else needs a look.
+- An idle state says nothing. A cell, a line or a button that only reports the normal case ("Up to date",
+  "Update all (0)") is left out; it appears when it has something to say.
 
 ## Research
 

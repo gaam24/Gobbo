@@ -1,4 +1,4 @@
-import { Disclosure, SectionHeading } from "@/components/app/content-blocks";
+import { Disclosure } from "@/components/app/content-blocks";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useTranslation } from "@/i18n";
@@ -9,20 +9,14 @@ import { AdvancedProfiles } from "@/views/games/editor/advanced-profiles";
 import { AdvancedTools } from "@/views/games/editor/advanced-tools";
 import type { GameDraft } from "@/views/games/editor/draft";
 
-/// Every field the quick part does not show, and the TOML source. The form and the source edit the same draft: a form
-/// change replaces the source text, and applying the source replaces the form.
-export function AdvancedForm({
+/// The fields most games never need, each group folded under one sentence that says when to open it. A user reads five
+/// lines instead of forty fields and opens only the group their game needs. The Linux-only values are in `AdvancedLinux`.
+export function MoreOptions({
 	draft,
 	onChange,
 	folder,
 	programs,
 	directories,
-	source,
-	sourceDirty,
-	formText,
-	sourceError,
-	onSourceChange,
-	onApplySource,
 }: {
 	draft: GameDraft;
 	onChange: (draft: GameDraft) => void;
@@ -31,6 +25,66 @@ export function AdvancedForm({
 	/** The programs Gobbo found in the game folder, offered by the program fields. */
 	programs: string[];
 	directories: string[];
+}) {
+	const { t } = useTranslation();
+	const groups = [
+		{
+			id: "detection",
+			title: t("editor.advanced.detection"),
+			hint: t("editor.more.detectionHint"),
+			content: <AdvancedDetection draft={draft} onChange={onChange} programs={programs} folder={folder} />,
+		},
+		{
+			id: "deploy",
+			title: t("editor.advanced.deploy"),
+			hint: t("editor.more.deployHint"),
+			content: <AdvancedDeploy draft={draft} onChange={onChange} directories={directories} />,
+		},
+		{
+			id: "profiles",
+			title: t("editor.advanced.profiles"),
+			hint: t("editor.more.profilesHint"),
+			content: <AdvancedProfiles draft={draft} onChange={onChange} />,
+		},
+		{
+			id: "extras",
+			title: t("editor.advanced.extras"),
+			hint: t("editor.more.extrasHint"),
+			content: <AdvancedExtras draft={draft} onChange={onChange} />,
+		},
+		{
+			id: "tools",
+			title: t("editor.advanced.tools"),
+			hint: t("editor.more.toolsHint"),
+			content: <AdvancedTools draft={draft} onChange={onChange} />,
+		},
+	];
+
+	return (
+		<div className="grid gap-2">
+			<p className="text-muted-foreground mb-4 text-sm text-pretty">{t("editor.more.hint")}</p>
+			{groups.map((group) => (
+				<section key={group.id} id={`editor-${group.id}`} className="grid scroll-mt-6 gap-1 border-t py-4">
+					<Disclosure title={<span className="text-base font-semibold">{group.title}</span>}>
+						<div className="pt-2">{group.content}</div>
+					</Disclosure>
+					<p className="text-muted-foreground pl-6 text-sm text-pretty">{group.hint}</p>
+				</section>
+			))}
+		</div>
+	);
+}
+
+/// The definition as TOML. The form and the source edit the same draft: a form change replaces the source text, and
+/// applying the source replaces the form.
+export function DefinitionSource({
+	source,
+	sourceDirty,
+	formText,
+	sourceError,
+	onSourceChange,
+	onApplySource,
+}: {
 	source: string;
 	sourceDirty: boolean;
 	formText: string;
@@ -40,50 +94,22 @@ export function AdvancedForm({
 }) {
 	const { t } = useTranslation();
 	return (
-		<Disclosure className="scroll-mt-6 border-t pt-6" title={<span className="text-base font-semibold">{t("editor.advanced.title")}</span>}>
-			<p className="text-muted-foreground text-sm">{t("editor.advanced.hint")}</p>
-			<div className="grid gap-10">
-				<section id="editor-detection" className="grid scroll-mt-6 gap-4">
-					<SectionHeading title={t("editor.advanced.detection")} />
-					<AdvancedDetection draft={draft} onChange={onChange} programs={programs} folder={folder} />
-				</section>
-				<section id="editor-deploy" className="grid scroll-mt-6 gap-4 border-t pt-8">
-					<SectionHeading title={t("editor.advanced.deploy")} />
-					<AdvancedDeploy draft={draft} onChange={onChange} directories={directories} />
-				</section>
-				<section id="editor-profiles" className="grid scroll-mt-6 gap-4 border-t pt-8">
-					<SectionHeading title={t("editor.advanced.profiles")} />
-					<AdvancedProfiles draft={draft} onChange={onChange} />
-				</section>
-				<section id="editor-extras" className="grid scroll-mt-6 gap-4 border-t pt-8">
-					<SectionHeading title={t("editor.advanced.extras")} />
-					<AdvancedExtras draft={draft} onChange={onChange} />
-				</section>
-				<section id="editor-tools" className="grid scroll-mt-6 gap-4 border-t pt-8">
-					<SectionHeading title={t("editor.advanced.tools")} />
-					<AdvancedTools draft={draft} onChange={onChange} />
-				</section>
-				<section id="editor-source" className="grid scroll-mt-6 gap-3 border-t pt-8">
-					<SectionHeading
-						title={t("editor.source.title")}
-						actions={
-							<Button type="button" variant="outline" size="sm" disabled={!sourceDirty} onClick={() => void onApplySource()}>
-								{t("editor.source.apply")}
-							</Button>
-						}
-					/>
-					<p className="text-muted-foreground text-xs text-pretty">{t("editor.source.hint")}</p>
-					{sourceDirty && <p className="text-primary text-xs">{t("editor.source.pending")}</p>}
-					<Textarea
-						className="min-h-80 font-mono text-xs"
-						aria-label={t("editor.source.title")}
-						value={sourceDirty ? source : formText}
-						spellCheck={false}
-						onChange={(event) => onSourceChange(event.currentTarget.value)}
-					/>
-					{sourceError && <p className="text-destructive text-xs whitespace-pre-wrap">{sourceError}</p>}
-				</section>
+		<section id="editor-source" className="grid gap-3">
+			<div className="flex items-start justify-between gap-3">
+				<p className="text-muted-foreground text-sm text-pretty">{t("editor.source.hint")}</p>
+				<Button type="button" variant="outline" size="sm" disabled={!sourceDirty} onClick={() => void onApplySource()}>
+					{t("editor.source.apply")}
+				</Button>
 			</div>
-		</Disclosure>
+			{sourceDirty && <p className="text-primary text-xs">{t("editor.source.pending")}</p>}
+			<Textarea
+				className="min-h-[60vh] font-mono text-xs"
+				aria-label={t("editor.source.title")}
+				value={sourceDirty ? source : formText}
+				spellCheck={false}
+				onChange={(event) => onSourceChange(event.currentTarget.value)}
+			/>
+			{sourceError && <p className="text-destructive text-xs whitespace-pre-wrap">{sourceError}</p>}
+		</section>
 	);
 }

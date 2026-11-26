@@ -123,30 +123,42 @@ function ReportBody({
 	onRetry: () => void;
 }) {
 	const { t, i18n } = useTranslation();
+	const attention = report.checks.filter((check) => check.state !== "ok");
+	const passed = report.checks.filter((check) => check.state === "ok");
+	let badgeKey: "setupCheck.notReady" | "setupCheck.readyWithWarnings" | "setupCheck.ready" = "setupCheck.ready";
+
+	if (!report.ready) badgeKey = "setupCheck.notReady";
+	else if (attention.length > 0) badgeKey = "setupCheck.readyWithWarnings";
+	const row = (check: PreflightReport["checks"][number]) => (
+		<CheckRow
+			key={check.id}
+			check={check}
+			free={check.id === "space" && report.free_space_kb > 0 ? formatSize(report.free_space_kb, i18n.language) : null}
+			onOpenSettings={onOpenSettings}
+			onShowMods={onShowMods}
+			onOpenStorage={onOpenStorage}
+			onGetRequirement={onGetRequirement}
+		/>
+	);
 	return (
 		<>
 			<div className="flex items-center justify-between gap-2">
-				<StatusBadge tone={report.ready ? "success" : "warning"}>
-					{report.ready ? t("setupCheck.ready") : t("setupCheck.notReady")}
-				</StatusBadge>
+				<StatusBadge tone={report.ready && attention.length === 0 ? "success" : "warning"}>{t(badgeKey)}</StatusBadge>
 				<Button variant="ghost" size="sm" onClick={onRetry}>
 					<RefreshCw /> {t("setupCheck.checkAgain")}
 				</Button>
 			</div>
 			{report.loader && <LoaderCard loader={report.loader} installing={installing} onInstall={onInstallLoader} />}
-			<BoxList>
-				{report.checks.map((check) => (
-					<CheckRow
-						key={check.id}
-						check={check}
-						free={check.id === "space" && report.free_space_kb > 0 ? formatSize(report.free_space_kb, i18n.language) : null}
-						onOpenSettings={onOpenSettings}
-						onShowMods={onShowMods}
-						onOpenStorage={onOpenStorage}
-						onGetRequirement={onGetRequirement}
-					/>
+			{/* What needs the user comes first; the checks that pass fold away, so one warning is not lost among eight ticks. */}
+			{attention.length > 0 && <BoxList>{attention.map((check) => row(check))}</BoxList>}
+			{passed.length > 0 &&
+				(attention.length === 0 ? (
+					<BoxList>{passed.map((check) => row(check))}</BoxList>
+				) : (
+					<Disclosure title={t("setupCheck.passed")} count={passed.length}>
+						<BoxList>{passed.map((check) => row(check))}</BoxList>
+					</Disclosure>
 				))}
-			</BoxList>
 			{(report.problems.length > 0 || report.warnings.length > 0) && (
 				<Disclosure title={t("setupCheck.details")}>
 					<ul className="grid gap-1 pl-4 text-sm">

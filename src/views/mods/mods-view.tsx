@@ -294,6 +294,7 @@ export function ModsView({ gameId, status }: ModsViewProps) {
 									problems={status.problems}
 									warnings={status.warnings}
 									onInstallLoader={() => void gameActions.installLoader(gameId)}
+									onTurnOn={(modId) => void onSetEnabled(modId, true)}
 								/>
 								<ImportVersionBanner
 									mods={pendingVersions}

@@ -127,7 +127,7 @@ test("a user-group header shows its name and a mod count, without the page actio
 	expect(html).not.toContain("Delete page…");
 	expect(html).toContain("Rename group");
 	expect(html).toContain("Remove from group");
-	expect(html).not.toContain("Set translation as winner");
+	expect(html).not.toContain("Let the translation override the base");
 });
 
 test("a translation group shows its language and the translation action", () => {
@@ -149,7 +149,7 @@ test("a translation group shows its language and the translation action", () => 
 	};
 	const html = render(group, withCategory);
 	expect(html).toContain("German");
-	expect(html).toContain("Set translation as winner");
+	expect(html).toContain("Let the translation override the base");
 });
 
 afterAll(() => mock.restore());

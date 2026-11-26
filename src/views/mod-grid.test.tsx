@@ -324,7 +324,7 @@ test("a translation group shows its language in the compact header", () => {
 	const html = renderToString(<ModGrid {...gridProps({ rows: rowsOf([alpha, beta]), groups })} />);
 	expect(html).toContain("German pack");
 	expect(html).toContain("German");
-	expect(html).toContain("Set translation as winner");
+	expect(html).toContain("Let the translation override the base");
 });
 
 afterAll(() => mock.restore());

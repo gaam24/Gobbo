@@ -28,7 +28,6 @@ export interface GettingStartedActions {
 
 /// A compact deployment summary. The actions live in the game header; the settings show the overlay.
 export function DeploymentSummary({
-	gameName,
 	status,
 	updates,
 	gameRunning,
@@ -40,7 +39,6 @@ export function DeploymentSummary({
 	onOpenDownloads,
 	onInstallLoader,
 }: GettingStartedActions & {
-	gameName: string;
 	status: Status;
 	updates: Record<string, UpdateReport>;
 	/// The game is running, so an apply waits until it stops.
@@ -169,36 +167,32 @@ export function DeploymentSummary({
 					</ItemActions>
 				</Item>
 			)}
-			<div className="grid gap-1">
-				<h2 className="text-base font-semibold">{t("deploy.title")}</h2>
-				<p className="text-muted-foreground text-sm">{status.deployed ? t("deploy.state.deployed") : t("deploy.state.draft")}</p>
-				{status.game_subtitle && <p className="text-subtle-foreground text-sm">{status.game_subtitle}</p>}
-			</div>
+			{/* The game name, the enabled count and the filter counts are already in the header and the toolbar. This block
+			    says only what the game runs now; while changes wait, the card above says that, so the state line is left out. */}
+			{status.deployed && (
+				<div className="grid gap-1">
+					<h2 className="text-base font-semibold">{t("deploy.title")}</h2>
+					{status.draft_changes === 0 && <p className="text-muted-foreground text-sm">{t("deploy.state.deployed")}</p>}
+				</div>
+			)}
 
-			<FactList
-				facts={[
-					fact(t("deploy.game"), gameName, { className: "truncate" }),
-					fact(
-						t("deploy.enabled"),
-						t("deploy.enabledCount", {
-							enabled: enabled.length,
-							total: status.mods.length,
-						}),
-						{
-							className: "tabular-nums",
-						},
-					),
-					fact(t("deploy.conflicts"), status.conflict_count, {
-						className: "tabular-nums",
-					}),
-					fact(t("deploy.updates"), updatesCount, {
-						className: "tabular-nums",
-					}),
-					fact(t("deploy.lastDeployed"), status.deployed_at ? formatTime(status.deployed_at * 1000, i18n.language) : null, {
-						className: "tabular-nums",
-					}),
-				]}
-			/>
+			{status.deployed && (
+				<FactList
+					facts={[
+						fact(t("deploy.lastDeployed"), status.deployed_at ? formatTime(status.deployed_at * 1000, i18n.language) : null),
+						status.conflict_count > 0
+							? fact(t("deploy.conflicts"), status.conflict_count, {
+									className: "tabular-nums",
+								})
+							: null,
+						updatesCount > 0
+							? fact(t("deploy.updates"), updatesCount, {
+									className: "tabular-nums",
+								})
+							: null,
+					]}
+				/>
+			)}
 			{blocker && <p className="text-muted-foreground text-sm">{t(blocker)}</p>}
 
 			{status.has_overwrite && onOpenOverwrite && (

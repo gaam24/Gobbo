@@ -33,10 +33,14 @@ export function translateCode(code: string, params: Record<string, string> = {})
 	return translateDynamic(code, values);
 }
 
-/// The text for a message code, such as `file.no_conflict`. A code without a translation shows the code itself.
+/// The text for a message code, such as `file.no_conflict`. A report can mix codes from the shared `messages` table with
+/// codes that name their own section (`health.draft`), so both are tried. A code without a translation shows the code.
 export function translate(message: Message): string {
 	const key = `messages.${message.code}`;
-	return hasTranslation(key) ? translateCode(key, message.params) : message.code;
+
+	if (hasTranslation(key)) return translateCode(key, message.params);
+	if (hasTranslation(message.code)) return translateCode(message.code, message.params);
+	return message.code;
 }
 
 /// The text for a backend error. Each error kind adds a short hint where one helps, such as "try again".

@@ -1,5 +1,5 @@
 import { cn } from "cn";
-import { ChevronDown, Download } from "lucide-react";
+import { ChevronDown, Download, ToggleRight } from "lucide-react";
 import { useState } from "react";
 import type { Status } from "@/bindings";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -21,10 +21,13 @@ export function ModsAlerts({
 	problems,
 	warnings,
 	onInstallLoader,
+	onTurnOn,
 }: {
 	problems: Status["problems"];
 	warnings: Status["warnings"];
 	onInstallLoader?: () => void;
+	/// Turns on a mod another mod needs. A warning that names a turned-off requirement gets this button next to it.
+	onTurnOn?: (modId: string) => void;
 }) {
 	const { t } = useTranslation();
 	const [open, setOpen] = useState(() => readPref(WARNINGS_OPEN_PREF, true, isOpen));
@@ -68,16 +71,37 @@ export function ModsAlerts({
 								<Button variant="ghost" size="sm" className="-m-1 h-auto w-full min-w-0 justify-start gap-1.5 p-1 font-semibold">
 									<ChevronDown className={cn("size-3.5 shrink-0 transition-transform", !open && "-rotate-90")} aria-hidden />
 									<span className="truncate">{t("mods.relations.warningsTitle")}</span>
-									<span className="text-subtle-foreground ml-auto font-mono text-xs tabular-nums">{warnings.length}</span>
+									<span className="text-subtle-foreground text-xs font-normal tabular-nums">{warnings.length}</span>
 								</Button>
 							</CollapsibleTrigger>
 						</AlertTitle>
 						<CollapsibleContent>
 							<AlertDescription>
 								<ul className="list-disc pl-4 wrap-break-word">
-									{warnings.map((warning) => (
-										<li key={`${warning.code}${JSON.stringify(warning.params)}`}>{translate(warning)}</li>
-									))}
+									{warnings.map((warning, index) => {
+										const requirementId = warning.code === "relations.requires_disabled" ? warning.params.requirement_id : undefined;
+										// Two mods can need the same one; the button sits only next to the first message that names it.
+										const turnOnId =
+											requirementId !== undefined && warnings.findIndex((other) => other.params.requirement_id === requirementId) === index
+												? requirementId
+												: null;
+										return (
+											<li key={`${warning.code}${JSON.stringify(warning.params)}`}>
+												{translate(warning)}
+												{turnOnId !== null && onTurnOn && (
+													<Button
+														type="button"
+														variant="outline"
+														size="sm"
+														className="mt-1.5 mb-1 flex w-fit"
+														onClick={() => onTurnOn(turnOnId)}
+													>
+														<ToggleRight aria-hidden /> {t("mods.relations.turnOn", { name: warning.params.requirement ?? "" })}
+													</Button>
+												)}
+											</li>
+										);
+									})}
 								</ul>
 							</AlertDescription>
 						</CollapsibleContent>

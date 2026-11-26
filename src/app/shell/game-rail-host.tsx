@@ -11,8 +11,13 @@ export function GameRailHost() {
 	const { managedGames, managed } = useGames();
 	const { view, openGames, openAppSettings, openDownloads, openNotifications, openStorage } = useNavigation();
 	const { notices } = useNoticeList();
-	const { gameId, status, selectGame, openPathFor, copyPath, gameActions } = useWorkspace();
+	const { gameId, status, gameRunning, selectGame, openPathFor, copyPath, gameActions } = useWorkspace();
 	const { summary } = useDownloadsContext();
+
+	let activeState: "running" | "draft" | null = null;
+
+	if (gameRunning) activeState = "running";
+	else if ((status?.draft_changes ?? 0) > 0) activeState = "draft";
 
 	const openRailView = (next: "games" | "app" | "downloads" | "notifications" | "storage") => {
 		if (next === "games") openGames();
@@ -27,6 +32,7 @@ export function GameRailHost() {
 			games={managedGames}
 			managed={managed ?? []}
 			activeId={gameId}
+			activeState={activeState}
 			view={view}
 			paths={
 				status

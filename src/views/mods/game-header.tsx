@@ -4,13 +4,17 @@ import {
 	CircleAlert,
 	Download,
 	Files,
+	Layers,
 	ListOrdered,
 	OctagonX,
 	PanelRightClose,
 	PanelRightOpen,
 	Play,
-	Settings2,
+	RefreshCw,
+	RotateCcw,
+	SlidersHorizontal,
 	Stethoscope,
+	ToggleRight,
 	Undo2,
 	Upload,
 	Wrench,
@@ -176,11 +180,46 @@ export function GameHeader({ gameId, status }: { gameId: string; status: Status 
 				</Button>
 			)}
 			{chip()}
+			<DropdownMenu>
+				<DropdownMenuTrigger asChild>
+					<Button variant="ghost" aria-label={t("header.menu.tools")} title={t("header.menu.tools")}>
+						<Wrench /> <span className="hidden @5xl:inline">{t("header.menu.tools")}</span>
+					</Button>
+				</DropdownMenuTrigger>
+				<DropdownMenuContent align="end" className="w-64">
+					<DropdownMenuItem onSelect={() => openDialog({ kind: "conflicts" })}>
+						<Files /> {t("conflicts.title")}
+						{status.conflict_count > 0 && (
+							<span className="text-muted-foreground ml-auto text-xs tabular-nums">{status.conflict_count}</span>
+						)}
+					</DropdownMenuItem>
+					{status.load_order && (
+						<DropdownMenuItem onSelect={() => openDialog({ kind: "load-order" })}>
+							<ListOrdered /> {t("loadOrder.title")}
+						</DropdownMenuItem>
+					)}
+					<DropdownMenuItem onSelect={() => openDialog({ kind: "snapshots" })}>
+						<ArchiveRestore /> {t("snapshots.title")}
+					</DropdownMenuItem>
+					<DropdownMenuSeparator />
+					<DropdownMenuItem onSelect={() => openDialog({ kind: "health" })}>
+						<Stethoscope /> {t("health.title")}
+					</DropdownMenuItem>
+					<DropdownMenuItem onSelect={() => openDialog({ kind: "setup" })}>
+						<Wrench /> {t("setupCheck.title")}
+					</DropdownMenuItem>
+				</DropdownMenuContent>
+			</DropdownMenu>
 			<div className="flex items-center">
 				{primary()}
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
-						<Button variant="default" size="icon" aria-label={t("header.executableMenu")} title={t("header.executableMenu")}>
+						<Button
+							variant={presentation.primary.id === "stop" ? "destructive" : "default"}
+							size="icon"
+							aria-label={t("header.executableMenu")}
+							title={t("header.executableMenu")}
+						>
 							<ChevronDown />
 						</Button>
 					</DropdownMenuTrigger>
@@ -227,33 +266,11 @@ export function GameHeader({ gameId, status }: { gameId: string; status: Status 
 								</DropdownMenuItem>
 							</>
 						)}
-						{(status.executables.length > 0 || presentation.menu.length > 0 || (canUndo && !gameRunning)) && <DropdownMenuSeparator />}
-						<DropdownMenuLabel>{t("header.menu.tools")}</DropdownMenuLabel>
-						<DropdownMenuItem onSelect={() => openDialog({ kind: "setup" })}>
-							<Wrench /> {t("setupCheck.title")}
-						</DropdownMenuItem>
-						<DropdownMenuItem onSelect={() => openDialog({ kind: "health" })}>
-							<Stethoscope /> {t("health.title")}
-						</DropdownMenuItem>
-						<DropdownMenuItem onSelect={() => openDialog({ kind: "snapshots" })}>
-							<ArchiveRestore /> {t("snapshots.title")}
-						</DropdownMenuItem>
-						<DropdownMenuItem onSelect={() => openDialog({ kind: "conflicts" })}>
-							<Files /> {t("conflicts.title")}
-							{status.conflict_count > 0 && (
-								<span className="text-muted-foreground ml-auto font-mono text-xs tabular-nums">{status.conflict_count}</span>
-							)}
-						</DropdownMenuItem>
-						{status.load_order && (
-							<DropdownMenuItem onSelect={() => openDialog({ kind: "load-order" })}>
-								<ListOrdered /> {t("loadOrder.title")}
-							</DropdownMenuItem>
-						)}
 					</DropdownMenuContent>
 				</DropdownMenu>
 			</div>
 			<Button variant="ghost" size="icon" aria-label={t("mods.gameSettings")} title={t("mods.gameSettings")} onClick={openGameSettings}>
-				<Settings2 />
+				<SlidersHorizontal />
 			</Button>
 			<Button
 				variant="ghost"
@@ -320,12 +337,16 @@ export function GameHeader({ gameId, status }: { gameId: string; status: Status 
 function actionIcon(action: GameAction) {
 	switch (action.id) {
 		case "play":
-		case "apply":
 		case "apply-and-play":
-		case "discard":
-		case "enable":
-		case "retry":
 			return <Play />;
+		case "apply":
+			return <Layers />;
+		case "discard":
+			return <RotateCcw />;
+		case "enable":
+			return <ToggleRight />;
+		case "retry":
+			return <RefreshCw />;
 		case "stop":
 			return <OctagonX />;
 		case "import":

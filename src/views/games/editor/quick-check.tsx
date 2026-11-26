@@ -1,4 +1,5 @@
-import { Check } from "lucide-react";
+import { Check, CircleDashed, CircleX } from "lucide-react";
+import { BoxList, OutcomeRow } from "@/components/app/content-blocks";
 import { type TranslationKey, useTranslation } from "@/i18n";
 import { QuickSection } from "@/views/games/editor/quick-section";
 import type { QuickProps } from "@/views/games/editor/quick-types";
@@ -24,29 +25,31 @@ export function QuickCheck({ check, issues }: QuickProps) {
 	const { t } = useTranslation();
 	return (
 		<QuickSection number={4} title={t("editor.quick.checkTitle")} hint={t("editor.quick.checkHint")}>
+			{/* A field not filled in yet is a step to do, not an error: it is drawn as a to-do, not in red. */}
 			{issues.length > 0 && (
-				<ul className="grid gap-1 text-sm">
+				<BoxList>
 					{issues.map((issue) => (
-						<li key={issue} className="text-destructive">
-							{t(`editor.quick.issue.${issue}`)}
-						</li>
+						<OutcomeRow key={issue} icon={CircleDashed} title={t(`editor.quick.issue.${issue}`)} />
 					))}
-				</ul>
+				</BoxList>
 			)}
 			{issues.length === 0 && check !== null && check.ok && (
-				<p className="text-primary flex items-center gap-2 text-sm font-medium">
-					<Check aria-hidden className="size-4" /> {t("editor.quick.checkOk")}
-				</p>
+				<BoxList>
+					<OutcomeRow icon={Check} tone="primary" title={t("editor.quick.checkOk")} />
+				</BoxList>
 			)}
 			{issues.length === 0 && check !== null && !check.ok && (
-				<ul className="grid gap-1 text-sm">
+				<BoxList>
 					{check.problems.map((problem) => (
-						<li key={`${problem.section}-${problem.message}`} className="text-destructive">
-							<span className="text-muted-foreground text-xs">{t(SECTION_LABELS[problem.section] ?? "editor.sections.source")}</span>{" "}
-							{problem.message}
-						</li>
+						<OutcomeRow
+							key={`${problem.section}-${problem.message}`}
+							icon={CircleX}
+							tone="destructive"
+							title={problem.message}
+							detail={t(SECTION_LABELS[problem.section] ?? "editor.sections.source")}
+						/>
 					))}
-				</ul>
+				</BoxList>
 			)}
 		</QuickSection>
 	);

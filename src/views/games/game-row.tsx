@@ -149,14 +149,13 @@ export function GameRow({
 						</StatusBadge>
 					)}
 				</span>
-				<span className="text-subtle-foreground block truncate font-mono text-xs">{game.id}</span>
+				{/* The id matters only to someone who writes definitions; everyone else reads the name. */}
+				{game.origin === "user" && <span className="text-subtle-foreground block truncate font-mono text-xs">{game.id}</span>}
 			</div>
 			{root ? (
 				<PathText path={root} className="text-muted-foreground" />
 			) : (
-				<span className="text-muted-foreground truncate font-mono text-xs">
-					{t(status === "added" ? "games.rootUnset" : "games.notFound")}
-				</span>
+				<span className="text-muted-foreground truncate text-sm">{t(status === "added" ? "games.rootUnset" : "games.notFound")}</span>
 			)}
 			<div className="flex items-center justify-end gap-1">
 				{action}

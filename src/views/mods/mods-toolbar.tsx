@@ -139,6 +139,15 @@ export function ModsToolbar({
 					onRestore={onRestoreList}
 				/>
 				<SeparatorButton disabled={filtering} onAdd={onAddSeparator} />
+				<Button
+					variant="outline"
+					aria-label={t("mods.import")}
+					title={t("mods.import")}
+					className="@max-5xl:px-2.5"
+					onClick={() => void onImport()}
+				>
+					<Upload /> <span className="hidden @5xl:inline">{t("mods.import")}</span>
+				</Button>
 				{!updatesReady && (
 					<span id="updates-need-key" className="sr-only">
 						{t("updates.needKey")}
@@ -162,30 +171,18 @@ export function ModsToolbar({
 					</TooltipTrigger>
 					{!updatesReady && <TooltipContent className="max-w-64">{t("updates.needKey")}</TooltipContent>}
 				</Tooltip>
-				{!updatesReady || updateCount === 0 ? (
-					<span id="update-all-reason" className="sr-only">
-						{!updatesReady ? t("updates.needKey") : t("palette.reason.noUpdates")}
-					</span>
-				) : null}
-				<Tooltip>
-					<TooltipTrigger asChild>
-						<span className="inline-flex">
-							<Button
-								variant="outline"
-								aria-label={t("updates.all", { count: updateCount })}
-								aria-describedby={!updatesReady || updateCount === 0 ? "update-all-reason" : undefined}
-								title={updatesReady ? t("updates.all", { count: updateCount }) : t("updates.needKey")}
-								className="@max-5xl:px-2.5"
-								onClick={() => setPreviewUpdates(true)}
-								disabled={!updatesReady || updateCount === 0}
-							>
-								<Download /> <span className="hidden @5xl:inline">{t("updates.all", { count: updateCount })}</span>
-							</Button>
-						</span>
-					</TooltipTrigger>
-					{!updatesReady && <TooltipContent className="max-w-64">{t("updates.needKey")}</TooltipContent>}
-					{updatesReady && updateCount === 0 && <TooltipContent className="max-w-64">{t("palette.reason.noUpdates")}</TooltipContent>}
-				</Tooltip>
+				{/* Update all is offered only when there is something to update; a dead "Update all (0)" took the toolbar's best spot. */}
+				{updatesReady && updateCount > 0 && (
+					<Button
+						variant="outline"
+						aria-label={t("updates.all", { count: updateCount })}
+						title={t("updates.all", { count: updateCount })}
+						className="@max-5xl:px-2.5"
+						onClick={() => setPreviewUpdates(true)}
+					>
+						<Download /> <span className="hidden @5xl:inline">{t("updates.all", { count: updateCount })}</span>
+					</Button>
+				)}
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
 						<Button variant="ghost" size="icon" aria-label={t("mods.more")} title={t("mods.more")}>

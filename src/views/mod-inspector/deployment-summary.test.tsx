@@ -13,7 +13,6 @@ await applyLanguage("en");
 function render(status: Status_Serialize): string {
 	return renderToString(
 		<DeploymentSummary
-			gameName="Example Game"
 			status={status}
 			updates={{}}
 			gameRunning={false}

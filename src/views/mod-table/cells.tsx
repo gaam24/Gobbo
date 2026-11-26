@@ -42,7 +42,7 @@ export function VersionCell({
 		if (folder) await onSelectVersion(mod.id, folder);
 	};
 
-	let line: ReactNode;
+	let line: ReactNode = null;
 
 	if (update?.error) {
 		line = <span className="text-subtle-foreground">{t("mods.version.checkFailed")}</span>;
@@ -68,13 +68,9 @@ export function VersionCell({
 				{t("mods.version.ignoredShort")}
 			</span>
 		);
-	} else if (update?.state === "current") {
-		line = <span className="text-muted-foreground">{t("mods.version.upToDate")}</span>;
-	} else if (mod.sources.length > 0) {
-		line = <span className="text-subtle-foreground">{t("mods.version.notChecked")}</span>;
-	} else {
-		line = <span className="text-subtle-foreground">{t("mods.version.noSource")}</span>;
 	}
+	// "Up to date", "Not checked" and "No source" are the normal case and were repeated under every row. The cell now
+	// speaks only when a version needs attention; the tooltip still says when it was checked.
 
 	const picker =
 		mod.version_count > 1 ? (
@@ -190,7 +186,7 @@ export function ConflictText({ wins, loses, onOpen }: { wins: number; loses: num
 /// A date from Unix seconds, or nothing when the page or the check does not give one.
 export function DateCell({ seconds, locale }: { seconds: number | null | undefined; locale: string }) {
 	if (seconds == null) return <span className="text-subtle-foreground text-xs">{EMPTY}</span>;
-	return <span className="text-muted-foreground text-xs tabular-nums">{formatDate(seconds * 1000, locale)}</span>;
+	return <span className="text-muted-foreground text-xs">{formatDate(seconds * 1000, locale)}</span>;
 }
 
 /// A count from the provider page at the right edge of its column, or nothing when the page does not give it.
