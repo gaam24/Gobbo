@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-description = "Starts a Windows program suspended, redirects the static imports that come from the overlay layer, loads the hook before the first instruction and resumes it. Windows only; empty elsewhere."
+description = "Starts a Windows program suspended, redirects the static imports that come from the overlay layer, loads the hook before the first instruction and resumes it; also restarts Gobbo with administrator rights. Windows only; empty elsewhere."
 publish = false
 
 [[bin]]
@@ -29,7 +29,10 @@ windows-sys = { workspace = true, features = [
   "Win32_System_Kernel",
   "Win32_System_LibraryLoader",
   "Win32_System_Memory",
+  "Win32_System_Registry",
   "Win32_System_Threading",
+  "Win32_UI_Shell",
+  "Win32_UI_WindowsAndMessaging",
 ] }
 
 [dev-dependencies]

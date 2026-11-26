@@ -16,6 +16,7 @@ Here's what each platform supports today.
 | User data: isolated redirects         | Yes, through the hook               | Copy fallback, no redirect                                    |
 | User data: shared                     | Yes                                 | Yes                                                           |
 | Launch: native executable             | Yes                                 | Yes                                                           |
+| Launch: a game that needs administrator rights | Restart Gobbo as administrator; mods then load | Not applicable                                     |
 | Launch: Proton                        | No                                  | Yes                                                           |
 | Launch: a Windows game from another store | Yes (directly)                  | Yes, through the newest installed Proton, in the store's prefix or one Gobbo owns |
 | Tools: Proton prerequisites           | No                                  | Yes                                                           |

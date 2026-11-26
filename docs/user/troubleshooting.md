@@ -33,6 +33,8 @@ way. A native Linux build may not be covered by the current launcher; see [Linux
 ## The game does not start
 
 - Check the Steam launch option; the game must be started through Gobbo or through the option Gobbo shows.
+- **Windows says the game needs administrator rights:** Gobbo offers to restart as administrator. Accept the Windows prompt, then press **Play** again. While Gobbo runs as administrator, dragging files from Explorer and browser links may not work; restart Gobbo normally when you finish playing.
+- **The game starts only through its launcher:** pick the game's own program in the game settings. Mods load into the program Gobbo starts, not into a second program that a launcher starts for it.
 - Try another Proton build in the game settings.
 - A game that has never run through Steam has no Proton prefix. Start it once through Steam, then try the tools again.
 - Read the game console in Gobbo. A crash prompt can save a dump; the log names the last step.

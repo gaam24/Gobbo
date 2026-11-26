@@ -255,6 +255,12 @@ export const commands = {
 	 */
 	launchGame: (game: string, executable: string | null, applyDraft: boolean) => typedError<boolean, AppError_Serialize>(__TAURI_INVOKE("launch_game", { game, executable, applyDraft })),
 	/**
+	 *  Restarts Gobbo with administrator rights so a program that asks for them can start in the overlay. Answers whether
+	 *  the new copy started; `false` means the user closed the UAC prompt and the current copy stays open. On success the
+	 *  current copy exits once the answer is sent, and the new copy waits for it before taking the single-instance lock.
+	 */
+	restartElevated: () => typedError<boolean, AppError_Serialize>(__TAURI_INVOKE("restart_elevated")),
+	/**
 	 *  Whether the game runs now, from Gobbo or from Steam. Deploying and launching wait while it does; editing does
 	 *  not.
 	 */

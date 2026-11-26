@@ -23,6 +23,11 @@ pub const fn supports_user_data_redirect() -> bool {
     false
 }
 
+/// Linux has no UAC and no elevated token in the Windows sense.
+pub const fn is_elevated() -> bool {
+    false
+}
+
 /// Where the other stores keep their data on Linux: Heroic and Lutris, native and Flatpak, Legendary, minigalaxy and
 /// the GOG folders in the home folder. Linux has no Epic launcher and no registry.
 pub fn store_folders(home: &Path) -> super::StoreFolders {

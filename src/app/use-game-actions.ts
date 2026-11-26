@@ -22,12 +22,13 @@ import {
 import { useTranslation } from "@/i18n";
 import { clearFailedTask, recordFailedTask } from "@/lib/failed-tasks-store";
 import type { FomodChoice } from "@/lib/fomod";
-import { type CommandResult, codeOf, messageOf, needsChoicePathOf, paymentRequiredOf, translate, unwrap } from "@/lib/ipc";
+import { type CommandResult, codeOf, detailOf, messageOf, needsChoicePathOf, paymentRequiredOf, translate, unwrap } from "@/lib/ipc";
 import { knownRows, type ListEdit, listItems, pagePartsOf, statusItems, toRows } from "@/lib/mods";
 import { createGameQueues, setDeployProgress, setUpdateAllCancel, setUpdateAllProgress, setUpdateProgress } from "@/lib/progress-store";
 import { createQueue } from "@/lib/serial-queue";
 import { type BackendTaskPayload, registerBackendActions, registerTask, removeTask, unregisterBackendActions } from "@/lib/tasks-store";
 import { newProgressChannel, pickFiles } from "@/lib/tauri";
+import { writePref } from "@/lib/ui-prefs";
 import { useLatestRef } from "@/lib/use-latest-ref";
 import type { useNotices } from "@/lib/use-notices";
 import { useTauriListener } from "@/lib/use-tauri-listener";
@@ -82,6 +83,7 @@ export function useGameActions({
 	notifyDurable,
 	notifyError,
 	notifyFailure,
+	openElevation,
 	openManualUpdates,
 	currentBrowserProviders,
 	refreshProviders,
@@ -117,6 +119,8 @@ export function useGameActions({
 	installWithChoices: (gameId: string, path: string) => void;
 	/// Reports a failed call with its translated text and its technical detail.
 	notifyFailure: (failure: unknown) => void;
+	/// Opens the confirmation that restarts Gobbo as administrator.
+	openElevation: () => void;
 }) {
 	const { t } = useTranslation();
 	/// The busy presentation of every game. Only the shown game's row is read below, but a switch no longer clears the
@@ -464,18 +468,41 @@ export function useGameActions({
 	/// The game starts from Gobbo (through Proton on Linux). Without a deployment it starts with no mods, so we say so plainly.
 	/// Starting the game deploys the shown profile first when it is not the deployed one, so the status is read again.
 	const launchNow = (executable: string | null, applyDraft = false) =>
-		forGame(async (gameId) => {
-			const withMods = await unwrap(commands.launchGame(gameId, executable, applyDraft));
-			// A start with mods needs no notice: the header shows that the game runs. Only a start without mods is worth one.
-			if (!withMods) notify(t("notice.launchedWithoutMods"));
-			await reloadAfter(gameId);
-		});
+		forGameResult(async (gameId) => {
+			try {
+				const withMods = await unwrap(commands.launchGame(gameId, executable, applyDraft));
+				// A start with mods needs no notice: the header shows that the game runs. Only a start without mods is worth one.
+				if (!withMods) notify(t("notice.launchedWithoutMods"));
+				await reloadAfter(gameId);
+			} catch (failure) {
+				// A program Windows refuses to start at Gobbo's integrity level gets its own confirmation, not a dead-end
+				// notice. Every other failure keeps the usual report.
+				if (codeOf(failure) === "launch.elevation_required") {
+					openElevation();
+					return;
+				}
+
+				notifyError(messageOf(failure), detailOf(failure));
+			}
+		}, false);
 	const runLaunch = async (executable: string | null, applyDraft = false) => {
 		const gameId = id;
 		setBusyOf(gameId, { busy: "launching" });
 		await launchNow(executable, applyDraft);
 		setBusyOf(gameId, { busy: null });
 	};
+
+	/// The confirmation's action: the backend starts an elevated copy and exits this one. A closed UAC prompt is a
+	/// choice, so it gets a neutral notice instead of an error.
+	const restartElevated = () =>
+		void attempt(async () => {
+			const started = await unwrap(commands.restartElevated());
+
+			// The elevated copy is a new process, so the reminder that follows it travels through the window storage. A
+			// cancelled prompt clears it, and a failure before this line never sets it.
+			writePref("elevated-mode", started);
+			notify(t(started ? "notice.elevationRestarting" : "notice.elevationCancelled"), undefined, "info");
+		});
 
 	/// Puts the previous version back after an in-app update. The new version stays installed, so the user can switch
 	/// again from the picker.
@@ -1048,6 +1075,7 @@ export function useGameActions({
 		undo,
 		discardChanges,
 		runLaunch,
+		restartElevated,
 		updateMod,
 		updateAll,
 		openUpdatePage,

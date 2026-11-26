@@ -13,6 +13,11 @@ const SUCCESS_TOAST_MS = 5000;
 const ERROR_TOAST_MS = 10000;
 
 const NOTICES_PREF = "notices";
+const ELEVATED_PREF = "elevated-mode";
+const isTrue = (value: unknown): value is boolean => value === true;
+/// Read once, before the first render: the elevated copy is a new process, and the reminder must survive its start.
+const startedElevated = readPref(ELEVATED_PREF, false, isTrue);
+if (startedElevated) writePref(ELEVATED_PREF, false);
 
 /// The live toast and the run of identical results it stands for. Keeping the id lets a repeat update that toast in
 /// place instead of stacking another card.
@@ -25,7 +30,11 @@ interface ToastFeed {
 /// across restarts; the bell and the notifications page show it. Each notice also pops up as a toast, which goes away on
 /// its own. Ongoing work never reaches either surface: it lives in the Working panel.
 export function useNotices() {
-	const [notices, setNotices] = useState<Notice[]>(() => readPref<Notice[]>(NOTICES_PREF, [], isNoticeList).slice(0, MAX_NOTICES));
+	const [notices, setNotices] = useState<Notice[]>(() => {
+		const stored = readPref<Notice[]>(NOTICES_PREF, [], isNoticeList).slice(0, MAX_NOTICES);
+
+		return startedElevated ? addNotice(stored, newNotice("info", translateKey("notice.elevated"))) : stored;
+	});
 	const feed = useRef<ToastFeed | null>(null);
 	useEffect(() => {
 		writePref(NOTICES_PREF, notices.length > 0 ? notices : null);
@@ -71,6 +80,15 @@ export function useNotices() {
 		},
 		[emitToast],
 	);
+
+	/// The elevated copy shows the reminder once. It is already in the notification list from the state above; the toast
+	/// makes it visible without changing React state during the effect.
+	const saidElevated = useRef(false);
+	useEffect(() => {
+		if (!startedElevated || saidElevated.current) return;
+		saidElevated.current = true;
+		emitToast(translateKey("notice.elevated"), "info", undefined, ERROR_TOAST_MS);
+	}, [emitToast]);
 
 	/// `detail` is the technical side of the failure, such as the backend's error code. It goes into the details.
 	const notifyError = useCallback(

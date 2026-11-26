@@ -21,6 +21,7 @@ export function ConfirmDialog({
 	confirmLabel,
 	confirmDisabled = false,
 	destructive = true,
+	size = "sm",
 	onConfirm,
 }: {
 	open: boolean;
@@ -35,12 +36,15 @@ export function ConfirmDialog({
 	confirmDisabled?: boolean;
 	/// The confirm button is red by default, for deleting. An install is not destructive.
 	destructive?: boolean;
+	/// `sm` is the narrow question with two equal buttons. A long confirm label needs `default`, which gives the text
+	/// room and stacks the buttons when the window is narrow.
+	size?: "default" | "sm";
 	onConfirm: () => void | Promise<void>;
 }) {
 	const { t } = useTranslation();
 	return (
 		<AlertDialog open={open} onOpenChange={onOpenChange}>
-			<AlertDialogContent size="sm">
+			<AlertDialogContent size={size}>
 				<AlertDialogHeader>
 					<AlertDialogTitle>{title}</AlertDialogTitle>
 					{children ? (

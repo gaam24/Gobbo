@@ -200,6 +200,52 @@ pub async fn launch_game(
     Ok(launched)
 }
 
+/// Restarts Gobbo with administrator rights so a program that asks for them can start in the overlay. Answers whether
+/// the new copy started; `false` means the user closed the UAC prompt and the current copy stays open. On success the
+/// current copy exits once the answer is sent, and the new copy waits for it before taking the single-instance lock.
+#[tauri::command]
+#[specta::specta]
+pub async fn restart_elevated(app: tauri::AppHandle) -> Result<bool, crate::error::AppError> {
+    #[cfg(windows)]
+    {
+        let exe = std::env::current_exe().map_err(|error| {
+            crate::error::AppError::user("launch.elevation_failed").with("detail", error)
+        })?;
+        let args = vec![
+            crate::update::relaunch::PARENT_ARG.to_string(),
+            std::process::id().to_string(),
+        ];
+        let started = crate::commands::helpers::blocking(move || {
+            match crate::platform::restart_elevated(&exe, &args) {
+                Ok(()) => Ok(true),
+                Err(crate::platform::ElevateError::Cancelled) => Ok(false),
+                Err(crate::platform::ElevateError::Io(error)) => {
+                    Err(crate::error::AppError::user("launch.elevation_failed")
+                        .with("detail", error))
+                }
+            }
+        })
+        .await?;
+
+        if started {
+            // The reply needs to reach the window first. The new copy waits for this pid, so it starts as soon as this
+            // one has released the single-instance lock and the data folder.
+            let app = app.clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_millis(500));
+                app.exit(0);
+            });
+        }
+
+        Ok(started)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = app;
+        Err(crate::error::AppError::user("launch.elevation_unsupported"))
+    }
+}
+
 /// Stops the game and records that the user asked for it, so the last run is not treated as a crash.
 #[tauri::command]
 #[specta::specta]

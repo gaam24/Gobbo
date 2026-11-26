@@ -8,12 +8,14 @@
 
 #![cfg(windows)]
 
+mod elevate;
 mod inject;
 pub mod stage0;
 #[cfg(test)]
 mod stage0_probe;
 pub mod static_imports;
 
+pub use elevate::{ElevateError, is_elevated, restart_elevated};
 pub use inject::{inject_early, inject_early_by_tid};
 pub use static_imports::imports;
 
@@ -615,7 +617,7 @@ fn command_line(program: &Path, args: &[String]) -> Vec<u16> {
 
 /// One argument for the command line. A switch such as `/c` or `-windowed` stays unquoted: `cmd.exe` treats a quoted
 /// `/c` as a program name and fails. Everything else goes through `quote`, which keeps spaces and embedded quotes.
-fn quote_argument(arg: &[u16]) -> Vec<u16> {
+pub(crate) fn quote_argument(arg: &[u16]) -> Vec<u16> {
     let is_switch = arg
         .first()
         .is_some_and(|unit| *unit == u16::from(b'/') || *unit == u16::from(b'-'))

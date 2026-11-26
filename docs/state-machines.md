@@ -182,7 +182,9 @@ import already has them. It creates no profile, settings file or other state.
 closes the stack, but closing a dialog no longer stops the work it started: the task stays in **Working** under its own
 game and can be reopened from there. `showDetails(tab)` also records the tab the inspector should show; the conflict
 counter uses it to open **Conflicts** on the same mod. **Change installer options** opens a FOMOD wizard that starts from the answers saved with
-the version, and reinstalls with the new ones.
+the version, and reinstalls with the new ones. A launch that Windows refuses with `ERROR_ELEVATION_REQUIRED` opens the
+elevation dialog; it asks before Gobbo restarts as administrator, and the game is started only by the Play action after
+the new copy is open.
 
 ## Errors
 

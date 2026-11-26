@@ -11,6 +11,10 @@ use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
 use super::ProtonBuild;
 use crate::domain::pathkey::windows_key;
 
+/// Restart Gobbo with administrator rights, and whether this process already has them. The Win32 calls live in the
+/// launcher crate, which is Windows-only and already keeps the app free of `unsafe`.
+pub use gobbo_overlay_launch::{ElevateError, is_elevated, restart_elevated};
+
 /// Whether the platform can redirect a user-data folder instead of copying it around a launch.
 pub const fn supports_user_data_redirect() -> bool {
     true

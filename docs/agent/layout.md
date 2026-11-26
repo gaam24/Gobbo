@@ -13,7 +13,7 @@
 | `src-tauri/crates/overlay-bench/`     | The file-operation benchmark for the hook: baseline, pass-through and active, with allocations.                |
 | `src-tauri/crates/overlay-probe/`     | The in-session doctor: a matrix of file operations and a JSON report, x64 and x86.                             |
 | `src-tauri/crates/overlay-dump/`      | The minidumper server shared by Gobbo and the 32-bit helper.                                                   |
-| `src-tauri/crates/overlay-launch/`    | Windows launcher: starts a program suspended and loads the hook. May use `unsafe`.                             |
+| `src-tauri/crates/overlay-launch/`    | Windows launcher: starts a program suspended, loads the hook, and restarts Gobbo elevated. May use `unsafe`.   |
 | `src-tauri/crates/overlay-pe/`        | Reads the import table and the bitness of an executable from its bytes. Plain logic, tested on every platform. |
 | `src-tauri/crates/overlay-hook/`      | Windows DLL loaded into the game; hooks file APIs. May use `unsafe`.                                           |
 | `games/`                              | One folder per supported game with `game.toml` (data only; no branches on a game id).                          |

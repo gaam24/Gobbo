@@ -56,6 +56,11 @@ export const DeployPreviewDialog = lazy(async () => {
 	return { default: component };
 });
 
+export const ElevationDialog = lazy(async () => {
+	const { ElevationDialog: component } = await import("@/views/launch/elevation-dialog");
+	return { default: component };
+});
+
 export const CommunityProfileDialog = lazy(async () => {
 	const { CommunityProfileDialog: component } = await import("@/views/mods/community-profile-dialog");
 	return { default: component };

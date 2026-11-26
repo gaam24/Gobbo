@@ -50,5 +50,11 @@ pub async fn portable_update_install(
     app: AppHandle,
     progress: Channel<PortableUpdateStep>,
 ) -> Result<(), AppError> {
+    // The elevated token would write the program files with administrator rights. The update is a normal-mode action:
+    // it can move the copy the user is running, so it must not run beside the UAC boundary.
+    if crate::platform::is_elevated() {
+        return Err(AppError::user("update.restart_normally"));
+    }
+
     portable::install(&app, progress).await
 }

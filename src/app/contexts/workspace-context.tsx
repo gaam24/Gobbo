@@ -281,6 +281,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 		currentBrowserProviders,
 		refreshProviders,
 		notifyFailure,
+		openElevation: () => openDialog({ kind: "elevation" }),
 		installWithChoices: (gameId, path) => void importLater.current?.([path], { game: gameId, source: null }),
 	});
 	useTrayContext(id, gameActions.busy);

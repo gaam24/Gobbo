@@ -14,6 +14,7 @@ import {
 	DefinitionImportDialog,
 	DeleteModDialog,
 	DeployPreviewDialog,
+	ElevationDialog,
 	FomodWizard,
 	GroupEditDialog,
 	HealthDialog,
@@ -275,6 +276,17 @@ export function AppDialogs() {
 			{dialog?.kind === "setup" && gameId && (
 				<Suspense fallback={null}>
 					<SetupDialog gameId={gameId} onClose={closeDialog} />
+				</Suspense>
+			)}
+			{dialog?.kind === "elevation" && (
+				<Suspense fallback={null}>
+					<ElevationDialog
+						onRestart={() => {
+							closeDialog();
+							gameActions.restartElevated();
+						}}
+						onClose={closeDialog}
+					/>
 				</Suspense>
 			)}
 			{dialog?.kind === "health" && gameId && (

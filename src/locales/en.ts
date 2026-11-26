@@ -532,6 +532,10 @@ const en = {
 		undone: "Apply undone.",
 		undoneWarnings: "Undone, with warnings: {{warnings}}",
 		launchedWithoutMods: "Started the game with no mods. It runs exactly as it is in the game folder.",
+		elevationRestarting: "Restarting Gobbo as administrator…",
+		elevationCancelled: "Restart cancelled. Nothing changed.",
+		elevated:
+			"Gobbo is running as administrator. Drag and drop and browser links may not work. Restart Gobbo normally when you finish playing.",
 		gameStopped: "Game stopped.",
 		gameNotRunning: "No game processes were running.",
 		userDataSaved: "Saved the profile's game data setting.",
@@ -577,6 +581,14 @@ const en = {
 		versionIgnored: "This version is hidden. It'll show up again when the mod site lists a newer one.",
 		versionShown: "This version shows again.",
 		stepsSaved: "Saved the game steps.",
+	},
+	elevation: {
+		title: "This program needs administrator rights",
+		why: "Windows won't let Gobbo start it with mods while Gobbo runs normally.",
+		warning:
+			"Gobbo will restart as administrator, and Windows will ask for permission. While it runs as administrator, dragging files from Explorer and browser links may not work.",
+		after: "After the restart, press Play again. Restart Gobbo normally when you finish playing.",
+		restart: "Restart as administrator",
 	},
 	import: {
 		noGame: "Add a game on the Games page first, so the mod has somewhere to go.",
@@ -2674,6 +2686,8 @@ const en = {
 			archive_too_many_entries: "The update archive has {{count}} entries, but Gobbo only accepts up to {{limit}}.",
 			failed: "The update didn't work: {{detail}}",
 			not_available: "There's no newer version to download.",
+			restart_normally:
+				"Close Gobbo and start it normally to install this update. Updates can't replace the program while Gobbo runs as administrator.",
 			unsupported: "There's no portable update archive for this system.",
 		},
 		archive: {
@@ -2963,6 +2977,10 @@ const en = {
 		launch: {
 			env_bad_name: "Environment variables, line {{line}}: a name can't be empty or contain a space. Write it as NAME=value.",
 			env_no_equals: "Environment variables, line {{line}}: there's no = sign. Write it as NAME=value.",
+			elevation_failed: "Couldn't restart Gobbo as administrator: {{detail}}",
+			elevation_required:
+				'This program needs administrator rights. Gobbo can\'t start it in the mod overlay while running normally. Close Gobbo, start it with "Run as administrator", then try again.',
+			elevation_unsupported: "Restarting Gobbo as administrator is only available on Windows.",
 			exe_missing: "The game program {{path}} is missing.",
 			native_failed: "Couldn't start the game: {{detail}}",
 			prefix_unknown: "The game folder isn't in a Steam library, so Gobbo can't find its Proton prefix.",

@@ -92,6 +92,7 @@ settings::restore_game
 settings::delete_removed_game
 settings::storage_usage
 launch::launch_game
+launch::restart_elevated
 launch::game_running
 launch::stop_game
 settings::platform

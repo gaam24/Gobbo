@@ -39,14 +39,14 @@ pub fn portable_target(os: &str, arch: &str) -> Option<&'static str> {
 pub use linux::overlay_session_pids;
 #[cfg(not(windows))]
 pub use linux::{
-    Process, find_proton, game_is_running, installed_protons, overlay_in_use, proton_at,
-    proton_named, steam_installs, steam_root, stop_game, store_folders,
+    Process, find_proton, game_is_running, installed_protons, is_elevated, overlay_in_use,
+    proton_at, proton_named, steam_installs, steam_root, stop_game, store_folders,
     supports_user_data_redirect,
 };
 #[cfg(windows)]
 pub use windows::{
-    Process, game_is_running, installed_protons, steam_installs, stop_game, store_folders,
-    supports_user_data_redirect,
+    ElevateError, Process, game_is_running, installed_protons, is_elevated, restart_elevated,
+    steam_installs, stop_game, store_folders, supports_user_data_redirect,
 };
 
 /// Where the game stores other than Steam keep their data on this computer. Each system fills in what it has and

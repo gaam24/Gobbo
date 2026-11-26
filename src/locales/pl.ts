@@ -543,6 +543,10 @@ const pl = {
 		undone: "Cofnięto zastosowanie.",
 		undoneWarnings: "Cofnięto, ale z ostrzeżeniami: {{warnings}}",
 		launchedWithoutMods: "Uruchomiono grę bez modów — tak, jak jest w folderze gry.",
+		elevationRestarting: "Ponowne uruchamianie Gobbo jako administrator…",
+		elevationCancelled: "Anulowano ponowne uruchomienie. Nic się nie zmieniło.",
+		elevated:
+			"Gobbo działa jako administrator. Przeciąganie plików i linki z przeglądarki mogą nie działać. Gdy skończysz grać, uruchom Gobbo normalnie.",
 		gameStopped: "Zatrzymano grę.",
 		gameNotRunning: "Nie widać żadnego działającego procesu gry.",
 		userDataSaved: "Zapisano ustawienie danych gry dla profilu.",
@@ -599,6 +603,14 @@ const pl = {
 		versionIgnored: "Ta wersja jest ignorowana. Pojawi się znowu, gdy dostawca wystawi inną.",
 		versionShown: "Wersja jest znowu widoczna.",
 		stepsSaved: "Zapisano kroki gry.",
+	},
+	elevation: {
+		title: "Ten program wymaga uprawnień administratora",
+		why: "Windows nie pozwoli Gobbo uruchomić go z modami, gdy Gobbo działa normalnie.",
+		warning:
+			"Gobbo uruchomi się ponownie jako administrator, a Windows zapyta o zgodę. Gdy działa jako administrator, przeciąganie plików z Eksploratora i linki z przeglądarki mogą nie działać.",
+		after: "Po ponownym uruchomieniu naciśnij ponownie **Graj**. Gdy skończysz grać, uruchom Gobbo normalnie.",
+		restart: "Uruchom jako administrator",
 	},
 	import: {
 		noGame: "Najpierw dodaj grę na stronie Gry, żeby było dokąd wrzucić mod.",
@@ -2786,6 +2798,8 @@ const pl = {
 			archive_too_many_entries: "Archiwum aktualizacji ma {{count}} pozycji, a Gobbo przyjmuje najwyżej {{limit}}.",
 			failed: "Nie udało się zaktualizować: {{detail}}",
 			not_available: "Nie ma nowszej wersji do pobrania.",
+			restart_normally:
+				"Zamknij Gobbo i uruchom je normalnie, aby zainstalować aktualizację. Gdy Gobbo działa jako administrator, nie może podmienić własnych plików programu.",
 			unsupported: "Dla tego systemu nie ma archiwum aktualizacji wersji portable.",
 		},
 		archive: {
@@ -3078,6 +3092,10 @@ const pl = {
 		launch: {
 			env_bad_name: "Zmienne środowiska, wiersz {{line}}: nazwa nie może być pusta ani zawierać spacji. Wpisz to jako NAZWA=wartość.",
 			env_no_equals: "Zmienne środowiska, wiersz {{line}}: brakuje znaku =. Wpisz to jako NAZWA=wartość.",
+			elevation_failed: "Nie udało się uruchomić Gobbo jako administratora: {{detail}}",
+			elevation_required:
+				"Ten program wymaga uprawnień administratora. Gobbo nie może uruchomić go w nakładce modów, gdy działa normalnie. Zamknij Gobbo, uruchom je jako administrator i spróbuj ponownie.",
+			elevation_unsupported: "Ponowne uruchomienie Gobbo jako administratora jest dostępne tylko na Windows.",
 			exe_missing: "Brakuje programu gry: {{path}}.",
 			native_failed: "Nie udało się uruchomić gry: {{detail}}",
 			prefix_unknown: "Folder gry nie leży w bibliotece Steam, więc Gobbo nie znajdzie jej prefiksu Protona.",

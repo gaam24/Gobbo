@@ -28,6 +28,7 @@ export type AppDialog =
 	| { kind: "reinstall"; modId: string; folder: string; name: string }
 	| { kind: "archive-report"; folder: string; name: string }
 	| { kind: "setup" }
+	| { kind: "elevation" }
 	| { kind: "health" }
 	| { kind: "sort" }
 	| { kind: "load-order" }

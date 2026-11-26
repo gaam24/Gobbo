@@ -62,6 +62,7 @@ All notable changes to this project are documented in this file. The format foll
 ### Added
 
 - **Hell is Us mods work in Gobbo.** Pak, IoStore and UE4SS mods install and deploy.
+- **A game that needs administrator rights offers to restart Gobbo with them.** Windows asks for permission, and after the restart the game starts with mods; Gobbo says when to restart it normally again.
 
 ### Changed
 

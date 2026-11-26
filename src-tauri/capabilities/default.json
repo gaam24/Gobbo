@@ -95,6 +95,7 @@
     "allow-delete-removed-game",
     "allow-storage-usage",
     "allow-launch-game",
+    "allow-restart-elevated",
     "allow-game-running",
     "allow-stop-game",
     "allow-platform",
