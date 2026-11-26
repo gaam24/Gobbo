@@ -84,5 +84,5 @@ test("an active apply explains that it keeps using the layer", () => {
 test("a copied set offers no move back", () => {
 	const html = render({ ...redirect, mode: "copy" });
 	expect(html).not.toContain("Move data back to the game folder");
-	expect(html).toContain("copied in before the game starts");
+	expect(html).toContain("copies it in before the game starts");
 });

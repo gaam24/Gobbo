@@ -17,27 +17,27 @@ describe("recovery", () => {
 		await clickByLabel("Downloads");
 		await waitForHeading("Downloads");
 		await clickByLabel(name);
-		await waitForText("Something went wrong");
+		await waitForText("This screen stopped working");
 		await waitForText("E2E forced render failure in mods");
 		await waitForText("Reload window");
 		assert.ok((await count("nav")) > 0, "the rail disappeared with one page");
 		await setThrow(null);
 		await clickByText("Try again", "button", "[role='alert']");
 		await waitForHeading(name);
-		await waitForNoText("Something went wrong");
+		await waitForNoText("This screen stopped working");
 		await cleanupFixture(id, fixture.root);
 	});
 	it("shows the whole-window fallback when the shell itself fails and recovers on reload", async () => {
 		await setThrow("shell");
 		await reloadWindow();
-		await waitForText("Something went wrong");
+		await waitForText("This screen stopped working");
 		await waitForText("Reload window");
 		assert.equal(await count("nav"), 0, "the shell fallback kept the rail");
 		await setThrow(null);
 		await clickByText("Reload window", "button", "[role='alert']");
 		await waitForShell();
 		assert.ok((await count("nav [aria-label]")) > 0, "the rail did not come back after the reload");
-		await waitForNoText("Something went wrong");
+		await waitForNoText("This screen stopped working");
 	});
 	it("keeps a game usable after its settings and profiles files are damaged", async () => {
 		const id = uniqueId("recover-broken");

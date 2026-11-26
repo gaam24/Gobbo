@@ -333,7 +333,7 @@ const en = {
 		rememberHint: "You can change it in Settings, under Interface.",
 	},
 	errorBoundary: {
-		title: "Something went wrong",
+		title: "This screen stopped working",
 		body: "Gobbo ran into an unexpected error. Your mods and profiles are safe. Reload the window or try that screen again.",
 		reload: "Reload window",
 	},
@@ -1932,7 +1932,7 @@ const en = {
 			inherit: "This profile starts from the existing data; anything it changes stays in the profile.",
 			emptyBase:
 				"The first separate launch copies the existing folder into this profile. After that, only the profile's own files are used.",
-			copy: "The overlay isn't used here, so this folder is copied in before the game starts and copied back after it closes.",
+			copy: "Mods don't reach this folder directly, so Gobbo copies it in before the game starts and back after it closes.",
 			missing: "The folder will be created the first time you launch.",
 			open: "Open profile folder",
 			size: "Profile layer: {{size}}",
@@ -1971,7 +1971,7 @@ const en = {
 		},
 		overlay: {
 			title: "How mods reach the game",
-			hint: "The overlay is how mods reach the game. The game folder stays untouched, and every profile keeps its own layer.",
+			hint: "Gobbo lays your mods over the game folder while it runs, so the folder itself stays untouched and every profile keeps its own set.",
 		},
 		steam: {
 			step1: "In Steam, open the game's Properties, then General.",
@@ -1985,7 +1985,7 @@ const en = {
 		},
 		tools: {
 			title: "Game tools",
-			hint: "Tools from the game definition. Gobbo runs them in the overlay, so they can see your mods.",
+			hint: "Tools from the game definition. Gobbo starts them with your mods in place, so they see them.",
 			found: "Found in the game folder",
 			missing: "Not found in the game folder",
 			noGame: "Set the game folder first",
@@ -2617,8 +2617,8 @@ const en = {
 	},
 	tools: {
 		title: "Game tools",
-		hint: "They run in the overlay, so they can see your mods. Anything they write ends up in the files the game wrote.",
-		needsOverlay: "Tools only see your mods while this profile is applied with the overlay.",
+		hint: "They start with your mods in place, so they see them. Anything they write ends up in the files the game wrote.",
+		needsOverlay: "Tools see your mods only after this profile is applied.",
 		run: "Run",
 	},
 	header: {
@@ -2823,7 +2823,7 @@ const en = {
 			prerequisite_checksum: "The {{name}} download doesn't match its checksum, so it wasn't kept.",
 			archive_missing_program: "The archive doesn't contain {{program}}.",
 			no_game_folder: "Set the game folder before you install a tool.",
-			needs_overlay: "Tools only run in the overlay. Apply this profile first.",
+			needs_overlay: "Tools need the mods in place. Apply this profile first.",
 			missing: "{{tool}} isn't in the game folder or in any mod.",
 			cancelled: "The tool run was stopped.",
 		},
@@ -2966,7 +2966,7 @@ const en = {
 			loader_missing: "Some enabled mods need {{name}}. Install it first, then apply the mods.",
 			missing_file: "A file is missing: {{path}}",
 			no_overlay_session: "Nothing is applied yet. Apply the mods first.",
-			overlay_in_use: "The game in {{path}} is still running in its overlay. Stop it before changing the mods.",
+			overlay_in_use: "The game in {{path}} is still running with mods. Stop it before changing the mods.",
 			overlay_unavailable: "The overlay isn't available on this system: {{detail}}.",
 			nothing_to_undo: "There's nothing to undo.",
 			not_utf8: "This file isn't valid UTF-8: {{path}}",
@@ -3035,7 +3035,7 @@ const en = {
 			env_no_equals: "Environment variables, line {{line}}: there's no = sign. Write it as NAME=value.",
 			elevation_failed: "Couldn't restart Gobbo as administrator: {{detail}}",
 			elevation_required:
-				'This program needs administrator rights. Gobbo can\'t start it in the mod overlay while running normally. Close Gobbo, start it with "Run as administrator", then try again.',
+				'This program needs administrator rights. Gobbo can\'t start it with mods while running normally. Close Gobbo, start it with "Run as administrator", then try again.',
 			elevation_unsupported: "Restarting Gobbo as administrator is only available on Windows.",
 			exe_missing: "The game program {{path}} is missing.",
 			native_failed: "Couldn't start the game: {{detail}}",
@@ -3117,7 +3117,7 @@ const en = {
 	},
 	messages: {
 		diagnostics: {
-			writes_outside: "The last run wrote {{count}} files into the game folder ({{path}}) while the overlay was active.",
+			writes_outside: "The last run wrote {{count}} files straight into the game folder ({{path}}) while mods were applied.",
 		},
 		collection: {
 			already_in_library: "{{name}} is already in your mods, so nothing was downloaded.",
@@ -3189,7 +3189,7 @@ const en = {
 			},
 			problems_one: "There's {{count}} problem. Fix it in the mod list.",
 			problems_other: "There are {{count}} problems. Fix them in the mod list.",
-			overlay: "The overlay is available. The game folder stays untouched.",
+			overlay: "Mods can be applied without changing the game folder.",
 			space: {
 				ok: "There's enough free space on the mods drive.",
 				low: "The mods drive is running low on space.",
@@ -3222,7 +3222,7 @@ const en = {
 			running: "Running",
 			done: "Done",
 			skipped: "Skipped: the folder this step needs isn't in the game",
-			needs_overlay: "Not run: the mods aren't applied, so there's no overlay",
+			needs_overlay: "Not run: the mods aren't applied yet",
 		},
 		file: {
 			mod_disabled: "Mod turned off",
@@ -3245,7 +3245,7 @@ const en = {
 		},
 		undo: {
 			dir_not_empty: "The folder {{path}} isn't empty, so it was left in place.",
-			overlay_writes_kept: "Files written while the game ran in the overlay were kept in {{path}}.",
+			overlay_writes_kept: "Files the game wrote while it ran with mods were kept in {{path}}.",
 			entry_failed: "Couldn't remove {{path}}: {{detail}}",
 			file_is_folder: "A file the apply placed at {{path}} is now a folder, so it was left in place.",
 			folder_is_file: "A folder the apply created at {{path}} is now a file, so it was left in place.",

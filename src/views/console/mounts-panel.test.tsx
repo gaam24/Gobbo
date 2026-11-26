@@ -51,7 +51,7 @@ test("the mounts panel names each mount, its layer and whether the game holds it
 test("a warning about writes outside Gobbo is translated with its values", () => {
 	const html = renderToString(<MountsView view={diagnostics} selected={new Set()} onToggle={nothing} onClean={nothing} />);
 	expect(html).toContain("Writes outside Gobbo");
-	expect(html).toContain("wrote 3 files into the game folder");
+	expect(html).toContain("wrote 3 files straight into the game folder");
 });
 
 test("the cleanup button is enabled only when a layer is selected", () => {

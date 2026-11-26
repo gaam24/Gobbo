@@ -1,6 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 
 import { commands } from "@/bindings";
+import { Disclosure } from "@/components/app/content-blocks";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/i18n";
 
@@ -49,10 +50,11 @@ function ErrorFallback({ error, onReset }: { error: Error; onReset: () => void }
 				<h1 className="text-lg font-semibold">{t("errorBoundary.title")}</h1>
 				<p className="text-muted-foreground text-sm">{t("errorBoundary.body")}</p>
 			</div>
-			<details className="text-muted-foreground text-xs">
-				<summary className="cursor-pointer select-none">{t("common.details")}</summary>
-				<pre className="mt-2 overflow-x-auto rounded-md border p-2 font-mono whitespace-pre-wrap">{error.message}</pre>
-			</details>
+			<Disclosure title={<span className="text-muted-foreground text-xs font-normal">{t("common.details")}</span>}>
+				<pre className="text-muted-foreground overflow-x-auto rounded-lg border p-2 font-mono text-xs whitespace-pre-wrap">
+					{error.message}
+				</pre>
+			</Disclosure>
 			<div className="flex flex-wrap gap-2">
 				<Button onClick={() => window.location.reload()}>{t("errorBoundary.reload")}</Button>
 				<Button variant="outline" onClick={onReset}>

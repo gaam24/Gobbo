@@ -5,6 +5,7 @@ import type { AppView } from "@/app/prefs";
 import type { GameView, ManagedGame } from "@/bindings";
 import { GameTile } from "@/components/game-tile";
 import { GobboMark } from "@/components/gobbo-mark";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useTranslation } from "@/i18n";
@@ -114,14 +115,7 @@ export function GameRail({
 				<RailButton label={t("downloads.title")} current={view === "downloads"} className="relative" onClick={() => onView("downloads")}>
 					<Download className="size-5" aria-hidden />
 					{downloads.running + downloads.waiting + downloads.failed > 0 && (
-						<span
-							className={cn(
-								"text-background absolute -top-0.5 -right-0.5 grid min-w-5 place-items-center rounded-full px-1 text-xs font-medium",
-								badgeTone,
-							)}
-						>
-							{downloads.running + downloads.waiting + downloads.failed}
-						</span>
+						<RailCount className={badgeTone}>{downloads.running + downloads.waiting + downloads.failed}</RailCount>
 					)}
 					{downloads.percent !== null && (
 						<span aria-hidden className="bg-muted absolute inset-x-2.5 bottom-1.5 h-1 overflow-hidden rounded-full">
@@ -136,16 +130,7 @@ export function GameRail({
 					onClick={() => onView("notifications")}
 				>
 					<Bell className="size-5" aria-hidden />
-					{unread.count > 0 && (
-						<span
-							className={cn(
-								"text-background absolute -top-0.5 -right-0.5 grid min-w-5 place-items-center rounded-full px-1 text-xs font-medium",
-								unread.error ? "bg-destructive" : "bg-foreground",
-							)}
-						>
-							{unread.count}
-						</span>
-					)}
+					{unread.count > 0 && <RailCount className={unread.error ? "bg-destructive" : "bg-foreground"}>{unread.count}</RailCount>}
 				</RailButton>
 				<RailButton label={t("storage.title")} current={view === "storage"} onClick={() => onView("storage")}>
 					<HardDrive className="size-5" aria-hidden />
@@ -159,6 +144,16 @@ export function GameRail({
 				</RailButton>
 			</div>
 		</nav>
+	);
+}
+
+/// The count on a rail button, such as unread notices or running downloads. It is the shadcn badge pinned to the
+/// button's corner; the colour says whether the count holds a failure.
+function RailCount({ className, children }: { className: string; children: number }) {
+	return (
+		<Badge aria-hidden className={cn("text-background absolute -top-0.5 -right-0.5 min-w-5 px-1 tabular-nums", className)}>
+			{children}
+		</Badge>
 	);
 }
 

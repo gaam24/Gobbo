@@ -84,6 +84,9 @@ All notable changes to this project are documented in this file. The format foll
 - **The mouse's back and forward buttons move between screens.** Alt+← and Alt+→ do the same, and Esc leaves a settings or side page.
 - **More keyboard shortcuts.** Ctrl+1–9 opens a game from the rail, Ctrl+, opens settings, Ctrl+O imports archives, Ctrl+Enter reviews the changes to apply, Delete removes the selected mod after asking, / jumps to the search, and Ctrl+S saves in the game editor.
 - **Buttons show their shortcut in the tooltip.** The shortcut list has a new Moving around section.
+- **Messages about tools, running games and the setup check use plain words.** They say what happens to your mods instead of naming the overlay.
+- **The Polish translation is more consistent.** Linux is inflected the same way everywhere, and the same labels use the same words.
+- **An error screen says which part stopped working.** Its details fold away like every other panel.
 - **Storage shows each game's share of the space.** The folder path moved to the folder button.
 - **Settings say what each switch does instead of repeating its name.** The notification grid uses checkboxes.
 - **The interface uses the same words for shared files everywhere.** A mod overrides another; "wins" and "loses" are gone.
