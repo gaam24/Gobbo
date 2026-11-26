@@ -119,9 +119,9 @@ pub struct Early<'a> {
 pub(crate) struct Patched {
     config_address: usize,
     stubs: Vec<(usize, Vec<u8>)>,
-    #[cfg(test)]
+    #[cfg(all(test, target_arch = "x86_64"))]
     process: HANDLE,
-    #[cfg(test)]
+    #[cfg(all(test, target_arch = "x86_64"))]
     trampolines: usize,
 }
 
@@ -145,7 +145,7 @@ impl Patched {
 
     /// Puts the original bytes back into the child's stubs and turns the redirect off, so no later call is served from
     /// the layer by this DLL. The image stays mapped: a call may still be running in it.
-    #[cfg(test)]
+    #[cfg(all(test, target_arch = "x86_64"))]
     pub(crate) fn restore(self) -> io::Result<()> {
         for (address, original) in &self.stubs {
             write_code(self.process, *address, original)?;
@@ -179,7 +179,30 @@ pub fn redirect_config(game_root: &Path, layer_root: &Path) -> io::Result<logic:
     Ok(config)
 }
 
-/// `\??\` and the folder, with `/` as `\` and no trailing separator.
+/// The two leading separators of a Win32 UNC path.
+const WIN32_UNC: [u16; 2] = [b'\\' as u16; 2];
+/// The NT spelling of a UNC root, before the server and share.
+const NT_UNC: [u16; 8] = [
+    b'\\' as u16,
+    b'?' as u16,
+    b'?' as u16,
+    b'\\' as u16,
+    b'U' as u16,
+    b'N' as u16,
+    b'C' as u16,
+    b'\\' as u16,
+];
+
+/// Whether `tail` names both a server and a share. Without both, the path is not a UNC folder the redirect can use.
+fn has_unc_server_share(tail: &[u16]) -> bool {
+    let Some(separator) = tail.iter().position(|&unit| unit == u16::from(b'\\')) else {
+        return false;
+    };
+    separator > 0 && tail.len() > separator + 1
+}
+
+/// `\??\` and the folder, with `/` as `\` and no trailing separator. A drive path keeps its DOS spelling; a Win32 UNC
+/// root becomes the `\??\UNC\server\share` form the loader uses, and an NT UNC root is kept as it is.
 fn nt_prefix(folder: &Path) -> io::Result<Vec<u16>> {
     let mut units: Vec<u16> = folder
         .as_os_str()
@@ -196,14 +219,36 @@ fn nt_prefix(folder: &Path) -> io::Result<Vec<u16>> {
         units.pop();
     }
 
-    let absolute = units.len() >= 3 && units[1] == u16::from(b':') && units[2] == u16::from(b'\\');
+    let drive = units.len() >= 3 && units[1] == u16::from(b':') && units[2] == u16::from(b'\\');
+    let win32_unc = units.len() >= WIN32_UNC.len() && units[..WIN32_UNC.len()] == WIN32_UNC[..];
+    let nt_unc =
+        units.len() >= NT_UNC.len() && logic::starts_with_ascii_ignore_case(&units, &NT_UNC);
 
-    if !absolute {
+    let prefix = if drive {
+        let mut prefix = logic::NT_PREFIX.to_vec();
+        prefix.extend(units);
+        prefix
+    } else if win32_unc {
+        let tail = &units[WIN32_UNC.len()..];
+        if !has_unc_server_share(tail) {
+            return Err(io::Error::other(
+                "the redirect needs a UNC folder with a server and a share",
+            ));
+        }
+        let mut prefix = NT_UNC.to_vec();
+        prefix.extend(tail);
+        prefix
+    } else if nt_unc {
+        let tail = &units[NT_UNC.len()..];
+        if !has_unc_server_share(tail) {
+            return Err(io::Error::other(
+                "the redirect needs a UNC folder with a server and a share",
+            ));
+        }
+        units
+    } else {
         return Err(io::Error::other("the redirect needs an absolute folder"));
-    }
-
-    let mut prefix = logic::NT_PREFIX.to_vec();
-    prefix.extend(units);
+    };
 
     if prefix.len() > logic::PREFIX_UNITS {
         return Err(io::Error::other(
@@ -266,11 +311,16 @@ pub(crate) fn install(
         Bits::X86 => find_image(process, "ntdll.dll")?,
     };
     let mut originals = Vec::with_capacity(STUBS.len());
+    // A 32-bit child's exports are read once in bulk. The x64 path keeps its process-local export lookup.
+    let stub_addresses = match bits {
+        Bits::X64 => None,
+        Bits::X86 => Some(export_stubs(process, ntdll)?),
+    };
 
     for (index, name) in STUBS.iter().enumerate() {
-        let address = match bits {
-            Bits::X64 => ntdll_export(name)?,
-            Bits::X86 => export_in(process, ntdll, name)?,
+        let address = match stub_addresses {
+            Some(addresses) => addresses[index],
+            None => ntdll_export(name)?,
         };
         let original = read_code(process, address, bits.stub_length())?;
 
@@ -317,10 +367,10 @@ pub(crate) fn install(
     // they mean. Dropping the guard here would unmap them under a live child.
     std::mem::forget(mappings);
     Ok(Patched {
-        #[cfg(test)]
+        #[cfg(all(test, target_arch = "x86_64"))]
         process,
         config_address,
-        #[cfg(test)]
+        #[cfg(all(test, target_arch = "x86_64"))]
         trampolines,
         stubs: originals,
     })
@@ -373,7 +423,9 @@ fn is_accepted_stub(bits: Bits, bytes: &[u8], index: usize) -> bool {
 }
 
 /// The x64 stub of a system call: `mov r10, rcx; mov eax, <number>`, and a `syscall` followed by `ret` further on. A
-/// check of the shared user data between them (Windows 10 and 11) is allowed, not required.
+/// check of the shared user data between them (Windows 10 and 11) is allowed, not required. A RIP-relative memory
+/// operand is refused: the trampoline is a copy at a different address, so its displacement would name a different
+/// address than the original did. The decoder identifies that operand reliably, so no byte pattern is guessed.
 fn accepted_x64(instructions: &[Instruction]) -> bool {
     let [first, second, ..] = instructions else {
         return false;
@@ -387,7 +439,10 @@ fn accepted_x64(instructions: &[Instruction]) -> bool {
     let system_call = instructions
         .windows(2)
         .any(|pair| pair[0].mnemonic() == Mnemonic::Syscall && pair[1].mnemonic() == Mnemonic::Ret);
-    copies_first_argument && loads_number && system_call
+    let no_ip_relative_memory = instructions
+        .iter()
+        .all(|instruction| !matches!(instruction.memory_base(), Register::RIP | Register::EIP));
+    copies_first_argument && loads_number && system_call && no_ip_relative_memory
 }
 
 /// The x86 stub of a system call through WOW64: `mov eax, <number>; mov edx, <target>; call edx; ret <argument bytes>`.
@@ -427,7 +482,7 @@ fn ntdll_base() -> usize {
     unsafe { GetModuleHandleW(wide(OsStr::new("ntdll.dll")).as_ptr()) as usize }
 }
 
-/// Checks that the child's ntdll is the one this process uses: its header carries the same timestamp and image size.
+/// Checks that the child's ntdll is the one this process uses: its header carries the same timestamp.
 fn check_ntdll(process: HANDLE) -> io::Result<()> {
     let base = ntdll_base();
 
@@ -446,6 +501,116 @@ fn check_ntdll(process: HANDLE) -> io::Result<()> {
     }
 
     Ok(())
+}
+
+/// The PE fields shared by the image scan, the 32-bit export lookup and the DLL mapper. `bits` selects the optional
+/// header layout and, when the image is one the launcher maps, the structural checks a malformed header must pass.
+#[derive(Debug)]
+struct PeHeaders {
+    machine: u16,
+    magic: u16,
+    section_count: usize,
+    optional_size: usize,
+    preferred_base: u64,
+    image_size: usize,
+    headers_size: usize,
+    directory_count: u32,
+    export: (usize, usize),
+    section_table: usize,
+}
+
+/// Decodes a PE header with the bounds-checked readers. With `Some(bits)` the PE signature and section table must be
+/// valid; architecture and magic are checked by the callers, which have different failures for them. With `None` the
+/// parse is best effort: it uses the PE32 layout and stops at the export RVA, as the image-region scan always did.
+fn pe_headers(bytes: &[u8], bits: Option<Bits>) -> io::Result<PeHeaders> {
+    let nt = u32le(bytes, 0x3C)? as usize;
+
+    if bits.is_some() && bytes.get(nt..image_at(nt, 4)?) != Some(b"PE\0\0".as_slice()) {
+        return Err(io::Error::other(
+            "the stage 0 DLL is not the PE image for this child",
+        ));
+    }
+
+    let machine = u16le(bytes, image_at(nt, 4)?)?;
+    let section_count = usize::from(u16le(bytes, image_at(nt, 6)?)?);
+    let optional_size = usize::from(u16le(bytes, image_at(nt, 20)?)?);
+    let optional = image_at(nt, 24)?;
+    let magic = u16le(bytes, optional)?;
+
+    let layout = bits.unwrap_or(Bits::X86);
+    let preferred_base = match layout {
+        Bits::X64 => u64le(bytes, image_at(optional, 24)?)?,
+        Bits::X86 => u64::from(u32le(bytes, image_at(optional, 28)?)?),
+    };
+    let image_size = u32le(bytes, image_at(optional, 56)?)? as usize;
+    let headers_size = u32le(bytes, image_at(optional, 60)?)? as usize;
+    let directory_count = u32le(bytes, image_at(optional, 92)?)?;
+    let directories = image_at(optional, layout.directories())?;
+    let export_rva = u32le(bytes, directories)? as usize;
+    // The best-effort scan never read the directory's size; adding that read could reject a header it used to accept.
+    let export_size = match bits {
+        Some(_) => u32le(bytes, image_at(directories, 4)?)? as usize,
+        None => 0,
+    };
+    let section_table = image_at(optional, optional_size)?;
+
+    if bits.is_some() {
+        let table = 40usize
+            .checked_mul(section_count)
+            .and_then(|length| section_table.checked_add(length))
+            .ok_or_else(|| io::Error::other("the stage 0 DLL is truncated"))?;
+        if table > bytes.len() {
+            return Err(io::Error::other("the stage 0 DLL is truncated"));
+        }
+    }
+
+    Ok(PeHeaders {
+        machine,
+        magic,
+        section_count,
+        optional_size,
+        preferred_base,
+        image_size,
+        headers_size,
+        directory_count,
+        export: (export_rva, export_size),
+        section_table,
+    })
+}
+
+/// Lays an embedded DLL out by RVA: the headers, then each section's bytes at its virtual address. Returns the image
+/// and its size. A section that reaches past the image is clipped, exactly as `map_image` did before.
+fn layout_image(bytes: &[u8], bits: Bits) -> io::Result<(Vec<u8>, usize)> {
+    let headers = pe_headers(bytes, Some(bits))?;
+    let mut image = vec![0u8; headers.image_size];
+    // The embedded image is trusted to be well formed, but a broken build must not panic in the launcher.
+    if headers.headers_size > image.len() || headers.headers_size > bytes.len() {
+        return Err(io::Error::other("the stage 0 DLL is truncated"));
+    }
+    image[..headers.headers_size].copy_from_slice(&bytes[..headers.headers_size]);
+
+    for index in 0..headers.section_count {
+        let header = headers.section_table + 40 * index;
+        let size = u32le(bytes, header + 16)? as usize;
+        let raw = u32le(bytes, header + 20)? as usize;
+        let address = u32le(bytes, header + 12)? as usize;
+        let length = size.min(image.len().saturating_sub(address));
+
+        if length > 0 {
+            let end = raw
+                .checked_add(length)
+                .ok_or_else(|| io::Error::other("the stage 0 DLL is truncated"))?;
+            let source = bytes
+                .get(raw..end)
+                .ok_or_else(|| io::Error::other("the stage 0 DLL is truncated"))?;
+            let target = image
+                .get_mut(address..address + length)
+                .ok_or_else(|| io::Error::other("the stage 0 DLL is truncated"))?;
+            target.copy_from_slice(source);
+        }
+    }
+
+    Ok((image, headers.image_size))
 }
 
 /// The base of an image named `name` in the child, found by scanning its committed image regions. Used for a 32-bit
@@ -494,8 +659,7 @@ fn export_name(process: HANDLE, base: usize) -> Option<String> {
         return None;
     }
 
-    let nt = u32le(&header, 0x3C).ok()? as usize;
-    let directory = u32le(&header, nt + 24 + 96).ok()? as usize;
+    let directory = pe_headers(&header, None).ok()?.export.0;
 
     if directory == 0 {
         return None;
@@ -506,31 +670,248 @@ fn export_name(process: HANDLE, base: usize) -> Option<String> {
     cstring(process, base + name_rva)
 }
 
-/// The address of an export of a 32-bit image in the child, read from the child's memory.
-fn export_in(process: HANDLE, base: usize, name: &str) -> io::Result<usize> {
-    let header = read_code(process, base, 0x1000)?;
-    let nt = u32le(&header, 0x3C)? as usize;
-    let directory = u32le(&header, nt + 24 + 96)? as usize;
-    let export = read_code(process, base + directory, 40)?;
-    let count = u32le(&export, 24)? as usize;
-    let functions = u32le(&export, 28)? as usize;
-    let names = u32le(&export, 32)? as usize;
-    let ordinals = u32le(&export, 36)? as usize;
+/// The largest export table scanned in a child's image. An ntdll has a few thousand entries; a larger table is refused
+/// instead of being copied into the launcher.
+const MAX_EXPORT_NAMES: usize = 64 * 1024;
+/// The largest window of export name strings read in one call.
+const MAX_EXPORT_STRINGS: usize = 1024 * 1024;
+/// How many bytes of an export name are read, matching the old per-name lookup.
+const NAME_BYTES: usize = 64;
 
-    for index in 0..count {
-        let name_rva = u32le(&read_code(process, base + names + 4 * index, 4)?, 0)? as usize;
+/// Adds an offset inside a child's image, refusing an overflow before it can wrap on a 32-bit launcher.
+fn image_at(base: usize, offset: usize) -> io::Result<usize> {
+    base.checked_add(offset)
+        .ok_or_else(|| io::Error::other("an image offset overflows"))
+}
 
-        if cstring(process, base + name_rva).as_deref() == Some(name) {
-            let ordinal = usize::from(u16le(
-                &read_code(process, base + ordinals + 2 * index, 2)?,
-                0,
-            )?);
-            let rva = u32le(&read_code(process, base + functions + 4 * ordinal, 4)?, 0)? as usize;
-            return Ok(base + rva);
+/// The array RVAs and counts of an export directory, every range checked against the image size.
+#[derive(Clone, Copy)]
+struct ExportArrays {
+    count: usize,
+    function_count: usize,
+    functions: usize,
+    names: usize,
+    ordinals: usize,
+}
+
+/// Reads the counts and array RVAs of an export directory. All values come from the child and are bounded before any
+/// remote array is read.
+fn export_arrays(directory: &[u8], image_size: usize) -> io::Result<ExportArrays> {
+    let count = u32le(directory, 24)? as usize;
+    let function_count = u32le(directory, 20)? as usize;
+    let functions = u32le(directory, 28)? as usize;
+    let names = u32le(directory, 32)? as usize;
+    let ordinals = u32le(directory, 36)? as usize;
+
+    if count == 0 || count > MAX_EXPORT_NAMES || function_count > MAX_EXPORT_NAMES {
+        return Err(io::Error::other(
+            "the child's ntdll has an invalid export table",
+        ));
+    }
+
+    for (rva, width, entries) in [
+        (names, 4usize, count),
+        (ordinals, 2usize, count),
+        (functions, 4usize, function_count),
+    ] {
+        let length = width
+            .checked_mul(entries)
+            .ok_or_else(|| io::Error::other("the child's export table is too large"))?;
+        if image_at(rva, length)? > image_size {
+            return Err(io::Error::other(
+                "an export array is outside the child's image",
+            ));
         }
     }
 
-    Err(io::Error::other(format!("the child's ntdll has no {name}")))
+    Ok(ExportArrays {
+        count,
+        function_count,
+        functions,
+        names,
+        ordinals,
+    })
+}
+
+/// Checks the bulk-read name pointers and returns the RVA and length of one window holding every name string.
+fn export_window(
+    arrays: &ExportArrays,
+    name_pointers: &[u8],
+    image_size: usize,
+) -> io::Result<(usize, usize)> {
+    let expected = arrays
+        .count
+        .checked_mul(4)
+        .ok_or_else(|| io::Error::other("the child's export table is too large"))?;
+    if name_pointers.len() != expected {
+        return Err(io::Error::other(
+            "the child's export name array is truncated",
+        ));
+    }
+
+    let mut low = usize::MAX;
+    let mut high = 0;
+
+    for pointer in name_pointers.as_chunks::<4>().0 {
+        let rva = u32::from_le_bytes(*pointer) as usize;
+        if image_at(rva, NAME_BYTES)? > image_size {
+            return Err(io::Error::other(
+                "an export name is outside the child's image",
+            ));
+        }
+        low = low.min(rva);
+        high = high.max(rva);
+    }
+
+    let end = image_at(high, NAME_BYTES)?;
+    let length = end
+        .checked_sub(low)
+        .ok_or_else(|| io::Error::other("the child's export names have an invalid range"))?;
+    if length > MAX_EXPORT_STRINGS {
+        return Err(io::Error::other(
+            "the child's export names are too spread out",
+        ));
+    }
+    Ok((low, length))
+}
+
+/// The indices of the wanted names in a bulk-read export name table. The first entry with a given name wins, and the
+/// scan stops once all four names have been found. Names are compared byte for byte, case sensitively.
+fn stub_indices(
+    wanted: &[&str; 4],
+    name_pointers: &[u8],
+    strings: &[u8],
+    strings_rva: usize,
+) -> [Option<usize>; 4] {
+    let mut found = [None; 4];
+
+    for (index, pointer) in name_pointers.as_chunks::<4>().0.iter().enumerate() {
+        if found.iter().all(Option::is_some) {
+            break;
+        }
+        let rva = u32::from_le_bytes(*pointer) as usize;
+        let Some(offset) = rva.checked_sub(strings_rva) else {
+            continue;
+        };
+        let Some(bytes) = offset
+            .checked_add(NAME_BYTES)
+            .and_then(|end| strings.get(offset..end))
+        else {
+            continue;
+        };
+        let end = bytes
+            .iter()
+            .position(|&byte| byte == 0)
+            .unwrap_or(bytes.len());
+        let name = &bytes[..end];
+
+        for (slot, candidate) in wanted.iter().enumerate() {
+            if found[slot].is_none() && name == candidate.as_bytes() {
+                found[slot] = Some(index);
+            }
+        }
+    }
+
+    found
+}
+
+/// The addresses of the four loader stubs of a 32-bit image in the child. The header and the export arrays are read
+/// once in bulk; only the found entries' names, ordinals and functions are read from the child individually.
+fn export_stubs(process: HANDLE, base: usize) -> io::Result<[usize; STUBS.len()]> {
+    let missing = |name: &str| io::Error::other(format!("the child's ntdll has no {name}"));
+
+    let header = read_code(process, base, 0x1000)?;
+    if !header.starts_with(b"MZ") {
+        return Err(io::Error::other("the child's ntdll has no DOS header"));
+    }
+    let nt = u32le(&header, 0x3C)? as usize;
+    if !header
+        .get(nt..)
+        .is_some_and(|tail| tail.starts_with(b"PE\0\0"))
+    {
+        return Err(io::Error::other("the child's ntdll has no PE header"));
+    }
+    let headers = pe_headers(&header, None)?;
+    let image_size = headers.image_size;
+    if headers.magic != Bits::X86.magic() {
+        return Err(io::Error::other("the child's ntdll is not a 32-bit image"));
+    }
+    if headers.directory_count == 0 {
+        return Err(io::Error::other(
+            "the child's ntdll has no data directories",
+        ));
+    }
+    let directory = headers.export.0;
+    if directory == 0 {
+        return Err(missing(STUBS[0]));
+    }
+    if image_at(directory, 40)? > headers.image_size {
+        return Err(io::Error::other(
+            "the child's export directory is outside the image",
+        ));
+    }
+
+    let export = read_code(process, image_at(base, directory)?, 40)?;
+    let arrays = export_arrays(&export, image_size)?;
+    let name_pointers = read_code(process, image_at(base, arrays.names)?, arrays.count * 4)?;
+    let (strings_rva, strings_len) = export_window(&arrays, &name_pointers, image_size)?;
+    let strings = read_code(process, image_at(base, strings_rva)?, strings_len)?;
+    let found = stub_indices(&STUBS, &name_pointers, &strings, strings_rva);
+
+    let mut addresses = [0; STUBS.len()];
+    for (slot, name) in STUBS.iter().enumerate() {
+        let Some(index) = found[slot] else {
+            return Err(missing(name));
+        };
+
+        // Confirm and resolve only this entry, with the same four reads the old per-name scan made for a hit.
+        let name_rva = u32le(
+            &read_code(
+                process,
+                image_at(base, image_at(arrays.names, index * 4)?)?,
+                4,
+            )?,
+            0,
+        )? as usize;
+        let bytes = read_code(process, image_at(base, name_rva)?, NAME_BYTES)?;
+        let end = bytes
+            .iter()
+            .position(|&byte| byte == 0)
+            .unwrap_or(bytes.len());
+        if &bytes[..end] != name.as_bytes() {
+            return Err(missing(name));
+        }
+
+        let ordinal = usize::from(u16le(
+            &read_code(
+                process,
+                image_at(base, image_at(arrays.ordinals, index * 2)?)?,
+                2,
+            )?,
+            0,
+        )?);
+        if ordinal >= arrays.function_count {
+            return Err(io::Error::other(
+                "an export ordinal is outside the child's image",
+            ));
+        }
+        let rva = u32le(
+            &read_code(
+                process,
+                image_at(base, image_at(arrays.functions, ordinal * 4)?)?,
+                4,
+            )?,
+            0,
+        )? as usize;
+        if image_at(rva, Bits::X86.stub_length())? > image_size {
+            return Err(io::Error::other(
+                "an export function is outside the child's image",
+            ));
+        }
+        addresses[slot] = image_at(base, rva)?;
+    }
+
+    Ok(addresses)
 }
 
 /// A NUL-terminated string at `address` in the child, at most 64 bytes.
@@ -569,30 +950,26 @@ fn map_image(process: HANDLE, bits: Bits, mappings: &mut Mappings) -> io::Result
         ));
     }
 
-    let nt = u32le(bytes, 0x3C)? as usize;
+    let headers = pe_headers(bytes, Some(bits))?;
 
-    if bytes.get(nt..nt + 4) != Some(b"PE\0\0") || u16le(bytes, nt + 4)? != bits.machine() {
+    // The architecture checks stay here: the image scan uses a best-effort parse and the child's ntdll has its own
+    // error messages for the same fields.
+    if headers.machine != bits.machine() {
         return Err(io::Error::other(
             "the stage 0 DLL is not the PE image for this child",
         ));
     }
-
-    let section_count = usize::from(u16le(bytes, nt + 6)?);
-    let optional_size = usize::from(u16le(bytes, nt + 20)?);
-    let optional = nt + 24;
-
-    if u16le(bytes, optional)? != bits.magic() {
+    if headers.magic != bits.magic() {
         return Err(io::Error::other(
             "the stage 0 DLL has the wrong optional header",
         ));
     }
 
-    let preferred = match bits {
-        Bits::X64 => u64le(bytes, optional + 24)?,
-        Bits::X86 => u64::from(u32le(bytes, optional + 28)?),
-    };
-    let image_size = u32le(bytes, optional + 56)? as usize;
-    let headers_size = u32le(bytes, optional + 60)? as usize;
+    // The section table starts after the optional header, so the data directories can be found from its position.
+    let optional = headers
+        .section_table
+        .checked_sub(headers.optional_size)
+        .ok_or_else(|| io::Error::other("the stage 0 DLL is truncated"))?;
     let directories = optional + bits.directories();
     let directory = |index: usize| -> io::Result<(usize, usize)> {
         Ok((
@@ -607,24 +984,10 @@ fn map_image(process: HANDLE, bits: Bits, mappings: &mut Mappings) -> io::Result
         ));
     }
 
-    let base = allocate(process, image_size)?;
-    mappings.track_image(base, image_size);
-    let delta = (base as u64).wrapping_sub(preferred);
-    let mut image = vec![0u8; image_size];
-    image[..headers_size].copy_from_slice(&bytes[..headers_size]);
-    let sections = nt + 24 + optional_size;
-
-    for index in 0..section_count {
-        let header = sections + 40 * index;
-        let size = u32le(bytes, header + 16)? as usize;
-        let raw = u32le(bytes, header + 20)? as usize;
-        let address = u32le(bytes, header + 12)? as usize;
-        let length = size.min(image_size.saturating_sub(address));
-
-        if length > 0 {
-            image[address..address + length].copy_from_slice(&bytes[raw..raw + length]);
-        }
-    }
+    let base = allocate(process, headers.image_size)?;
+    mappings.track_image(base, headers.image_size);
+    let (mut image, _) = layout_image(bytes, bits)?;
+    let delta = (base as u64).wrapping_sub(headers.preferred_base);
 
     let (relocations, relocations_size) = directory(5)?;
     let mut offset = 0;
@@ -678,22 +1041,24 @@ fn map_image(process: HANDLE, bits: Bits, mappings: &mut Mappings) -> io::Result
 }
 
 /// The export names of a mapped image, with their RVAs. A 32-bit stdcall export is decorated (`_name@N`); the
-/// decoration is removed, so the names are the ones the launcher asks for.
+/// decoration is removed, so the names are the ones the launcher asks for. The counts and array RVAs come from the
+/// same checked decoder the child's ntdll uses; only the name strings are read here.
 fn read_exports(image: &[u8], directory: usize) -> io::Result<HashMap<String, usize>> {
     if directory == 0 {
         return Err(io::Error::other("the stage 0 DLL exports nothing"));
     }
 
-    let count = u32le(image, directory + 24)? as usize;
-    let functions = u32le(image, directory + 28)? as usize;
-    let names = u32le(image, directory + 32)? as usize;
-    let ordinals = u32le(image, directory + 36)? as usize;
+    // Slice first so a directory at the end of the image keeps the field reads' truncation error.
+    let directory = image
+        .get(directory..)
+        .ok_or_else(|| io::Error::other("the stage 0 DLL is truncated"))?;
+    let arrays = export_arrays(directory, image.len())?;
     let mut exports = HashMap::new();
 
-    for index in 0..count {
-        let name_rva = u32le(image, names + 4 * index)? as usize;
-        let ordinal = usize::from(u16le(image, ordinals + 2 * index)?);
-        let rva = u32le(image, functions + 4 * ordinal)? as usize;
+    for index in 0..arrays.count {
+        let name_rva = u32le(image, arrays.names + 4 * index)? as usize;
+        let ordinal = usize::from(u16le(image, arrays.ordinals + 2 * index)?);
+        let rva = u32le(image, arrays.functions + 4 * ordinal)? as usize;
         let tail = image
             .get(name_rva..)
             .ok_or_else(|| io::Error::other("an export name is outside the image"))?;
@@ -863,7 +1228,189 @@ mod tests {
         assert!(!is_accepted_stub(Bits::X86, &other, 0));
     }
 
+    const SYNTHETIC_DIRECTORY: usize = 0x1000;
+    const SYNTHETIC_FUNCTIONS: usize = 0x1100;
+    const SYNTHETIC_NAMES: usize = 0x1200;
+    const SYNTHETIC_ORDINALS: usize = 0x1300;
+    const SYNTHETIC_STRINGS: usize = 0x2000;
+    const SYNTHETIC_SIZE: usize = 0x5000;
+
+    /// Lays an export directory out by RVA: seven names, seven functions, and ordinals that are not in name order.
+    fn synthetic_exports() -> Vec<u8> {
+        let names = [
+            "OtherExport",
+            "NtCreateFile",
+            "ntopenfile",
+            "NtOpenFile",
+            "NtOpenFileEx",
+            "NtQueryAttributesFile",
+            "NtQueryFullAttributesFile",
+        ];
+        let ordinals = [0u16, 3, 1, 2, 4, 5, 6];
+        let mut image = vec![0u8; SYNTHETIC_SIZE];
+
+        let mut string_rva = SYNTHETIC_STRINGS;
+        for (index, name) in names.iter().enumerate() {
+            image[SYNTHETIC_NAMES + 4 * index..SYNTHETIC_NAMES + 4 * index + 4]
+                .copy_from_slice(&(string_rva as u32).to_le_bytes());
+            image[SYNTHETIC_ORDINALS + 2 * index..SYNTHETIC_ORDINALS + 2 * index + 2]
+                .copy_from_slice(&ordinals[index].to_le_bytes());
+            image[string_rva..string_rva + name.len()].copy_from_slice(name.as_bytes());
+            string_rva += name.len() + 1;
+        }
+
+        for index in 0..ordinals.len() {
+            let rva = 0x4000 + 0x10 * index;
+            image[SYNTHETIC_FUNCTIONS + 4 * index..SYNTHETIC_FUNCTIONS + 4 * index + 4]
+                .copy_from_slice(&(rva as u32).to_le_bytes());
+        }
+
+        let put_u32 = |image: &mut [u8], at: usize, value: u32| {
+            image[at..at + 4].copy_from_slice(&value.to_le_bytes());
+        };
+        put_u32(
+            &mut image,
+            SYNTHETIC_DIRECTORY + 12,
+            SYNTHETIC_STRINGS as u32,
+        );
+        put_u32(&mut image, SYNTHETIC_DIRECTORY + 16, 1);
+        put_u32(&mut image, SYNTHETIC_DIRECTORY + 20, ordinals.len() as u32);
+        put_u32(&mut image, SYNTHETIC_DIRECTORY + 24, names.len() as u32);
+        put_u32(
+            &mut image,
+            SYNTHETIC_DIRECTORY + 28,
+            SYNTHETIC_FUNCTIONS as u32,
+        );
+        put_u32(&mut image, SYNTHETIC_DIRECTORY + 32, SYNTHETIC_NAMES as u32);
+        put_u32(
+            &mut image,
+            SYNTHETIC_DIRECTORY + 36,
+            SYNTHETIC_ORDINALS as u32,
+        );
+        image
+    }
+
+    /// Carves the three bulk reads the launcher makes out of the synthetic image.
+    fn synthetic_slices(image: &[u8]) -> (&[u8], &[u8], usize) {
+        let arrays = export_arrays(
+            &image[SYNTHETIC_DIRECTORY..SYNTHETIC_DIRECTORY + 40],
+            SYNTHETIC_SIZE,
+        )
+        .unwrap();
+        let pointers = &image[arrays.names..arrays.names + arrays.count * 4];
+        let (rva, length) = export_window(&arrays, pointers, SYNTHETIC_SIZE).unwrap();
+        (pointers, &image[rva..rva + length], rva)
+    }
+
     #[test]
+    fn the_bulk_matcher_finds_the_four_stubs_by_their_exact_names() {
+        let image = synthetic_exports();
+        let (pointers, strings, strings_rva) = synthetic_slices(&image);
+        let found = stub_indices(&STUBS, pointers, strings, strings_rva);
+        assert_eq!(found, [Some(3), Some(1), Some(5), Some(6)]);
+
+        // The ordinals are deliberately not in name order: each function must come from its own entry.
+        for (slot, index) in found.into_iter().enumerate() {
+            let index = index.unwrap();
+            let ordinal = u16::from_le_bytes(
+                image[SYNTHETIC_ORDINALS + 2 * index..SYNTHETIC_ORDINALS + 2 * index + 2]
+                    .try_into()
+                    .unwrap(),
+            );
+            let function = u32::from_le_bytes(
+                image[SYNTHETIC_FUNCTIONS + 4 * ordinal as usize
+                    ..SYNTHETIC_FUNCTIONS + 4 * ordinal as usize + 4]
+                    .try_into()
+                    .unwrap(),
+            );
+            assert_eq!(function as usize, 0x4000 + 0x10 * [2, 3, 5, 6][slot]);
+        }
+
+        let mut wanted = STUBS;
+        wanted[0] = "NtOpenFileMissing";
+        assert_eq!(
+            stub_indices(&wanted, pointers, strings, strings_rva)[0],
+            None
+        );
+    }
+
+    #[test]
+    fn the_bulk_matcher_ignores_name_pointers_outside_the_string_window() {
+        let image = synthetic_exports();
+        let (pointers, strings, _) = synthetic_slices(&image);
+        assert_eq!(stub_indices(&STUBS, pointers, &strings[..8], 0), [None; 4]);
+    }
+
+    #[test]
+    fn export_arrays_refuse_counts_and_ranges_outside_the_image() {
+        let image = synthetic_exports();
+        let directory = &image[SYNTHETIC_DIRECTORY..SYNTHETIC_DIRECTORY + 40];
+        let arrays = export_arrays(directory, SYNTHETIC_SIZE).unwrap();
+        assert_eq!(arrays.count, 7);
+        assert_eq!(arrays.function_count, 7);
+        assert_eq!(arrays.names, SYNTHETIC_NAMES);
+        assert!(export_arrays(directory, SYNTHETIC_FUNCTIONS + 27).is_err());
+        assert!(export_arrays(directory, 0).is_err());
+
+        let mut too_many = directory.to_vec();
+        too_many[24..28].copy_from_slice(&((MAX_EXPORT_NAMES + 1) as u32).to_le_bytes());
+        assert!(export_arrays(&too_many, SYNTHETIC_SIZE).is_err());
+    }
+
+    #[test]
+    fn read_exports_uses_the_shared_export_array_decoder() {
+        let image = synthetic_exports();
+        let directory = &image[SYNTHETIC_DIRECTORY..SYNTHETIC_DIRECTORY + 40];
+        let arrays = export_arrays(directory, image.len()).unwrap();
+        let exports = read_exports(&image, SYNTHETIC_DIRECTORY).unwrap();
+        assert_eq!(exports.len(), arrays.count);
+
+        // Every entry the shared decoder describes must appear with the same name and function RVA.
+        for index in 0..arrays.count {
+            let name_rva = u32le(&image, arrays.names + 4 * index).unwrap() as usize;
+            let ordinal = usize::from(u16le(&image, arrays.ordinals + 2 * index).unwrap());
+            let rva = u32le(&image, arrays.functions + 4 * ordinal).unwrap() as usize;
+            let end = image[name_rva..]
+                .iter()
+                .position(|&byte| byte == 0)
+                .unwrap();
+            let name = std::str::from_utf8(&image[name_rva..name_rva + end]).unwrap();
+            assert_eq!(exports.get(undecorate(name).as_str()), Some(&rva));
+        }
+        assert_eq!(exports["OtherExport"], 0x4000);
+        assert_eq!(exports["ntopenfile"], 0x4010);
+        assert_eq!(exports["NtOpenFile"], 0x4020);
+        assert_eq!(exports["NtCreateFile"], 0x4030);
+        assert_eq!(
+            read_exports(&image, 0).unwrap_err().to_string(),
+            "the stage 0 DLL exports nothing"
+        );
+    }
+
+    #[test]
+    fn the_export_string_window_is_bounded_and_inside_the_image() {
+        let image = synthetic_exports();
+        let directory = &image[SYNTHETIC_DIRECTORY..SYNTHETIC_DIRECTORY + 40];
+        let arrays = export_arrays(directory, SYNTHETIC_SIZE).unwrap();
+        let pointers = &image[arrays.names..arrays.names + arrays.count * 4];
+        assert_eq!(
+            export_window(&arrays, pointers, SYNTHETIC_SIZE).unwrap().0,
+            SYNTHETIC_STRINGS
+        );
+        assert!(export_window(&arrays, pointers, SYNTHETIC_STRINGS + NAME_BYTES - 1).is_err());
+
+        let mut outside = pointers.to_vec();
+        outside[0..4].copy_from_slice(&(SYNTHETIC_SIZE as u32).to_le_bytes());
+        assert!(export_window(&arrays, &outside, SYNTHETIC_SIZE).is_err());
+
+        let mut spread = pointers.to_vec();
+        spread[0..4].copy_from_slice(&0u32.to_le_bytes());
+        spread[4..8].copy_from_slice(&((MAX_EXPORT_STRINGS + 1) as u32).to_le_bytes());
+        assert!(export_window(&arrays, &spread, MAX_EXPORT_STRINGS + NAME_BYTES + 2).is_err());
+    }
+
+    #[test]
+    #[cfg(target_arch = "x86_64")]
     fn the_stubs_of_this_windows_build_are_accepted() {
         // The four loader stubs as this process's ntdll has them. A Windows update that changes their shape fails here
         // first, before a launch does.
@@ -879,6 +1426,17 @@ mod tests {
                 "{name}: {bytes:02X?}"
             );
         }
+    }
+
+    #[test]
+    fn a_rip_relative_operand_in_the_stub_prefix_is_refused() {
+        // `test byte ptr [rip+0x7FFE0308], 1` (mod=00, rm=101) would point into the trampoline instead of at the
+        // shared user data the original stub reads. The absolute SIB form in the fixture above is still accepted.
+        let stub = [
+            0x4C, 0x8B, 0xD1, 0xB8, 0x33, 0x00, 0x00, 0x00, 0xF6, 0x05, 0x08, 0x03, 0xFE, 0x7F,
+            0x01, 0x75, 0x03, 0x0F, 0x05, 0xC3, 0x90, 0x90,
+        ];
+        assert!(!is_accepted_stub(Bits::X64, &stub, 0));
     }
 
     #[test]
@@ -916,33 +1474,192 @@ mod tests {
         );
     }
 
+    /// A minimal PE image with one section, in either optional-header layout.
+    fn synthetic_pe(bits: Bits) -> Vec<u8> {
+        const NT: usize = 0x40;
+        let optional_size = match bits {
+            Bits::X64 => 240,
+            Bits::X86 => 224,
+        };
+        let optional = NT + 24;
+        let section_table = optional + optional_size;
+        let mut bytes = vec![0u8; section_table + 40];
+
+        let put_u16 = |bytes: &mut [u8], at: usize, value: u16| {
+            bytes[at..at + 2].copy_from_slice(&value.to_le_bytes());
+        };
+        let put_u32 = |bytes: &mut [u8], at: usize, value: u32| {
+            bytes[at..at + 4].copy_from_slice(&value.to_le_bytes());
+        };
+        let put_u64 = |bytes: &mut [u8], at: usize, value: u64| {
+            bytes[at..at + 8].copy_from_slice(&value.to_le_bytes());
+        };
+
+        bytes[..2].copy_from_slice(b"MZ");
+        put_u32(&mut bytes, 0x3C, NT as u32);
+        bytes[NT..NT + 4].copy_from_slice(b"PE\0\0");
+        put_u16(&mut bytes, NT + 4, bits.machine());
+        put_u16(&mut bytes, NT + 6, 1);
+        put_u16(&mut bytes, NT + 20, optional_size as u16);
+        put_u16(&mut bytes, optional, bits.magic());
+
+        let preferred = match bits {
+            Bits::X64 => 0x1800_0000u64,
+            Bits::X86 => 0x0100_0000u64,
+        };
+        match bits {
+            Bits::X64 => put_u64(&mut bytes, optional + 24, preferred),
+            Bits::X86 => put_u32(&mut bytes, optional + 28, preferred as u32),
+        }
+        put_u32(&mut bytes, optional + 56, 0x5000);
+        put_u32(&mut bytes, optional + 60, 0x400);
+        put_u32(&mut bytes, optional + 92, 16);
+        let directories = optional + bits.directories();
+        put_u32(&mut bytes, directories, 0x2000);
+        put_u32(&mut bytes, directories + 4, 0x80);
+        put_u32(&mut bytes, section_table + 12, 0x1000);
+        put_u32(&mut bytes, section_table + 16, 0x200);
+        put_u32(&mut bytes, section_table + 20, 0x400);
+        bytes
+    }
+
+    #[test]
+    fn pe_headers_read_both_optional_header_layouts() {
+        for bits in [Bits::X64, Bits::X86] {
+            let bytes = synthetic_pe(bits);
+            let headers = pe_headers(&bytes, Some(bits)).unwrap();
+            assert_eq!(headers.machine, bits.machine());
+            assert_eq!(headers.magic, bits.magic());
+            assert_eq!(headers.section_count, 1);
+            assert_eq!(
+                headers.optional_size,
+                if bits == Bits::X64 { 240 } else { 224 }
+            );
+            assert_eq!(
+                headers.preferred_base,
+                match bits {
+                    Bits::X64 => 0x1800_0000,
+                    Bits::X86 => 0x0100_0000,
+                }
+            );
+            assert_eq!(headers.image_size, 0x5000);
+            assert_eq!(headers.headers_size, 0x400);
+            assert_eq!(headers.directory_count, 16);
+            assert_eq!(headers.export, (0x2000, 0x80));
+            assert_eq!(headers.section_table, 0x40 + 24 + headers.optional_size);
+        }
+    }
+
+    #[test]
+    fn pe_headers_refuse_a_truncated_optional_header() {
+        let bytes = synthetic_pe(Bits::X64);
+        let error = pe_headers(&bytes[..0x40 + 24], Some(Bits::X64)).unwrap_err();
+        assert_eq!(error.to_string(), "the stage 0 DLL is truncated");
+    }
+
+    #[test]
+    fn pe_headers_check_the_signature_only_for_an_image_it_maps() {
+        let mut bytes = synthetic_pe(Bits::X86);
+        bytes[0x40..0x44].copy_from_slice(b"PX\0\0");
+        let error = pe_headers(&bytes, Some(Bits::X86)).unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "the stage 0 DLL is not the PE image for this child"
+        );
+        // A foreign image is scanned by RVA, without the mapper's signature check.
+        assert_eq!(pe_headers(&bytes, None).unwrap().export.0, 0x2000);
+    }
+
+    #[test]
+    fn pe_headers_refuse_a_section_table_past_the_buffer() {
+        let bytes = synthetic_pe(Bits::X86);
+        let truncated = &bytes[..0x40 + 24 + 224 + 39];
+        let error = pe_headers(truncated, Some(Bits::X86)).unwrap_err();
+        assert_eq!(error.to_string(), "the stage 0 DLL is truncated");
+        assert_eq!(pe_headers(truncated, None).unwrap().section_count, 1);
+    }
+
+    #[test]
+    fn layout_image_refuses_a_header_copy_outside_the_image_or_the_file() {
+        let mut bytes = synthetic_pe(Bits::X86);
+        let optional = 0x40 + 24;
+        let section = optional + 224;
+        // Keep the section copy in range so only the header range is under test.
+        bytes[section + 16..section + 20].copy_from_slice(&0x40u32.to_le_bytes());
+        bytes[section + 20..section + 24].copy_from_slice(&0x100u32.to_le_bytes());
+
+        bytes[optional + 60..optional + 64].copy_from_slice(&0x100u32.to_le_bytes());
+        assert!(layout_image(&bytes, Bits::X86).is_ok());
+
+        // The header fits the image but reaches past the embedded file.
+        let past_file = bytes.len() as u32 + 1;
+        bytes[optional + 60..optional + 64].copy_from_slice(&past_file.to_le_bytes());
+        assert_eq!(
+            layout_image(&bytes, Bits::X86).unwrap_err().to_string(),
+            "the stage 0 DLL is truncated"
+        );
+
+        // The file is long enough now, but the header reaches past the image.
+        bytes.resize(0x5002, 0);
+        bytes[optional + 60..optional + 64].copy_from_slice(&0x5001u32.to_le_bytes());
+        assert_eq!(
+            layout_image(&bytes, Bits::X86).unwrap_err().to_string(),
+            "the stage 0 DLL is truncated"
+        );
+    }
+
+    #[test]
+    fn layout_image_refuses_a_section_whose_raw_range_is_past_the_buffer() {
+        let mut bytes = synthetic_pe(Bits::X86);
+        let optional = 0x40 + 24;
+        let section = optional + 224;
+        bytes[optional + 60..optional + 64].copy_from_slice(&0x100u32.to_le_bytes());
+
+        // A section with a valid virtual address but raw data starting at the end of the file.
+        let past_file = bytes.len() as u32;
+        bytes[section + 20..section + 24].copy_from_slice(&past_file.to_le_bytes());
+        assert_eq!(
+            layout_image(&bytes, Bits::X86).unwrap_err().to_string(),
+            "the stage 0 DLL is truncated"
+        );
+
+        // A raw pointer near the top of the address space cannot be added to the length.
+        bytes[section + 20..section + 24].copy_from_slice(&u32::MAX.to_le_bytes());
+        assert_eq!(
+            layout_image(&bytes, Bits::X86).unwrap_err().to_string(),
+            "the stage 0 DLL is truncated"
+        );
+
+        // A section reaching past the image is still clipped, as it was before.
+        bytes[section + 12..section + 16].copy_from_slice(&(0x5000u32 - 0x20).to_le_bytes());
+        bytes[section + 20..section + 24].copy_from_slice(&0x100u32.to_le_bytes());
+        let (image, size) = layout_image(&bytes, Bits::X86).unwrap();
+        assert_eq!(image.len(), size);
+        assert_eq!(&image[0x5000 - 0x20..], &bytes[0x100..0x120]);
+    }
+
     /// Lays the embedded DLL out by RVA, the way `map_image` does in the child, so its exports and code can be read.
     fn mapped_dll(bits: Bits) -> Vec<u8> {
         let bytes = bits.dll();
         assert!(!bytes.is_empty(), "this build has no stage 0 DLL");
-        let nt = u32le(bytes, 0x3C).unwrap() as usize;
-        let section_count = usize::from(u16le(bytes, nt + 6).unwrap());
-        let optional_size = usize::from(u16le(bytes, nt + 20).unwrap());
-        let optional = nt + 24;
-        let image_size = u32le(bytes, optional + 56).unwrap() as usize;
-        let headers_size = u32le(bytes, optional + 60).unwrap() as usize;
-        let mut image = vec![0u8; image_size];
-        image[..headers_size].copy_from_slice(&bytes[..headers_size]);
-        let sections = nt + 24 + optional_size;
-
-        for index in 0..section_count {
-            let header = sections + 40 * index;
-            let size = u32le(bytes, header + 16).unwrap() as usize;
-            let raw = u32le(bytes, header + 20).unwrap() as usize;
-            let address = u32le(bytes, header + 12).unwrap() as usize;
-            let length = size.min(image_size.saturating_sub(address));
-
-            if length > 0 {
-                image[address..address + length].copy_from_slice(&bytes[raw..raw + length]);
-            }
-        }
-
+        let (image, image_size) = layout_image(bytes, bits).unwrap();
+        assert_eq!(image.len(), image_size);
         image
+    }
+
+    #[test]
+    fn the_embedded_dlls_pass_the_shared_export_decoder() {
+        for bits in [Bits::X64, Bits::X86] {
+            let bytes = bits.dll();
+            if bytes.is_empty() {
+                continue;
+            }
+            let image = mapped_dll(bits);
+            let rva = pe_headers(bytes, Some(bits)).unwrap().export.0;
+            let arrays = export_arrays(&image[rva..rva + 40], image.len()).unwrap();
+            assert!(arrays.count > 0);
+            assert!(read_exports(&image, rva).unwrap().len() >= STUBS.len());
+        }
     }
 
     #[test]
@@ -992,6 +1709,20 @@ mod tests {
             r"\??\C:\Games\Lethal Company"
         );
         assert!(nt_prefix(Path::new(r"Games\Lethal")).is_err());
+    }
+
+    #[test]
+    fn a_unc_folder_becomes_an_nt_unc_prefix() {
+        let win32 = nt_prefix(Path::new(r"\\server\share\Games")).unwrap();
+        let nt = nt_prefix(Path::new(r"\??\UNC\server\share\Games")).unwrap();
+        assert_eq!(
+            String::from_utf16_lossy(&win32),
+            r"\??\UNC\server\share\Games"
+        );
+        assert_eq!(nt, win32);
+        assert!(nt_prefix(Path::new(r"\\server")).is_err());
+        assert!(nt_prefix(Path::new(r"\\server\")).is_err());
+        assert!(nt_prefix(Path::new(r"\??\UNC\share")).is_err());
     }
 
     #[test]

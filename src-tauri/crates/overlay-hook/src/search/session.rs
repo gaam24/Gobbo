@@ -1,4 +1,4 @@
-﻿//! The listings that a program reads through `FindFirstFileW`, `FindNextFileW` and `FindClose`. The entries are kept in our
+//! The listings that a program reads through `FindFirstFileW`, `FindNextFileW` and `FindClose`. The entries are kept in our
 //! own table, keyed by a handle far from the ones Windows gives out, so `FindNextFileW` and `FindClose` know which calls
 //! are ours.
 
@@ -17,7 +17,7 @@ use windows_sys::Win32::Storage::FileSystem::{
     FindExSearchLimitToDirectories, FindExSearchNameMatch, WIN32_FIND_DATAW,
 };
 
-use super::listing::{RootStream, Taken, find_layers};
+use super::listing::{RootStream, Taken, find_layers_own};
 use crate::guard::Guard;
 use crate::paths::{place, shown};
 use crate::trace::{trace, trace_call};
@@ -63,8 +63,8 @@ static SEARCHES: LazyLock<Mutex<FxHashMap<usize, Arc<Mutex<Search>>>>> =
 /// The maximum number of live listings. A new listing at the cap passes to the original call instead of evicting a
 /// live handle, so a program that forgets to close handles cannot grow the table and no enumeration is reset.
 const MAX_SEARCHES: usize = 128;
-/// The first handle of our listings. It has the high bit set and an odd value, so it is neither a normal kernel handle
-/// (which is aligned) nor a plausible small handle; it also fits a 32-bit `usize`.
+/// The first handle of our listings. It is an odd value well above a normal aligned kernel handle, and it still fits a
+/// 32-bit `usize`.
 const SEARCH_BASE: usize = (1usize << (usize::BITS - 8)) | 1;
 static NEXT_SEARCH: AtomicUsize = AtomicUsize::new(SEARCH_BASE);
 
@@ -106,6 +106,47 @@ fn supported_ex(level: i32, search: i32, filter: *const c_void, flags: u32) -> b
     level && search && filter.is_null() && flags & !known == 0
 }
 
+/// Whether the folder part of a pattern has a wildcard. The hook resolves one folder with `shown` and asks the system
+/// only for the names inside it; a wildcard folder needs the original call, which expands every matching folder.
+fn folder_has_wildcard(rel: &str) -> bool {
+    rel.contains('*') || rel.contains('?')
+}
+
+/// The shared body of `FindFirstFileW` and `FindFirstFileExW`. `start` builds a merged listing, or returns `None` to
+/// use the original call; `call` performs that call and returns `Err` when its `original!` fallback already left.
+///
+/// # Safety
+/// `name` must be a NUL-terminated UTF-16 string, or null. `start` and `call` must pass the caller's arguments on
+/// unchanged.
+unsafe fn find_first_with(
+    operation: &'static str,
+    name: *const u16,
+    start: impl FnOnce() -> Option<*mut c_void>,
+    call: impl FnOnce() -> Result<*mut c_void, *mut c_void>,
+) -> *mut c_void {
+    unsafe { trace_call(operation, name) };
+    // Keep the guard across the original call: `FindFirstFileW` reaches the NT layer, where a second hooked call would
+    // classify the same path again.
+    let guard = Guard::enter();
+
+    if guard.is_some()
+        && let Some(handle) = start()
+    {
+        trace(|| format!("result {operation} listed handle={handle:?}"));
+        return handle;
+    }
+
+    match call() {
+        Ok(handle) => {
+            let _last_error = PreserveLastError::capture();
+            trace(|| format!("result {operation} handle={handle:?}"));
+            handle
+        }
+        // The fallback left before an original call produced a result, so there is no result to restore or trace.
+        Err(handle) => handle,
+    }
+}
+
 /// `FindFirstFileW`: a listing of a folder of the game, merged from the layers.
 ///
 /// # Safety
@@ -114,27 +155,20 @@ pub(crate) unsafe extern "system" fn find_first(
     name: *const u16,
     data: *mut WIN32_FIND_DATAW,
 ) -> *mut c_void {
-    unsafe { trace_call("FindFirstFileW", name) };
-    // Keep the guard across the original call: `FindFirstFileW` reaches the NT layer, where a second hooked call would
-    // classify the same path again.
-    let guard = Guard::enter();
-
-    if guard.is_some()
-        && let Some(handle) =
-            unsafe { start_search(name, data, FindExInfoStandard, FindExSearchNameMatch, 0) }
-    {
-        trace(|| format!("result FindFirstFileW listed handle={handle:?}"));
-        return handle;
+    unsafe {
+        find_first_with(
+            "FindFirstFileW",
+            name,
+            || start_search(name, data, FindExInfoStandard, FindExSearchNameMatch, 0),
+            || {
+                let original = original!(find_first, {
+                    fail(ERROR_INVALID_FUNCTION);
+                    Err(INVALID_HANDLE_VALUE)
+                });
+                Ok(original.call(name, data))
+            },
+        )
     }
-
-    let original = original!(find_first, {
-        fail(ERROR_INVALID_FUNCTION);
-        INVALID_HANDLE_VALUE
-    });
-    let handle = unsafe { original.call(name, data) };
-    let _last_error = PreserveLastError::capture();
-    trace(|| format!("result FindFirstFileW handle={handle:?}"));
-    handle
 }
 
 /// `FindFirstFileExW`: the same as `FindFirstFileW` for the standard information levels.
@@ -149,26 +183,26 @@ pub(crate) unsafe extern "system" fn find_first_ex(
     filter: *const c_void,
     flags: u32,
 ) -> *mut c_void {
-    unsafe { trace_call("FindFirstFileExW", name) };
     trace(|| format!("args FindFirstFileExW level={level} search={search} flags=0x{flags:x}"));
-    let guard = Guard::enter();
-
-    if guard.is_some()
-        && supported_ex(level, search, filter, flags)
-        && let Some(handle) = unsafe { start_search(name, data.cast(), level, search, flags) }
-    {
-        trace(|| format!("result FindFirstFileExW listed handle={handle:?}"));
-        return handle;
+    unsafe {
+        find_first_with(
+            "FindFirstFileExW",
+            name,
+            || {
+                if !supported_ex(level, search, filter, flags) {
+                    return None;
+                }
+                start_search(name, data.cast(), level, search, flags)
+            },
+            || {
+                let original = original!(find_first_ex, {
+                    fail(ERROR_INVALID_FUNCTION);
+                    Err(INVALID_HANDLE_VALUE)
+                });
+                Ok(original.call(name, level, data, search, filter, flags))
+            },
+        )
     }
-
-    let original = original!(find_first_ex, {
-        fail(ERROR_INVALID_FUNCTION);
-        INVALID_HANDLE_VALUE
-    });
-    let handle = unsafe { original.call(name, level, data, search, filter, flags) };
-    let _last_error = PreserveLastError::capture();
-    trace(|| format!("result FindFirstFileExW handle={handle:?}"));
-    handle
 }
 
 /// `FindNextFileW`: the next entry of one of our listings, or the original call for any other handle.
@@ -248,14 +282,31 @@ unsafe fn start_search(
     let mount = place.mount;
     let pattern = place.rel;
     let (rel, mask) = pattern.rsplit_once('\\').unwrap_or(("", pattern.as_str()));
-    let own = match shown(mount, rel) {
-        Ok(Some((_, path, attributes))) if attributes & FILE_ATTRIBUTE_DIRECTORY != 0 => path,
+    // A wildcard in a directory component spans several folders. Probing one of them would report a path-not-found
+    // for the literal `data*`; the original call expands the pattern across every matching folder.
+    if folder_has_wildcard(rel) {
+        return None;
+    }
+    let (own, attributes) = match shown(mount, rel) {
+        Ok(Some((_, path, attributes))) if attributes & FILE_ATTRIBUTE_DIRECTORY != 0 => {
+            (path, attributes)
+        }
         // The folder is missing or hidden: the program gets the error Windows gives for a missing folder.
         Ok(_) => return Some(no_entries(ERROR_PATH_NOT_FOUND)),
         // A refused attribute query is reported as Windows reports it, not as a missing folder.
         Err(failure) => return Some(no_entries(failure.win32())),
     };
-    let layers = find_layers(mount, rel, mask, level, search, flags, true, Some(&own));
+    let layers = find_layers_own(
+        mount,
+        rel,
+        mask,
+        level,
+        search,
+        flags,
+        true,
+        Some(&own),
+        Some(attributes),
+    );
 
     if let Some((handle, first)) = layers.direct {
         // SAFETY: `data` is the program's `WIN32_FIND_DATAW` output, writable for one entry; `first` is plain data.
@@ -325,6 +376,55 @@ unsafe fn next_entry(handle: *mut c_void, data: *mut WIN32_FIND_DATAW) -> Option
 #[cfg(test)]
 mod tests {
     use super::*;
+    use windows_sys::Win32::Foundation::GetLastError;
+
+    #[test]
+    fn the_helper_uses_the_started_handle_or_the_original_result() {
+        let started = std::ptr::dangling_mut::<u16>().cast::<c_void>();
+        let original = std::ptr::dangling_mut::<u32>().cast::<c_void>();
+
+        // A merged listing wins and never reaches the original call.
+        let handle = unsafe {
+            find_first_with(
+                "FindFirstFileW",
+                std::ptr::null(),
+                || Some(started),
+                || panic!("the original must not run"),
+            )
+        };
+        assert_eq!(handle, started);
+
+        // With no listing the original runs, and its error survives the capture and the result trace.
+        // SAFETY: the test owns this thread's error.
+        set_error(1111);
+        let handle = unsafe {
+            find_first_with(
+                "FindFirstFileW",
+                std::ptr::null(),
+                || None,
+                || {
+                    // SAFETY: same as above.
+                    set_error(4321);
+                    Ok(original)
+                },
+            )
+        };
+        // SAFETY: same as above.
+        let error = unsafe { GetLastError() };
+        assert_eq!(handle, original);
+        assert_eq!(error, 4321);
+
+        // A fallback from the original closure is passed through without a result trace.
+        let handle = unsafe {
+            find_first_with(
+                "FindFirstFileW",
+                std::ptr::null(),
+                || None,
+                || Err(INVALID_HANDLE_VALUE),
+            )
+        };
+        assert_eq!(handle, INVALID_HANDLE_VALUE);
+    }
 
     #[test]
     fn only_an_unknown_level_search_or_flag_goes_to_the_original() {
@@ -362,5 +462,14 @@ mod tests {
         assert!(ours((SEARCH_BASE + 2) as *mut c_void));
         assert!(!ours(4 as *mut c_void));
         assert!(!ours(INVALID_HANDLE_VALUE));
+    }
+
+    #[test]
+    fn a_wildcard_folder_goes_to_the_original_call() {
+        assert!(folder_has_wildcard("archive*"));
+        assert!(folder_has_wildcard("data?\\nested"));
+        assert!(!folder_has_wildcard("archive\\nested"));
+        assert!(!folder_has_wildcard(""));
+        // The leaf of a pattern is the caller's mask, not a folder: only the part before the last separator is checked.
     }
 }

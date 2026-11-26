@@ -1,6 +1,6 @@
-//! The trace lines: the ones waiting for their batch, the last ones kept for a crash report, and the thread that writes the
-//! batches of a dev build every 100 ms. A file is written for each batch, not for each line: opening a file for every
-//! traced call stalled the game.
+//! The trace lines: the ones waiting for their batch, the last ones kept for a crash report, and the thread that writes
+//! the batches every 100 ms when a log is named. A file is written for each batch, not for each line: opening a file for
+//! every traced call stalled the game.
 
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -10,18 +10,18 @@ use std::time::{Duration, Instant};
 use windows_sys::Win32::System::Threading::GetCurrentThreadId;
 
 use super::settings::settings;
-use super::writer::write_lines;
+use super::writer::{reporting, write_lines};
 use crate::guard::Guard;
 
 /// The trace lines not written yet. The lines still in the buffer when the game is killed are lost.
 static TRACE: Mutex<Vec<String>> = Mutex::new(Vec::new());
 /// The trace is written after this many lines.
 const TRACE_BATCH: usize = 200;
-/// Starts the thread that writes the trace of a dev build every 100 ms, once. It starts only after the detours are enabled
-/// (`allow_flusher`): until then the install must see one thread, and that is what makes the enable cheap.
+/// Starts the thread that writes the trace every 100 ms when a log is named, once. It starts only after the detours are
+/// enabled (`allow_flusher`): until then the install must see one thread, and that is what makes the enable cheap.
 static FLUSHER_ALLOWED: AtomicBool = AtomicBool::new(false);
 static FLUSHER: Once = Once::new();
-/// The last trace lines, kept in a dev build for a crash report, oldest first.
+/// The last trace lines, kept while a log is named for a crash report, oldest first.
 static RECENT: Mutex<VecDeque<String>> = Mutex::new(VecDeque::new());
 /// How many of the last trace lines are kept.
 const RECENT_LINES: usize = 512;
@@ -33,11 +33,13 @@ static START: OnceLock<Instant> = OnceLock::new();
 /// Adds one line to the trace, in batches, with its number, its time and its thread. A line added while the trace is
 /// being written (the write's own calls, for one) only joins the buffer, and goes out with a later batch.
 pub(crate) fn trace_line(line: &str) {
-    if settings().log.is_none() || super::crashing() {
+    let logging = settings().log.is_some();
+    if !logging || reporting() {
         return;
     }
-    // A dev build also writes the trace from a thread of its own, so the calls just before a crash are in the file.
-    if cfg!(debug_assertions) && FLUSHER_ALLOWED.load(Ordering::Acquire) {
+    // A named log also writes from a thread of its own, so the calls just before a crash are in the file. This covers a
+    // release build with an explicit `GOBBO_OVERLAY_LOG` as well as the dev default.
+    if FLUSHER_ALLOWED.load(Ordering::Acquire) {
         FLUSHER.call_once(start_flusher);
     }
 
@@ -47,7 +49,7 @@ pub(crate) fn trace_line(line: &str) {
     let thread = unsafe { GetCurrentThreadId() };
     let stamped = stamp(sequence, millis, thread, line);
 
-    if cfg!(debug_assertions) {
+    if logging {
         let mut recent = RECENT.lock().unwrap_or_else(PoisonError::into_inner);
         keep_last(&mut recent, stamped.clone(), RECENT_LINES);
     }
@@ -87,19 +89,21 @@ pub(super) fn recent_lines() -> Vec<String> {
     }
 }
 
-/// Lets a dev build start its trace thread. Called once the detours are enabled, so the install does not run beside it.
+/// Lets a named log start its trace thread. Called once the detours are enabled, so the install does not run beside it.
 pub(crate) fn allow_flusher() {
     FLUSHER_ALLOWED.store(true, Ordering::Release);
     // The lines of the install are written now: a short run can end before the trace thread has its first turn.
     flush_trace();
 
-    if cfg!(debug_assertions) {
+    // A dev build names a log by default; a release build does so only when `GOBBO_OVERLAY_LOG` is explicit. With no
+    // log there is nothing to flush and no reason for a thread.
+    if settings().log.is_some() {
         FLUSHER.call_once(start_flusher);
     }
 }
 
-/// The thread that writes the trace of a dev build every 100 ms. Its writes are the trace's own, so they go through the
-/// guard like any other write.
+/// The thread that writes a named log every 100 ms. Its writes are the trace's own, so they go through the guard like
+/// any other write.
 fn start_flusher() {
     let _ = std::thread::Builder::new()
         .name("gobbo-trace".into())
@@ -111,9 +115,9 @@ fn start_flusher() {
         });
 }
 
-/// Writes the trace lines still waiting in the buffer. The process calls it when it exits: a batch that never filled
-/// would otherwise be lost, and the end of a run is what the trace is for. Lines stay in the buffer while the guard is
-/// held elsewhere, so a write that cannot start now is not lost.
+/// Writes the trace lines still waiting in the buffer. A full batch and the 100 ms flusher call this; nothing runs at
+/// process exit (`DllMain` does no I/O), so a tail shorter than the flush interval is lost by design. Lines stay in the
+/// buffer while the guard is held elsewhere, so a write that cannot start now is not lost.
 pub(crate) fn flush_trace() {
     let Some(path) = &settings().log else {
         return;

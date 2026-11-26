@@ -5,8 +5,8 @@
 use std::ffi::c_void;
 
 use windows_sys::Win32::Foundation::{
-    STATUS_ACCESS_DENIED, STATUS_DIRECTORY_NOT_EMPTY, STATUS_NOT_SUPPORTED,
-    STATUS_OBJECT_NAME_COLLISION, STATUS_UNSUCCESSFUL,
+    STATUS_ACCESS_DENIED, STATUS_DIRECTORY_NOT_EMPTY, STATUS_INVALID_PARAMETER,
+    STATUS_NOT_SUPPORTED, STATUS_OBJECT_NAME_COLLISION, STATUS_UNSUCCESSFUL,
 };
 
 use super::layout::{
@@ -36,7 +36,13 @@ pub(crate) unsafe extern "system" fn nt_set_information_file(
     length: u32,
     class: u32,
 ) -> i32 {
-    if let Some(_guard) = enter_session() {
+    // A deletion decides before the original call whether it must refuse and what lower entry it may hide. The hide is
+    // deferred until the original succeeds, so a failed deletion leaves the lower file visible.
+    let mut hide_after_success: Option<(&'static crate::state::Mount, String)> = None;
+    // Bind the guard outside the block: it must stay alive across the original call and the whiteout write below, so
+    // every file call the hook makes there passes through untouched. `if let` would drop it at the end of the block.
+    let guard = enter_session();
+    if guard.is_some() {
         let deleting = unsafe { deletion_requested(class, info, length) };
         let renaming = matches!(class, FILE_RENAME_INFORMATION | FILE_RENAME_INFORMATION_EX);
         // A handle outside every layer cannot change a lower entry or the game folder. The final-path check uses a stack
@@ -44,8 +50,11 @@ pub(crate) unsafe extern "system" fn nt_set_information_file(
         if (deleting || renaming) && handles::layer_kind(handle) == Some(LayerKind::Outside) {
             // Fall through to the original call.
         } else {
-            if deleting && let Some(refusal) = unsafe { hide_deleted(handle) } {
-                return refusal;
+            if deleting {
+                match unsafe { deletion_whiteout_for(handle) } {
+                    Ok(hide) => hide_after_success = hide,
+                    Err(refusal) => return refusal,
+                }
             }
 
             if let Some(result) = unsafe { rename_in_game(handle, info, length, class) } {
@@ -79,7 +88,14 @@ pub(crate) unsafe extern "system" fn nt_set_information_file(
 
     let original = original!(nt_set_information_file, STATUS_UNSUCCESSFUL);
     let result = unsafe { original.call(handle, status, info, length, class) };
+    // Capture the original call's error before `hide()` touches the disk; dropping `_last_error` restores it on return.
+    // `guard` is still alive here, so the whiteout's own file calls pass through the hook untouched.
     let _last_error = PreserveLastError::capture();
+
+    if let Some((mount, rel)) = whiteout_on_success(hide_after_success, result) {
+        hide(mount, &rel);
+    }
+
     result
 }
 
@@ -177,7 +193,10 @@ unsafe fn rename_in_game(
         hide_places.push((target_place.mount, target_place.rel.clone()));
     }
 
-    Some(Ok((build_rename(bytes, &new_name), hide_places)))
+    let Some(renamed) = build_rename(bytes, &new_name) else {
+        return Some(Err(STATUS_INVALID_PARAMETER));
+    };
+    Some(Ok((renamed, hide_places)))
 }
 
 /// Whether the information asks to delete the file on close.
@@ -198,32 +217,192 @@ unsafe fn deletion_requested(class: u32, info: *const c_void, length: u32) -> bo
     }
 }
 
-/// Hides the lower entry of a file deleted through `handle`. `None` lets the deletion go ahead. A handle to the mod layer
-/// or to the game folder is refused, and so is a folder that still has visible entries.
+/// Where a deleted handle lies, as plain data so the refusal/hide decision can be tested without a real handle.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum DeletedPlace {
+    /// The handle's final path could not be queried.
+    Unqueryable,
+    /// The handle is in a mount's upper layer.
+    Upper {
+        /// The entry is a folder that still has visible children.
+        folder_has_entries: bool,
+        /// Whether a lower copy exists; `None` when the layers could not be queried.
+        lower: Option<bool>,
+    },
+    /// The handle is in one of a mount's lower layers.
+    Lower,
+    /// The handle is in no layer of any mount.
+    Elsewhere,
+}
+
+/// The pure pre-call decision for a deletion. `Err` is the status to return before the original call; `Ok(Some(..))` is
+/// the lower entry to hide once the original succeeds; `Ok(None)` passes the call through with no whiteout.
+///
+/// The whiteout is kept until a successful original call, so a deletion Windows refuses (a read-only attribute,
+/// `STATUS_CANNOT_DELETE`, ...) leaves the lower file visible as it does in an unmodded run.
+fn deletion_decision<T>(place: DeletedPlace, upper: Option<T>) -> Result<Option<T>, i32> {
+    match place {
+        DeletedPlace::Unqueryable | DeletedPlace::Elsewhere => Ok(None),
+        DeletedPlace::Lower => Err(STATUS_ACCESS_DENIED),
+        DeletedPlace::Upper {
+            folder_has_entries,
+            lower,
+        } => {
+            if folder_has_entries {
+                Err(STATUS_DIRECTORY_NOT_EMPTY)
+            } else if lower.unwrap_or(true) {
+                // A lower copy that cannot be queried is still a copy to hide: the upper one is being deleted.
+                Ok(upper)
+            } else {
+                Ok(None)
+            }
+        }
+    }
+}
+
+/// The whiteout a deletion writes for the status the original call returned. A negative status writes nothing, so the
+/// lower file stays visible even though the hook was asked to delete it.
+fn whiteout_on_success<T>(hide: Option<T>, result: i32) -> Option<T> {
+    if result >= 0 { hide } else { None }
+}
+
+/// Resolves `handle` into the whiteout to write after the original deletion succeeds. `Err` is the status to return
+/// before calling the original; `Ok(None)` lets the call pass through. A handle to the game folder is refused, and so
+/// is a folder that still has visible entries.
 ///
 /// # Safety
 /// `handle` must be a file handle of this process, or invalid.
-unsafe fn hide_deleted(handle: *mut c_void) -> Option<i32> {
-    let real = handles::layer_path(handle)?;
+unsafe fn deletion_whiteout_for(
+    handle: *mut c_void,
+) -> Result<Option<(&'static crate::state::Mount, String)>, i32> {
+    let Some(real) = handles::layer_path(handle) else {
+        return deletion_decision(DeletedPlace::Unqueryable, None);
+    };
 
-    if let Some((mount, rel)) = handles::relative_in_upper(&real) {
-        if is_folder(&real) && has_visible_entries(mount, &rel) {
-            return Some(STATUS_DIRECTORY_NOT_EMPTY);
+    let upper = handles::relative_in_upper(&real);
+    let place = match upper.as_ref() {
+        Some((mount, rel)) => {
+            let folder_has_entries = is_folder(&real) && has_visible_entries(mount, rel);
+            if folder_has_entries {
+                // The folder refusal short-circuits the lower query, as it did before the split.
+                DeletedPlace::Upper {
+                    folder_has_entries: true,
+                    lower: None,
+                }
+            } else {
+                DeletedPlace::Upper {
+                    folder_has_entries: false,
+                    lower: in_lower(mount, rel).ok(),
+                }
+            }
         }
-        // A lower copy that cannot be queried is still a copy to hide: the upper one is about to be deleted.
-        if in_lower(mount, &rel).unwrap_or(true) {
-            hide(mount, &rel);
+        None => {
+            if handles::relative_in_lower_layers(&real).is_some() {
+                DeletedPlace::Lower
+            } else {
+                DeletedPlace::Elsewhere
+            }
         }
-
-        return None;
-    }
-
-    handles::relative_in_lower_layers(&real)
-        .is_some()
-        .then_some(STATUS_ACCESS_DENIED)
+    };
+    deletion_decision(place, upper)
 }
 
 /// Whether a real path is a folder. A path that cannot be read is not.
 fn is_folder(real: &str) -> bool {
     std::fs::metadata(real).is_ok_and(|meta| meta.is_dir())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The regression is a Rust lifetime: binding the guard outside the `if` keeps it alive across the calls that
+    /// follow. This pins the pattern without a real handle or detour table; the hook itself needs both.
+    #[test]
+    fn an_outer_guard_stays_inside_after_the_if_block() {
+        use crate::guard::Guard;
+
+        let guard = Guard::enter();
+        assert!(guard.is_some());
+        if guard.is_some() {
+            assert!(Guard::enter().is_none());
+        }
+        // Still inside after the block, as the hook is across its original call and its whiteout write.
+        assert!(Guard::enter().is_none());
+        drop(guard);
+        assert!(Guard::enter().is_some());
+    }
+
+    /// The upper entry to hide, as plain data: the decision needs no real handle or mount.
+    fn upper() -> Option<&'static str> {
+        Some("upper\\file.txt")
+    }
+
+    #[test]
+    fn an_unqueryable_or_outside_handle_passes_without_a_whiteout() {
+        assert_eq!(
+            deletion_decision(DeletedPlace::Unqueryable, upper()),
+            Ok(None)
+        );
+        assert_eq!(
+            deletion_decision(DeletedPlace::Elsewhere, upper()),
+            Ok(None)
+        );
+    }
+
+    #[test]
+    fn a_handle_in_a_lower_layer_is_refused_before_the_original_call() {
+        assert_eq!(
+            deletion_decision(DeletedPlace::Lower, upper()),
+            Err(STATUS_ACCESS_DENIED)
+        );
+    }
+
+    #[test]
+    fn a_non_empty_folder_is_refused_before_the_original_call() {
+        let place = DeletedPlace::Upper {
+            folder_has_entries: true,
+            lower: Some(true),
+        };
+        assert_eq!(
+            deletion_decision(place, upper()),
+            Err(STATUS_DIRECTORY_NOT_EMPTY)
+        );
+    }
+
+    #[test]
+    fn a_lower_copy_or_a_failed_query_is_hidden_after_success() {
+        for lower in [Some(true), None] {
+            let place = DeletedPlace::Upper {
+                folder_has_entries: false,
+                lower,
+            };
+            assert_eq!(deletion_decision(place, upper()), Ok(upper()));
+        }
+    }
+
+    #[test]
+    fn an_upper_file_without_a_lower_copy_passes_without_a_whiteout() {
+        let place = DeletedPlace::Upper {
+            folder_has_entries: false,
+            lower: Some(false),
+        };
+        assert_eq!(deletion_decision(place, upper()), Ok(None));
+    }
+
+    /// The order is the regression: the whiteout is computed before the call but written only for a successful status.
+    #[test]
+    fn a_failed_deletion_leaves_the_lower_file_visible() {
+        let hide = deletion_decision(
+            DeletedPlace::Upper {
+                folder_has_entries: false,
+                lower: Some(true),
+            },
+            upper(),
+        )
+        .ok()
+        .flatten();
+        assert_eq!(whiteout_on_success(hide, STATUS_UNSUCCESSFUL), None);
+        assert_eq!(whiteout_on_success(hide, 0), upper());
+    }
 }

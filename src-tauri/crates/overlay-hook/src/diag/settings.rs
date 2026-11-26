@@ -63,9 +63,9 @@ pub(crate) fn settings() -> &'static Settings {
         log: switch(ENV_LOG, "trace.log"),
         diag: switch(ENV_DIAG, "counts.txt"),
         crash: switch(ENV_CRASH, "crash.txt"),
-        dump: dump_switch(),
+        dump: dump_switch(std::env::var_os(ENV_IN_PROCESS_DUMP)),
         dumper: dumper_switch(),
-        ring: ring_switch(),
+        ring: ring_switch(std::env::var_os(ENV_RING)),
         session: switch(ENV_SESSION, "session.json"),
         disabled: std::env::var(ENV_DISABLE)
             .unwrap_or_default()
@@ -88,34 +88,41 @@ fn flag(name: &str) -> bool {
     std::env::var_os(name).is_some_and(|value| !value.is_empty() && value != "off")
 }
 
-/// The minidump file: `1` or `on` selects the developer file, another non-empty value is a path, and unset/`off` means
-/// no dump. Unlike the trace, a dump is never on by default: it is large and a first-chance exception may be harmless.
-fn dump_switch() -> Option<PathBuf> {
-    match std::env::var_os(ENV_IN_PROCESS_DUMP) {
+/// The three-way switch shared by the dump and the ring: an empty value or `off` names nothing, `1`/`on` asks
+/// `enabled`, any other value is a path, and only an unset value asks `unset`. In particular `off` never reaches
+/// `unset`, so it cannot turn on a default that applies only when the variable is absent.
+fn path_switch(
+    value: Option<OsString>,
+    enabled: impl FnOnce() -> Option<PathBuf>,
+    unset: impl FnOnce() -> Option<PathBuf>,
+) -> Option<PathBuf> {
+    match value {
         Some(value) if value.is_empty() || value == "off" => None,
-        Some(value) if value == "1" || value == "on" => developer_file(CRASH_DUMP_FILE),
+        Some(value) if value == "1" || value == "on" => enabled(),
         Some(value) => Some(PathBuf::from(value)),
-        None => None,
+        None => unset(),
     }
 }
 
-/// The base of the decision ring: a path, or `1`/`on` for the developer base. Unset, a dev build keeps a ring next to
-/// the other developer files; a release build writes none until the app names a base.
-fn ring_switch() -> Option<PathBuf> {
+/// The minidump file for a value of its variable: `1` or `on` selects the developer file, another non-empty value is a
+/// path, and unset/`off` means no dump. Unlike the trace, a dump is never on by default: it is large and a first-chance
+/// exception may be harmless.
+fn dump_switch(value: Option<OsString>) -> Option<PathBuf> {
+    path_switch(value, || developer_file(CRASH_DUMP_FILE), || None)
+}
+
+/// The base of the decision ring for a value of its variable: a path, or `1`/`on` for the developer base. Unset, a dev
+/// build keeps a ring next to the other developer files; a release build writes none until the app names a base.
+fn ring_switch(value: Option<OsString>) -> Option<PathBuf> {
     let developer = || developer_dir().map(|dir| dir.join(BASE_STEM));
 
-    match std::env::var_os(ENV_RING) {
-        Some(value) if value.is_empty() || value == "off" => None,
-        Some(value) if value == "1" || value == "on" => developer(),
-        Some(value) => Some(PathBuf::from(value)),
-        None => {
-            if cfg!(debug_assertions) {
-                developer()
-            } else {
-                None
-            }
+    path_switch(value, developer, || {
+        if cfg!(debug_assertions) {
+            developer()
+        } else {
+            None
         }
-    }
+    })
 }
 
 /// The out-of-process minidumper socket. The x64 Gobbo process serves the x64 hook; the 32-bit hook uses the helper and
@@ -188,5 +195,72 @@ mod tests {
         );
         assert_eq!(choose(None, developer), Some(PathBuf::from("dev")));
         assert_eq!(choose(None, || None), None);
+    }
+
+    #[test]
+    fn the_dump_switch_reads_every_value_with_one_rule() {
+        let path = OsString::from("C:\\x\\dump.dmp");
+        let developer = developer_file(CRASH_DUMP_FILE);
+        let cases = [
+            (None, None),
+            (Some(OsString::new()), None),
+            (Some(OsString::from("off")), None),
+            (Some(OsString::from("1")), developer.clone()),
+            (Some(OsString::from("on")), developer.clone()),
+            (Some(path.clone()), Some(PathBuf::from(&path))),
+        ];
+
+        for (value, expected) in cases {
+            assert_eq!(dump_switch(value.clone()), expected, "{value:?}");
+        }
+    }
+
+    #[test]
+    fn the_ring_switch_reads_every_value_with_one_rule() {
+        let path = OsString::from("C:\\x\\ring");
+        let developer = developer_dir().map(|dir| dir.join(BASE_STEM));
+        let unset = || {
+            if cfg!(debug_assertions) {
+                developer.clone()
+            } else {
+                None
+            }
+        };
+        let cases = [
+            (None, unset()),
+            (Some(OsString::new()), None),
+            (Some(OsString::from("off")), None),
+            (Some(OsString::from("1")), developer.clone()),
+            (Some(OsString::from("on")), developer.clone()),
+            (Some(path.clone()), Some(PathBuf::from(&path))),
+        ];
+
+        for (value, expected) in cases {
+            assert_eq!(ring_switch(value.clone()), expected, "{value:?}");
+        }
+    }
+
+    #[test]
+    fn off_never_uses_the_unset_default_but_an_absent_value_does() {
+        let enabled = || Some(PathBuf::from("enabled"));
+        let mut asked = false;
+
+        assert_eq!(
+            path_switch(Some(OsString::from("off")), enabled, || {
+                asked = true;
+                Some(PathBuf::from("unset"))
+            }),
+            None
+        );
+        assert!(!asked, "off must not consult the unset default");
+
+        assert_eq!(
+            path_switch(None, enabled, || {
+                asked = true;
+                Some(PathBuf::from("unset"))
+            }),
+            Some(PathBuf::from("unset"))
+        );
+        assert!(asked, "an unset value must take the default");
     }
 }

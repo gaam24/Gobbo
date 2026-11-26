@@ -8,7 +8,6 @@ use gobbo_overlay_core::{fold_ascii_unit, relative_to, wide};
 use windows_sys::Win32::Storage::FileSystem::GetFullPathNameW;
 
 use super::session;
-use super::target::visible;
 use crate::state::{Mount, mounts};
 use crate::text::same_folded_wide;
 
@@ -172,9 +171,9 @@ fn full_path_units<'a>(name: &[u16], output: &'a mut [u16]) -> Option<&'a [u16]>
     Some(&output[..length as usize])
 }
 
-/// Whether a name uses a device namespace that can alias a file in the game folder. Such a name must not be treated as
-/// "outside" by a write, delete or rename: `\\.\C:`, `\\.\UNC`, `\\.\Volume{...}`, `\\?\GLOBALROOT`, `\\?\Volume{...}`,
-/// `\??\GLOBALROOT`, `\??\Volume{...}` and `\Device\`. A named pipe or mailslot is not a file and is not flagged.
+/// Whether a name must fail closed for a mutation: a device namespace that can alias a game file, or a component that
+/// ends in a dot or a space (which Win32 strips, so the layers would key the whiteout on a spelling Windows never opens).
+/// A named pipe or mailslot is not a file and is not flagged. Reads do not call this check and still pass through.
 ///
 /// # Safety
 /// `name` must be a NUL-terminated UTF-16 string, or null.
@@ -190,8 +189,15 @@ pub(crate) unsafe fn unsafe_name(name: *const u16) -> bool {
 }
 
 /// The UTF-16 form of `unsafe_name`. It is also used for NT object names after `\??\` has been kept: the caller passes
-/// the units the name really has.
+/// the units the name really has. Called only where a write, delete, rename or link would follow: an uncertain spelling
+/// is refused instead of being mis-keyed, while a read keeps its normal pass-through.
 pub(crate) fn unsafe_units(units: &[u16]) -> bool {
+    trailing_dot_or_space(units) || device_namespace(units)
+}
+
+/// The device namespaces that can alias a file in the game folder: `\\.\C:`, `\\.\UNC`, `\\.\Volume{...}`, `\\?\UNC`,
+/// `\\?\GLOBALROOT`, `\\?\Volume{...}`, `\??\UNC`, `\??\GLOBALROOT`, `\??\Volume{...}` and `\Device\`.
+fn device_namespace(units: &[u16]) -> bool {
     let rest = if let Some(rest) = units.strip_prefix(&[92, 92, 63, 92]) {
         rest // \\?\
     } else if let Some(rest) = units.strip_prefix(&[92, 63, 63, 92]) {
@@ -206,6 +212,12 @@ pub(crate) fn unsafe_units(units: &[u16]) -> bool {
         return false;
     };
 
+    // A verbatim UNC name (`\\?\UNC\...` or `\??\UNC\...`) can name a share that is the game folder, but it cannot be
+    // classified by the fast path. Like `\\.\UNC\...`, it fails closed for a write, delete or rename.
+    if starts_ci(rest, b"unc\\") {
+        return true;
+    }
+
     if word_ci(rest, b"globalroot") {
         let tail = &rest[10..];
         let tail = tail.strip_prefix(&[92]).unwrap_or(tail);
@@ -213,6 +225,66 @@ pub(crate) fn unsafe_units(units: &[u16]) -> bool {
     }
 
     starts_ci(rest, b"volume{")
+}
+
+/// Whether a component ends in a dot or a space. Win32 strips those trailing characters, so a whiteout written for the
+/// unstripped spelling would not hide the file Windows actually opens: the lower file could reappear once the mutation
+/// is undone. Root syntax is skipped — a drive (`C:`), a leading `\`, and the server and share of a UNC name are not
+/// file names. The pure dot names `.` and `..` are directory markers, not names Win32 strips, so they stay usable.
+fn trailing_dot_or_space(units: &[u16]) -> bool {
+    let mut rest = units;
+    let mut verbatim = false;
+    // The syntax of a device prefix is not a component; only the tail is.
+    for prefix in [
+        &[92u16, 92, 63, 92][..], // \\?\
+        &[92, 63, 63, 92],        // \??\
+        &[92, 92, 46, 92],        // \\.\
+    ] {
+        if let Some(tail) = rest.strip_prefix(prefix) {
+            rest = tail;
+            verbatim = true;
+            break;
+        }
+    }
+
+    let unc = if verbatim && starts_ci(rest, b"unc\\") {
+        rest = &rest[4..];
+        true
+    } else if rest.starts_with(&[92u16, 92]) {
+        rest = &rest[2..];
+        true
+    } else {
+        false
+    };
+
+    let mut parts = rest.split(|unit| *unit == u16::from(b'\\'));
+    let first = parts.next().unwrap_or(&[]);
+    let first_name = if first.is_empty() || unc {
+        None
+    } else if is_drive(first) {
+        // `C:` is a root; `C:a.txt` is a drive-relative name whose tail is still a component.
+        (first.len() > 2).then_some(&first[2..])
+    } else {
+        Some(first)
+    };
+    if unc {
+        // Skip the share after the server.
+        let _ = parts.next();
+    }
+
+    first_name.is_some_and(component_trailing_dot_or_space)
+        || parts.any(component_trailing_dot_or_space)
+}
+
+/// Whether one file-name component ends in a dot or a space, ignoring the two directory markers.
+fn component_trailing_dot_or_space(component: &[u16]) -> bool {
+    !component.is_empty()
+        && component != [u16::from(b'.')]
+        && component != [u16::from(b'.'), u16::from(b'.')]
+        && matches!(
+            component.last(),
+            Some(&last) if last == u16::from(b'.') || last == u16::from(b' ')
+        )
 }
 
 /// Whether a `\Device\...` tail names a disk or a volume that can alias a game file.
@@ -390,7 +462,8 @@ fn is_unc_absolute(units: &[u16]) -> bool {
 }
 
 /// Whether a relative path is already in the form `normal` gives it: no empty component, no `.` or `..`, and no trailing
-/// separator. Such a path can be compared and returned as it is.
+/// separator. Such a path can be compared and returned as it is. A component ending in a dot or a space is handled by
+/// the mutation-only check in `unsafe_units`, not here: a read may keep that spelling, while a write fails closed.
 fn is_plain(rel: &[u16]) -> bool {
     let mut start = 0;
 
@@ -410,15 +483,6 @@ fn is_plain(rel: &[u16]) -> bool {
     }
 
     true
-}
-
-/// Whether the layers show the file that `name` names, when the name is in one of the session's mounts. The caller is
-/// inside the hook.
-///
-/// # Safety
-/// `name` must be a NUL-terminated UTF-16 string, or null.
-pub(crate) unsafe fn shown_name(name: *const u16) -> bool {
-    unsafe { place(name) }.is_some_and(|place| visible(place.mount, &place.rel).is_some())
 }
 
 #[cfg(test)]
@@ -529,6 +593,22 @@ mod tests {
     }
 
     #[test]
+    fn a_verbatim_unc_path_is_flagged_but_an_ordinary_unc_path_is_not() {
+        // Both spellings of a verbatim UNC name fail closed: a share can be the game folder, and the fast path cannot
+        // classify it.
+        for name in [
+            r"\\?\UNC\server\share\Game\file.txt",
+            r"\??\UNC\server\share\Game\file.txt",
+            r"\\?\unc\server\share\file.txt",
+        ] {
+            assert!(unsafe_units(&units(name)), "{name}");
+        }
+
+        // The plain UNC spelling is an ordinary path and must still be available to a read.
+        assert!(!unsafe_units(&units(r"\\server\share\Game\file.txt")));
+    }
+
+    #[test]
     fn the_short_name_of_the_game_folder_is_inside_too() {
         let root = root();
         let short = short();
@@ -540,6 +620,34 @@ mod tests {
             fast_relative(&root, &short, &units(r"c:\progra~1\game\a.txt")),
             Fast::Inside(rel) if rel == "a.txt"
         ));
+    }
+
+    #[test]
+    fn a_trailing_dot_or_space_component_is_unsafe_for_a_mutation() {
+        // Win32 strips trailing dots and spaces, so a whiteout keyed on these spellings would not hide the real file.
+        // The mutation-only check refuses them; the drive, server and share roots are not components.
+        for name in [
+            r"C:\Game\a.txt.",
+            r"C:\Game\a.txt ",
+            r"C:\Game\dir. \file.txt",
+            r"\\server\share\Game\a.txt.",
+            r"C:\Game\.. \file.txt",
+            r"C:a.txt.",
+            r"a.txt.",
+        ] {
+            assert!(unsafe_units(&units(name)), "{name}");
+        }
+
+        // Ordinary names, an interior dot and the pure directory markers stay usable.
+        for name in [
+            r"C:\Game\a.txt",
+            r"C:\Game\v1.2\file",
+            r"C:\Game\..\file.txt",
+            r"\\server\share\Game\a.txt",
+            r"C:\",
+        ] {
+            assert!(!unsafe_units(&units(name)), "{name}");
+        }
     }
 
     #[test]

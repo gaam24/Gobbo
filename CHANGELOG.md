@@ -72,3 +72,12 @@ All notable changes to this project are documented in this file. The format foll
 - **Making a mod from the overwrite folder reports a folder it cannot resolve.** Gobbo no longer reads the wrong place when it cannot work out where mods go.
 - **An unrecognised saved store is shown as a manual install.** Gobbo no longer labels the game with a Steam app id it cannot confirm.
 - **Gobbo waits briefly if its data folders are busy at startup.** A short lock from another window no longer stops the app from opening.
+- **A deleted mod file stays deleted after the next launch.** The overlay no longer loses a deletion when two changes reach the same folder together.
+- **A delete Windows refuses no longer hides the mod file.** The game gets the real error and the file stays visible.
+- **A game that fails to start with mods reports it right away.** Gobbo no longer waits the full start timeout for a child process that has already exited.
+- **A 32-bit game no longer stays stuck when its start helper hangs.** Gobbo stops it after 20 seconds and reports the failure.
+- **A game with hundreds of folders keeps the modded view.** The overlay no longer stops merging after 128 folders.
+- **A search pattern that names several folders lists their mod files.** Patterns such as `data*\*.txt` return the matching files instead of "not found".
+- **A 32-bit game starts faster.** The launcher reads the ntdll export table once instead of thousands of cross-process reads.
+- **A large game no longer loads its whole program into memory to start.** Gobbo reads the headers and import data, with a fallback for unusual images.
+- **A game whose mod folder uses characters outside the system code page starts.** Gobbo falls back to the short 8.3 path for the import table instead of refusing the launch.

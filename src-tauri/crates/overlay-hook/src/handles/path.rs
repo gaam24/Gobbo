@@ -224,42 +224,54 @@ fn relative_to_either(base: &str, short: Option<&str>, path: &str) -> Option<Str
     relative_to(base, path).or_else(|| short.and_then(|short| relative_to(short, path)))
 }
 
+/// The mount-relative path of `path` in the upper layer of `mount`: long spelling, then its 8.3 form.
+fn relative_in_upper_of(mount: &MountText, path: &str) -> Option<String> {
+    relative_to_either(
+        &mount.upper,
+        mount.upper_short.as_ref().map(|short| short.plain.as_str()),
+        path,
+    )
+}
+
+/// The mount-relative path of `path` in any layer of `mount`: the upper layer, then the lower layers.
+fn relative_in_any_of(mount: &MountText, path: &str) -> Option<String> {
+    relative_in_upper_of(mount, path).or_else(|| relative_in_lower(mount, path))
+}
+
+/// Shared body of the three relative-path queries: strip the verbatim prefix once, then ask `from` about each mount in
+/// session order. The upper and lower filters remain the callers' choice; this adds no allocation or lock.
+fn relative_in_layers_in(
+    path: &str,
+    from: impl Fn(&MountText, &str) -> Option<String>,
+) -> Option<(&'static Mount, String)> {
+    relative_in_layers_from(mount_text()?, path, from)
+}
+
+/// The pure iterate-and-relative part, so the layer filters can be tested without a stored session.
+fn relative_in_layers_from(
+    text: &[MountText],
+    path: &str,
+    from: impl Fn(&MountText, &str) -> Option<String>,
+) -> Option<(&'static Mount, String)> {
+    let path = strip_verbatim_str(path);
+    text.iter()
+        .find_map(|mount| from(mount, path).map(|rel| (mount.mount, rel)))
+}
+
 /// The mount and relative path when `path` is in the upper layer of a mount. `None` when it is elsewhere.
 pub(crate) fn relative_in_upper(path: &str) -> Option<(&'static Mount, String)> {
-    let text = mount_text()?;
-    let path = strip_verbatim_str(path);
-    text.iter().find_map(|mount| {
-        relative_to_either(
-            &mount.upper,
-            mount.upper_short.as_ref().map(|short| short.plain.as_str()),
-            path,
-        )
-        .map(|rel| (mount.mount, rel))
-    })
+    relative_in_layers_in(path, relative_in_upper_of)
 }
 
 /// The mount and relative path when `path` is in a lower layer. The upper layer is excluded because a handle there may
 /// be changed in place.
 pub(crate) fn relative_in_lower_layers(path: &str) -> Option<(&'static Mount, String)> {
-    let text = mount_text()?;
-    let path = strip_verbatim_str(path);
-    text.iter()
-        .find_map(|mount| relative_in_lower(mount, path).map(|rel| (mount.mount, rel)))
+    relative_in_layers_in(path, relative_in_lower)
 }
 
 /// The mount and relative path when `path` is in any layer.
 pub(crate) fn relative_in_layers(path: &str) -> Option<(&'static Mount, String)> {
-    let text = mount_text()?;
-    let path = strip_verbatim_str(path);
-    text.iter().find_map(|mount| {
-        relative_to_either(
-            &mount.upper,
-            mount.upper_short.as_ref().map(|short| short.plain.as_str()),
-            path,
-        )
-        .or_else(|| relative_in_lower(mount, path))
-        .map(|rel| (mount.mount, rel))
-    })
+    relative_in_layers_in(path, relative_in_any_of)
 }
 
 /// The mount-relative path of `path` in the lower layers of `mount`: the root, then the staging layer.
@@ -894,6 +906,75 @@ pub(crate) fn without_volume(path: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use gobbo_overlay_core::Whiteouts;
+    use std::path::PathBuf;
+
+    #[test]
+    fn a_path_matched_by_upper_or_lower_is_matched_by_the_combined_filter() {
+        let mount: &'static Mount = Box::leak(Box::new(Mount::new(
+            "game".to_string(),
+            PathBuf::from(r"C:\Game"),
+            Layers::new(
+                PathBuf::from(r"C:\Game"),
+                Some(PathBuf::from(r"C:\Mods")),
+                PathBuf::from(r"C:\OverlayUpper"),
+            ),
+            Whiteouts::default(),
+        )));
+        let mounts = [MountText::new(mount)];
+        let rel = r"data\a.txt";
+        let upper_path = format!(r"{}\data\a.txt", mounts[0].upper);
+        let root_path = format!(r"{}\data\a.txt", mounts[0].root);
+        let staging_path = format!(r"{}\data\a.txt", mounts[0].staging.as_deref().unwrap());
+
+        let same = |left: &Option<(&'static Mount, String)>,
+                    right: &Option<(&'static Mount, String)>| match (left, right)
+        {
+            (Some((lm, lr)), Some((rm, rr))) => std::ptr::eq(*lm, *rm) && lr == rr,
+            (None, None) => true,
+            _ => false,
+        };
+        let rel_of =
+            |found: &Option<(&'static Mount, String)>| found.as_ref().map(|(_, rel)| rel.clone());
+
+        let from_upper = relative_in_layers_from(&mounts, &upper_path, relative_in_upper_of);
+        assert_eq!(rel_of(&from_upper), Some(rel.to_string()));
+        assert!(
+            from_upper
+                .as_ref()
+                .is_some_and(|(found, _)| std::ptr::eq(*found, mount))
+        );
+        assert!(same(
+            &relative_in_layers_from(&mounts, &upper_path, relative_in_any_of),
+            &from_upper
+        ));
+        assert!(relative_in_layers_from(&mounts, &upper_path, relative_in_lower).is_none());
+
+        let from_root = relative_in_layers_from(&mounts, &root_path, relative_in_lower);
+        assert_eq!(rel_of(&from_root), Some(rel.to_string()));
+        assert!(
+            from_root
+                .as_ref()
+                .is_some_and(|(found, _)| std::ptr::eq(*found, mount))
+        );
+        assert!(same(
+            &relative_in_layers_from(&mounts, &root_path, relative_in_any_of),
+            &from_root
+        ));
+        assert!(relative_in_layers_from(&mounts, &root_path, relative_in_upper_of).is_none());
+
+        let from_staging = relative_in_layers_from(&mounts, &staging_path, relative_in_lower);
+        assert_eq!(rel_of(&from_staging), Some(rel.to_string()));
+        assert!(
+            from_staging
+                .as_ref()
+                .is_some_and(|(found, _)| std::ptr::eq(*found, mount))
+        );
+        assert!(same(
+            &relative_in_layers_from(&mounts, &staging_path, relative_in_any_of),
+            &from_staging
+        ));
+    }
 
     #[test]
     fn a_volume_is_removed_from_a_drive_and_a_server_path() {

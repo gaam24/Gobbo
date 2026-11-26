@@ -199,8 +199,7 @@ impl Ring {
             file.read_exact(&mut stored)?;
         }
 
-        let version = u32::from_le_bytes([stored[8], stored[9], stored[10], stored[11]]);
-        if length != ring_length() || stored[..8] != MAGIC[..] || version != VERSION {
+        if length != ring_length() || !header_is_current(&stored) {
             file.set_len(ring_length())?;
             file.seek(SeekFrom::Start(0))?;
             file.write_all(&header(0))?;
@@ -358,7 +357,9 @@ pub fn read_last(path: &Path, limit: usize) -> io::Result<(Vec<Decision>, u64)> 
     file.seek(SeekFrom::Start(0))?;
     file.read_exact(&mut header)?;
 
-    if &header[..8] != MAGIC {
+    // The writer recreates a file whose header disagrees with this build; the reader uses the same check so a file
+    // written by another build is never decoded with this build's stride.
+    if !header_is_current(&header) {
         return Ok((Vec::new(), 0));
     }
 
@@ -425,6 +426,13 @@ const fn ring_length() -> u64 {
 /// The folder and the file-name prefix shared by the ring files of `base`.
 fn split_base(base: &Path) -> Option<(&Path, String)> {
     let dir = base.parent()?;
+    // A base with no directory component has an empty parent; `process_file` writes it in the current folder, so the
+    // readers must look there too.
+    let dir = if dir.as_os_str().is_empty() {
+        Path::new(".")
+    } else {
+        dir
+    };
     let stem = base.file_name()?.to_str()?;
     Some((dir, format!("{stem}.")))
 }
@@ -489,6 +497,15 @@ fn write_at(file: &File, buffer: &[u8], offset: u64) -> io::Result<()> {
 /// The offset of the record in `slot`.
 const fn record_offset(slot: usize) -> u64 {
     (HEADER + slot * RECORD) as u64
+}
+
+/// Whether a header describes this build's ring: the magic plus the version and the record geometry. The writer and
+/// the reader share this one rule, so a damaged field cannot leave a ring that is appended to but never read back.
+fn header_is_current(header: &[u8; HEADER]) -> bool {
+    header[..8] == MAGIC[..]
+        && u32::from_le_bytes([header[8], header[9], header[10], header[11]]) == VERSION
+        && u32::from_le_bytes([header[12], header[13], header[14], header[15]]) == RECORD as u32
+        && u32::from_le_bytes([header[16], header[17], header[18], header[19]]) == CAPACITY
 }
 
 /// The header of a new ring with the write index `write`.
@@ -714,11 +731,89 @@ mod tests {
     }
 
     #[test]
+    fn a_ring_with_a_mismatched_header_field_is_recreated_by_open() {
+        let dir = scratch("open-fields");
+        let path = dir.join("ring");
+        let mut ring = Ring::open(&path).unwrap();
+        ring.record(Kind::Write, Layer::Upper, 0, "before", 1)
+            .unwrap();
+        drop(ring);
+        let original = std::fs::read(&path).unwrap();
+
+        // Keep the length and magic intact so only the stored field can force a recreate.
+        for (at, wrong) in [
+            (8u64, VERSION + 1),
+            (12u64, RECORD as u32 + 1),
+            (16u64, CAPACITY + 1),
+        ] {
+            std::fs::write(&path, &original).unwrap();
+            let mut file = OpenOptions::new().write(true).open(&path).unwrap();
+            file.seek(SeekFrom::Start(at)).unwrap();
+            file.write_all(&wrong.to_le_bytes()).unwrap();
+            drop(file);
+
+            let mut ring = Ring::open(&path).unwrap();
+            assert_eq!(ring.write, 0, "header field at {at}");
+            ring.record(Kind::Write, Layer::Upper, 0, "after", 1)
+                .unwrap();
+            drop(ring);
+            let (decisions, total) = read_last(&path, 10).unwrap();
+            assert_eq!(total, 1, "header field at {at}");
+            assert_eq!(decisions[0].path, "after", "header field at {at}");
+        }
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn a_header_with_a_mismatched_layout_field_is_not_read() {
+        let dir = scratch("header-fields");
+        let path = dir.join("ring");
+        let mut ring = Ring::open(&path).unwrap();
+        ring.record(Kind::Write, Layer::Upper, 0, "kept", 1)
+            .unwrap();
+        drop(ring);
+        assert_eq!(read_last(&path, 10).unwrap().0.len(), 1);
+
+        let original = std::fs::read(&path).unwrap();
+        // Corrupt one field at a time, keeping the magic and the file length intact.
+        for (at, wrong) in [
+            (8u64, VERSION + 1),
+            (12u64, RECORD as u32 + 1),
+            (16u64, CAPACITY + 1),
+        ] {
+            let mut file = OpenOptions::new().write(true).open(&path).unwrap();
+            file.seek(SeekFrom::Start(at)).unwrap();
+            file.write_all(&wrong.to_le_bytes()).unwrap();
+            drop(file);
+            assert_eq!(
+                read_last(&path, 10).unwrap(),
+                (Vec::new(), 0),
+                "header field at {at}"
+            );
+            std::fs::write(&path, &original).unwrap();
+        }
+        assert_eq!(read_last(&path, 10).unwrap().0.len(), 1);
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
     fn a_name_that_is_not_a_pid_is_not_read() {
         assert!(matches_ring("base.123.ring", "base."));
         assert!(!matches_ring("base.abc.ring", "base."));
         assert!(!matches_ring("base.123.tmp", "base."));
         assert!(!matches_ring("other.123.ring", "base."));
+    }
+
+    #[test]
+    fn a_base_without_a_directory_is_read_from_the_current_folder() {
+        assert_eq!(
+            split_base(Path::new("overlay-decisions")),
+            Some((Path::new("."), "overlay-decisions.".to_string()))
+        );
+        assert_eq!(
+            split_base(Path::new("state/overlay-decisions")),
+            Some((Path::new("state"), "overlay-decisions.".to_string()))
+        );
     }
 
     #[test]

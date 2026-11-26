@@ -1,6 +1,6 @@
 //! The NT layer under the Win32 file API. The loader opens DLLs through these calls, and programs that skip `KernelBase`
-//! reach the files through them too, so the same redirection applies here. Object names relative to a directory handle
-//! are not redirected: the directory handle was opened through a call that was already redirected.
+//! reach the files through them too, so the same redirection applies here. A name relative to a directory handle is joined
+//! onto the path the program sees for that handle and classified like an absolute name.
 //!
 //! - `open`: `NtCreateFile` and `NtOpenFile`, and the deletion of a file opened for it.
 //! - `query`: `NtQueryAttributesFile` and `NtQueryFullAttributesFile`, the loader's existence checks.

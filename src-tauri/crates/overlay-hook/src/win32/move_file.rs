@@ -132,6 +132,13 @@ fn move_refusal(flags: u32) -> Option<u32> {
     (flags & MOVEFILE_DELAY_UNTIL_REBOOT != 0).then_some(ERROR_NOT_SUPPORTED)
 }
 
+/// Whether a replacement must hide a lower entry with the target's name. `None` means this is not a replacement in a
+/// mount. A failed lower query is treated as "there is a lower entry": without the whiteout the lower file would come
+/// back in the listing as soon as the replacement is deleted.
+fn hide_below_on_replace<E>(below: Option<Result<bool, E>>) -> bool {
+    matches!(below, Some(Ok(true)) | Some(Err(_)))
+}
+
 /// The move, when one of the two paths is inside the game folder. `None` means neither is, and the call goes ahead.
 ///
 /// # Safety
@@ -200,12 +207,12 @@ unsafe fn move_in_game(
     // A move that replaces a file of a lower layer replaces the file for the program: the lower file is gone, so it is
     // hidden once the move succeeds. Without the whiteout it would stay in the listing under the replacement's name, and
     // come back when the replacement is deleted.
-    let replaces_below = match &to_place {
+    let replaces_below = hide_below_on_replace(match &to_place {
         Some(place) if flags & MOVEFILE_REPLACE_EXISTING != 0 => {
-            in_lower(place.mount, &place.rel).unwrap_or(false)
+            Some(in_lower(place.mount, &place.rel))
         }
-        _ => false,
-    };
+        _ => None,
+    });
     let source_wide = wide(source.as_os_str());
     let dest_wide = wide(dest.as_os_str());
     let moved = mover(source_wide.as_ptr(), dest_wide.as_ptr());
@@ -240,5 +247,16 @@ mod tests {
         );
         assert_eq!(move_refusal(MOVEFILE_REPLACE_EXISTING), None);
         assert_eq!(move_refusal(0), None);
+    }
+
+    #[test]
+    fn a_denied_lower_query_hides_the_replaced_file() {
+        // A denied query is a possible lower file: hiding it is safe, not hiding it would let it reappear.
+        assert!(hide_below_on_replace(Some(Err::<bool, u32>(
+            ERROR_ACCESS_DENIED
+        ))));
+        assert!(hide_below_on_replace(Some(Ok::<bool, u32>(true))));
+        assert!(!hide_below_on_replace(Some(Ok::<bool, u32>(false))));
+        assert!(!hide_below_on_replace(None::<Result<bool, u32>>));
     }
 }

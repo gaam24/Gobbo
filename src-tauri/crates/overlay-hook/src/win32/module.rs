@@ -28,9 +28,17 @@ pub(crate) unsafe extern "system" fn get_module_file_name(
     let original = original!(get_module_file_name, {
         fail(ERROR_INVALID_FUNCTION) as u32
     });
+    // A null buffer is the caller's bug. Pass it straight to the original: the program gets the answer it would get
+    // without the hook, and nothing here writes through the pointer or maps the path.
+    if buffer.is_null() {
+        // SAFETY: `original` is the Windows function and `module`/`buffer`/`size` are the program's own arguments.
+        return unsafe { original.call(module, buffer, size) };
+    }
     // The common path stays in UTF-16: map a layer prefix in a stack buffer, or copy the program's path as it is. No
-    // `String` and no `Vec`. A path longer than the stack takes the growing path below.
-    let mut actual = [0u16; 1024];
+    // `String` and no `Vec`. A 520-unit read buffer covers every ordinary module path; longer ones take the growing
+    // path below, which still reports the whole answer. Keeping this buffer smaller halves the stack an outside path
+    // pays, and the A/W conversion below works from the same units either way.
+    let mut actual = [0u16; 520];
 
     if let Some(length) = unsafe { read_path_units(original, module, &mut actual) } {
         return copy_mapped_module(&actual[..length], buffer, size);
@@ -56,7 +64,15 @@ pub(crate) unsafe extern "system" fn get_module_file_name_a(
     let original = original!(get_module_file_name, {
         fail(ERROR_INVALID_FUNCTION) as u32
     });
-    let mut actual = [0u16; 1024];
+    // A null buffer is the caller's bug. Pass the A call to its own original, before any conversion or write.
+    if buffer.is_null() {
+        let original = original!(get_module_file_name_a, {
+            fail(ERROR_INVALID_FUNCTION) as u32
+        });
+        // SAFETY: the original receives the program's own arguments of the A function.
+        return unsafe { original.call(module, buffer, size) };
+    }
+    let mut actual = [0u16; 520];
 
     if let Some(length) = unsafe { read_path_units(original, module, &mut actual) } {
         return copy_mapped_module_ansi(&actual[..length], buffer, size);
@@ -92,7 +108,7 @@ fn guest_long_path_ansi(path: Option<Vec<u16>>) -> Option<Vec<u8>> {
 unsafe fn read_path_units(
     original: &TypedDetour<GetModuleFileNameWFn>,
     module: *mut c_void,
-    buffer: &mut [u16; 1024],
+    buffer: &mut [u16],
 ) -> Option<usize> {
     // SAFETY: the buffer is `buffer.len()` units long, and the call writes at most that many.
     unsafe { read_path_units_with(|buffer, size| original.call(module, buffer, size), buffer) }
@@ -104,7 +120,7 @@ unsafe fn read_path_units(
 /// `call` must write at most `size` units into the buffer it is given.
 unsafe fn read_path_units_with(
     mut call: impl FnMut(*mut u16, u32) -> u32,
-    buffer: &mut [u16; 1024],
+    buffer: &mut [u16],
 ) -> Option<usize> {
     // SAFETY: the buffer is `buffer.len()` units long, and the call writes at most that many.
     let length = call(buffer.as_mut_ptr(), buffer.len() as u32);
@@ -174,7 +190,12 @@ pub(crate) unsafe extern "system" fn get_module_file_name_ex(
     let original = original!(get_module_file_name_ex, {
         fail(ERROR_INVALID_FUNCTION) as u32
     });
-    let mut actual = [0u16; 1024];
+    // A null buffer is the caller's bug. Pass it straight to the original, before any conversion or write.
+    if buffer.is_null() {
+        // SAFETY: `original` is the Windows function and the arguments are the program's own.
+        return unsafe { original.call(process, module, buffer, size) };
+    }
+    let mut actual = [0u16; 520];
 
     if let Some(length) = unsafe { read_ex_path_units(original, process, module, &mut actual) } {
         return copy_mapped_module(&actual[..length], buffer, size);
@@ -200,7 +221,15 @@ pub(crate) unsafe extern "system" fn get_module_file_name_ex_a(
     let original = original!(get_module_file_name_ex, {
         fail(ERROR_INVALID_FUNCTION) as u32
     });
-    let mut actual = [0u16; 1024];
+    // A null buffer is the caller's bug. Pass the A call to its own original, before any conversion or write.
+    if buffer.is_null() {
+        let original = original!(get_module_file_name_ex_a, {
+            fail(ERROR_INVALID_FUNCTION) as u32
+        });
+        // SAFETY: the original receives the program's own arguments of the A function.
+        return unsafe { original.call(process, module, buffer, size) };
+    }
+    let mut actual = [0u16; 520];
 
     if let Some(length) = unsafe { read_ex_path_units(original, process, module, &mut actual) } {
         return copy_mapped_module_ansi(&actual[..length], buffer, size);
@@ -221,7 +250,7 @@ unsafe fn read_ex_path_units(
     original: &TypedDetour<GetModuleFileNameExWFn>,
     process: *mut c_void,
     module: *mut c_void,
-    buffer: &mut [u16; 1024],
+    buffer: &mut [u16],
 ) -> Option<usize> {
     // SAFETY: the buffer is `buffer.len()` units long, and the call writes at most that many.
     unsafe {
@@ -370,6 +399,11 @@ impl Zero for u8 {
 }
 
 fn copy_units<T: Copy + Zero>(path: &[T], buffer: *mut T, size: u32) -> u32 {
+    // The hooks hand a null buffer to the original before reaching here. Never dereference one in any case.
+    if buffer.is_null() {
+        return 0;
+    }
+
     if size == 0 {
         return 0;
     }
@@ -429,6 +463,26 @@ mod tests {
         let mut buffer = [0u16; 4];
         assert_eq!(copy_units(&text, buffer.as_mut_ptr(), 4), 3);
         assert_eq!(buffer, [97, 98, 99, 0]);
+    }
+
+    #[test]
+    fn a_null_output_buffer_is_never_dereferenced() {
+        let text: Vec<u16> = "abc".encode_utf16().collect();
+        assert_eq!(copy_units(&text, std::ptr::null_mut(), 8), 0);
+        assert_eq!(copy_units(b"abc", std::ptr::null_mut(), 8), 0);
+    }
+
+    #[test]
+    fn a_full_read_buffer_falls_back_to_the_growing_path() {
+        let mut buffer = [0u16; 4];
+        // A path that fills the stack buffer, or no path at all, leaves the caller to use `read_path`; a path that fits
+        // is returned in UTF-16 for the same A/W conversion.
+        assert!(unsafe { read_path_units_with(|_, _| 4, &mut buffer) }.is_none());
+        assert!(unsafe { read_path_units_with(|_, _| 0, &mut buffer) }.is_none());
+        assert_eq!(
+            unsafe { read_path_units_with(|_, _| 3, &mut buffer) },
+            Some(3)
+        );
     }
 
     #[test]

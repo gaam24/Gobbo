@@ -63,6 +63,9 @@ impl Monitor {
         if let Some(thread) = self.thread.take() {
             let _ = thread.join();
         }
+        // The x86 helper removes its own socket when it stops; do the same for this in-process server, now that its
+        // thread has stopped listening. A stale socket would make the next launch refuse to bind.
+        let _ = fs::remove_file(&self.path);
     }
 }
 

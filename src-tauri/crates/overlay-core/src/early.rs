@@ -72,7 +72,7 @@ pub fn parse_line(line: &str) -> Option<Line> {
 
 /// The bytes of one even-length run of hex pairs, or `None` when a pair is not a byte.
 fn parse_hex(text: &str) -> Option<Vec<u8>> {
-    if !text.len().is_multiple_of(2) {
+    if !text.len().is_multiple_of(2) || !text.bytes().all(|byte| byte.is_ascii_hexdigit()) {
         return None;
     }
 
@@ -136,6 +136,8 @@ mod tests {
             "stub 1",
             "stub 1 zz",
             "stub 1 abc",
+            "stub 1 +1ab",
+            "stub 1 abcd-",
             "other 1",
             "config -1",
         ] {

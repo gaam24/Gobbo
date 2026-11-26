@@ -5,7 +5,7 @@ use std::os::windows::ffi::OsStringExt;
 
 use gobbo_overlay_core::fold_unit;
 
-/// The largest number of UTF-16 units scanned for a terminator. Names are capped at the same size in `paths::names`.
+/// The largest number of UTF-16 units scanned for a terminator, so a name without one cannot make the scan run forever.
 const MAX_TEXT_UNITS: usize = 32_768;
 
 /// The text of a NUL-terminated UTF-16 string.

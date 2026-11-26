@@ -20,9 +20,9 @@ pub(super) unsafe fn full_name(name: *const u16) -> Option<PathBuf> {
     Some(PathBuf::from(absolute(&text)?))
 }
 
-/// The file a game-relative path moves or replaces from: its upper copy, copied up first when only a lower layer has the
-/// file. The flag tells whether a lower entry stays behind after the operation (it has to be hidden then).
-/// The path of a move or replace source: the layer path, or the full name when it is outside every mount.
+/// The path of a move or replace source: the upper copy inside a mount (copied up first when only a lower layer has the
+/// file), or the full name when the path is outside every mount. The flag tells whether a lower entry stays behind after
+/// the operation (it has to be hidden then).
 ///
 /// # Safety
 /// `name` must be a NUL-terminated UTF-16 string, or null.

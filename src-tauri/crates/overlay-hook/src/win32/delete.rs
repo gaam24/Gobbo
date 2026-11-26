@@ -30,11 +30,13 @@ unsafe fn delete_or_remove(
 ) -> i32 {
     unsafe { trace_call(operation, name) };
 
-    if unsafe { unsafe_name(name) } {
-        return fail(ERROR_ACCESS_DENIED);
-    }
     // Keep the guard across the original call: the NT layer would classify the same path again.
     let guard = Guard::enter();
+    // A device namespace can alias a file in the game folder. Like `CreateFileW`, the refusal needs a real session:
+    // without one there is nothing to refuse, and the hook's own re-entrant calls pass through untouched.
+    if guard.is_some() && unsafe { unsafe_name(name) } {
+        return fail(ERROR_ACCESS_DENIED);
+    }
 
     if guard.is_some()
         && let Some(place) = unsafe { place(name) }
@@ -112,6 +114,44 @@ fn shown_and_lower(mount: &Mount, rel: &str) -> Result<(Option<ShownEntry>, bool
     Ok((shown, below))
 }
 
+/// Deletes the upper copy when there is one, hides a lower entry, and keeps the original call's error across the
+/// whiteout write. `upper` is the copy to remove; `missing_upper` is the error a caller reports when it expected a copy
+/// that was not shown. `remove` performs the original call on the wide upper path.
+fn remove_upper_and_hide_below(
+    mount: &Mount,
+    rel: &str,
+    upper: Option<&PathBuf>,
+    missing_upper: Option<u32>,
+    below: bool,
+    remove: impl FnOnce(*const u16) -> i32,
+) -> i32 {
+    // The whiteout write below does its own file I/O. Keep the error of the original call until after it.
+    // With no upper copy there was no original call, so capture the incoming error just before the write.
+    let _last_error = if let Some(upper) = upper {
+        let upper_wide = wide(upper.as_os_str());
+        let result = remove(upper_wide.as_ptr());
+        let last_error = PreserveLastError::capture();
+
+        if result == 0 {
+            return 0;
+        }
+
+        Some(last_error)
+    } else if let Some(code) = missing_upper {
+        return fail(code);
+    } else if below {
+        Some(PreserveLastError::capture())
+    } else {
+        None
+    };
+
+    if below {
+        hide(mount, rel);
+    }
+
+    1
+}
+
 /// The deletion of a game-relative file: the upper copy is deleted, and a lower entry is hidden.
 fn delete_in_game(mount: &Mount, rel: &str) -> i32 {
     let (shown, below) = match shown_and_lower(mount, rel) {
@@ -140,28 +180,29 @@ fn delete_in_game(mount: &Mount, rel: &str) -> i32 {
             upper: in_upper,
             hide: below,
         } => {
-            if in_upper {
-                let Some((_, upper, _)) = shown.as_ref() else {
-                    return fail(ERROR_FILE_NOT_FOUND);
-                };
-                let upper_wide = wide(upper.as_os_str());
-                let original = original!(delete_file, {
-                    fail(ERROR_INVALID_FUNCTION);
-                    0
-                });
-                let deleted = unsafe { original.call(upper_wide.as_ptr()) };
-                let _last_error = PreserveLastError::capture();
-
-                if deleted == 0 {
-                    return 0;
+            let (upper, missing_upper) = if in_upper {
+                match shown.as_ref() {
+                    Some((_, upper, _)) => (Some(upper), None),
+                    // Defensive: the plan asked for an upper copy that the visible entry did not provide.
+                    None => (None, Some(ERROR_FILE_NOT_FOUND)),
                 }
-            }
-
-            if below {
-                hide(mount, rel);
-            }
-
-            1
+            } else {
+                (None, None)
+            };
+            remove_upper_and_hide_below(
+                mount,
+                rel,
+                upper,
+                missing_upper,
+                below,
+                |upper_wide| unsafe {
+                    let original = original!(delete_file, {
+                        fail(ERROR_INVALID_FUNCTION);
+                        0
+                    });
+                    original.call(upper_wide)
+                },
+            )
         }
     }
 }
@@ -224,31 +265,98 @@ fn remove_in_game(mount: &Mount, rel: &str) -> i32 {
         return fail(code);
     }
     // The upper folder is the one `shown` returned; there is no need to ask the disk about it again.
-    if let Some((Layer::Upper, upper, _)) = shown.as_ref() {
-        let upper_wide = wide(upper.as_os_str());
+    let upper = match shown.as_ref() {
+        Some((Layer::Upper, upper, _)) => Some(upper),
+        _ => None,
+    };
+    remove_upper_and_hide_below(mount, rel, upper, None, below, |upper_wide| unsafe {
         let original = original!(remove_directory, {
             fail(ERROR_INVALID_FUNCTION);
             0
         });
-        let removed = unsafe { original.call(upper_wide.as_ptr()) };
-        let _last_error = PreserveLastError::capture();
-
-        if removed == 0 {
-            return 0;
-        }
-    }
-
-    if below {
-        hide(mount, rel);
-    }
-
-    1
+        original.call(upper_wide)
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use windows_sys::Win32::Foundation::ERROR_PATH_NOT_FOUND;
+    use crate::win32::set_error;
+    use gobbo_overlay_core::{Layers, Whiteouts};
+    use windows_sys::Win32::Foundation::{ERROR_PATH_NOT_FOUND, GetLastError};
+
+    fn test_mount() -> &'static Mount {
+        let layers = Layers::new(
+            PathBuf::from(r"C:\Game"),
+            None,
+            PathBuf::from(r"C:\Game\upper"),
+        );
+        Box::leak(Box::new(Mount::new(
+            "test".to_string(),
+            PathBuf::from(r"C:\Game"),
+            layers,
+            Whiteouts::default(),
+        )))
+    }
+
+    #[test]
+    fn a_failed_removal_leaves_the_lower_file_visible_and_restores_the_error() {
+        let mount = test_mount();
+        let upper = PathBuf::from(r"C:\Game\upper\data\a.txt");
+        // SAFETY: the test owns this thread's error.
+        set_error(1111);
+        let result =
+            remove_upper_and_hide_below(mount, r"data\a.txt", Some(&upper), None, true, |_| {
+                // SAFETY: same as above; this stands for the original call's error.
+                set_error(4321);
+                0
+            });
+        // SAFETY: same as above.
+        let error = unsafe { GetLastError() };
+
+        assert_eq!(result, 0);
+        assert_eq!(error, 4321);
+        assert!(!mount.whiteouts_snapshot().hides(r"data\a.txt"));
+    }
+
+    #[test]
+    fn a_successful_removal_hides_the_lower_file_and_restores_the_error() {
+        let mount = test_mount();
+        let upper = PathBuf::from(r"C:\Game\upper\data\a.txt");
+        // SAFETY: the test owns this thread's error.
+        set_error(1111);
+        let result =
+            remove_upper_and_hide_below(mount, r"data\a.txt", Some(&upper), None, true, |_| {
+                // SAFETY: same as above; this stands for the original call's error.
+                set_error(4321);
+                1
+            });
+        // SAFETY: same as above.
+        let error = unsafe { GetLastError() };
+
+        assert_eq!(result, 1);
+        assert_eq!(error, 4321);
+        assert!(mount.whiteouts_snapshot().hides(r"data\a.txt"));
+    }
+
+    #[test]
+    fn a_missing_upper_copy_reports_the_callers_error_without_hiding() {
+        let mount = test_mount();
+        let result = remove_upper_and_hide_below(
+            mount,
+            r"data\a.txt",
+            None,
+            Some(ERROR_FILE_NOT_FOUND),
+            true,
+            |_| panic!("there is no upper copy to remove"),
+        );
+        // SAFETY: the test owns this thread's error.
+        let error = unsafe { GetLastError() };
+
+        assert_eq!(result, 0);
+        assert_eq!(error, ERROR_FILE_NOT_FOUND);
+        assert!(!mount.whiteouts_snapshot().hides(r"data\a.txt"));
+    }
 
     #[test]
     fn a_folder_is_refused_and_a_missing_file_is_missing() {

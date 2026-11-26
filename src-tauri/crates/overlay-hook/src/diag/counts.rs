@@ -2,28 +2,47 @@
 //! call as more than a quarter of all calls says that a loop is likely.
 
 use std::collections::BTreeMap;
+use std::collections::btree_map::Entry;
 use std::fmt::Write as _;
 use std::sync::{Mutex, PoisonError};
 
+use super::session::{HookState, HookStatus};
 use super::settings::settings;
-use super::writer::write_file;
+use super::writer::{reporting, write_file};
 use crate::guard::Guard;
 
-/// Events counted under one key each, and the total of all of them.
+impl HookStatus {
+    /// Why this hook cannot be active, when it was left off by `GOBBO_OVERLAY_DISABLE` or could not be installed. The
+    /// readiness report uses it to name the essential hooks that stopped the overlay, without exposing `HookState`.
+    pub(crate) fn inactive_cause(&self) -> Option<String> {
+        match &self.state {
+            HookState::Disabled => Some("was disabled by GOBBO_OVERLAY_DISABLE".into()),
+            HookState::Failed(error) => Some(format!("failed: {error}")),
+            HookState::Created | HookState::Enabled => None,
+        }
+    }
+}
+
+/// Events counted under one key each, the total of all of them, and the new keys refused when the map was full.
 #[derive(Default)]
 struct Counts {
     by_key: BTreeMap<String, u64>,
     total: u64,
+    dropped: u64,
 }
 
 /// The report is written after this many counted events.
 const REPORT_EVERY: u64 = 1000;
 /// How many of the most frequent keys the report lists.
 const REPORT_TOP: usize = 60;
+/// The most distinct keys kept in memory while `GOBBO_OVERLAY_CALLS` and `GOBBO_OVERLAY_DIAG` are on. A program that
+/// builds a new path per call must not grow the map without bound; later new keys are counted as dropped instead.
+const MAX_KEYS: usize = 4096;
 
 static COUNTS: Mutex<Counts> = Mutex::new(Counts {
     by_key: BTreeMap::new(),
     total: 0,
+    dropped: 0,
 });
 
 /// Counts one event under `operation` and the detail that `detail` builds. Nothing is built or counted unless the report
@@ -34,7 +53,7 @@ pub(crate) fn count(operation: &str, detail: impl FnOnce() -> String) {
         return;
     };
 
-    if !settings.calls || super::crashing() {
+    if !settings.calls || reporting() {
         return;
     }
 
@@ -57,10 +76,22 @@ pub(crate) fn count(operation: &str, detail: impl FnOnce() -> String) {
     }
 }
 
-/// Counts one event, saturating instead of overflowing after a lifetime of calls.
+/// Counts one event, saturating instead of overflowing after a lifetime of calls. A new key beyond `MAX_KEYS` is
+/// dropped rather than growing the map; the event still counts towards the total and towards the report interval.
 fn increment(counts: &mut Counts, key: String) {
-    let entry = counts.by_key.entry(key).or_insert(0);
-    *entry = entry.saturating_add(1);
+    let full = counts.by_key.len() >= MAX_KEYS;
+    match counts.by_key.entry(key) {
+        Entry::Occupied(mut entry) => {
+            *entry.get_mut() = entry.get().saturating_add(1);
+        }
+        Entry::Vacant(entry) => {
+            if full {
+                counts.dropped = counts.dropped.saturating_add(1);
+            } else {
+                entry.insert(1);
+            }
+        }
+    }
     counts.total = counts.total.saturating_add(1);
 }
 
@@ -78,6 +109,10 @@ fn report(counts: &Counts) -> String {
 
     for (key, count) in ranked.into_iter().take(REPORT_TOP) {
         let _ = writeln!(out, "{count:>9}  {key}");
+    }
+
+    if counts.dropped > 0 {
+        let _ = writeln!(out, "dropped distinct keys: {}", counts.dropped);
     }
 
     out
@@ -128,6 +163,20 @@ mod tests {
 
         assert_eq!(counts.by_key["a"], u64::MAX);
         assert_eq!(counts.total, u64::MAX);
+    }
+
+    #[test]
+    fn the_map_stays_capped_and_the_report_counts_dropped_keys() {
+        let mut counts = Counts::default();
+
+        for number in 0..MAX_KEYS + 10 {
+            increment(&mut counts, format!("operation {number}"));
+        }
+
+        assert_eq!(counts.by_key.len(), MAX_KEYS);
+        assert_eq!(counts.dropped, 10);
+        assert_eq!(counts.total, (MAX_KEYS + 10) as u64);
+        assert!(report(&counts).contains("dropped distinct keys: 10"));
     }
 
     #[test]

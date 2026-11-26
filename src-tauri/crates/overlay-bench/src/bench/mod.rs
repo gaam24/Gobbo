@@ -5,6 +5,7 @@ mod worker;
 
 use std::error::Error;
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -25,22 +26,202 @@ const MAX_LIST: u64 = 200;
 const HOOK_BUILD_COMMAND: &str =
     "cargo build -p gobbo-overlay-hook --features \"bench-alloc bench-stats\"";
 
-/// The columns of one result row, in order. The header is built from this list, and the worker's row writer and the
-/// parser both check their width against it, so a column cannot be added in one place and lost in another.
-const COLUMNS: &[&str] = &[
-    "operation",
-    "p50",
-    "p95",
-    "p99",
-    "mean",
-    "worker_allocs",
-    "hook_allocs",
-    "hook_bytes",
-    "spelling",
-    "probes",
-    "locks",
-    "io",
-];
+// The schema is declared once in `define_row!` below. Every helper that reads or writes a result (the CSV header and
+// row, the JSON object, the table cells and the median) is generated from that one list, so a new metric cannot be left
+// out of one format. A struct literal that does not supply a new field is a compile error.
+
+/// The Rust type of one schema field.
+macro_rules! field_type {
+    (text) => {
+        String
+    };
+    (time) => {
+        u64
+    };
+    (rate) => {
+        f64
+    };
+}
+
+/// Parses one CSV field into its schema type.
+macro_rules! parse_field {
+    (text, $value:expr) => {
+        $value.to_string()
+    };
+    (time, $value:expr) => {
+        $value.parse()?
+    };
+    (rate, $value:expr) => {
+        $value.parse()?
+    };
+}
+
+/// Renders one field for a CSV row.
+macro_rules! csv_field {
+    (text, $value:expr) => {
+        $value.clone()
+    };
+    (time, $value:expr) => {
+        $value.to_string()
+    };
+    (rate, $value:expr) => {
+        format!("{:.2}", $value)
+    };
+}
+
+/// Renders one field for the JSON object. Durations are stored in nanoseconds and reported in microseconds.
+macro_rules! json_field {
+    (text, $value:expr) => {
+        format!("\"{}\"", $value)
+    };
+    (time, $value:expr) => {
+        format!("{:.2}", $value as f64 / 1000.0)
+    };
+    (rate, $value:expr) => {
+        format!("{:.2}", $value)
+    };
+}
+
+/// Renders one field for the markdown table. Durations use the same microsecond scale as the JSON object.
+macro_rules! table_field {
+    (text, $value:expr) => {
+        $value.clone()
+    };
+    (time, $value:expr) => {
+        format!("{:.2}", $value as f64 / 1000.0)
+    };
+    (rate, $value:expr) => {
+        format!("{:.2}", $value)
+    };
+}
+
+/// Takes the median of one field across rows. The operation name is the same in every round, so the first one is used.
+macro_rules! median_field {
+    (text, $rows:expr, $field:ident) => {
+        $rows
+            .first()
+            .map_or_else(String::new, |row| row.$field.clone())
+    };
+    (time, $rows:expr, $field:ident) => {
+        median_u64($rows.iter().map(|row| row.$field))
+    };
+    (rate, $rows:expr, $field:ident) => {
+        median_f64($rows.iter().map(|row| row.$field))
+    };
+}
+
+/// The JSON key of a field: its column name, unless the schema gives another one.
+macro_rules! json_key {
+    ($field:ident) => {
+        stringify!($field)
+    };
+    ($field:ident => $key:literal) => {
+        $key
+    };
+}
+
+/// Declares the one result row type and every format derived from it. Each entry is `name: kind`, with an optional
+/// `=> "json_key"` when the JSON object uses a different name (the timings report microseconds, not nanoseconds).
+macro_rules! define_row {
+    ($( $field:ident : $kind:ident $( => $json:literal )? ),+ $(,)?) => {
+        /// The ordered CSV column names, and the order of every value in a row.
+        const COLUMNS: &[&str] = &[ $( stringify!($field) ),+ ];
+        /// The width of one result row.
+        const COLUMN_COUNT: usize = COLUMNS.len();
+        // Keep the public format fixed: adding a column without updating this fails the build, not the output.
+        const _: () = assert!(COLUMN_COUNT == 12);
+
+        /// One result row: an operation name and the measurements taken for it.
+        #[derive(Clone, Debug, PartialEq)]
+        struct Row {
+            $( $field: field_type!($kind) ),+
+        }
+
+        impl Row {
+            /// The ordered column names as owned strings.
+            fn columns() -> [String; COLUMN_COUNT] {
+                [ $( String::from(stringify!($field)) ),+ ]
+            }
+
+            /// The JSON object keys, in the same order as the columns.
+            fn json_keys() -> [String; COLUMN_COUNT] {
+                [ $( String::from(json_key!($field $(=> $json)?)) ),+ ]
+            }
+
+            /// Parses a CSV data line, refusing one whose field count does not match the schema.
+            fn from_csv(line: &str) -> Result<Self, Box<dyn Error>> {
+                let fields: Vec<&str> = line.split(',').collect();
+
+                if fields.len() != COLUMN_COUNT {
+                    return Err(format!(
+                        "expected {} fields ({}) but got {}: {line}",
+                        COLUMN_COUNT,
+                        COLUMNS.join(","),
+                        fields.len()
+                    )
+                    .into());
+                }
+
+                // The width was checked above, so every `next()` yields a field.
+                let mut fields = fields.into_iter();
+                Ok(Self {
+                    $( $field: {
+                        let value = fields.next().unwrap_or("");
+                        parse_field!($kind, value)
+                    } ),+
+                })
+            }
+
+            /// Renders the row as one CSV line, without a trailing newline.
+            fn to_csv(&self) -> String {
+                [ $( csv_field!($kind, self.$field) ),+ ].join(",")
+            }
+
+            /// Writes the row as one CSV line.
+            fn write_csv(&self, out: &mut impl Write) -> std::io::Result<()> {
+                writeln!(out, "{}", self.to_csv())
+            }
+
+            /// The markdown table cells, in schema order.
+            fn table_cells(&self) -> [String; COLUMN_COUNT] {
+                [ $( table_field!($kind, self.$field) ),+ ]
+            }
+
+            /// The JSON object body for this row, without the surrounding braces.
+            fn to_json(&self) -> String {
+                let values = [ $( json_field!($kind, self.$field) ),+ ];
+                Self::json_keys()
+                    .iter()
+                    .zip(values.iter())
+                    .map(|(key, value)| format!("\"{key}\":{value}"))
+                    .collect::<Vec<_>>()
+                    .join(",")
+            }
+
+            /// The median of each field across rounds, keyed by the first row's operation name.
+            fn median(rows: &[&Row]) -> Row {
+                Row {
+                    $( $field: median_field!($kind, rows, $field) ),+
+                }
+            }
+        }
+    };
+}
+
+define_row! {
+    operation: text,
+    p50: time => "p50_us",
+    p95: time => "p95_us",
+    p99: time => "p99_us",
+    mean: time => "mean_us",
+    worker_allocs: rate,
+    hook_allocs: rate,
+    hook_bytes: rate,
+    spelling: rate,
+    probes: rate,
+    locks: rate,
+    io: rate,
+}
 
 /// The folder names of one mode's fixture. The fixture builder and the worker share them so a path is built from the
 /// layout instead of being inferred from another folder's name.
@@ -304,60 +485,13 @@ fn write(path: PathBuf, contents: &[u8]) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-/// One row of the worker's CSV result.
-#[derive(Debug, PartialEq)]
-struct Row {
-    operation: String,
-    p50: u64,
-    p95: u64,
-    p99: u64,
-    mean: u64,
-    worker_allocs: f64,
-    hook_allocs: f64,
-    hook_bytes: f64,
-    spelling: f64,
-    probes: f64,
-    locks: f64,
-    io: f64,
-}
-
-/// Parses one data line. A line with the wrong field count is an error, not a missing measurement to skip.
-fn parse_row(line: &str) -> Result<Row, Box<dyn Error>> {
-    let fields: Vec<&str> = line.split(',').collect();
-
-    if fields.len() != COLUMNS.len() {
-        return Err(format!(
-            "expected {} fields ({}) but got {}: {line}",
-            COLUMNS.len(),
-            COLUMNS.join(","),
-            fields.len()
-        )
-        .into());
-    }
-
-    Ok(Row {
-        operation: fields[0].to_string(),
-        p50: fields[1].parse()?,
-        p95: fields[2].parse()?,
-        p99: fields[3].parse()?,
-        mean: fields[4].parse()?,
-        worker_allocs: fields[5].parse()?,
-        hook_allocs: fields[6].parse()?,
-        hook_bytes: fields[7].parse()?,
-        spelling: fields[8].parse()?,
-        probes: fields[9].parse()?,
-        locks: fields[10].parse()?,
-        io: fields[11].parse()?,
-    })
-}
-
 /// Parses the worker's result file and reports the position of any bad line.
 fn read_rows(path: &Path) -> Result<Vec<Row>, Box<dyn Error>> {
     let text = fs::read_to_string(path)?;
     let mut rows = Vec::new();
 
     for (line_number, line) in text.lines().enumerate().skip(1) {
-        let row = parse_row(line)
+        let row = Row::from_csv(line)
             .map_err(|error| format!("result line {} ({error})", line_number + 1))?;
         rows.push(row);
     }
@@ -525,20 +659,7 @@ fn aggregate(rounds: Measured) -> Result<Aggregated, Box<dyn Error>> {
                 values.push(value);
             }
 
-            merged_rows.push(Row {
-                operation: row.operation.clone(),
-                p50: median_u64(values.iter().map(|row| row.p50)),
-                p95: median_u64(values.iter().map(|row| row.p95)),
-                p99: median_u64(values.iter().map(|row| row.p99)),
-                mean: median_u64(values.iter().map(|row| row.mean)),
-                worker_allocs: median_f64(values.iter().map(|row| row.worker_allocs)),
-                hook_allocs: median_f64(values.iter().map(|row| row.hook_allocs)),
-                hook_bytes: median_f64(values.iter().map(|row| row.hook_bytes)),
-                spelling: median_f64(values.iter().map(|row| row.spelling)),
-                probes: median_f64(values.iter().map(|row| row.probes)),
-                locks: median_f64(values.iter().map(|row| row.locks)),
-                io: median_f64(values.iter().map(|row| row.io)),
-            });
+            merged_rows.push(Row::median(&values));
         }
 
         merged.push((*mode, merged_rows));
@@ -657,22 +778,7 @@ fn print_table(results: &[(Mode, Vec<Row>)]) {
 
     for (mode, rows) in results {
         for row in rows {
-            println!(
-                "| {} | {} | {:.2} | {:.2} | {:.2} | {:.2} | {:.2} | {:.2} | {:.2} | {:.2} | {:.2} | {:.2} | {:.2} |",
-                mode.name(),
-                row.operation,
-                row.p50 as f64 / 1000.0,
-                row.p95 as f64 / 1000.0,
-                row.p99 as f64 / 1000.0,
-                row.mean as f64 / 1000.0,
-                row.worker_allocs,
-                row.hook_allocs,
-                row.hook_bytes,
-                row.spelling,
-                row.probes,
-                row.locks,
-                row.io,
-            );
+            println!("| {} | {} |", mode.name(), row.table_cells().join(" | "));
         }
     }
 
@@ -730,23 +836,7 @@ fn print_json(results: &[(Mode, Vec<Row>)]) {
     for (mode, rows) in results {
         let rows: Vec<String> = rows
             .iter()
-            .map(|row| {
-                format!(
-                    r#"{{"operation":"{}","p50_us":{:.2},"p95_us":{:.2},"p99_us":{:.2},"mean_us":{:.2},"worker_allocs":{:.2},"hook_allocs":{:.2},"hook_bytes":{:.2},"spelling":{:.2},"probes":{:.2},"locks":{:.2},"io":{:.2}}}"#,
-                    row.operation,
-                    row.p50 as f64 / 1000.0,
-                    row.p95 as f64 / 1000.0,
-                    row.p99 as f64 / 1000.0,
-                    row.mean as f64 / 1000.0,
-                    row.worker_allocs,
-                    row.hook_allocs,
-                    row.hook_bytes,
-                    row.spelling,
-                    row.probes,
-                    row.locks,
-                    row.io,
-                )
-            })
+            .map(|row| format!("{{{}}}", row.to_json()))
             .collect();
         modes.push(format!(
             r#"{{"mode":"{}","rows":[{}]}}"#,
@@ -830,4 +920,95 @@ fn run_main() -> Result<(), Box<dyn Error>> {
         json,
         check_budgets,
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample_row() -> Row {
+        Row {
+            operation: "open_read".to_string(),
+            p50: 1_250,
+            p95: 2_500,
+            p99: 3_750,
+            mean: 2_000,
+            worker_allocs: 1.25,
+            hook_allocs: 2.5,
+            hook_bytes: 4.75,
+            spelling: 1.0,
+            probes: 3.25,
+            locks: 2.0,
+            io: 0.5,
+        }
+    }
+
+    #[test]
+    fn every_column_is_in_the_csv_header_and_the_json_object() {
+        let row = sample_row();
+        let header = Row::columns().join(",");
+        let json = row.to_json();
+
+        for (column, key) in COLUMNS.iter().zip(Row::json_keys().iter()) {
+            assert!(
+                header.split(',').any(|name| name == *column),
+                "{column} is missing from the CSV header"
+            );
+            assert!(
+                json.contains(&format!("\"{key}\":")),
+                "{key} is missing from the JSON object"
+            );
+        }
+    }
+
+    #[test]
+    fn the_csv_and_json_formats_stay_byte_identical() {
+        let row = sample_row();
+
+        assert_eq!(
+            Row::columns().join(","),
+            "operation,p50,p95,p99,mean,worker_allocs,hook_allocs,hook_bytes,spelling,probes,locks,io"
+        );
+        assert_eq!(
+            row.to_csv(),
+            "open_read,1250,2500,3750,2000,1.25,2.50,4.75,1.00,3.25,2.00,0.50"
+        );
+        assert_eq!(
+            format!("{{{}}}", row.to_json()),
+            r#"{"operation":"open_read","p50_us":1.25,"p95_us":2.50,"p99_us":3.75,"mean_us":2.00,"worker_allocs":1.25,"hook_allocs":2.50,"hook_bytes":4.75,"spelling":1.00,"probes":3.25,"locks":2.00,"io":0.50}"#
+        );
+    }
+
+    #[test]
+    fn one_schema_width_guards_every_format() {
+        let row = sample_row();
+
+        assert_eq!(COLUMNS.len(), 12);
+        assert_eq!(Row::columns().len(), COLUMNS.len());
+        assert_eq!(Row::json_keys().len(), COLUMNS.len());
+        assert_eq!(row.to_csv().split(',').count(), COLUMNS.len());
+        assert_eq!(row.table_cells().len(), COLUMNS.len());
+        assert_eq!(row.to_json().split(",\"").count(), COLUMNS.len());
+    }
+
+    #[test]
+    fn median_covers_every_generated_field() {
+        let low = sample_row();
+        let high = Row {
+            operation: "open_read".to_string(),
+            p50: 9_000,
+            p95: 9_100,
+            p99: 9_200,
+            mean: 9_300,
+            worker_allocs: 9.1,
+            hook_allocs: 9.2,
+            hook_bytes: 9.3,
+            spelling: 9.4,
+            probes: 9.5,
+            locks: 9.6,
+            io: 9.7,
+        };
+
+        assert_eq!(Row::median(&[&low, &high]), high);
+    }
 }

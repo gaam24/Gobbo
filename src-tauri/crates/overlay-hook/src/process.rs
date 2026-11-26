@@ -14,7 +14,9 @@ use gobbo_overlay_launch::ReadyEvent;
 use windows_sys::Win32::Foundation::{
     CloseHandle, ERROR_DLL_INIT_FAILED, ERROR_INVALID_FUNCTION, FALSE,
 };
-use windows_sys::Win32::System::Threading::{CREATE_SUSPENDED, ResumeThread, TerminateProcess};
+use windows_sys::Win32::System::Threading::{
+    CREATE_SUSPENDED, GetExitCodeProcess, ResumeThread, TerminateProcess,
+};
 
 use crate::text::display_name;
 use crate::trace::log;
@@ -302,18 +304,34 @@ unsafe fn start_child(
         // SAFETY: the thread handle is the one `CreateProcessW` returned for the child.
         unsafe { ResumeThread(child.thread) };
 
-        if hooked
-            && let Some(ready) = &ready
-            && ready.wait(None).is_err()
-        {
-            log(&format!(
-                "child process {} did not report its hook ready",
-                child.process_id
-            ));
-
-            if !crate::diag::settings().allow_unhooked_children {
-                drop(_last_error);
-                return stop_unhooked(child);
+        if hooked && let Some(ready) = &ready {
+            // Watch the child too: a child whose init failed exits before signalling, and waiting on the event alone
+            // would stall the caller for the whole readiness timeout.
+            match ready.wait(Some(child.process)) {
+                Ok(()) => {}
+                Err(error) => {
+                    log(&format!(
+                        "child process {} did not report its hook ready: {error}",
+                        child.process_id
+                    ));
+                    let mut code = 0;
+                    // SAFETY: `child.process` is the process handle `CreateProcessW` returned, still open here, and
+                    // `code` is the out parameter the call writes.
+                    let readable = unsafe { GetExitCodeProcess(child.process, &mut code) } != FALSE;
+                    if !readable || child_ready_failure(code) {
+                        if !crate::diag::settings().allow_unhooked_children {
+                            drop(_last_error);
+                            return stop_unhooked(child);
+                        }
+                    } else {
+                        // A short-lived helper can finish before its first instruction signals readiness. Its exit
+                        // code shows the hook started and the program ran, so the start is a success.
+                        log(&format!(
+                            "child process {} exited with code {} before it could report its hook ready; the start succeeded",
+                            child.process_id, code
+                        ));
+                    }
+                }
             }
         }
     }
@@ -393,9 +411,8 @@ fn inject_child(
     }
 
     if wow64 && cfg!(target_pointer_width = "64") {
-        // A 64-bit hook cannot set the context of a 32-bit thread. The 32-bit helper does it. The guard keeps the
-        // helper's own process start out of this hook.
-        let _guard = crate::guard::Guard::enter();
+        // A 64-bit hook cannot set the context of a 32-bit thread. The 32-bit helper does it. The guard `start_child`
+        // entered keeps the helper's own process start out of this hook.
         return match gobbo_overlay_launch::inject32(child.process_id, child.thread_id, &paths.wow64)
         {
             Ok(()) => true,
@@ -496,4 +513,45 @@ fn stop_unhooked(child: &ProcessInformation) -> i32 {
 
     crate::win32::set_error(ERROR_DLL_INIT_FAILED);
     0
+}
+
+/// The stub's exit codes for a failed `LoadLibraryExW`, `GetProcAddress` and `GobboOverlayInit` (see
+/// `overlay-launch/src/inject/stub.rs`). `1114` is also `ERROR_DLL_INIT_FAILED`.
+const STUB_LOAD_FAILED: u32 = 1114;
+const STUB_PROC_FAILED: u32 = 1115;
+const STUB_INIT_FAILED: u32 = 1116;
+/// The code `GetExitCodeProcess` reports while the child is still alive, including a readiness timeout.
+const STILL_ACTIVE: u32 = 259;
+
+/// Whether a failed readiness wait must fail closed: the stub could not start the hook, or the child is still alive.
+/// Any other exit code means the child actually ran and ended before it could signal readiness, so the start succeeded.
+fn child_ready_failure(code: u32) -> bool {
+    matches!(
+        code,
+        STUB_LOAD_FAILED | STUB_PROC_FAILED | STUB_INIT_FAILED | STILL_ACTIVE
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_failed_hook_or_a_live_child_fails_closed_but_a_finished_child_does_not() {
+        for code in [
+            STUB_LOAD_FAILED,
+            STUB_PROC_FAILED,
+            STUB_INIT_FAILED,
+            STILL_ACTIVE,
+        ] {
+            assert!(child_ready_failure(code), "code {code} must fail closed");
+        }
+
+        for code in [0, 42] {
+            assert!(
+                !child_ready_failure(code),
+                "code {code} is a child that ran and ended"
+            );
+        }
+    }
 }

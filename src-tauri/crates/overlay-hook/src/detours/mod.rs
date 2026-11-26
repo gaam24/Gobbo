@@ -256,15 +256,21 @@ pub(crate) const TRACE_ONLY: [&str; 1] = [TRACE_ONLY_HOOK];
 pub(crate) const NO_DISABLE_WARNING: [&str; 2] = [TRACE_ONLY_HOOK, "nt_query_information_file"];
 
 /// The hooks the overlay needs active before the game may run: without one of them a path to the real folder stays open.
-pub(crate) const ESSENTIAL: [&str; 9] = [
+/// A synthetic search handle needs `find_next`/`find_close`, `get_final_path` backs handle classification, and the link
+/// hooks are the fail-closed guard for a game-folder write through the NT link classes.
+pub(crate) const ESSENTIAL: [&str; 13] = [
     "create_file",
     "nt_create_file",
     "nt_open_file",
     "nt_query_attributes_file",
     "nt_query_full_attributes_file",
     "nt_set_information_file",
+    "create_hard_link",
+    "create_symbolic_link",
     "find_first",
     "find_first_ex",
+    "find_next",
+    "find_close",
     "get_final_path",
 ];
 
@@ -314,5 +320,21 @@ mod tests {
         {
             assert!(names.contains(name), "the hook table has no '{name}'");
         }
+    }
+
+    /// A synthetic search handle from either FindFirst hook must be consumed and closed by hooked calls; the original
+    /// `FindNextFileW`/`FindClose` would receive a handle they never created.
+    #[test]
+    fn a_synthetic_search_handle_keeps_its_pair_essential() {
+        assert!(ESSENTIAL.contains(&"find_first"));
+        assert!(ESSENTIAL.contains(&"find_first_ex"));
+        assert!(
+            ESSENTIAL.contains(&"find_next"),
+            "a synthetic handle needs FindNextFileW"
+        );
+        assert!(
+            ESSENTIAL.contains(&"find_close"),
+            "a synthetic handle needs FindClose"
+        );
     }
 }

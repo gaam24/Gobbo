@@ -32,6 +32,11 @@ windows-sys = { workspace = true, features = [
   "Win32_System_Threading",
 ] }
 
+[dev-dependencies]
+# The shared PE fixture builder. With resolver "3" the feature is unified into this crate's own test builds only; a
+# normal build of the launcher never enables it.
+gobbo-overlay-pe = { workspace = true, features = ["test-support"] }
+
 # The overlay crates deliberately stay out of the workspace lint groups: the hook is Win32 code and the pedantic/nursery
 # group would flood them with warnings (see ../AGENTS.md). An empty table is Cargo's documented way to make that intent
 # explicit and silence the `missing_lints_inheritance` warning.

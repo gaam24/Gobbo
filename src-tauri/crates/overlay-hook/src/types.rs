@@ -185,6 +185,9 @@ const _: () = {
     use windows_sys::Win32::Foundation::UNICODE_STRING;
 
     assert!(size_of::<UnicodeString>() == size_of::<UNICODE_STRING>());
+    assert!(offset_of!(UnicodeString, length) == offset_of!(UNICODE_STRING, Length));
+    assert!(offset_of!(UnicodeString, maximum_length) == offset_of!(UNICODE_STRING, MaximumLength));
+    assert!(offset_of!(UnicodeString, buffer) == offset_of!(UNICODE_STRING, Buffer));
     assert!(size_of::<ObjectAttributes>() == size_of::<OBJECT_ATTRIBUTES>());
     assert!(offset_of!(ObjectAttributes, length) == offset_of!(OBJECT_ATTRIBUTES, Length));
     assert!(
@@ -193,4 +196,12 @@ const _: () = {
     );
     assert!(offset_of!(ObjectAttributes, object_name) == offset_of!(OBJECT_ATTRIBUTES, ObjectName));
     assert!(offset_of!(ObjectAttributes, attributes) == offset_of!(OBJECT_ATTRIBUTES, Attributes));
+    assert!(
+        offset_of!(ObjectAttributes, security_descriptor)
+            == offset_of!(OBJECT_ATTRIBUTES, SecurityDescriptor)
+    );
+    assert!(
+        offset_of!(ObjectAttributes, security_qos)
+            == offset_of!(OBJECT_ATTRIBUTES, SecurityQualityOfService)
+    );
 };

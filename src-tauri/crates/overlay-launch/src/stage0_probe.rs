@@ -1,7 +1,114 @@
 //! Stage 0 regressions through the production installer: M2 serves a suspended child's loader calls from the layer,
 //! M3 binds a system DLL name from the layer, and X5 does the same for a 32-bit child.
 
-use crate::stage0::{Bits, STUBS, install, ntdll_export, redirect_config};
+use crate::stage0::{Bits, install, redirect_config};
+#[cfg(target_arch = "x86_64")]
+use crate::stage0::{STUBS, ntdll_export};
+
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::process::Command;
+
+/// The game's DLL: it imports the system `version.dll` and returns what that function returns for a missing file.
+/// Without a redirect the system copy answers 0.
+const GAME_DLL: &str = r#"
+#[link(name = "version")]
+unsafe extern "system" {
+    fn GetFileVersionInfoSizeW(name: *const u16, handle: *mut u32) -> u32;
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn gobbo_game_version_size() -> u32 {
+    let name: Vec<u16> = "C:/gobbo-no-such-file.txt".encode_utf16().chain(core::iter::once(0)).collect();
+    unsafe { GetFileVersionInfoSizeW(name.as_ptr(), core::ptr::null_mut()) }
+}
+"#;
+
+/// The program: exits with 0 when the game DLL reports the mod's answer.
+const PROGRAM: &str = r#"
+#[link(name = "game", kind = "dylib")]
+unsafe extern "C" {
+    fn gobbo_game_version_size() -> u32;
+}
+fn main() {
+    std::process::exit(if unsafe { gobbo_game_version_size() } == 42 { 0 } else { 4 });
+}
+"#;
+
+/// Compiles one of the fixture sources. `def` is the `.def` file that maps the stdcall export of the 32-bit layer DLL
+/// to the undecorated system name.
+fn rustc(source: &Path, output: &Path, target: &str, dll: bool, native: &Path, def: Option<&Path>) {
+    let mut command = Command::new(std::env::var_os("RUSTC").unwrap_or_else(|| "rustc".into()));
+    command.args(["--edition=2021", "-O", "--target", target]);
+
+    if dll {
+        command.args(["--crate-type", "cdylib"]);
+    }
+
+    command
+        .arg("-L")
+        .arg(format!("native={}", native.display()));
+
+    if let Some(def) = def {
+        command.args(["-C", &format!("link-arg=/DEF:{}", def.display())]);
+    }
+
+    let status = command
+        .arg("-o")
+        .arg(output)
+        .arg(source)
+        .status()
+        .expect("rustc runs");
+    assert!(status.success(), "{} did not build", output.display());
+}
+
+/// Builds the game folder with the game DLL and the program, and the mod layer with a `version.dll` made from
+/// `layer_source`. `def_export`, when set, is the `.def` mapping line that gives the layer DLL the undecorated system
+/// name; the game DLL and the program are built the same way on both bitnesses.
+fn binding_fixture(
+    name: &str,
+    target: &str,
+    layer_source: &str,
+    def_export: Option<&str>,
+) -> (PathBuf, PathBuf, PathBuf) {
+    let base = std::env::temp_dir().join(format!("gobbo-{name}-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&base);
+    let game = base.join("game");
+    let layer = base.join("mods");
+    let work = base.join("work");
+
+    for folder in [&game, &layer, &work] {
+        fs::create_dir_all(folder).unwrap();
+    }
+
+    let version_source = work.join("version.rs");
+    fs::write(&version_source, layer_source).unwrap();
+    let def = def_export.map(|export| {
+        let def = work.join("version.def");
+        fs::write(&def, format!("LIBRARY version\nEXPORTS\n    {export}\n")).unwrap();
+        def
+    });
+    rustc(
+        &version_source,
+        &layer.join("version.dll"),
+        target,
+        true,
+        &work,
+        def.as_deref(),
+    );
+
+    let game_source = work.join("game.rs");
+    fs::write(&game_source, GAME_DLL).unwrap();
+    let game_dll = game.join("game.dll");
+    rustc(&game_source, &game_dll, target, true, &work, None);
+    // The program links the game DLL through its import library, which the DLL build wrote next to it.
+    fs::copy(game_dll.with_extension("dll.lib"), work.join("game.lib")).unwrap();
+
+    let program_source = work.join("program.rs");
+    fs::write(&program_source, PROGRAM).unwrap();
+    let program = game.join("program.exe");
+    rustc(&program_source, &program, target, false, &work, None);
+    (game, layer, program)
+}
 
 /// M2: the redirect serves the loader's file calls of a suspended child from the layer.
 #[cfg(test)]
@@ -11,13 +118,17 @@ pub(super) mod m2_redirect {
     use std::path::PathBuf;
     use std::ptr::null;
 
-    use windows_sys::Win32::Foundation::{CloseHandle, FALSE, HANDLE, WAIT_OBJECT_0};
+    #[cfg(target_arch = "x86_64")]
+    use windows_sys::Win32::Foundation::HANDLE;
+    use windows_sys::Win32::Foundation::{CloseHandle, FALSE, WAIT_OBJECT_0};
     use windows_sys::Win32::System::Threading::{
         CREATE_SUSPENDED, CreateProcessW, GetExitCodeProcess, PROCESS_INFORMATION, ResumeThread,
         STARTUPINFOW, TerminateProcess, WaitForSingleObject,
     };
 
-    use super::{Bits, STUBS, install, ntdll_export, redirect_config};
+    use super::{Bits, install, redirect_config};
+    #[cfg(target_arch = "x86_64")]
+    use super::{STUBS, ntdll_export};
     use crate::wide;
 
     /// A suspended child, terminated when dropped.
@@ -108,6 +219,7 @@ pub(super) mod m2_redirect {
     }
 
     #[test]
+    #[cfg(target_arch = "x86_64")]
     fn m2_a_file_missing_from_the_game_folder_is_read_from_the_layer() {
         reads_the_layer_copy("read", r"C:\Windows\System32\cmd.exe", Bits::X64);
     }
@@ -119,6 +231,7 @@ pub(super) mod m2_redirect {
     }
 
     #[test]
+    #[cfg(target_arch = "x86_64")]
     fn m2_restore_puts_the_stubs_back_and_turns_the_redirect_off() {
         let (game, layer) = folders("restore");
         let child = spawn_suspended(r"C:\Windows\System32\cmd.exe /c exit 0");
@@ -165,6 +278,7 @@ pub(super) mod m2_redirect {
         code as i32
     }
 
+    #[cfg(target_arch = "x86_64")]
     fn read_bytes(process: HANDLE, address: usize, length: usize) -> Vec<u8> {
         let mut bytes = vec![0u8; length];
         let mut done = 0;
@@ -183,13 +297,10 @@ pub(super) mod m2_redirect {
 }
 
 /// M3: a game DLL imports a system name (`version.dll`) that the layer also has. The layer copy must be the one bound.
-#[cfg(test)]
+/// It builds and starts an x64 program, so it only runs in an x64 test binary; X5 covers the x86 case.
+#[cfg(all(test, target_arch = "x86_64"))]
 mod m3_system_name {
-    use std::fs;
-    use std::path::{Path, PathBuf};
-    use std::process::Command;
-
-    use super::{Bits, install, redirect_config};
+    use super::{Bits, binding_fixture, install, redirect_config};
 
     use super::m2_redirect::{resume_and_wait, spawn_suspended};
 
@@ -201,83 +312,10 @@ pub unsafe extern "system" fn GetFileVersionInfoSizeW(_name: *const u16, _handle
 }
 "#;
 
-    /// The game's DLL: it imports the system `version.dll` and returns what that function returns for a missing file.
-    /// Without a redirect the system copy answers 0.
-    const GAME_DLL: &str = r#"
-#[link(name = "version")]
-unsafe extern "system" {
-    fn GetFileVersionInfoSizeW(name: *const u16, handle: *mut u32) -> u32;
-}
-#[unsafe(no_mangle)]
-pub extern "C" fn gobbo_game_version_size() -> u32 {
-    let name: Vec<u16> = "C:/gobbo-no-such-file.txt".encode_utf16().chain(core::iter::once(0)).collect();
-    unsafe { GetFileVersionInfoSizeW(name.as_ptr(), core::ptr::null_mut()) }
-}
-"#;
-
-    /// The program: exits with 0 when the game DLL reports the mod's answer.
-    const PROGRAM: &str = r#"
-#[link(name = "game", kind = "dylib")]
-unsafe extern "C" {
-    fn gobbo_game_version_size() -> u32;
-}
-fn main() {
-    std::process::exit(if unsafe { gobbo_game_version_size() } == 42 { 0 } else { 4 });
-}
-"#;
-
-    fn rustc(source: &Path, output: &Path, dll: bool, native: &Path) {
-        let mut command = Command::new(std::env::var_os("RUSTC").unwrap_or_else(|| "rustc".into()));
-        command.args(["--edition=2021", "-O", "--target", "x86_64-pc-windows-msvc"]);
-
-        if dll {
-            command.args(["--crate-type", "cdylib"]);
-        }
-
-        let status = command
-            .arg("-L")
-            .arg(format!("native={}", native.display()))
-            .arg("-o")
-            .arg(output)
-            .arg(source)
-            .status()
-            .expect("rustc runs");
-        assert!(status.success(), "{} did not build", output.display());
-    }
-
-    /// Builds the game folder (with the game DLL and the program) and the layer (with the mod's `version.dll`).
-    fn fixture(name: &str) -> (PathBuf, PathBuf, PathBuf) {
-        let base = std::env::temp_dir().join(format!("gobbo-m3-{name}-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&base);
-        let game = base.join("game");
-        let layer = base.join("mods");
-        let work = base.join("work");
-
-        for folder in [&game, &layer, &work] {
-            fs::create_dir_all(folder).unwrap();
-        }
-
-        let version_source = work.join("version.rs");
-        fs::write(&version_source, LAYER_VERSION).unwrap();
-        rustc(&version_source, &layer.join("version.dll"), true, &work);
-
-        let game_source = work.join("game.rs");
-        fs::write(&game_source, GAME_DLL).unwrap();
-        let game_dll = game.join("game.dll");
-        rustc(&game_source, &game_dll, true, &work);
-        // The program links the game DLL through its import library, which the DLL build wrote next to it.
-        fs::copy(game_dll.with_extension("dll.lib"), work.join("game.lib")).unwrap();
-
-        let program_source = work.join("program.rs");
-        fs::write(&program_source, PROGRAM).unwrap();
-        let program = game.join("program.exe");
-        rustc(&program_source, &program, false, &work);
-        (game, layer, program)
-    }
-
     #[test]
     fn m3_the_layer_copy_of_a_system_name_is_the_one_bound() {
-        let (game, layer, program) = fixture("bound");
+        let (game, layer, program) =
+            binding_fixture("m3-bound", "x86_64-pc-windows-msvc", LAYER_VERSION, None);
         let command = format!("\"{}\"", program.display());
         let child = spawn_suspended(&command);
         let process = child.0.hProcess;
@@ -292,7 +330,8 @@ fn main() {
 
     #[test]
     fn m3_control_without_the_redirect_binds_the_system_copy() {
-        let (_game, _layer, program) = fixture("control");
+        let (_game, _layer, program) =
+            binding_fixture("m3-control", "x86_64-pc-windows-msvc", LAYER_VERSION, None);
         let command = format!("\"{}\"", program.display());
         let child = spawn_suspended(&command);
         let code = resume_and_wait(&child);
@@ -307,11 +346,7 @@ fn main() {
 /// system `version.dll` exports.
 #[cfg(test)]
 mod x5_system_name32 {
-    use std::fs;
-    use std::path::{Path, PathBuf};
-    use std::process::Command;
-
-    use super::{Bits, install, redirect_config};
+    use super::{Bits, binding_fixture, install, redirect_config};
 
     use super::m2_redirect::{resume_and_wait, spawn_suspended};
 
@@ -323,104 +358,14 @@ pub unsafe extern "system" fn layer_size(_name: *const u16, _handle: *mut u32) -
 }
 "#;
 
-    /// The game's DLL, linked to the system `version.dll` import library of the 32-bit SDK.
-    const GAME_DLL: &str = r#"
-#[link(name = "version")]
-unsafe extern "system" {
-    fn GetFileVersionInfoSizeW(name: *const u16, handle: *mut u32) -> u32;
-}
-#[unsafe(no_mangle)]
-pub extern "C" fn gobbo_game_version_size() -> u32 {
-    let name: Vec<u16> = "C:/gobbo-no-such-file.txt".encode_utf16().chain(core::iter::once(0)).collect();
-    unsafe { GetFileVersionInfoSizeW(name.as_ptr(), core::ptr::null_mut()) }
-}
-"#;
-
-    const PROGRAM: &str = r#"
-#[link(name = "game", kind = "dylib")]
-unsafe extern "C" {
-    fn gobbo_game_version_size() -> u32;
-}
-fn main() {
-    std::process::exit(if unsafe { gobbo_game_version_size() } == 42 { 0 } else { 4 });
-}
-"#;
-
-    fn rustc(source: &Path, output: &Path, dll: bool, native: &Path) {
-        let mut command = Command::new(std::env::var_os("RUSTC").unwrap_or_else(|| "rustc".into()));
-        command.args(["--edition=2021", "-O", "--target", "i686-pc-windows-msvc"]);
-
-        if dll {
-            command.args(["--crate-type", "cdylib"]);
-        }
-
-        let status = command
-            .arg("-L")
-            .arg(format!("native={}", native.display()))
-            .arg("-o")
-            .arg(output)
-            .arg(source)
-            .status()
-            .expect("rustc runs");
-        assert!(status.success(), "{} did not build", output.display());
-    }
-
-    fn fixture(name: &str) -> (PathBuf, PathBuf, PathBuf) {
-        let base = std::env::temp_dir().join(format!("gobbo-x5-{name}-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&base);
-        let game = base.join("game");
-        let layer = base.join("mods");
-        let work = base.join("work");
-
-        for folder in [&game, &layer, &work] {
-            fs::create_dir_all(folder).unwrap();
-        }
-
-        let version_source = work.join("version.rs");
-        fs::write(&version_source, LAYER_VERSION).unwrap();
-        // The system name is exported undecorated: a `.def` file maps it to the stdcall function.
-        let def = work.join("version.def");
-        fs::write(
-            &def,
-            "LIBRARY version\nEXPORTS\n    GetFileVersionInfoSizeW=_layer_size@8\n",
-        )
-        .unwrap();
-        let output = layer.join("version.dll");
-        let mut command = Command::new(std::env::var_os("RUSTC").unwrap_or_else(|| "rustc".into()));
-        command.args([
-            "--edition=2021",
-            "-O",
-            "--target",
-            "i686-pc-windows-msvc",
-            "--crate-type",
-            "cdylib",
-            "-C",
-        ]);
-        command.arg(format!("link-arg=/DEF:{}", def.display()));
-        let status = command
-            .arg("-o")
-            .arg(&output)
-            .arg(&version_source)
-            .status()
-            .expect("rustc runs");
-        assert!(status.success(), "the layer version.dll did not build");
-
-        let game_source = work.join("game.rs");
-        fs::write(&game_source, GAME_DLL).unwrap();
-        let game_dll = game.join("game.dll");
-        rustc(&game_source, &game_dll, true, &work);
-        fs::copy(game_dll.with_extension("dll.lib"), work.join("game.lib")).unwrap();
-
-        let program_source = work.join("program.rs");
-        fs::write(&program_source, PROGRAM).unwrap();
-        let program = game.join("program.exe");
-        rustc(&program_source, &program, false, &work);
-        (game, layer, program)
-    }
-
     #[test]
     fn x5_the_layer_copy_of_a_system_name_is_bound_in_a_32_bit_child() {
-        let (game, layer, program) = fixture("bound");
+        let (game, layer, program) = binding_fixture(
+            "x5-bound",
+            "i686-pc-windows-msvc",
+            LAYER_VERSION,
+            Some("GetFileVersionInfoSizeW=_layer_size@8"),
+        );
         let child = spawn_suspended(&format!("\"{}\"", program.display()));
         let _patched = install(
             child.0.hProcess,
@@ -437,7 +382,12 @@ fn main() {
 
     #[test]
     fn x5_control_without_the_redirect_binds_the_system_copy() {
-        let (_game, _layer, program) = fixture("control");
+        let (_game, _layer, program) = binding_fixture(
+            "x5-control",
+            "i686-pc-windows-msvc",
+            LAYER_VERSION,
+            Some("GetFileVersionInfoSizeW=_layer_size@8"),
+        );
         let child = spawn_suspended(&format!("\"{}\"", program.display()));
         assert_eq!(
             resume_and_wait(&child),

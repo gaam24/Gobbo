@@ -344,24 +344,7 @@ fn build_fixture(
     fs::write(&dll_source, MOD_DLL).unwrap();
     let dll = library.join(format!("modA/bin/{arch}/mod.dll"));
     fs::create_dir_all(dll.parent()?).unwrap();
-    let rustc = std::env::var_os("RUSTC").unwrap_or_else(|| "rustc".into());
-    let status = Command::new(&rustc)
-        .args([
-            "--edition=2021",
-            "--crate-type",
-            "cdylib",
-            "-O",
-            "--target",
-            target,
-            "-o",
-        ])
-        .arg(&dll)
-        .arg(&dll_source)
-        .status()
-        .ok()?;
-    if !status.success() {
-        return None;
-    }
+    compile(&dll_source, &dll, target, true, None)?;
 
     let def = out.join("mod.def");
     fs::write(&def, "LIBRARY mod\nEXPORTS\n    gobbo_probe_marker\n").unwrap();
@@ -382,21 +365,8 @@ fn build_fixture(
     fs::write(&probe_source, PROBE).unwrap();
     let probe = root.join(format!("bin/{arch}/probe.exe"));
     fs::create_dir_all(probe.parent()?).unwrap();
-    let status = Command::new(&rustc)
-        .args([
-            "--edition=2021",
-            "-O",
-            "--target",
-            target,
-            "-L",
-            &format!("native={}", out.display()),
-            "-o",
-        ])
-        .arg(&probe)
-        .arg(&probe_source)
-        .status()
-        .ok()?;
-    status.success().then_some((dll, probe))
+    compile(&probe_source, &probe, target, false, Some(&out))?;
+    Some((dll, probe))
 }
 
 /// Builds the game's own `mod.dll`, which exports a different marker. It stays in the game folder; the patch must make
@@ -416,22 +386,8 @@ fn build_game_dll(root: &Path, arch: &str) -> Option<PathBuf> {
     fs::write(&source, GAME_DLL).unwrap();
     let dll = root.join(format!("bin/{arch}/mod.dll"));
     fs::create_dir_all(dll.parent()?).unwrap();
-    let rustc = std::env::var_os("RUSTC").unwrap_or_else(|| "rustc".into());
-    let status = Command::new(&rustc)
-        .args([
-            "--edition=2021",
-            "--crate-type",
-            "cdylib",
-            "-O",
-            "--target",
-            target,
-            "-o",
-        ])
-        .arg(&dll)
-        .arg(&source)
-        .status()
-        .ok()?;
-    status.success().then_some(dll)
+    compile(&source, &dll, target, true, None)?;
+    Some(dll)
 }
 
 /// A helper binary next to the test executable or in the Cargo dev layout above it.
@@ -464,9 +420,15 @@ fn main() {
 }
 "#;
 
-/// Compiles `source` for `target` into `output`: a DLL when `dll` is set, else a program. `native` holds the import
-/// libraries the source links to.
-fn compile(source: &Path, output: &Path, target: &str, native: &Path, dll: bool) -> Option<()> {
+/// Compiles `source` for `target` into `output`: a DLL when `dll` is set, else a program. `native` is the import-library
+/// search path for sources that link to one.
+fn compile(
+    source: &Path,
+    output: &Path,
+    target: &str,
+    dll: bool,
+    native: Option<&Path>,
+) -> Option<()> {
     let rustc = std::env::var_os("RUSTC").unwrap_or_else(|| "rustc".into());
     let mut command = Command::new(&rustc);
     command.args(["--edition=2021", "-O", "--target", target]);
@@ -474,15 +436,13 @@ fn compile(source: &Path, output: &Path, target: &str, native: &Path, dll: bool)
     if dll {
         command.args(["--crate-type", "cdylib"]);
     }
+    if let Some(native) = native {
+        command
+            .arg("-L")
+            .arg(format!("native={}", native.display()));
+    }
 
-    let status = command
-        .arg("-L")
-        .arg(format!("native={}", native.display()))
-        .arg("-o")
-        .arg(output)
-        .arg(source)
-        .status()
-        .ok()?;
+    let status = command.arg("-o").arg(output).arg(source).status().ok()?;
     status.success().then_some(())
 }
 
@@ -516,20 +476,20 @@ fn build_dependency_fixture(
     fs::write(&mod_source, MOD_DLL).unwrap();
     let mod_dll = library.join("modA/bin/x64/mod.dll");
     fs::create_dir_all(mod_dll.parent()?).unwrap();
-    compile(&mod_source, &mod_dll, target, &out, true)?;
+    compile(&mod_source, &mod_dll, target, true, Some(&out))?;
     import_library(lib, &out, "mod", "gobbo_probe_marker", "x64")?;
 
     let dep_source = out.join("dep.rs");
     fs::write(&dep_source, DEPENDENCY_DLL).unwrap();
     let dep_dll = root.join("bin/x64/dep.dll");
     fs::create_dir_all(dep_dll.parent()?).unwrap();
-    compile(&dep_source, &dep_dll, target, &out, true)?;
+    compile(&dep_source, &dep_dll, target, true, Some(&out))?;
     import_library(lib, &out, "dep", "gobbo_dep_marker", "x64")?;
 
     let probe_source = out.join("dep-probe.rs");
     fs::write(&probe_source, DEPENDENCY_PROBE).unwrap();
     let probe = root.join("bin/x64/dep_probe.exe");
-    compile(&probe_source, &probe, target, &out, false)?;
+    compile(&probe_source, &probe, target, false, Some(&out))?;
     Some(probe)
 }
 

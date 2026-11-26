@@ -77,7 +77,7 @@ use std::ffi::c_void;
 use std::sync::OnceLock;
 
 use gobbo_overlay_core::{MountConfig, MountSpec};
-use windows_sys::Win32::Foundation::CloseHandle;
+use windows_sys::Win32::Foundation::{CloseHandle, FALSE, GetLastError};
 use windows_sys::Win32::System::LibraryLoader::DisableThreadLibraryCalls;
 use windows_sys::Win32::System::SystemServices::DLL_PROCESS_ATTACH;
 use windows_sys::Win32::System::Threading::{EVENT_MODIFY_STATE, OpenEventW, SetEvent};
@@ -106,8 +106,8 @@ pub unsafe extern "system" fn DllMain(
         unsafe { DisableThreadLibraryCalls(module) };
     }
     // DLL_PROCESS_DETACH does nothing on either path: dynamic unload is not a supported operation. The installed
-    // hooks and the two background threads outlive it, the OS reclaims everything at process death, and the trace
-    // tail is a dev artifact lost by design. A lock or I/O here could deadlock under the loader lock.
+    // hooks and the background threads outlive it, the OS reclaims everything at process death, and a trace tail
+    // shorter than the flush interval is lost by design. A lock or I/O here could deadlock under the loader lock.
 
     1
 }
@@ -139,20 +139,32 @@ pub extern "C" fn GobboOverlayInit() -> i32 {
     if ready { 1 } else { 0 }
 }
 
-/// Signals `Local\GobboOverlayReady_<pid>`, which the launcher waits on before it resumes the game.
+/// Signals `Local\GobboOverlayReady_<pid>`, which the launcher waits on before it resumes the game. A failure is
+/// logged so a launcher timeout has a cause; readiness itself never depends on the signal reaching the launcher.
 fn signal_ready() {
     let name = gobbo_overlay_launch::ready_event_name(std::process::id());
     // SAFETY: `name` is a NUL-terminated name, and the call only opens the event the launcher created.
     let event = unsafe { OpenEventW(EVENT_MODIFY_STATE, 0, name.as_ptr()) };
 
     if event.is_null() {
+        // SAFETY: `GetLastError` only reads the error of the calling thread, before logging can change it.
+        let error = unsafe { GetLastError() };
+        log(&format!(
+            "the ready event could not be opened (error {error}); the launcher may time out"
+        ));
         return;
     }
     // SAFETY: `event` is an event handle opened above; it is closed once.
-    unsafe {
-        SetEvent(event);
-        CloseHandle(event);
+    let set = unsafe { SetEvent(event) };
+    if set == FALSE {
+        // SAFETY: `GetLastError` only reads the error of the calling thread, before logging can change it.
+        let error = unsafe { GetLastError() };
+        log(&format!(
+            "the ready event could not be set (error {error}); the launcher may time out"
+        ));
     }
+    // SAFETY: `event` is an event handle opened above; it is closed once here.
+    unsafe { CloseHandle(event) };
 }
 
 fn install() -> bool {
@@ -169,7 +181,17 @@ fn install() -> bool {
     timeline.mark("config");
     diag::prune_old_files();
     timeline.mark("prune");
-    diag::remember_modules();
+    // Only the trace's caller, the first-chance crash report and the dump paths need module ranges. Walking every
+    // module is startup work with no benefit when none of them is on; the crash report prints the bare address when
+    // the table is empty.
+    let switches = diag::settings();
+    if switches.calls
+        || switches.crash.is_some()
+        || switches.dump.is_some()
+        || switches.dumper.is_some()
+    {
+        diag::remember_modules();
+    }
     timeline.mark("modules");
     diag::install_crash_reporting();
     timeline.mark("crash_reporting");
@@ -202,8 +224,14 @@ fn install() -> bool {
     // outside the game's pass-through budget.
     let _ = crate::paths::paths();
     timeline.mark("paths");
-    // The loader's stubs may still jump into the stage 0 redirect. They go back to their own bytes before the detours go in.
-    early::restore();
+    // The loader's stubs may still jump into the stage 0 redirect. They go back to their own bytes before the detours
+    // go in; a partial handover must stop here, or the loader's calls would bypass every decision the hook makes.
+    if let Err(error) = early::restore() {
+        log(&format!(
+            "early redirect could not be handed back ({error}); detours are not installed"
+        ));
+        return false;
+    }
     timeline.mark("early_restore");
     let (created, statuses) = unsafe { detours::create_hooks() };
     state::store_hooks(created);
@@ -229,9 +257,9 @@ fn install() -> bool {
     timeline.mark("enable");
     let enabled = statuses.iter().filter(|status| status.is_enabled()).count();
     let failed = statuses.iter().filter(|status| status.is_failed()).count();
-    // The launcher may resume the game only when every hook the overlay needs is active. Optional hooks (links,
-    // replace, tracing) may be missing without letting the game run against the real folder. The two lists live next
-    // to the detour table so a renamed field has one place to be fixed.
+    // The launcher may resume the game only when every hook the overlay needs is active. Optional hooks such as replace
+    // and tracing may be missing without letting the game run against the real folder; the link hooks are now part of
+    // the essential set. The two lists live next to the detour table so a renamed field has one place to be fixed.
     let is_enabled = |name: &str| {
         statuses
             .iter()
@@ -240,6 +268,9 @@ fn install() -> bool {
     let ready = ESSENTIAL.iter().all(|name| is_enabled(name))
         && PROCESS.iter().any(|name| is_enabled(name));
     crate::process::set_internal_hook(is_enabled(PROCESS_INTERNAL));
+    // The detours are live now. The report and the ring are the hook's own files, and their paths come from the
+    // environment; keep their I/O out of the hook so a path under a mount is not redirected or recorded as a decision.
+    let _diagnostic_io = crate::guard::Guard::enter();
     diag::write_session(
         &config,
         &statuses,
@@ -249,6 +280,11 @@ fn install() -> bool {
     log(&format!(
         "overlay hooks: {enabled} enabled, {failed} failed, ready={ready}"
     ));
+    // The session report is written before the readiness gate is evaluated. When the gate says no, append the
+    // essential hooks that caused it, so "disabled" on one hook is not the whole explanation.
+    if !ready {
+        warn_unready(&statuses);
+    }
     // The ring opens after the session report: its own writes, and the report's, are not game decisions.
     diag::open_ring(diag::settings().ring.as_deref());
     ready
@@ -283,5 +319,71 @@ fn log_session(config: &MountConfig) {
 
     if diag::settings().passthrough {
         log("passthrough: calls are not redirected");
+    }
+}
+
+/// The essential hooks whose state explains why the overlay is not ready. The session report already warns about failed
+/// hooks and most disabled ones; this names the ones the readiness gate needs, so the cause of `ready=false` is explicit.
+fn unready_causes(statuses: &[diag::HookStatus]) -> Vec<String> {
+    let mut causes = Vec::new();
+
+    for name in ESSENTIAL.iter().chain(PROCESS.iter()) {
+        for status in statuses.iter().filter(|status| status.name == *name) {
+            if let Some(cause) = status.inactive_cause() {
+                causes.push(format!("essential hook {name} {cause}"));
+            }
+        }
+    }
+
+    causes
+}
+
+/// Appends the readiness causes to the session report's warnings, under the install's diagnostic guard. The report is
+/// written before the gate is evaluated, so its warnings cannot include this otherwise. Any failure is best-effort:
+/// diagnostics must never stop the game.
+fn warn_unready(statuses: &[diag::HookStatus]) {
+    let causes = unready_causes(statuses);
+    if causes.is_empty() {
+        return;
+    }
+    log(&format!("overlay not ready: {}", causes.join("; ")));
+
+    let Some(path) = &diag::settings().session else {
+        return;
+    };
+    let Ok(text) = std::fs::read_to_string(path) else {
+        return;
+    };
+    let Ok(mut report) = serde_json::from_str::<serde_json::Value>(&text) else {
+        return;
+    };
+    let Some(warnings) = report
+        .get_mut("warnings")
+        .and_then(serde_json::Value::as_array_mut)
+    else {
+        return;
+    };
+    warnings.extend(causes.into_iter().map(serde_json::Value::String));
+    if let Ok(text) = serde_json::to_string(&report) {
+        let _ = std::fs::write(path, text);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn an_unready_overlay_names_essential_hooks_that_were_disabled_or_failed() {
+        let mut disabled = diag::HookStatus::created("create_file");
+        disabled.mark_disabled();
+        let failed = diag::HookStatus::failed("nt_open_file", "no export".into());
+        let mut optional = diag::HookStatus::created("get_file_information");
+        optional.mark_disabled();
+        let causes = unready_causes(&[disabled, failed, optional]);
+
+        assert_eq!(causes.len(), 2, "{causes:?}");
+        assert!(causes[0].contains("create_file"), "{causes:?}");
+        assert!(causes[1].contains("nt_open_file"), "{causes:?}");
     }
 }

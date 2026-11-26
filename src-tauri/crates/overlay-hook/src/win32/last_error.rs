@@ -46,4 +46,42 @@ mod tests {
         // SAFETY: same as above.
         assert_eq!(unsafe { GetLastError() }, 1234);
     }
+
+    #[test]
+    fn an_outer_guard_restores_the_error_after_an_inner_scope_and_a_later_change() {
+        // SAFETY: the test runs on its own thread, and it sets only that thread's error.
+        unsafe { SetLastError(1111) };
+        {
+            let outer = PreserveLastError::capture();
+            {
+                let inner = PreserveLastError::capture();
+                // SAFETY: same as above.
+                unsafe { SetLastError(2222) };
+                drop(inner);
+            }
+            // SAFETY: same as above; this stands for the whiteout write after the original call.
+            unsafe { SetLastError(3333) };
+            drop(outer);
+        }
+        // SAFETY: same as above.
+        assert_eq!(unsafe { GetLastError() }, 1111);
+    }
+
+    #[test]
+    fn a_guard_taken_only_for_the_whiteout_restores_the_incoming_error() {
+        // SAFETY: the test runs on its own thread, and it sets only that thread's error.
+        unsafe { SetLastError(4444) };
+        {
+            // The lower-only delete has no original call to preserve: the guard is taken just before the write.
+            let guard = PreserveLastError::capture();
+            // SAFETY: same as above; this stands for the whiteout journal I/O.
+            unsafe { SetLastError(5555) };
+            drop(guard);
+        }
+        // SAFETY: same as above.
+        assert_eq!(unsafe { GetLastError() }, 4444);
+        // SAFETY: a failure reported after the guard is gone sets its own error.
+        unsafe { SetLastError(6666) };
+        assert_eq!(unsafe { GetLastError() }, 6666);
+    }
 }

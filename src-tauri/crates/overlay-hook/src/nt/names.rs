@@ -5,7 +5,7 @@ use std::ffi::c_void;
 use std::os::windows::ffi::OsStrExt;
 use std::path::Path;
 
-use windows_sys::Win32::Foundation::STATUS_ACCESS_DENIED;
+use windows_sys::Win32::Foundation::{STATUS_ACCESS_DENIED, STATUS_NAME_TOO_LONG};
 
 use crate::handles;
 use crate::paths::{
@@ -194,7 +194,7 @@ pub(super) unsafe fn redirect_nt(
         Target::Layer { path } => Redirected::Layer {
             name: nt_name_units(&path),
         },
-        // `redirect_relative` passes `same_root = false`, so this variant is not produced for NT names.
+        // `redirect_relative_on` passes `same_root = false`, so this variant is not produced for NT names.
         Target::Same => Redirected::Same,
     }))
 }
@@ -248,7 +248,7 @@ pub(super) unsafe fn call_redirected(
 ) -> i32 {
     match redirected {
         Some(Ok(Redirected::Layer { name })) => unsafe { call_moved(attributes, &name, call) },
-        // A root read from the NT path keeps the original attributes; `redirect_relative` does not produce this for NT
+        // A root read from the NT path keeps the original attributes; `redirect_relative_on` does not produce this for NT
         // names today, but passing the call through is the safe behavior if it ever does.
         Some(Ok(Redirected::Same)) | None => call(attributes),
         Some(Err(failure)) => failure.status(),
@@ -270,9 +270,9 @@ unsafe fn call_moved(
         .checked_mul(2)
         .and_then(|bytes| u16::try_from(bytes).ok())
     else {
-        // A name too long for a `UNICODE_STRING` byte count must not be truncated into a different file; pass the
-        // program's own attributes through to the original call instead.
-        return call(attributes);
+        // The redirected name is inside a mount. Passing the program's own attributes through would write to the game
+        // folder, so a name that cannot be counted in a `UNICODE_STRING` must fail instead of failing open.
+        return STATUS_NAME_TOO_LONG;
     };
     let unicode = UnicodeString {
         length: bytes,
@@ -320,5 +320,27 @@ mod tests {
             nt_name_units(Path::new("C:\\x")),
             "\\??\\C:\\x".encode_utf16().collect::<Vec<u16>>()
         );
+    }
+
+    #[test]
+    fn a_redirected_name_too_long_for_a_unicode_string_is_refused() {
+        let attributes = ObjectAttributes {
+            length: 0,
+            root_directory: std::ptr::null_mut(),
+            object_name: std::ptr::null(),
+            attributes: 0,
+            security_descriptor: std::ptr::null_mut(),
+            security_qos: std::ptr::null_mut(),
+        };
+        let name = vec![u16::from(b'a'); u16::MAX as usize / 2 + 1];
+        let mut called = false;
+        let status = unsafe {
+            call_moved(&attributes, &name, |_| {
+                called = true;
+                0
+            })
+        };
+        assert_eq!(status, STATUS_NAME_TOO_LONG);
+        assert!(!called, "the original call would write to the game folder");
     }
 }

@@ -4,12 +4,13 @@ Switches are read once at install, never per call:
 
 - `GOBBO_OVERLAY_LOG` - a path, or `off`/empty. Dev default: the developer folder. Writes decisions and errors, not one
   line per call.
-- `GOBBO_OVERLAY_CALLS` - any non-empty value except `off`. Adds one line per hooked call and result, and the detailed
-  count report. Off by default: the stack walk and the line per call are too expensive for normal play.
+- `GOBBO_OVERLAY_CALLS` - any non-empty value except `off`. Adds one line per hooked call and result and counts them.
+  The detailed count report needs `GOBBO_OVERLAY_DIAG` too. Off by default: the stack walk and the line per call are
+  too expensive for normal play.
 - `GOBBO_OVERLAY_PASS` - any non-empty value except `off`. Traces writes, deletes and renames that pass through because
   their path is outside every mount. Off by default: saves and settings are expected there.
-- `GOBBO_OVERLAY_DIAG` - a path, or `off`/empty. Dev default: the developer folder. The report exists only with
-  `GOBBO_OVERLAY_CALLS`.
+- `GOBBO_OVERLAY_DIAG` - a path, or `off`/empty. Dev default: the developer folder. Names the detailed count report. The
+  report needs `GOBBO_OVERLAY_CALLS` to count the calls.
 - `GOBBO_OVERLAY_CRASH` - a path, or `off`/empty. Dev default: the developer folder. A text report is written for a
   panic or for an opt-in first-chance exception; an unhandled exception writes the dump and the decision ring.
 - `GOBBO_OVERLAY_CRASH_FIRST` - any non-empty value except `off`: also report first-chance exceptions with a vectored
@@ -44,7 +45,8 @@ records (4096 per process); the writer appends the record and then the header in
 a lock. The app merges the files of all processes by time and shows the newest ones in the game console. The ring records
 writes, copy-ups, whiteouts, missing write targets, refusals and merged NT directory listings by default; pass-through
 writes are added only with `GOBBO_OVERLAY_PASS`, because the pass-through budget forbids the ring's lock and I/O there.
-The session report is `session.json`; the crash report is a minidump written by Gobbo from a `minidumper` client message.
+The session report is `session.json`; the crash report is a text file. The out-of-process dump is a minidump written by
+Gobbo from a `minidumper` client message.
 The hook never symbolizes stacks in-process. The report adds `injection` (`early`) and the launcher records how many
 static import descriptors it rewrote; a rewrite failure stops the launch and is reported with the process exit code.
 `dbghelp.dll` is not in the hook's import table: the in-process dump loads it lazily from `System32` only on a crash.
@@ -60,15 +62,17 @@ deviation records; do not restructure either lock without moving its record firs
 
 - The decision ring (`RING` in `diag/ring.rs`) is held across `Ring::record`, which writes the record and the index
   file. The path text is built before the lock is taken, so no formatting runs under it.
-- The trace file (`TRACE_FILE` in `diag/writer.rs`) is held across `metadata`, `rename`, `open` and `write_all` during a
-  rotation, so a batch cannot interleave with the rename of the file it is writing.
+- The trace file (`TRACE_FILE` in `diag/writer.rs`) is held across `rename`, `open` and `write_all` during a rotation, so
+  a batch cannot interleave with the rename of the file it is writing. The rotation size comes from a byte counter next
+  to `TRACE_FILE`, not from `metadata()` on every batch; the file is measured once when it is opened.
 
 The crash path is special:
 
 - unhandled exceptions only by default; the text report covers a panic and the opt-in first-chance path
   (`GOBBO_OVERLAY_CRASH_FIRST`), while an unhandled crash writes the dump and the ring;
 - `GOBBO_OVERLAY_DUMP=1` or a path also writes an in-process DbgHelp minidump when no out-of-process monitor is connected;
-- the last-chance filter avoids loader APIs: module ranges are cached at install and `locate_cached` is used there;
+- module ranges are cached at install for `locate_cached`; the opt-in vectored first-chance handler uses it, not the
+  last-chance filter;
 - `EXCEPTION_CONTINUE_SEARCH` always;
 - `CRASHING` is set only after the report writer is ready;
 - the production path is an out-of-process `minidumper`/`minidump-writer` in Gobbo; the in-process dump is a dev aid.

@@ -2,7 +2,7 @@
 //! that keeps a write away from the game folder. Also the access masks that ask for a write.
 
 use rustc_hash::FxHashMap;
-use std::fs;
+use std::fs::{self, FileTimes};
 use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -17,12 +17,13 @@ use windows_sys::Win32::Foundation::{
     STATUS_OBJECT_NAME_NOT_FOUND, STATUS_OBJECT_PATH_NOT_FOUND, STATUS_UNSUCCESSFUL,
 };
 use windows_sys::Win32::Storage::FileSystem::{
-    DELETE, FILE_APPEND_DATA, FILE_WRITE_ATTRIBUTES, FILE_WRITE_DATA, FILE_WRITE_EA, WRITE_DAC,
-    WRITE_OWNER,
+    CREATE_NEW, DELETE, FILE_APPEND_DATA, FILE_WRITE_ATTRIBUTES, FILE_WRITE_DATA, FILE_WRITE_EA,
+    WRITE_DAC, WRITE_OWNER,
 };
 use windows_sys::Win32::System::SystemServices::{ACCESS_SYSTEM_SECURITY, MAXIMUM_ALLOWED};
 
 use super::disk::{exists, make_parent};
+use super::parent_rel;
 use super::probe::{Missing, Probe, probe_child};
 use crate::diag::{decision_layer, record_decision};
 use crate::state::Mount;
@@ -125,6 +126,7 @@ pub(crate) unsafe fn redirect_opened(
     name: *const u16,
     writing: bool,
     keeps_contents: bool,
+    disposition: u32,
 ) -> Option<Result<Redirected, Failure>> {
     let place = unsafe { super::place(name) }?;
     Some(
@@ -134,6 +136,7 @@ pub(crate) unsafe fn redirect_opened(
             writing,
             keeps_contents,
             place.mount.guest_is_root(),
+            disposition,
         )
         .map(|target| match target {
             Target::Same => Redirected::Same,
@@ -153,24 +156,39 @@ pub(crate) fn redirect_relative_on(
     writing: bool,
     keeps_contents: bool,
 ) -> Result<Target, Failure> {
-    resolve(mount, rel, writing, keeps_contents, false)
+    // The NT layer has no Win32 creation disposition; a `CREATE_NEW`-style refusal is its own caller's rule.
+    resolve(mount, rel, writing, keeps_contents, false, 0)
+}
+
+/// Whether a `CREATE_NEW` open must refuse a name the write probes already showed. Upper and lower answers are passed
+/// in separately so this stays a pure decision: a name shown by any layer is taken, and nothing is copied first.
+fn create_new_taken(create_new: bool, upper_found: bool, lower_visible: bool) -> bool {
+    create_new && (upper_found || lower_visible)
 }
 
 /// The file a game-relative path means for a call. A write goes to the upper copy, made first when the program keeps the
 /// old contents. A read goes to the top-most layer that shows the file. A read that no layer shows is `Missing`.
-/// `same_root` lets a Win32 read keep the caller's pointer when the game folder is the top-most layer.
+/// `same_root` lets a Win32 read keep the caller's pointer when the game folder is the top-most layer. `disposition`
+/// carries `CREATE_NEW` into this single resolution, so an existing name is refused without a second classification or
+/// a separate visible probe.
 fn resolve(
     mount: &Mount,
     rel: &str,
     writing: bool,
     keeps_contents: bool,
     same_root: bool,
+    disposition: u32,
 ) -> Result<Target, Failure> {
     if writing {
+        let create_new = disposition == CREATE_NEW;
         // A write that already has an upper copy does not need the logical-parent check: the upper file cannot exist
         // without its folder, and the copy-up has nothing to do. This is the steady state for a game that rewrites its
         // own save or config; it saves one probe and one `create_dir_all` on every such open.
-        match probe_child(&mount.upper, rel) {
+        let upper = probe_child(&mount.upper, rel);
+        if create_new_taken(create_new, upper.is_found(), false) {
+            return Err(Failure::Denied(ERROR_FILE_EXISTS));
+        }
+        match upper {
             Probe::Found { .. } => {
                 let path = mount.write_target(rel);
                 record_decision(Kind::Write, DecisionLayer::Upper, 0, || {
@@ -187,12 +205,13 @@ fn resolve(
             }
             Probe::Missing(_) => {}
         }
-        // One visible probe answers the copy source, the spelling of the new copy and, when it finds a file, the parent
-        // check: a visible file cannot have a hidden or missing parent. A truncating write needs no copy, but its new
-        // copy still takes the spelling of a lower file, so the probe runs for it too; a refused probe then does not stop
-        // the write, as it did not before.
-        let visible = match probe_visible(mount, rel) {
-            Ok(shown) => shown,
+        // The upper probe above is handed to the layer walk, which would otherwise ask the upper layer the same
+        // question again. One visible probe answers the copy source, the spelling of the new copy and, when it finds a
+        // file, the parent check: a visible file cannot have a hidden or missing parent. A truncating write needs no
+        // copy, but its new copy still takes the spelling of a lower file, so the probe runs for it too; a refused probe
+        // then does not stop the write, as it did not before.
+        let visible = match visible_with_upper(mount, rel, Some(upper)) {
+            Ok((shown, _)) => shown,
             Err(_) if !keeps_contents => None,
             Err(code) => {
                 record_decision(Kind::Refuse, DecisionLayer::None, code, || {
@@ -201,6 +220,9 @@ fn resolve(
                 return Err(Failure::Denied(code));
             }
         };
+        if create_new_taken(create_new, false, visible.is_some()) {
+            return Err(Failure::Denied(ERROR_FILE_EXISTS));
+        }
         let path = match prepare_write_target(mount, rel, visible.is_some()) {
             Ok(target) => spelled_like(target, visible.as_ref()),
             Err(TargetFailure::Parent(failure)) => {
@@ -228,14 +250,22 @@ fn resolve(
         trace(|| format!("write {rel} keeps={keeps_contents} -> {}", path.display()));
         return Ok(Target::Layer { path });
     }
-    match probe_visible_layer(mount, rel, true) {
-        Ok(ShownLayer::Found {
+    let shown = match probe_visible_layer(mount, rel, true, None) {
+        Ok((shown, _)) => shown,
+        Err(code) => {
+            // A refused attribute query is reported as Windows reports it, not as a missing file.
+            trace(|| format!("read {rel} refused {code}"));
+            return Err(Failure::Denied(code));
+        }
+    };
+    match shown {
+        ShownLayer::Found {
             layer: Layer::Root, ..
-        }) if same_root => {
+        } if same_root => {
             trace(|| format!("read {rel} stays in the game folder"));
             Ok(Target::Same)
         }
-        Ok(ShownLayer::Found { layer, .. }) => {
+        ShownLayer::Found { layer, .. } => {
             let Some(base) = mount.base(layer) else {
                 return Err(Failure::Denied(ERROR_ACCESS_DENIED));
             };
@@ -243,10 +273,10 @@ fn resolve(
             trace(|| format!("read {rel} -> {} from {layer:?}", path.display()));
             Ok(Target::Layer { path })
         }
-        Ok(ShownLayer::Missing {
+        ShownLayer::Missing {
             reason,
             lower_checked,
-        }) => {
+        } => {
             // Every layer that a whiteout does not skip was already asked, and each attribute query told whether the
             // file or one of its folders is missing. Only a whiteout-hidden path still needs the parent query, because
             // it skipped the lower layers where that parent may live. A missing read is a routine probe, not a
@@ -259,11 +289,6 @@ fn resolve(
             trace(|| format!("read {rel} missing {missing:?}"));
             Err(missing.into())
         }
-        Err(code) => {
-            // A refused attribute query is reported as Windows reports it, not as a missing file.
-            trace(|| format!("read {rel} refused {code}"));
-            Err(Failure::Denied(code))
-        }
     }
 }
 
@@ -273,21 +298,32 @@ enum TargetFailure {
     Folder(Failure),
 }
 
+/// Whether `make_parent` still has to ask the disk. `None` means nobody probed the parent, so it must; a `Found`
+/// answer from the upper layer means the folder is already there and `exists` would only repeat that query.
+fn make_parent_needed(upper_parent: Option<Probe>) -> bool {
+    !upper_parent.is_some_and(Probe::is_found)
+}
+
 /// The write rule: check the logical parent, resolve the upper target, make its folder. `parent_checked` skips the
-/// query when a visible file already proved the parent exists.
+/// query when a visible file already proved the parent exists. The parent probe taken by `check_parent` is carried
+/// into `make_parent`, so a cold write pays one query per parent layer instead of two for the upper one.
 fn prepare_write_target(
     mount: &Mount,
     rel: &str,
     parent_checked: bool,
 ) -> Result<PathBuf, TargetFailure> {
-    if !parent_checked {
-        check_parent(mount, rel).map_err(TargetFailure::Parent)?;
-    }
+    let upper_parent = if parent_checked {
+        None
+    } else {
+        Some(check_parent(mount, rel).map_err(TargetFailure::Parent)?)
+    };
 
     let target = mount.write_target(rel);
-    make_parent(&target)
-        .map_err(Failure::Io)
-        .map_err(TargetFailure::Folder)?;
+    if make_parent_needed(upper_parent) {
+        make_parent(&target)
+            .map_err(Failure::Io)
+            .map_err(TargetFailure::Folder)?;
+    }
     Ok(target)
 }
 
@@ -299,18 +335,16 @@ pub(crate) fn make_write_target(mount: &Mount, rel: &str) -> Result<PathBuf, Fai
     })
 }
 
-/// The game-relative folder that holds `rel`; the game folder itself is `""`.
-fn parent_rel(rel: &str) -> &str {
-    rel.rsplit_once('\\').map_or("", |(folder, _)| folder)
-}
-
 /// Whether the folder that holds `rel` is a visible directory. The hook must check this before it creates any folder in
-/// the upper layer: Windows fails a write into a missing folder, and the overlay must do the same.
-pub(crate) fn check_parent(mount: &Mount, rel: &str) -> Result<(), Failure> {
-    match probe_visible(mount, parent_rel(rel)) {
-        Ok(Some((_, _, attributes))) if attributes & FILE_ATTRIBUTE_DIRECTORY != 0 => Ok(()),
-        Ok(_) => Err(Missing::Folder.into()),
-        Err(code) => Err(Failure::Denied(code)),
+/// the upper layer: Windows fails a write into a missing folder, and the overlay must do the same. The returned probe
+/// is the upper layer's answer about that folder, so the caller need not ask again when it makes the folder.
+pub(crate) fn check_parent(mount: &Mount, rel: &str) -> Result<Probe, Failure> {
+    let (visible, upper) =
+        visible_with_upper(mount, parent_rel(rel), None).map_err(Failure::Denied)?;
+    if visible.is_some_and(|(_, _, attributes)| attributes & FILE_ATTRIBUTE_DIRECTORY != 0) {
+        Ok(upper)
+    } else {
+        Err(Missing::Folder.into())
     }
 }
 
@@ -347,18 +381,33 @@ pub(crate) fn shown(mount: &Mount, rel: &str) -> Result<Option<(Layer, PathBuf, 
     probe_visible(mount, rel).map_err(Failure::Denied)
 }
 
+/// The top-most visible layer of a path, with its full path and attributes.
+type Visible = Option<(Layer, PathBuf, u32)>;
+
 /// The top-most layer where the path is visible, with its attributes. An access refusal is returned, so a write can fail
 /// with the code Windows gave instead of pretending the path is missing.
-fn probe_visible(mount: &Mount, rel: &str) -> Result<Option<(Layer, PathBuf, u32)>, u32> {
-    match probe_visible_layer(mount, rel, false)? {
+fn probe_visible(mount: &Mount, rel: &str) -> Result<Visible, u32> {
+    visible_with_upper(mount, rel, None).map(|(shown, _)| shown)
+}
+
+/// `probe_visible` with the upper layer's answer the caller already has, returned alongside the visible layer. The
+/// caller that probed upper before deciding to write must not pay for a second `GetFileAttributesW` on it.
+fn visible_with_upper(
+    mount: &Mount,
+    rel: &str,
+    known_upper: Option<Probe>,
+) -> Result<(Visible, Probe), u32> {
+    let (shown, upper) = probe_visible_layer(mount, rel, false, known_upper)?;
+    let visible = match shown {
         ShownLayer::Found { layer, attributes } => {
             let Some(base) = mount.base(layer) else {
                 return Err(ERROR_ACCESS_DENIED);
             };
-            Ok(Some((layer, join(base, rel), attributes)))
+            Some((layer, join(base, rel), attributes))
         }
-        ShownLayer::Missing { .. } => Ok(None),
-    }
+        ShownLayer::Missing { .. } => None,
+    };
+    Ok((visible, upper))
 }
 
 /// The answer of the layer loop: the top-most layer that shows the path, or the reason the path is missing. A missing
@@ -374,13 +423,27 @@ enum ShownLayer {
     },
 }
 
-/// The top-most layer that shows `rel`, without building a `PathBuf` for it. A read that stays in the game folder does
-/// not need the path at all, and a missing path must not pay for one per layer. `with_reason` asks for the exact
-/// `Missing` variant when no layer shows the path; a caller that only needs "missing" passes false and pays no extra
-/// query.
-fn probe_visible_layer(mount: &Mount, rel: &str, with_reason: bool) -> Result<ShownLayer, u32> {
+/// The probe a layer can reuse from the caller. Only the upper layer can have been asked already: the write path probes
+/// it before it decides to write, and asking again in the layer walk would double the upper query on every cold write.
+fn probe_for_layer(layer: Layer, known_upper: Option<Probe>) -> Option<Probe> {
+    (layer == Layer::Upper).then_some(known_upper).flatten()
+}
+
+/// The top-most layer that shows `rel`, plus the upper layer's probe, without building a `PathBuf` for it. A read that
+/// stays in the game folder does not need the path at all, and a missing path must not pay for one per layer.
+/// `with_reason` asks for the exact `Missing` variant when no layer shows the path; a caller that only needs "missing"
+/// passes false and pays no extra query. `known_upper` is the write path's first probe of the same path.
+fn probe_visible_layer(
+    mount: &Mount,
+    rel: &str,
+    with_reason: bool,
+    known_upper: Option<Probe>,
+) -> Result<(ShownLayer, Probe), u32> {
     mount.with_whiteouts(|whiteouts| {
         let hidden = whiteouts.hides(rel);
+        // The upper folder is always part of the walk, whiteout or not, so its answer is taken once here and shared
+        // with the caller and the write path. A path too long for the stack buffer still takes the allocating probe.
+        let upper_probe = known_upper.unwrap_or_else(|| probe_child(&mount.upper, rel));
         // A layer whose query says the parent exists (`Missing::File`) makes the logical parent visible, unless a
         // higher layer has a non-directory at that parent and shadows it. That higher entry is the one case where the
         // parent still has to be asked; the layers above `first_file` are checked once the loop is done.
@@ -390,9 +453,11 @@ fn probe_visible_layer(mount: &Mount, rel: &str, with_reason: bool) -> Result<Sh
             if layer != Layer::Upper && hidden {
                 continue;
             }
-            match probe_child(base, rel) {
+            let probe =
+                probe_for_layer(layer, Some(upper_probe)).unwrap_or_else(|| probe_child(base, rel));
+            match probe {
                 Probe::Found { attributes } => {
-                    return Ok(ShownLayer::Found { layer, attributes });
+                    return Ok((ShownLayer::Found { layer, attributes }, upper_probe));
                 }
                 Probe::Denied(code) => return Err(code),
                 Probe::Missing(missing) => {
@@ -405,10 +470,13 @@ fn probe_visible_layer(mount: &Mount, rel: &str, with_reason: bool) -> Result<Sh
         }
         // A whiteout hid the lower layers; their parent may still decide whether the file or the folder is missing.
         if hidden {
-            return Ok(ShownLayer::Missing {
-                reason: Missing::Folder,
-                lower_checked: false,
-            });
+            return Ok((
+                ShownLayer::Missing {
+                    reason: Missing::Folder,
+                    lower_checked: false,
+                },
+                upper_probe,
+            ));
         }
         if with_reason && let Some(layer) = first_file {
             for (higher, higher_base) in mount.layer_paths() {
@@ -419,20 +487,26 @@ fn probe_visible_layer(mount: &Mount, rel: &str, with_reason: bool) -> Result<Sh
                     // A directory here would have made the child query say `Missing::File`; any entry is a shadowing
                     // non-directory, so the merged path is missing a folder.
                     Probe::Found { .. } => {
-                        return Ok(ShownLayer::Missing {
-                            reason: Missing::Folder,
-                            lower_checked: true,
-                        });
+                        return Ok((
+                            ShownLayer::Missing {
+                                reason: Missing::Folder,
+                                lower_checked: true,
+                            },
+                            upper_probe,
+                        ));
                     }
                     Probe::Denied(code) => return Err(code),
                     Probe::Missing(_) => {}
                 }
             }
         }
-        Ok(ShownLayer::Missing {
-            reason,
-            lower_checked: true,
-        })
+        Ok((
+            ShownLayer::Missing {
+                reason,
+                lower_checked: true,
+            },
+            upper_probe,
+        ))
     })
 }
 
@@ -525,6 +599,10 @@ pub(crate) fn copy_up(
 /// `copy_up` with the visible file already probed by the write path. The probe is the expensive part on a cold layer;
 /// the caller that found a lower file also knows its parent exists, so it does not ask again. The target's folder is
 /// the caller's to make: `prepare_write_target` on the write path, `copy_up` for a move or replace source.
+/// Remaining gap: the `create_new` fallback below restores attributes and timestamps, but not alternate data streams
+/// or a full security descriptor. `fs::copy` (`CopyFileExW`) carries those on the hard-link path; a volume that cannot
+/// hard-link still loses them. Keeping that gap is safer than opening the destination for more access than the write
+/// the game asked for.
 fn copy_up_shown(
     rel: &str,
     target: &Path,
@@ -593,6 +671,28 @@ fn temporary_path(target: &Path) -> PathBuf {
     target.with_file_name(copy_temp_name(std::process::id(), sequence))
 }
 
+/// Copies the attributes and timestamps from a completed temporary copy onto the destination of a fallback copy.
+/// `fs::copy` already put the lower file's metadata on the temporary file; a byte copy into a new file does not. Both
+/// writes are best effort: a volume that refuses one must not turn a successful copy into a failed game write.
+fn copy_metadata(source: &fs::File, destination: &fs::File) {
+    let Ok(metadata) = source.metadata() else {
+        return;
+    };
+    // Set the times before the permissions: a read-only attribute can stop a later timestamp write.
+    if let (Ok(accessed), Ok(modified)) = (metadata.accessed(), metadata.modified())
+        && let Err(error) = destination.set_times(
+            FileTimes::new()
+                .set_accessed(accessed)
+                .set_modified(modified),
+        )
+    {
+        trace(|| format!("could not copy the timestamps of a copy-up: {error}"));
+    }
+    if let Err(error) = destination.set_permissions(metadata.permissions()) {
+        trace(|| format!("could not copy the attributes of a copy-up: {error}"));
+    }
+}
+
 /// Gives the completed temporary copy the target name without replacing a file that another thread or process created
 /// first. A hard link is atomic and keeps the metadata of the copy; a volume without hard links falls back to a
 /// `create_new` copy, which still never replaces an existing target.
@@ -616,6 +716,7 @@ fn publish_copy(temporary: &Path, target: &Path) -> io::Result<()> {
                 let _ = fs::remove_file(target);
                 return Err(error);
             }
+            copy_metadata(&source, &destination);
             Ok(())
         }
     }
@@ -701,16 +802,16 @@ mod tests {
         fs::write(staging.join("mod.txt"), "mod").unwrap();
 
         assert!(matches!(
-            resolve(&mount, "root.txt", false, true, true),
+            resolve(&mount, "root.txt", false, true, true, 0),
             Ok(Target::Same)
         ));
         assert!(matches!(
-            resolve(&mount, "mod.txt", false, true, true),
+            resolve(&mount, "mod.txt", false, true, true, 0),
             Ok(Target::Layer { .. })
         ));
         // The NT path passes `same_root = false`, so even a root read gets an absolute name.
         assert!(matches!(
-            resolve(&mount, "root.txt", false, true, false),
+            resolve(&mount, "root.txt", false, true, false, 0),
             Ok(Target::Layer { .. })
         ));
         fs::remove_dir_all(&base).unwrap();
@@ -728,10 +829,10 @@ mod tests {
         fs::create_dir_all(mount.root.join("existing")).unwrap();
 
         // The folder exists in the root layer, so the file is missing rather than its path.
-        let file = resolve(&mount, r"existing\missing.txt", false, true, false);
+        let file = resolve(&mount, r"existing\missing.txt", false, true, false, 0);
         assert!(matches!(file, Err(Failure::Missing(Missing::File))));
         // The folder is missing in every layer, so the path is the missing part.
-        let folder = resolve(&mount, r"absent\missing.txt", false, true, false);
+        let folder = resolve(&mount, r"absent\missing.txt", false, true, false, 0);
         assert!(matches!(folder, Err(Failure::Missing(Missing::Folder))));
         fs::remove_dir_all(&base).unwrap();
     }
@@ -749,7 +850,7 @@ mod tests {
         // so a child below it is missing its folder, not just the file.
         fs::write(mount.upper.join("shadow"), b"file").unwrap();
 
-        let missing = resolve(&mount, r"shadow\file.txt", false, true, false);
+        let missing = resolve(&mount, r"shadow\file.txt", false, true, false, 0);
         assert!(matches!(missing, Err(Failure::Missing(Missing::Folder))));
         fs::remove_dir_all(&base).unwrap();
     }
@@ -804,5 +905,114 @@ mod tests {
             true
         }));
         assert!(!asked);
+    }
+
+    #[test]
+    fn an_upper_probe_is_reused_only_for_the_upper_layer() {
+        let probe = Probe::Missing(Missing::File);
+        assert_eq!(probe_for_layer(Layer::Upper, Some(probe)), Some(probe));
+        assert_eq!(probe_for_layer(Layer::Staging, Some(probe)), None);
+        assert_eq!(probe_for_layer(Layer::Root, Some(probe)), None);
+        assert_eq!(probe_for_layer(Layer::Upper, None), None);
+    }
+
+    #[test]
+    fn a_known_upper_answer_is_used_without_a_second_query() {
+        let base = std::env::temp_dir().join(format!("gobbo-target-upper-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&base);
+        let mount = mount(&base);
+        fs::create_dir_all(&mount.upper).unwrap();
+        fs::create_dir_all(&mount.root).unwrap();
+        let known = probe_child(&mount.upper, "a.txt");
+        assert_eq!(known, Probe::Missing(Missing::File));
+        fs::write(mount.root.join("a.txt"), b"lower").unwrap();
+        // An upper file appears after the caller probed. The layer walk must use the caller's answer, so the file it
+        // reports is still the lower one, and the returned probe is exactly the one it was given.
+        fs::write(mount.upper.join("a.txt"), b"upper").unwrap();
+        let (visible, upper) = visible_with_upper(&mount, "a.txt", Some(known)).unwrap();
+        assert_eq!(upper, known);
+        assert!(matches!(visible, Some((Layer::Root, _, _))), "{visible:?}");
+        fs::remove_dir_all(&base).unwrap();
+    }
+
+    #[test]
+    fn make_parent_is_skipped_only_when_the_upper_parent_already_exists() {
+        assert!(make_parent_needed(None));
+        assert!(make_parent_needed(Some(Probe::Missing(Missing::File))));
+        assert!(make_parent_needed(Some(Probe::Missing(Missing::Folder))));
+        assert!(make_parent_needed(Some(Probe::Denied(ERROR_ACCESS_DENIED))));
+        assert!(!make_parent_needed(Some(Probe::Found {
+            attributes: FILE_ATTRIBUTE_DIRECTORY
+        })));
+        // A found file is still an existing path, as `exists` would report it.
+        assert!(!make_parent_needed(Some(Probe::Found { attributes: 0 })));
+    }
+
+    #[test]
+    fn a_create_new_name_is_taken_when_the_probes_show_it() {
+        assert!(!create_new_taken(false, true, true));
+        assert!(!create_new_taken(true, false, false));
+        assert!(create_new_taken(true, true, false));
+        assert!(create_new_taken(true, false, true));
+    }
+
+    #[test]
+    fn a_create_new_over_a_visible_file_refuses_before_making_the_upper_folder() {
+        let base = std::env::temp_dir().join(format!("gobbo-target-new-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&base);
+        let mount = mount(&base);
+        fs::create_dir_all(&mount.root).unwrap();
+        fs::write(mount.root.join("lower.txt"), b"lower").unwrap();
+
+        let lower = resolve(&mount, "lower.txt", true, true, false, CREATE_NEW);
+        assert_eq!(
+            lower.err().map(|failure| failure.win32()),
+            Some(ERROR_FILE_EXISTS)
+        );
+        assert!(!mount.upper.exists());
+
+        fs::create_dir_all(&mount.upper).unwrap();
+        fs::write(mount.upper.join("upper.txt"), b"upper").unwrap();
+        let upper = resolve(&mount, "upper.txt", true, true, false, CREATE_NEW);
+        assert_eq!(
+            upper.err().map(|failure| failure.win32()),
+            Some(ERROR_FILE_EXISTS)
+        );
+        assert_eq!(
+            fs::read_to_string(mount.upper.join("upper.txt")).unwrap(),
+            "upper"
+        );
+        fs::remove_dir_all(&base).unwrap();
+    }
+
+    #[test]
+    fn a_fallback_copy_keeps_the_modified_time() {
+        let base = std::env::temp_dir().join(format!("gobbo-target-meta-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&base);
+        fs::create_dir_all(&base).unwrap();
+        let from = base.join("temporary.bin");
+        let to = base.join("target.bin");
+        fs::write(&from, b"data").unwrap();
+        let older = std::time::SystemTime::now() - std::time::Duration::from_secs(3600);
+        let writable = fs::OpenOptions::new().write(true).open(&from).unwrap();
+        writable
+            .set_times(FileTimes::new().set_modified(older))
+            .unwrap();
+        drop(writable);
+
+        let source = fs::File::open(&from).unwrap();
+        let destination = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&to)
+            .unwrap();
+        copy_metadata(&source, &destination);
+        drop(source);
+        drop(destination);
+
+        let expected = fs::metadata(&from).unwrap().modified().unwrap();
+        let copied = fs::metadata(&to).unwrap().modified().unwrap();
+        assert_eq!(copied, expected);
+        fs::remove_dir_all(&base).unwrap();
     }
 }

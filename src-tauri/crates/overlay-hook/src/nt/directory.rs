@@ -1,7 +1,7 @@
 //! `NtQueryDirectoryFile`: a directory listing through an open handle, merged from the three layers. The caller gets the
 //! same `FILE_*_INFORMATION` structures it would get from the original call for the six classes the formatter knows
-//! (`DIRECTORY`, `FULL`, `BOTH`, `NAMES`, `ID_FULL`, `ID_BOTH`); an unknown class is passed to the original call, one
-//! entry at a time, with the pattern and the restart flag applied.
+//! (`DIRECTORY`, `FULL`, `BOTH`, `NAMES`, `ID_FULL`, `ID_BOTH`); an unknown class is passed to the original call with the
+//! caller's pattern, single-entry and restart flags unchanged.
 //!
 //! The listing is a snapshot, as a real directory query is: the first call with `RestartScan` builds it, and the next
 //! calls continue from the entry after the last one returned. The state is keyed by the handle and its game-relative
@@ -37,7 +37,7 @@ use crate::types::UnicodeString;
 /// How many listings are kept. A program that opens many folders in a row must not grow the table without a bound.
 const MAX_LISTINGS: usize = 128;
 /// How many entries are pulled from the stream for one response at least. The caller's buffer usually takes fewer; the
-/// rest stay in this small batch for the next call.
+/// batch starts empty and grows only to what the caller actually asks for.
 const BATCH: usize = 64;
 /// The most entries one response pulls, so a large caller's buffer does not grow a listing without a bound.
 const MAX_BATCH: usize = 128;
@@ -58,9 +58,10 @@ struct Listing {
     layers: ListingLayers,
     /// The next entry of `layers.taken` to put into `batch`.
     next: usize,
+    /// Starts empty: a single-entry query allocates one entry, not a full `BATCH`. `fill_batch` grows it only to what
+    /// the caller's buffer asks for.
     batch: Vec<WIN32_FIND_DATAW>,
     batch_pos: usize,
-    used: u64,
 }
 
 impl Listing {
@@ -124,6 +125,21 @@ impl Listing {
     }
 }
 
+/// Answers one query under the listing's own lock. The table lock is already released here, so `fill_batch`'s
+/// `FindNextFileW` never runs while the process-wide table is held.
+fn respond_from(
+    listing: &Mutex<Listing>,
+    class: u32,
+    info: *mut c_void,
+    length: u32,
+    single: bool,
+) -> (i32, usize, usize) {
+    listing
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .respond(class, info, length, single)
+}
+
 /// Whether the whiteout snapshot a listing was built from is still the mount's current one. A change replaces the
 /// mount's `Arc`, so a pointer mismatch means the entries were built against the old visibility and must be rebuilt.
 fn snapshot_fresh(listing: &Listing) -> bool {
@@ -139,25 +155,49 @@ fn serves_cached(listing: &Listing, mount: &Mount, rel: &str, mask: &str) -> boo
         && snapshot_fresh(listing)
 }
 
-/// One handle in the listing table: a plain folder the original NT query serves, or a merged snapshot.
+/// One handle in the listing table: a plain folder the original NT query serves, or a merged snapshot. Each merged
+/// listing has its own mutex, so a root-layer disk read never runs under the process-wide table mutex.
 enum TableEntry {
-    Plain { raw: Vec<u16>, used: u64 },
-    // The merged listing is large; a box keeps the table entry small.
-    Merged(Box<Listing>),
+    Plain {
+        raw: Vec<u16>,
+        used: u64,
+    },
+    Merged {
+        listing: Arc<Mutex<Listing>>,
+        used: u64,
+    },
 }
 
-impl TableEntry {
-    fn used(&self) -> u64 {
-        match self {
-            Self::Plain { used, .. } => *used,
-            Self::Merged(listing) => listing.used,
-        }
-    }
-}
-
+// The table is correctness state — one live query cursor per handle — not a cache of file data: every merged listing
+// streams the root layer from disk. Its lock is held only for map, `used` and `Arc` operations: a per-listing mutex is
+// never waited on, and no `FindNextFileW` is ever called, while the table is held.
 static LISTINGS: LazyLock<Mutex<FxHashMap<usize, TableEntry>>> =
     LazyLock::new(|| Mutex::new(FxHashMap::default()));
 static USED: AtomicU64 = AtomicU64::new(0);
+
+/// The key to evict when the table is full: a plain handle (which has no live cursor) before a merged one, and the least
+/// recently used of the preferred kind. The choice is pure so it can be tested without real handles.
+fn eviction_key(listings: &FxHashMap<usize, TableEntry>) -> Option<usize> {
+    listings
+        .iter()
+        .min_by_key(|(_, entry)| match entry {
+            TableEntry::Plain { used, .. } => (0, *used),
+            TableEntry::Merged { used, .. } => (1, *used),
+        })
+        .map(|(key, _)| *key)
+}
+
+/// Inserts an entry. A new key at the cap evicts one existing entry; replacing an existing key keeps every other entry,
+/// so a restart or a reused handle rebuilds its own cursor without disturbing another enumeration.
+fn insert_listing(listings: &mut FxHashMap<usize, TableEntry>, key: usize, entry: TableEntry) {
+    if !listings.contains_key(&key)
+        && listings.len() >= MAX_LISTINGS
+        && let Some(victim) = eviction_key(listings)
+    {
+        listings.remove(&victim);
+    }
+    listings.insert(key, entry);
+}
 
 /// `NtQueryDirectoryFile`: a listing of a folder of the game, merged from the layers.
 ///
@@ -367,26 +407,39 @@ unsafe fn query(
         // The handle still names the folder the listing was built from: continue the snapshot without resolving the
         // path to a `String` or probing the layers again. A real directory query is a snapshot too; the visibility
         // check belongs to the build, and a handle reused for another folder has another final path and rebuilds.
-        crate::stat_lock();
-        let mut listings = LISTINGS.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut merged = None;
+        {
+            // The table lock covers only map, `used` and `Arc` work. It is released before any per-listing lock is
+            // waited on, so a `FindNextFileW` inside a response can never run under it.
+            crate::stat_lock();
+            let mut listings = LISTINGS.lock().unwrap_or_else(PoisonError::into_inner);
 
-        if let Some(entry) = listings.get_mut(&(handle as usize)) {
-            match entry {
-                TableEntry::Plain { raw: stored, used } if stored.as_slice() == raw => {
-                    *used = stamp;
-                    return None;
-                }
+            if let Some(entry) = listings.get_mut(&(handle as usize)) {
+                match entry {
+                    TableEntry::Plain { raw: stored, used } if stored.as_slice() == raw => {
+                        *used = stamp;
+                        return None;
+                    }
 
-                TableEntry::Merged(listing)
-                    if listing.matches(raw) && listing.mask == mask && snapshot_fresh(listing) =>
-                {
-                    listing.used = stamp;
-                    let (status, bytes, _) = listing.respond(class, info, length, single != 0);
-                    write_iosb(iosb, status, bytes);
-                    return Some(status);
+                    TableEntry::Merged { listing, used } => {
+                        *used = stamp;
+                        merged = Some(Arc::clone(listing));
+                    }
+                    _ => {}
                 }
-                _ => {}
             }
+        }
+
+        if let Some(listing) = merged {
+            // The table is unlocked here. This lock may be held by another thread's `respond`, so waiting on it must
+            // not happen while the table is held.
+            let mut view = listing.lock().unwrap_or_else(PoisonError::into_inner);
+            if view.matches(raw) && view.mask == mask && snapshot_fresh(&view) {
+                let (status, bytes, _) = view.respond(class, info, length, single != 0);
+                write_iosb(iosb, status, bytes);
+                return Some(status);
+            }
+            // A stale snapshot falls through to the rebuild below, with the table already unlocked.
         }
     }
 
@@ -429,12 +482,8 @@ unsafe fn query(
         crate::stat_lock();
         let mut listings = LISTINGS.lock().unwrap_or_else(PoisonError::into_inner);
 
-        // At the cap, a new handle passes to the original instead of evicting a live enumeration.
-        if listings.len() >= MAX_LISTINGS && !listings.contains_key(&(handle as usize)) {
-            return None;
-        }
-
-        listings.insert(
+        insert_listing(
+            &mut listings,
             handle as usize,
             TableEntry::Plain {
                 raw: raw_length.map_or_else(Vec::new, |length| raw_buffer[..length].to_vec()),
@@ -446,18 +495,41 @@ unsafe fn query(
 
     crate::trace::call_with("NtQueryDirectoryFile", || rel.clone());
 
-    crate::stat_lock();
-    let mut listings = LISTINGS.lock().unwrap_or_else(PoisonError::into_inner);
-    let rebuild = restart != 0
-        || match listings.get(&(handle as usize)) {
-            None => true,
-            Some(TableEntry::Merged(listing)) => !serves_cached(listing, mount, &rel, &mask),
-            Some(TableEntry::Plain { raw, .. }) => {
-                raw_length.is_none_or(|length| raw.as_slice() != &raw_buffer[..length])
+    // A restart always rebuilds: it must never continue the old cursor. The table lock below covers only map, `used`
+    // and `Arc` work — never a wait on a per-listing lock, nor the `FindNextFileW` a response may perform.
+    let (mut rebuild, continuing) = {
+        crate::stat_lock();
+        let mut listings = LISTINGS.lock().unwrap_or_else(PoisonError::into_inner);
+        match listings.get_mut(&(handle as usize)) {
+            None => (true, None),
+            Some(TableEntry::Plain { raw, used }) => {
+                let rebuild = restart != 0
+                    || raw_length.is_none_or(|length| raw.as_slice() != &raw_buffer[..length]);
+                if !rebuild {
+                    *used = stamp;
+                }
+                (rebuild, None)
             }
-        };
+            Some(TableEntry::Merged { listing, used }) => {
+                *used = stamp;
+                (restart != 0, (restart == 0).then(|| Arc::clone(listing)))
+            }
+        }
+    };
+
+    if let Some(listing) = continuing {
+        // The table is unlocked; waiting on this lock cannot block any other table operation.
+        let mut view = listing.lock().unwrap_or_else(PoisonError::into_inner);
+        if serves_cached(&view, mount, &rel, &mask) {
+            let (status, bytes, _) = view.respond(class, info, length, single != 0);
+            write_iosb(iosb, status, bytes);
+            return Some(status);
+        }
+        // The snapshot is stale (or another thread replaced it): rebuild below.
+        rebuild = true;
+    }
+
     if rebuild {
-        drop(listings);
         let layers = find_layers(
             mount,
             &rel,
@@ -471,44 +543,37 @@ unsafe fn query(
         record_decision(Kind::List, DecisionLayer::None, 0, || {
             mount.decision_path(&rel)
         });
+        let listing = Arc::new(Mutex::new(Listing {
+            mount,
+            rel: rel.clone(),
+            raw: raw_length.map_or_else(Vec::new, |length| raw_buffer[..length].to_vec()),
+            mask: mask.as_ref().to_string(),
+            whiteouts: mount.whiteouts_snapshot(),
+            layers,
+            next: 0,
+            batch: Vec::new(),
+            batch_pos: 0,
+        }));
+
         crate::stat_lock();
-        listings = LISTINGS.lock().unwrap_or_else(PoisonError::into_inner);
-
-        // At the cap, a new handle passes to the original instead of evicting a live enumeration. A handle already in
-        // the table only replaces its own entry, so its restart or changed path still rebuilds as before.
-        if listings.len() >= MAX_LISTINGS && !listings.contains_key(&(handle as usize)) {
-            return None;
-        }
-
-        listings.insert(
+        let mut listings = LISTINGS.lock().unwrap_or_else(PoisonError::into_inner);
+        insert_listing(
+            &mut listings,
             handle as usize,
-            TableEntry::Merged(Box::new(Listing {
-                mount,
-                rel: rel.clone(),
-                raw: raw_length.map_or_else(Vec::new, |length| raw_buffer[..length].to_vec()),
-                mask: mask.as_ref().to_string(),
-                whiteouts: mount.whiteouts_snapshot(),
-                layers,
-                next: 0,
-                batch: Vec::with_capacity(BATCH),
-                batch_pos: 0,
+            TableEntry::Merged {
+                listing: Arc::clone(&listing),
                 used: stamp,
-            })),
+            },
         );
+        drop(listings);
+
+        let (status, bytes, _) = respond_from(&listing, class, info, length, single != 0);
+        write_iosb(iosb, status, bytes);
+        return Some(status);
     }
 
-    match listings.get_mut(&(handle as usize))? {
-        TableEntry::Merged(listing) => {
-            listing.used = stamp;
-            let (status, bytes, _) = listing.respond(class, info, length, single != 0);
-            write_iosb(iosb, status, bytes);
-            Some(status)
-        }
-        TableEntry::Plain { used, .. } => {
-            *used = stamp;
-            None
-        }
-    }
+    // An unchanged plain handle keeps passing to the original NT query.
+    None
 }
 
 /// Whether the folder's merged view is exactly the real game folder: no whiteout affects this folder's own listing, and
@@ -666,6 +731,55 @@ mod tests {
         data
     }
 
+    fn test_mount() -> &'static Mount {
+        let layers = gobbo_overlay_core::Layers::new(
+            std::path::PathBuf::from("game"),
+            None,
+            std::path::PathBuf::from("upper"),
+        );
+        Box::leak(Box::new(Mount::new(
+            "game".to_string(),
+            std::path::PathBuf::from("game"),
+            layers,
+            Whiteouts::default(),
+        )))
+    }
+
+    fn test_listing(
+        mount: &'static Mount,
+        rel: &str,
+        whiteouts: Arc<Whiteouts>,
+        entries: Vec<WIN32_FIND_DATAW>,
+    ) -> Listing {
+        Listing {
+            mount,
+            rel: rel.to_string(),
+            raw: Vec::new(),
+            mask: "*".to_string(),
+            whiteouts,
+            layers: ListingLayers {
+                taken: crate::search::Taken::leading(entries),
+                root: None,
+                direct: None,
+            },
+            next: 0,
+            batch: Vec::new(),
+            batch_pos: 0,
+        }
+    }
+
+    fn merged_entry(mount: &'static Mount, used: u64) -> TableEntry {
+        TableEntry::Merged {
+            listing: Arc::new(Mutex::new(test_listing(
+                mount,
+                "folder",
+                mount.whiteouts_snapshot(),
+                Vec::new(),
+            ))),
+            used,
+        }
+    }
+
     #[test]
     fn the_ex_switches_map_and_an_unknown_flag_is_passed_through() {
         assert_eq!(ex_switches(0), Some((0, 0)));
@@ -714,46 +828,21 @@ mod tests {
 
     #[test]
     fn a_changed_whiteout_snapshot_stops_a_listing_from_serving_a_cached_query() {
-        let layers = gobbo_overlay_core::Layers::new(
-            std::path::PathBuf::from("game"),
-            None,
-            std::path::PathBuf::from("upper"),
-        );
-        let mount: &'static Mount = Box::leak(Box::new(Mount::new(
-            "game".to_string(),
-            std::path::PathBuf::from("game"),
-            layers,
-            Whiteouts::default(),
-        )));
-        let rel = "folder".to_string();
+        let mount = test_mount();
+        let rel = "folder";
         let snapshot = mount.whiteouts_snapshot();
-        let listing = |whiteouts: Arc<Whiteouts>| Listing {
-            mount,
-            rel: rel.clone(),
-            raw: Vec::new(),
-            mask: "*".to_string(),
-            whiteouts,
-            layers: ListingLayers {
-                taken: crate::search::Taken::leading(Vec::new()),
-                root: None,
-                direct: None,
-            },
-            next: 0,
-            batch: Vec::new(),
-            batch_pos: 0,
-            used: 0,
-        };
+        let listing = |whiteouts: Arc<Whiteouts>| test_listing(mount, rel, whiteouts, Vec::new());
 
         assert!(serves_cached(
             &listing(Arc::clone(&snapshot)),
             mount,
-            &rel,
+            rel,
             "*"
         ));
         assert!(!serves_cached(
             &listing(Arc::new(Whiteouts::default())),
             mount,
-            &rel,
+            rel,
             "*"
         ));
         assert!(!serves_cached(
@@ -765,8 +854,96 @@ mod tests {
         assert!(!serves_cached(
             &listing(Arc::clone(&snapshot)),
             mount,
-            &rel,
+            rel,
             "name.txt"
         ));
+    }
+
+    #[test]
+    fn a_full_table_evicts_the_least_recently_used_plain_handle_before_a_merged_one() {
+        let mount = test_mount();
+        let mut listings = FxHashMap::default();
+        listings.insert(1, merged_entry(mount, 7));
+        listings.insert(2, merged_entry(mount, 3));
+        listings.insert(
+            3,
+            TableEntry::Plain {
+                raw: Vec::new(),
+                used: 1,
+            },
+        );
+        listings.insert(
+            4,
+            TableEntry::Plain {
+                raw: Vec::new(),
+                used: 9,
+            },
+        );
+
+        // A plain handle has no live cursor, so it goes even though the merged entries are older.
+        assert_eq!(eviction_key(&listings), Some(3));
+
+        listings.remove(&3);
+        listings.remove(&4);
+        assert_eq!(eviction_key(&listings), Some(2));
+    }
+
+    #[test]
+    fn a_new_key_at_the_cap_evicts_one_entry_and_an_existing_key_replaces_only_itself() {
+        let mut listings = FxHashMap::default();
+        for key in 0..MAX_LISTINGS {
+            listings.insert(
+                key,
+                TableEntry::Plain {
+                    raw: Vec::new(),
+                    used: key as u64,
+                },
+            );
+        }
+
+        insert_listing(
+            &mut listings,
+            MAX_LISTINGS,
+            TableEntry::Plain {
+                raw: Vec::new(),
+                used: 999,
+            },
+        );
+        assert_eq!(listings.len(), MAX_LISTINGS);
+        assert!(!listings.contains_key(&0));
+        assert!(listings.contains_key(&MAX_LISTINGS));
+
+        insert_listing(
+            &mut listings,
+            MAX_LISTINGS - 1,
+            TableEntry::Plain {
+                raw: Vec::new(),
+                used: 999,
+            },
+        );
+        assert_eq!(listings.len(), MAX_LISTINGS);
+        assert!(listings.contains_key(&1));
+        match listings.get(&(MAX_LISTINGS - 1)) {
+            Some(TableEntry::Plain { used, .. }) => assert_eq!(*used, 999),
+            _ => panic!("the replaced key must still be a plain entry"),
+        }
+    }
+
+    #[test]
+    fn a_listing_batch_starts_empty_and_grows_only_to_what_is_asked_for() {
+        let mount = test_mount();
+        let entries = (0..MAX_BATCH * 2)
+            .map(|index| entry(&format!("name{index}"), 0))
+            .collect();
+        let mut listing = test_listing(mount, "folder", mount.whiteouts_snapshot(), entries);
+
+        assert_eq!(listing.batch.capacity(), 0);
+        listing.fill_batch(1);
+        assert_eq!(listing.batch.len(), 1);
+        assert!(listing.batch.capacity() < BATCH);
+
+        listing.fill_batch(MAX_BATCH);
+        assert_eq!(listing.batch.len(), MAX_BATCH);
+        assert!(listing.batch.capacity() >= MAX_BATCH);
     }
 }

@@ -12,7 +12,9 @@
 pub mod early;
 pub mod nt_listing;
 
+use std::borrow::Cow;
 use std::collections::BTreeSet;
+use std::ops::Bound;
 use std::path::{Path, PathBuf};
 
 use rustc_hash::FxHashSet;
@@ -180,6 +182,32 @@ impl MountConfig {
                     reason: "staging path is not absolute",
                 });
             }
+
+            // A hooked write goes to `upper`. If `upper` were the base, a staging layer or the guest path itself, that
+            // write would land in the game or the shared profile data instead of this mount's own layer.
+            let upper = folded_config_path(&mount.upper);
+
+            if same_or_below(&folded_config_path(&mount.root), &upper) {
+                return Err(InvalidMountConfig {
+                    reason: "upper path is root or inside it",
+                });
+            }
+
+            if mount
+                .staging
+                .as_ref()
+                .is_some_and(|staging| same_or_below(&folded_config_path(staging), &upper))
+            {
+                return Err(InvalidMountConfig {
+                    reason: "upper path is staging or inside it",
+                });
+            }
+
+            if same_or_below(&folded_config_path(&mount.guest), &upper) {
+                return Err(InvalidMountConfig {
+                    reason: "upper path is guest or inside it",
+                });
+            }
         }
 
         Ok(self)
@@ -204,6 +232,28 @@ impl MountConfig {
     pub fn redirects(&self) -> impl Iterator<Item = &MountSpec> {
         self.mounts.iter().skip(1)
     }
+}
+
+/// The canonical, folded spelling of a config path: one separator, no dot components and one case rule. Both sides of
+/// a containment check go through it, so a difference in spelling cannot hide an overlap between two layers.
+fn folded_config_path(path: &Path) -> String {
+    let text = path.to_string_lossy();
+    let text = if text.contains('/') {
+        text.replace('/', "\\")
+    } else {
+        text.into_owned()
+    };
+    fold_key(&normal(&text))
+}
+
+/// Whether `path` is `base` itself or lies below it, when both are folded by [`folded_config_path`]. A sibling with
+/// the same starting text (`C:\Game Mods` for `C:\Game`) is not below it.
+fn same_or_below(base: &str, path: &str) -> bool {
+    path == base
+        || (!base.is_empty()
+            && path
+                .strip_prefix(base)
+                .is_some_and(|rest| rest.starts_with('\\')))
 }
 
 /// The layer a path resolved to.
@@ -415,23 +465,42 @@ impl Whiteouts {
             return true;
         }
 
-        let lower = fold_key(rel);
-        let prefix = if lower.is_empty() {
-            String::new()
-        } else {
-            format!("{lower}\\")
+        // One stack pass builds `lower\`; the heap is used only for a folder too deep to fit. The prefix is borrowed
+        // from the stack, so asking about a folder does not allocate a `String` for it.
+        let mut buffer = [0u8; 1025];
+        let folded = fold_key_path_into(rel, &mut buffer[..1024]);
+        let prefix: Cow<'_, str> = match folded {
+            Some("") => Cow::Borrowed(""),
+            Some(folded) => {
+                let length = folded.len();
+                buffer[length] = b'\\';
+                match std::str::from_utf8(&buffer[..length + 1]) {
+                    Ok(prefix) => Cow::Borrowed(prefix),
+                    Err(_) => {
+                        let mut owned = fold_key_path(rel);
+                        owned.push('\\');
+                        Cow::Owned(owned)
+                    }
+                }
+            }
+            None => {
+                let mut owned = fold_key_path(rel);
+                owned.push('\\');
+                Cow::Owned(owned)
+            }
         };
         // The paths with a prefix are a contiguous range in the ordered set, so an unrelated whiteout does not pay a
         // full scan.
+        let prefix_text: &str = prefix.as_ref();
         self.paths
-            .range(prefix.clone()..)
-            .take_while(|path| path.starts_with(&prefix))
+            .range::<str, _>((Bound::Included(prefix_text), Bound::Unbounded))
+            .take_while(|path| path.starts_with(prefix_text))
             .any(|path| !path[prefix.len()..].contains('\\'))
     }
 
     /// Hides `rel` in the lower layers, as a deletion does.
     pub fn hide(&mut self, rel: &str) {
-        let lower = fold_key(rel);
+        let lower = fold_key_path(rel);
         self.hashes.insert(key_hash(&lower));
         self.paths.insert(lower);
     }
@@ -643,6 +712,50 @@ pub fn fold_key_into<'a>(text: &str, buffer: &'a mut [u8]) -> Option<&'a str> {
     for c in text.chars() {
         let mut bytes = [0u8; 4];
         let encoded = fold_char(c).encode_utf8(&mut bytes);
+
+        if length + encoded.len() > buffer.len() {
+            return None;
+        }
+
+        buffer[length..length + encoded.len()].copy_from_slice(encoded.as_bytes());
+        length += encoded.len();
+    }
+
+    std::str::from_utf8(&buffer[..length]).ok()
+}
+
+/// `fold_key` with `/` mapped to `\`, the one separator rule of whiteout keys. A journal edited with forward slashes
+/// then holds the same key as a path the hook wrote, and a round trip through `to_text` keeps that key.
+fn fold_key_path(text: &str) -> String {
+    if !text.contains('/') {
+        return fold_key(text);
+    }
+
+    let mut folded = String::with_capacity(text.len());
+
+    for c in text.chars() {
+        if c == '/' {
+            folded.push('\\');
+        } else {
+            folded.push(fold_char(c));
+        }
+    }
+
+    folded
+}
+
+/// `fold_key_into` with the same separator rule as `fold_key_path`. `None` when it does not fit.
+fn fold_key_path_into<'a>(text: &str, buffer: &'a mut [u8]) -> Option<&'a str> {
+    if !text.contains('/') {
+        return fold_key_into(text, buffer);
+    }
+
+    let mut length = 0;
+
+    for c in text.chars() {
+        let folded = if c == '/' { '\\' } else { fold_char(c) };
+        let mut bytes = [0u8; 4];
+        let encoded = folded.encode_utf8(&mut bytes);
 
         if length + encoded.len() > buffer.len() {
             return None;
@@ -985,9 +1098,45 @@ pub fn wildcard_match(pattern: &str, name: &str) -> bool {
         return matches_from(pattern.as_bytes(), name.as_bytes());
     }
 
-    let pattern: Vec<char> = pattern.chars().map(fold_char).collect();
-    let name: Vec<char> = name.chars().map(fold_char).collect();
-    matches_from(&pattern, &name)
+    let mut pattern_buffer = ['\0'; MATCH_STACK];
+    let mut name_buffer = ['\0'; MATCH_STACK];
+    let pattern = match_chars(pattern, &mut pattern_buffer);
+    let name = match_chars(name, &mut name_buffer);
+    matches_from(pattern.as_slice(), name.as_slice())
+}
+
+/// The characters folded without an allocation by `wildcard_match`. A listing mask and a name are shorter than this;
+/// longer text falls back to the heap.
+const MATCH_STACK: usize = 256;
+
+/// The folded units of one wildcard operand, in a stack buffer when they fit and on the heap only when they do not.
+enum MatchChars<'a> {
+    Stack(&'a [char]),
+    Heap(Vec<char>),
+}
+
+impl MatchChars<'_> {
+    fn as_slice(&self) -> &[char] {
+        match self {
+            Self::Stack(chars) => chars,
+            Self::Heap(chars) => chars,
+        }
+    }
+}
+
+/// Folds `text` into `buffer`, using the heap only when the folded text has more than `MATCH_STACK` characters.
+fn match_chars<'a>(text: &str, buffer: &'a mut [char; MATCH_STACK]) -> MatchChars<'a> {
+    let length = text.chars().count();
+
+    if length <= MATCH_STACK {
+        for (slot, c) in buffer.iter_mut().zip(text.chars()) {
+            *slot = fold_char(c);
+        }
+
+        MatchChars::Stack(&buffer[..length])
+    } else {
+        MatchChars::Heap(text.chars().map(fold_char).collect())
+    }
 }
 
 /// `wildcard_match` for a UTF-16 name, as a directory listing returns it. An ASCII name is matched in a stack buffer
@@ -1093,52 +1242,176 @@ fn matches_from<T: MatchUnit + Copy>(pattern: &[T], name: &[T]) -> bool {
     pattern[p..].iter().all(|&rest| rest.is_star())
 }
 
+/// The stack space of `normal`. A path that does not fit moves to a heap buffer; no other part of normalization
+/// allocates.
+const NORMAL_STACK: usize = 1024;
+
+/// The output of `normal`, written in one pass. Only the bytes of the input and ASCII separators go into the buffer, so
+/// a prefix is always a character boundary and a `..` can pop the last component by truncating it.
+struct PathBuffer {
+    stack: [u8; NORMAL_STACK],
+    heap: Option<Vec<u8>>,
+    length: usize,
+}
+
+impl PathBuffer {
+    fn new() -> Self {
+        Self {
+            stack: [0; NORMAL_STACK],
+            heap: None,
+            length: 0,
+        }
+    }
+
+    fn len(&self) -> usize {
+        self.length
+    }
+
+    fn bytes(&self) -> &[u8] {
+        match &self.heap {
+            Some(heap) => heap,
+            None => &self.stack[..self.length],
+        }
+    }
+
+    fn push(&mut self, byte: u8) {
+        match &mut self.heap {
+            Some(heap) => {
+                heap.push(byte);
+                self.length += 1;
+            }
+            None if self.length < self.stack.len() => {
+                self.stack[self.length] = byte;
+                self.length += 1;
+            }
+            None => {
+                let mut heap = Vec::with_capacity(self.length.saturating_mul(2) + 1);
+                heap.extend_from_slice(&self.stack[..self.length]);
+                heap.push(byte);
+                self.heap = Some(heap);
+                self.length += 1;
+            }
+        }
+    }
+
+    fn push_str(&mut self, text: &[u8]) {
+        for &byte in text {
+            self.push(byte);
+        }
+    }
+
+    /// Removes the last component and its separator, without climbing above `root_len`.
+    fn pop_component(&mut self, root_len: usize) {
+        let bytes = self.bytes();
+        let mut end = self.length;
+
+        while end > root_len && bytes[end - 1] != b'\\' {
+            end -= 1;
+        }
+
+        // `end` points just after the separator; keep the text before it, or the root when there is no separator.
+        let keep = if end > root_len { end - 1 } else { root_len };
+        self.truncate(keep);
+    }
+
+    fn truncate(&mut self, length: usize) {
+        self.length = self.length.min(length);
+
+        if let Some(heap) = &mut self.heap {
+            heap.truncate(self.length);
+        }
+    }
+
+    fn into_string(self) -> String {
+        match self.heap {
+            Some(heap) => String::from_utf8(heap)
+                .unwrap_or_else(|error| String::from_utf8_lossy(error.as_bytes()).into_owned()),
+            None => std::str::from_utf8(&self.stack[..self.length])
+                .map(str::to_owned)
+                .unwrap_or_default(),
+        }
+    }
+}
+
+/// Whether a byte is one of the two path separators. The input is folded before the root and the components are read,
+/// so `/` and `\` follow the same rule.
+#[inline]
+fn is_separator(byte: u8) -> bool {
+    byte == b'\\' || byte == b'/'
+}
+
 /// A path as text in Windows form: `\` separators, no `\\?\` prefix, no trailing separator, and `.` and `..`
 /// resolved. The case is kept. `..` never climbs above the drive (`C:`) or the server (`\\server`) of the path.
+///
+/// One pass writes components into a stack buffer. A `..` truncates the last component in place, so the old `replace`,
+/// `format!`, `Vec<&str>` and second `String` are not needed for the usual short path. A path longer than the stack
+/// buffer moves to a heap buffer at the point where it overflows.
 fn normal(path: &str) -> String {
-    let text = path.replace('/', "\\");
-    let text = text.strip_prefix("\\\\?\\").unwrap_or(&text);
-    // `\\?\UNC\server\share` is the same folder as `\\server\share`.
-    let unc = text
-        .get(..4)
-        .filter(|head| head.eq_ignore_ascii_case("UNC\\"));
-    let text = match unc {
-        Some(_) => format!("\\\\{}", &text[4..]),
-        None => text.to_string(),
-    };
-    let text = text.as_str();
-    let (root, rest) = if let Some(rest) = text.strip_prefix("\\\\") {
-        ("\\\\", rest)
-    } else if let [drive, b':', ..] = text.as_bytes()
-        && drive.is_ascii_alphabetic()
+    let mut out = PathBuffer::new();
+    let bytes = path.as_bytes();
+    let mut rest = bytes;
+
+    if rest.len() >= 4
+        && is_separator(rest[0])
+        && is_separator(rest[1])
+        && rest[2] == b'?'
+        && is_separator(rest[3])
     {
-        text.split_at(2)
-    } else {
-        ("", text)
-    };
-    let mut parts: Vec<&str> = Vec::new();
+        rest = &rest[4..];
+    }
 
-    for part in rest.split('\\') {
-        match part {
-            "" | "." => {}
-            ".." => {
-                parts.pop();
+    // `\\?\UNC\server\share` (and a bare `UNC\...`) is the same folder as `\\server\share`.
+    let verbatim_unc = rest.len() >= 4
+        && rest
+            .get(..3)
+            .is_some_and(|head| head.eq_ignore_ascii_case(b"UNC"))
+        && is_separator(rest[3]);
+
+    if verbatim_unc {
+        rest = &rest[4..];
+    }
+
+    let root_len =
+        if verbatim_unc || (rest.len() >= 2 && is_separator(rest[0]) && is_separator(rest[1])) {
+            out.push(b'\\');
+            out.push(b'\\');
+            // The verbatim form already consumed its four prefix bytes; a plain UNC prefix still has two to skip.
+            if !verbatim_unc {
+                rest = &rest[2..];
             }
-            other => parts.push(other),
+            out.len()
+        } else if rest.len() >= 2 && rest[0].is_ascii_alphabetic() && rest[1] == b':' {
+            out.push(rest[0]);
+            out.push(b':');
+            rest = &rest[2..];
+            out.len()
+        } else {
+            0
+        };
+
+    let mut part_start = 0;
+
+    for index in 0..=rest.len() {
+        if index < rest.len() && !is_separator(rest[index]) {
+            continue;
         }
+
+        match &rest[part_start..index] {
+            b"" | b"." => {}
+            b".." => out.pop_component(root_len),
+            part => {
+                if !out.bytes().is_empty() && out.bytes().last() != Some(&b'\\') {
+                    out.push(b'\\');
+                }
+
+                out.push_str(part);
+            }
+        }
+
+        part_start = index + 1;
     }
 
-    let mut out = root.to_string();
-
-    for part in parts {
-        if !out.is_empty() && !out.ends_with('\\') {
-            out.push('\\');
-        }
-
-        out.push_str(part);
-    }
-
-    out
+    out.into_string()
 }
 
 #[cfg(test)]
@@ -1820,6 +2093,159 @@ mod tests {
             .encode_utf16()
             .collect();
         assert!(!whiteouts.hides_child_units_in_visible_folder("data", &name));
+    }
+
+    #[test]
+    fn normal_resolves_dot_components_without_climbing_above_a_root() {
+        assert_eq!(normal(r"C:\Game\..\..\x"), r"C:\x");
+        assert_eq!(normal(r"..\..\x"), "x");
+        assert_eq!(normal(r"\\server\share\..\..\x"), r"\\x");
+        assert_eq!(normal("C:/Game/./x/../y"), r"C:\Game\y");
+    }
+
+    #[test]
+    fn normal_handles_unc_verbatim_mixed_separators_and_trailing_separators() {
+        assert_eq!(normal(r"\\server\share"), r"\\server\share");
+        assert_eq!(normal(r"\\?\C:\Game\.\x"), r"C:\Game\x");
+        assert_eq!(normal(r"\\?\UNC\server\share\Game"), r"\\server\share\Game");
+        assert_eq!(normal(r"unc/server/share/x"), r"\\server\share\x");
+        assert_eq!(normal("//server/share/Game/"), r"\\server\share\Game");
+        assert_eq!(normal(r"C:\Game\\\\"), r"C:\Game");
+        assert_eq!(normal(r"C:"), "C:");
+        assert_eq!(normal(""), "");
+    }
+
+    #[test]
+    fn a_long_path_normalizes_on_the_heap() {
+        let path = format!(r"C:\{}", "segment\\".repeat(400));
+        assert!(path.len() > NORMAL_STACK);
+        let expected = format!(r"C:\{}", vec!["segment"; 400].join("\\"));
+        assert_eq!(normal(&path), expected);
+        // A `..` beyond the stack still drops the last component.
+        assert_eq!(
+            normal(&format!("{path}..\\tail")),
+            format!(r"C:\{}\tail", vec!["segment"; 399].join("\\"))
+        );
+    }
+
+    #[test]
+    fn a_long_non_ascii_name_and_pattern_match_through_the_heap_fallback() {
+        let name = format!("{}Ś.TXT", "a".repeat(300));
+        assert!(wildcard_match("*.txt", &name));
+        assert!(wildcard_match(&format!("{}ś.*", "a".repeat(300)), &name));
+        assert!(!wildcard_match("*.pak", &name));
+        let pattern = format!("{}Ś*", "a".repeat(300));
+        assert!(wildcard_match(
+            &pattern,
+            &format!("{}ś-file.txt", "a".repeat(300))
+        ));
+        assert!(!wildcard_match(&pattern, "short"));
+    }
+
+    #[test]
+    fn affects_listing_uses_a_prefix_for_a_deep_folder() {
+        let parts: Vec<String> = (1..=12).map(|number| format!("folder{number}")).collect();
+        let deep = parts.join("\\");
+        let parent = parts[..11].join("\\");
+        let grandparent = parts[..10].join("\\");
+        let mut whiteouts = Whiteouts::default();
+        whiteouts.hide(&format!("{deep}\\file.dat"));
+
+        assert!(!whiteouts.affects_listing(""));
+        assert!(!whiteouts.affects_listing(&grandparent));
+        assert!(!whiteouts.affects_listing(&parent));
+        assert!(whiteouts.affects_listing(&deep));
+        // The forward-slash spelling of a query follows the same separator rule as a journal key.
+        assert!(whiteouts.affects_listing(&deep.replace('\\', "/")));
+        assert!(!whiteouts.affects_listing("other"));
+
+        whiteouts.hide(&parent);
+        assert!(whiteouts.affects_listing(&grandparent));
+
+        // A folder too deep for the stack prefix buffer takes the heap path with the same result.
+        let long = "x".repeat(1100);
+        whiteouts.hide(&format!("{long}\\file.dat"));
+        assert!(whiteouts.affects_listing(&long));
+        assert!(!whiteouts.affects_listing("y"));
+    }
+
+    #[test]
+    fn a_journal_with_forward_slashes_hides_the_backslash_path() {
+        let whiteouts = Whiteouts::parse("data/a.txt\nDocs/Sub\n");
+        assert!(whiteouts.hides(r"data\a.txt"));
+        assert!(whiteouts.hides(r"docs\sub"));
+        assert_eq!(whiteouts.to_text(), "data\\a.txt\ndocs\\sub\n");
+        let mut direct = Whiteouts::default();
+        direct.hide("bin/x.dll");
+        assert!(direct.hides(r"bin\x.dll"));
+        assert_eq!(direct.iter().collect::<Vec<_>>(), [r"bin\x.dll"]);
+    }
+
+    #[test]
+    fn an_upper_layer_over_the_base_or_the_guest_is_refused() {
+        let base =
+            MountConfig::try_new(MountConfig::VERSION, vec![mount(MountSpec::GAME_ID)]).unwrap();
+
+        let mut upper_is_root = base.clone();
+        upper_is_root.mounts[0].upper = upper_is_root.mounts[0].root.clone();
+        assert!(upper_is_root.validate().is_err());
+
+        let mut upper_in_root = base.clone();
+        upper_in_root.mounts[0].upper = upper_in_root.mounts[0].root.join("overwrite");
+        assert!(upper_in_root.validate().is_err());
+
+        let mut upper_is_guest = base.clone();
+        upper_is_guest.mounts[0].upper = upper_is_guest.mounts[0].guest.clone();
+        assert!(upper_is_guest.validate().is_err());
+
+        // A different case and forward separators do not hide the overlap.
+        let root = base.mounts()[0].root.to_string_lossy().into_owned();
+        let mut folded = base.clone();
+        folded.mounts[0].upper = PathBuf::from(root.to_uppercase());
+        assert!(folded.validate().is_err());
+        let mut slashes = base;
+        slashes.mounts[0].upper = PathBuf::from(format!("{root}/overwrite"));
+        assert!(slashes.validate().is_err());
+    }
+
+    #[test]
+    fn an_upper_layer_over_staging_is_refused_but_a_sibling_is_valid() {
+        let overlapping = MountConfig::try_new(
+            MountConfig::VERSION,
+            vec![MountSpec {
+                id: MountSpec::GAME_ID.to_string(),
+                guest: absolute("game"),
+                root: absolute("game"),
+                staging: Some(absolute("state").join("mods")),
+                upper: absolute("state").join("mods").join("upper"),
+            }],
+        );
+        assert!(overlapping.is_err());
+        let mut equal = MountConfig::try_new(
+            MountConfig::VERSION,
+            vec![MountSpec {
+                id: MountSpec::GAME_ID.to_string(),
+                guest: absolute("game"),
+                root: absolute("game"),
+                staging: Some(absolute("state").join("mods")),
+                upper: absolute("state").join("overwrite"),
+            }],
+        )
+        .unwrap();
+        equal.mounts[0].upper = absolute("state").join("mods");
+        assert!(equal.validate().is_err());
+
+        let valid = MountConfig::try_new(
+            MountConfig::VERSION,
+            vec![MountSpec {
+                id: MountSpec::GAME_ID.to_string(),
+                guest: absolute("game"),
+                root: absolute("game"),
+                staging: Some(absolute("state").join("mods")),
+                upper: absolute("state").join("overwrite"),
+            }],
+        );
+        assert!(valid.is_ok());
     }
 }
 

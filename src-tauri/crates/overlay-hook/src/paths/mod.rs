@@ -15,7 +15,7 @@ mod spelling;
 mod target;
 
 pub(crate) use names::{
-    Place, absolute, place, place_path, place_units, shown_name, unsafe_name, unsafe_units,
+    Place, absolute, place, place_path, place_units, unsafe_name, unsafe_units,
 };
 pub(crate) use session::{long_path, paths, short_path_units};
 pub(crate) use spelling::{find_exact, with_pattern};
@@ -23,3 +23,8 @@ pub(crate) use target::{
     Failure, Redirected, Target, copy_up, in_lower, is_visible_dir, make_write_target, missing,
     name_taken, redirect_opened, redirect_relative_on, shown, visible, writes_requested,
 };
+
+/// The game-relative folder that holds `rel`; the game folder itself is `""`.
+pub(crate) fn parent_rel(rel: &str) -> &str {
+    rel.rsplit_once('\\').map_or("", |(parent, _)| parent)
+}

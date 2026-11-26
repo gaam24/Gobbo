@@ -10,15 +10,22 @@ use std::ptr::null;
 use gobbo_overlay_core::{join, wide};
 use windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE;
 use windows_sys::Win32::Storage::FileSystem::{
-    FindClose, FindExInfoStandard, FindExSearchNameMatch, FindFirstFileExW, WIN32_FIND_DATAW,
+    FIND_FIRST_EX_CASE_SENSITIVE, FindClose, FindExInfoStandard, FindExSearchNameMatch,
+    FindFirstFileExW, WIN32_FIND_DATAW,
 };
 
 use crate::text::same_folded_wide;
 use crate::win32::find_data_name;
 
 /// The entry `name` of the folder `rel` under `base`, as the disk spells it. `None` when the folder has no such entry, or
-/// the name is not the one found (the search matches the name under the folding rule, so this only guards the match).
-pub(crate) fn find_exact(base: &Path, rel: &str, name: &[u16]) -> Option<WIN32_FIND_DATAW> {
+/// the name is not the one found. The caller's `flags` reach the system search, so a `FIND_FIRST_EX_CASE_SENSITIVE`
+/// caller matches the spelling exactly instead of under the folding rule.
+pub(crate) fn find_exact(
+    base: &Path,
+    rel: &str,
+    name: &[u16],
+    flags: u32,
+) -> Option<WIN32_FIND_DATAW> {
     let mut data: WIN32_FIND_DATAW = unsafe { std::mem::zeroed() };
     crate::stat_spelling();
     crate::stat_io();
@@ -31,7 +38,7 @@ pub(crate) fn find_exact(base: &Path, rel: &str, name: &[u16]) -> Option<WIN32_F
                 (&raw mut data).cast::<c_void>(),
                 FindExSearchNameMatch,
                 null(),
-                0,
+                flags,
             )
         }
     });
@@ -41,7 +48,13 @@ pub(crate) fn find_exact(base: &Path, rel: &str, name: &[u16]) -> Option<WIN32_F
     }
     // SAFETY: the handle came from the search above and is closed once.
     unsafe { FindClose(handle) };
-    same_folded_wide(find_data_name(&data), name).then_some(data)
+    let found = find_data_name(&data);
+    let same = if flags & FIND_FIRST_EX_CASE_SENSITIVE != 0 {
+        found == name
+    } else {
+        same_folded_wide(found, name)
+    };
+    same.then_some(data)
 }
 
 /// Calls `call` with the search pattern `base\rel\mask`. The common pattern is assembled on the stack; a pattern too long

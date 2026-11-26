@@ -9,10 +9,9 @@
 //! the loader resolves before any program code runs.
 
 use std::ffi::{OsStr, c_void};
-use std::io;
+use std::fs::File;
+use std::io::{self, Read};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, OnceLock, PoisonError};
-use std::time::SystemTime;
 
 use windows_sys::Win32::Foundation::{FALSE, HANDLE};
 use windows_sys::Win32::Globalization::{CP_ACP, WideCharToMultiByte};
@@ -28,69 +27,78 @@ use crate::wide;
 
 use gobbo_overlay_pe::Import;
 
-/// The parsed parts of one executable: its static imports and its bitness, both taken from the same read. A launch
-/// asks for them twice (the report and the import patch); the executable may be hundreds of megabytes, so one cache
-/// entry keyed by its length and modification time saves a second full read.
+/// The parsed parts of one executable: its static imports and its bitness, from the same read.
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct Parsed {
     imports: Vec<Import>,
     pe32: bool,
 }
 
-/// The program path, its length and modification time, and the parse of that exact file.
-type CachedParse = (PathBuf, u64, SystemTime, Arc<Parsed>);
+/// How much of the program to read before deciding that the whole file is needed. The PE headers, the section table
+/// and the import directory sit near the start even of a game executable hundreds of megabytes in size. One extra
+/// byte is read so a file that is exactly this long is still told apart from a longer one.
+const PREFIX_BYTES: usize = 16 * 1024 * 1024;
 
-/// A game can start several helpers with different executables; a one-entry cache would read each one again when the
-/// next child starts. The list is small, so a linear lookup stays cheap.
-const CACHE_ENTRIES: usize = 8;
+/// Reads at most `limit` bytes plus one sentinel byte, parses the prefix, and reads the whole file only when the
+/// parser says it was cut off. A prefix that ends before the import data is never accepted as an empty import table:
+/// [`gobbo_overlay_pe::parse_prefix`] reports `NeedMore` for that case, and the full read then decides.
+fn parse_file_limited(program: &Path, limit: usize) -> io::Result<Parsed> {
+    let mut file = File::open(program)?;
+    let mut bytes = Vec::new();
+    // The extra byte says whether the file continues past the prefix without reading more of it.
+    file.by_ref()
+        .take((limit as u64).saturating_add(1))
+        .read_to_end(&mut bytes)?;
 
-static PARSED: OnceLock<Mutex<Vec<CachedParse>>> = OnceLock::new();
+    if bytes.len() <= limit {
+        // The whole file fitted in the read, so there is no prefix to decide about.
+        return parsed(gobbo_overlay_pe::parse(&bytes).map_err(malformed)?);
+    }
 
-fn cache() -> &'static Mutex<Vec<CachedParse>> {
-    PARSED.get_or_init(|| Mutex::new(Vec::new()))
-}
-
-/// The static imports of a program, cloned from the bounded cache. The list is small; the executable is not held.
-pub fn imports(program: &Path) -> io::Result<Vec<Import>> {
-    Ok(parsed(program)?.imports.clone())
-}
-
-/// The parsed executable, from the cache when its identity did not change.
-fn parsed(program: &Path) -> io::Result<Arc<Parsed>> {
-    let metadata = std::fs::metadata(program)?;
-    let len = metadata.len();
-    let modified = metadata.modified()?;
-    {
-        let entry = cache().lock().unwrap_or_else(PoisonError::into_inner);
-
-        if let Some((_, _, _, parsed)) =
-            entry.iter().find(|(path, cached_len, cached_modified, _)| {
-                path == program && *cached_len == len && *cached_modified == modified
-            })
-        {
-            return Ok(Arc::clone(parsed));
+    match gobbo_overlay_pe::parse_prefix(&bytes[..limit]) {
+        gobbo_overlay_pe::PrefixParse::Complete(result) => parsed(result.map_err(malformed)?),
+        gobbo_overlay_pe::PrefixParse::NeedMore => {
+            // Continue on the same handle: a file replaced or changed between two opens could not give a mixed
+            // answer from the prefix and the rest of the image.
+            file.read_to_end(&mut bytes)?;
+            parsed(gobbo_overlay_pe::parse(&bytes).map_err(malformed)?)
         }
     }
-
-    let parsed = Arc::new(parse_file(program)?);
-    let mut entry = cache().lock().unwrap_or_else(PoisonError::into_inner);
-    entry.retain(|(path, _, _, _)| path != program);
-
-    if entry.len() >= CACHE_ENTRIES {
-        entry.remove(0);
-    }
-
-    entry.push((program.to_path_buf(), len, modified, Arc::clone(&parsed)));
-    Ok(parsed)
 }
 
 fn parse_file(program: &Path) -> io::Result<Parsed> {
-    let bytes = std::fs::read(program)?;
-    let (pe32, imports) = gobbo_overlay_pe::parse(&bytes).map_err(malformed)?;
+    parse_file_limited(program, PREFIX_BYTES)
+}
+
+fn parsed((pe32, imports): (bool, Vec<Import>)) -> io::Result<Parsed> {
     Ok(Parsed { imports, pe32 })
 }
 
-/// Rewrites the import descriptors of the suspended program so the loader reads each `mapping` DLL from the mod layer.
-/// The mapping keys are the import names returned by `imports`; a key without a matching descriptor is ignored.
+/// The static imports of a program. The bounded read makes parsing on each launch cheap, so no cache is needed.
+pub fn imports(program: &Path) -> io::Result<Vec<Import>> {
+    Ok(parse_file(program)?.imports)
+}
+
+/// The RVAs of every import descriptor whose DLL name matches `name`, in table order. A legal PE can have two
+/// descriptors for one DLL; leaving either one bound to the game folder defeats the redirect.
+fn descriptor_rvas(imports: &[Import], name: &str) -> Vec<u32> {
+    imports
+        .iter()
+        .filter(|import| import.name.eq_ignore_ascii_case(name))
+        .map(|import| import.descriptor_rva)
+        .collect()
+}
+
+/// The two writes of an `IMAGE_IMPORT_DESCRIPTOR` patch: zeros for `TimeDateStamp` (+4) and `ForwarderChain` (+8), and
+/// the new `Name` RVA (+12). Clearing the bound-import fields makes the loader resolve the new name instead of using
+/// stale forwarders. `OriginalFirstThunk` (+0) is never written: the loader needs the lookup table it names.
+fn descriptor_patches(name_rva: u32) -> ([u8; 8], [u8; 4]) {
+    ([0u8; 8], name_rva.to_le_bytes())
+}
+
+/// Rewrites every import descriptor of the suspended program whose DLL is in `mapping` so the loader reads each DLL
+/// from the mod layer. Each matching descriptor gets its own remote name and descriptor patch. The mapping keys are the
+/// import names returned by `imports`; a key without a matching descriptor is ignored.
 ///
 /// # Safety
 /// `process` must be the suspended program's process handle, with the rights `CreateProcessW` returns.
@@ -103,81 +111,116 @@ pub unsafe fn rewrite(
         return Ok(());
     }
 
-    let parsed = parsed(program)?;
+    let parsed = parse_file(program)?;
     let imports = &parsed.imports;
     let pe32 = parsed.pe32;
     let base = main_module(process, pe32)?;
 
     for (name, path) in mapping {
-        let Some(import) = imports
-            .iter()
-            .find(|import| import.name.eq_ignore_ascii_case(name))
-        else {
+        let descriptors = descriptor_rvas(imports, name);
+        if descriptors.is_empty() {
             continue;
-        };
+        }
         let path = ansi(path)?;
-        let Some(remote) = allocate_near(process, base, NEAR_IMAGE_SIZE, path.len() + 1) else {
-            continue;
-        };
-        // SAFETY: `remote` is a fresh allocation of `path.len() + 1` bytes in the target.
-        let mut written = 0;
 
-        if unsafe {
-            WriteProcessMemory(
-                process,
-                remote,
-                path.as_ptr().cast(),
-                path.len() + 1,
-                &mut written,
-            )
-        } == FALSE
-            || written != path.len() + 1
-        {
-            free_remote(process, remote);
-            return Err(io::Error::last_os_error());
-        }
+        for descriptor_rva in descriptors {
+            let Some(remote) = allocate_near(process, base, NEAR_IMAGE_SIZE, path.len() + 1) else {
+                return Err(io::Error::other(format!(
+                    "could not allocate memory near the image for the import {name}"
+                )));
+            };
+            // SAFETY: `remote` is a fresh allocation of `path.len() + 1` bytes in the target.
+            let mut written = 0;
 
-        let name_rva = (remote as usize)
-            .checked_sub(base)
-            .and_then(|offset| u32::try_from(offset).ok());
-        let Some(name_rva) = name_rva else {
-            free_remote(process, remote);
-            continue;
-        };
-        let descriptor = base + import.descriptor_rva as usize + 12;
-        let mut old = 0;
-        // SAFETY: the descriptor is inside the mapped image, and the protection change covers its four-byte name field.
-        if unsafe {
-            VirtualProtectEx(
-                process,
-                descriptor as *const c_void,
-                4,
-                PAGE_READWRITE,
-                &mut old,
-            )
-        } == FALSE
-        {
-            free_remote(process, remote);
-            return Err(io::Error::last_os_error());
-        }
-        // SAFETY: the four bytes are the descriptor's `Name` field.
-        let written = unsafe {
-            WriteProcessMemory(
-                process,
-                descriptor as *const c_void,
-                (&raw const name_rva).cast(),
-                4,
-                &mut written,
-            )
-        };
-        // SAFETY: the old protection is restored whether the write succeeded or not.
-        unsafe {
-            VirtualProtectEx(process, descriptor as *const c_void, 4, old, &mut old);
-        }
+            if unsafe {
+                WriteProcessMemory(
+                    process,
+                    remote,
+                    path.as_ptr().cast(),
+                    path.len() + 1,
+                    &mut written,
+                )
+            } == FALSE
+                || written != path.len() + 1
+            {
+                free_remote(process, remote);
+                return Err(io::Error::last_os_error());
+            }
 
-        if written == FALSE {
-            free_remote(process, remote);
-            return Err(io::Error::last_os_error());
+            let name_rva = (remote as usize)
+                .checked_sub(base)
+                .and_then(|offset| u32::try_from(offset).ok());
+            let Some(name_rva) = name_rva else {
+                free_remote(process, remote);
+                return Err(io::Error::other(format!(
+                    "the layer path for the import {name} is too far from the image"
+                )));
+            };
+            let (bound, name_bytes) = descriptor_patches(name_rva);
+            let descriptor = base + descriptor_rva as usize;
+            let mut old = 0;
+            // SAFETY: the descriptor is inside the mapped image; the protection change covers the fields written below
+            // and is restored whether either write succeeds.
+            if unsafe {
+                VirtualProtectEx(
+                    process,
+                    descriptor as *const c_void,
+                    12,
+                    PAGE_READWRITE,
+                    &mut old,
+                )
+            } == FALSE
+            {
+                let error = io::Error::last_os_error();
+                free_remote(process, remote);
+                return Err(error);
+            }
+            // SAFETY: the eight bytes at +4 are the descriptor's `TimeDateStamp` and `ForwarderChain` fields; +0 is
+            // left alone so `OriginalFirstThunk` still names the lookup table.
+            let cleared = unsafe {
+                WriteProcessMemory(
+                    process,
+                    (descriptor + 4) as *const c_void,
+                    bound.as_ptr().cast(),
+                    bound.len(),
+                    &mut written,
+                )
+            };
+            let clear_error = (cleared == FALSE).then(io::Error::last_os_error);
+            let bound_written = written;
+            // SAFETY: the four bytes at +12 are the descriptor's `Name` field.
+            let patched = unsafe {
+                WriteProcessMemory(
+                    process,
+                    (descriptor + 12) as *const c_void,
+                    name_bytes.as_ptr().cast(),
+                    name_bytes.len(),
+                    &mut written,
+                )
+            };
+            let patch_error = (patched == FALSE).then(io::Error::last_os_error);
+            let name_written = written;
+            // SAFETY: restores the protection the call above returned.
+            unsafe {
+                VirtualProtectEx(process, descriptor as *const c_void, 12, old, &mut old);
+            }
+
+            if let Some(error) = clear_error.or(patch_error) {
+                free_remote(process, remote);
+                return Err(error);
+            }
+            if bound_written != bound.len() {
+                free_remote(process, remote);
+                return Err(io::Error::other(format!(
+                    "only {bound_written} of the eight bound-import bytes of the descriptor for {name} were written"
+                )));
+            }
+            if name_written != name_bytes.len() {
+                free_remote(process, remote);
+                return Err(io::Error::other(format!(
+                    "only {name_written} of the four bytes of the import descriptor for {name} were written"
+                )));
+            }
         }
     }
 
@@ -294,7 +337,8 @@ fn main_module(process: HANDLE, pe32: bool) -> io::Result<usize> {
 const NEAR_IMAGE_SIZE: u32 = 0x1000_0000;
 
 /// How many 64 KiB steps `allocate_near` tries above `NEAR_IMAGE_SIZE`. A small bound covers the usual gap after an
-/// image; if it is taken, the import is skipped instead of looping over the address space forever.
+/// image; if it is taken, the launch fails instead of looping over the address space forever or leaving the import
+/// bound to the game folder.
 const NEAR_RETRIES: u32 = 32;
 
 /// Allocates `size` bytes in the target close enough to `base` that the offset fits in the 32-bit import name RVA.
@@ -335,16 +379,46 @@ fn allocate_near(
     None
 }
 
-/// The path in the system ANSI code page, with a NUL terminator.
+// `GetShortPathNameW` is a stable kernel32 export. Declaring it here avoids widening this crate's windows-sys features
+// for one fallback; the rest of the Win32 calls come from windows-sys.
+#[link(name = "kernel32")]
+unsafe extern "system" {
+    fn GetShortPathNameW(long_path: *const u16, short_path: *mut u16, capacity: u32) -> u32;
+}
+
+/// The path in the system ANSI code page, with a NUL terminator. A path outside the code page is retried as its short
+/// (8.3) name, which often stays in ASCII; the original path is named in the error when neither form fits.
 fn ansi(path: &Path) -> io::Result<Vec<u8>> {
-    let wide = wide(path.as_os_str());
+    let long = wide(path.as_os_str());
+    if let Some(bytes) = ansi_units(&long)? {
+        return Ok(bytes);
+    }
+
+    let unrepresentable = || {
+        io::Error::other(format!(
+            "the layer path {} cannot be represented in the system ANSI code page",
+            path.display()
+        ))
+    };
+    let Some(short) = short_path(&long) else {
+        return Err(unrepresentable());
+    };
+    match ansi_units(&short)? {
+        Some(bytes) => Ok(bytes),
+        None => Err(unrepresentable()),
+    }
+}
+
+/// Converts NUL-terminated UTF-16 into the system ANSI code page. `Ok(None)` means a character had to be substituted,
+/// so the loader would look for a different name than the caller gave.
+fn ansi_units(units: &[u16]) -> io::Result<Option<Vec<u8>>> {
     // SAFETY: the length is the number of units, and a null output asks for the needed size.
     let needed = unsafe {
         WideCharToMultiByte(
             CP_ACP,
             0,
-            wide.as_ptr(),
-            wide.len() as i32 - 1,
+            units.as_ptr(),
+            units.len() as i32 - 1,
             std::ptr::null_mut(),
             0,
             std::ptr::null_mut(),
@@ -357,17 +431,19 @@ fn ansi(path: &Path) -> io::Result<Vec<u8>> {
     }
 
     let mut bytes = vec![0u8; needed as usize + 1];
-    // SAFETY: `bytes` has room for the converted text and the terminator.
+    let mut used_default = 0;
+    // SAFETY: `bytes` has room for the converted text and the terminator, and `used_default` is a valid BOOL for the
+    // call. A character outside the code page makes the loader look for a different name, so it is reported by `None`.
     let written = unsafe {
         WideCharToMultiByte(
             CP_ACP,
             0,
-            wide.as_ptr(),
-            wide.len() as i32 - 1,
+            units.as_ptr(),
+            units.len() as i32 - 1,
             bytes.as_mut_ptr(),
             needed,
-            std::ptr::null_mut(),
-            std::ptr::null_mut(),
+            std::ptr::null(),
+            &mut used_default,
         )
     };
 
@@ -375,9 +451,32 @@ fn ansi(path: &Path) -> io::Result<Vec<u8>> {
         return Err(io::Error::last_os_error());
     }
 
+    if used_default != 0 {
+        return Ok(None);
+    }
+
     bytes.truncate(written as usize);
     bytes.push(0);
-    Ok(bytes)
+    Ok(Some(bytes))
+}
+
+/// The short (8.3) form of a NUL-terminated path, itself NUL-terminated, or `None` when the volume has none.
+fn short_path(long: &[u16]) -> Option<Vec<u16>> {
+    // SAFETY: `long` is NUL-terminated; a zero capacity asks for the size of the result, including its terminator.
+    let needed = unsafe { GetShortPathNameW(long.as_ptr(), std::ptr::null_mut(), 0) };
+    let capacity = usize::try_from(needed).ok()?;
+    if capacity == 0 {
+        return None;
+    }
+    let mut short = vec![0u16; capacity];
+    // SAFETY: `short` has room for `capacity` units including the terminator, and `long` is NUL-terminated.
+    let written = unsafe { GetShortPathNameW(long.as_ptr(), short.as_mut_ptr(), needed) };
+    let used = usize::try_from(written).ok()?;
+    if used == 0 || used >= capacity {
+        return None;
+    }
+    short.truncate(used + 1);
+    Some(short)
 }
 
 /// The error of a malformed program image, for the callers that report `io::Error`.
@@ -399,6 +498,25 @@ fn malformed(detail: gobbo_overlay_pe::Malformed) -> io::Error {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Write;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    /// Writes a program-shaped file under the system temp folder and returns its path. The caller removes it.
+    fn a_program_file(bytes: &[u8], tail: usize) -> PathBuf {
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "gobbo-static-imports-{}-{stamp}.exe",
+            std::process::id()
+        ));
+        let mut file = File::create(&path).unwrap();
+        file.write_all(bytes).unwrap();
+        file.write_all(&vec![0xAB; tail]).unwrap();
+        drop(file);
+        path
+    }
 
     #[test]
     fn the_test_program_has_a_readable_import_table() {
@@ -412,12 +530,123 @@ mod tests {
         assert!(imports.iter().all(|import| import.descriptor_rva > 0));
     }
 
+    /// The failure branch is not unit-tested: whether a short name exists depends on the volume, and whether it is in
+    /// CP_ACP depends on the machine's code page. Neither can be forced by a portable fixture.
+    #[test]
+    fn an_ascii_layer_path_is_converted_with_a_terminator() {
+        let bytes = ansi(Path::new(r"C:\Games\mods\proxy.dll")).expect("ASCII is representable");
+        assert_eq!(bytes, b"C:\\Games\\mods\\proxy.dll\0".to_vec());
+    }
+
+    #[test]
+    fn a_representable_short_form_is_converted_with_a_terminator() {
+        let short = wide(OsStr::new(r"C:\PROGRA~1\proxy.dll"));
+        let bytes = ansi_units(&short)
+            .expect("the conversion itself succeeds")
+            .expect("ASCII is representable");
+        assert_eq!(bytes, b"C:\\PROGRA~1\\proxy.dll\0".to_vec());
+    }
+
+    /// Three descriptors, two for one DLL in different case, each with stale bound-import fields. The builder lives in
+    /// `gobbo-overlay-pe` so its header layout stays in step with the parser's own fixtures.
+    fn duplicate_dll_image() -> Vec<u8> {
+        gobbo_overlay_pe::test_support::image_with_bound_imports(
+            false,
+            &["version.dll", "VERSION.DLL", "kernel32.dll"],
+            &[(0x1234_5678, 0x9ABC_DEF0); 3],
+        )
+    }
+
+    #[test]
+    fn every_descriptor_of_a_dll_is_selected_case_insensitively() {
+        let bytes = duplicate_dll_image();
+        let (pe32, imports) = gobbo_overlay_pe::parse(&bytes).unwrap();
+        assert!(!pe32);
+        assert_eq!(imports.len(), 3);
+        assert_eq!(
+            descriptor_rvas(&imports, "Version.dll"),
+            vec![0x1000, 0x1014]
+        );
+        assert_eq!(descriptor_rvas(&imports, "kernel32.dll"), vec![0x1028]);
+    }
+
+    #[test]
+    fn a_descriptor_patch_clears_bound_imports_and_writes_the_name() {
+        let (bound, name) = descriptor_patches(0x1234_5678);
+        assert_eq!(bound, [0u8; 8]);
+        assert_eq!(name, 0x1234_5678u32.to_le_bytes());
+        // Only +4..+12 and +12..+16 are written; `OriginalFirstThunk` at +0 is not part of either patch.
+    }
+
     #[test]
     fn the_test_program_is_not_reported_as_pe32_when_the_build_is_x64() {
         let program = std::env::current_exe().unwrap();
         assert_eq!(
-            parsed(&program).unwrap().pe32,
+            parse_file(&program).unwrap().pe32,
             cfg!(target_pointer_width = "32")
         );
+    }
+
+    /// The bounded reader must give the same bitness and imports as parsing the whole file: a prefix may never turn
+    /// a real import list into a shorter one.
+    #[test]
+    fn the_bounded_reader_parses_the_test_program_like_the_whole_file() {
+        let program = std::env::current_exe().unwrap();
+        let whole = std::fs::read(&program).unwrap();
+        let expected = parsed(gobbo_overlay_pe::parse(&whole).unwrap()).unwrap();
+        assert_eq!(parse_file(&program).unwrap(), expected);
+    }
+
+    /// The reader's bound is the only limit on disk I/O here. An unusually large tail after the program is parsed
+    /// from the prefix alone and does not change the result.
+    #[test]
+    fn a_large_tail_after_the_program_is_not_read_into_the_parser() {
+        let program = std::env::current_exe().unwrap();
+        let original = std::fs::read(&program).unwrap();
+        let expected = gobbo_overlay_pe::parse(&original).unwrap();
+        let path = a_program_file(&original, PREFIX_BYTES + 64 * 1024);
+        let bytes = std::fs::read(&path).unwrap();
+        // The parser decided from the first `PREFIX_BYTES`: no byte of the tail was needed.
+        assert_eq!(
+            gobbo_overlay_pe::parse_prefix(&bytes[..PREFIX_BYTES]),
+            gobbo_overlay_pe::PrefixParse::Complete(Ok(expected.clone()))
+        );
+        assert_eq!(parse_file(&path).unwrap(), parsed(expected).unwrap());
+        std::fs::remove_file(&path).unwrap();
+    }
+
+    /// A prefix that ends in a header or inside an import descriptor must fall back to the whole file, not report an
+    /// empty import list.
+    #[test]
+    fn a_truncated_prefix_falls_back_to_the_whole_file() {
+        let program = std::env::current_exe().unwrap();
+        let whole = std::fs::read(&program).unwrap();
+        let expected = parsed(gobbo_overlay_pe::parse(&whole).unwrap()).unwrap();
+        // No bytes at all, and a prefix cut in the PE headers, both force the fallback.
+        assert_eq!(parse_file_limited(&program, 0).unwrap(), expected);
+        assert_eq!(parse_file_limited(&program, 0x90).unwrap(), expected);
+
+        // A prefix cut inside the first import descriptor of a synthetic image does the same.
+        let bytes = duplicate_dll_image();
+        let path = a_program_file(&bytes, 0);
+        let found = parse_file_limited(&path, 0x205).unwrap();
+        assert_eq!(found.imports.len(), 3);
+        assert_eq!(
+            descriptor_rvas(&found.imports, "Version.dll"),
+            vec![0x1000, 0x1014]
+        );
+        assert_eq!(
+            descriptor_rvas(&found.imports, "kernel32.dll"),
+            vec![0x1028]
+        );
+        std::fs::remove_file(&path).unwrap();
+    }
+
+    #[test]
+    fn a_malformed_program_is_rejected_by_the_bounded_reader() {
+        let path = a_program_file(b"not a PE image", 0);
+        let error = parse_file(&path).unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+        std::fs::remove_file(&path).unwrap();
     }
 }

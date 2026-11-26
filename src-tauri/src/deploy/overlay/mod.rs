@@ -62,8 +62,6 @@ pub(super) use session::matches_plan;
 pub use session::{
     Session, check_support, finish, make_room, prepare_with_progress, wait_released,
 };
-#[cfg(windows)]
-pub use windows::{mount_config, mounts_path};
 
 /// Overlayfs on Linux virtualizes every file, so no DLL name is reserved there.
 #[cfg(not(windows))]

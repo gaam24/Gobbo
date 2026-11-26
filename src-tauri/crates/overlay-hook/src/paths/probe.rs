@@ -165,8 +165,16 @@ const MAX_PATH_UNITS: usize = 260;
 /// The stack buffer of `probe_child`: room for the base path, the relative path and their separator.
 const CHILD_PATH_UNITS: usize = MAX_PATH_UNITS * 2;
 
+/// The `\\?\` and `\\.\` prefixes in UTF-16 units, used without going through `String`.
+const VERBATIM_PREFIX: &[u16] = &[92, 92, 63, 92];
+const DEVICE_PREFIX: &[u16] = &[92, 92, 46, 92];
+/// The verbatim prefix for a server: `\\?\UNC\`.
+const VERBATIM_UNC_PREFIX: &[u16] = &[92, 92, 63, 92, 85, 78, 67, 92];
+
 /// The path as a NUL-terminated UTF-16 string for a call that takes long paths. The attribute query does not add the
 /// `\\?\` prefix itself, so a long absolute path gets it here (`\\?\UNC\` for a server), as `Path::exists` gets it.
+/// The prefix is joined in UTF-16: `to_string_lossy` would replace an unpaired surrogate with U+FFFD and name a
+/// different file.
 fn verbatim_wide(path: &Path) -> Vec<u16> {
     let plain = wide(path.as_os_str());
 
@@ -174,17 +182,20 @@ fn verbatim_wide(path: &Path) -> Vec<u16> {
         return plain;
     }
 
-    let text = path.to_string_lossy();
-
-    if text.starts_with(r"\\?\") || text.starts_with(r"\\.\") {
+    if plain.starts_with(VERBATIM_PREFIX) || plain.starts_with(DEVICE_PREFIX) {
         return plain;
     }
 
-    let verbatim = match text.strip_prefix(r"\\") {
-        Some(server) => format!(r"\\?\UNC\{server}"),
-        None => format!(r"\\?\{text}"),
+    // A UNC name already starts with `\\`; the verbatim form replaces those two units with `\\?\UNC\`.
+    let (prefix, skip) = if plain.starts_with(&[92u16, 92]) {
+        (VERBATIM_UNC_PREFIX, 2)
+    } else {
+        (VERBATIM_PREFIX, 0)
     };
-    wide(OsStr::new(&verbatim))
+    let mut verbatim = Vec::with_capacity(prefix.len() + plain.len() - skip);
+    verbatim.extend_from_slice(prefix);
+    verbatim.extend_from_slice(&plain[skip..]);
+    verbatim
 }
 
 #[cfg(test)]
@@ -249,5 +260,47 @@ mod tests {
         std::fs::create_dir_all(&long).unwrap();
         assert!(matches!(probe(&long), Probe::Found { .. }));
         let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn a_long_path_with_an_unpaired_surrogate_keeps_its_units() {
+        use std::ffi::OsString;
+        use std::os::windows::ffi::OsStringExt;
+        use std::path::PathBuf;
+
+        // `OsString::from_wide` accepts an unpaired surrogate; `to_string_lossy` would replace it with U+FFFD and name a
+        // different file. The prefix must be added without converting the path through `String`.
+        let mut units = format!(r"C:\{}\", "x".repeat(300))
+            .encode_utf16()
+            .collect::<Vec<u16>>();
+        units.push(0xD800);
+        units.extend("tail.txt".encode_utf16());
+        let path = PathBuf::from(OsString::from_wide(&units));
+
+        let verbatim = verbatim_wide(&path);
+        assert!(verbatim.starts_with(VERBATIM_PREFIX), "{verbatim:?}");
+        assert!(verbatim.contains(&0xD800), "{verbatim:?}");
+        assert!(!verbatim.contains(&0xFFFD), "{verbatim:?}");
+        assert_eq!(verbatim.last(), Some(&0));
+    }
+
+    #[test]
+    fn a_long_unc_path_gets_the_verbatim_unc_prefix_without_lossy_conversion() {
+        use std::ffi::OsString;
+        use std::os::windows::ffi::OsStringExt;
+        use std::path::PathBuf;
+
+        let mut units = format!(r"\\server\{}\", "x".repeat(300))
+            .encode_utf16()
+            .collect::<Vec<u16>>();
+        units.push(0xDC00);
+        units.extend("file.txt".encode_utf16());
+        let path = PathBuf::from(OsString::from_wide(&units));
+
+        let verbatim = verbatim_wide(&path);
+        assert!(verbatim.starts_with(VERBATIM_UNC_PREFIX), "{verbatim:?}");
+        assert!(verbatim.contains(&0xDC00), "{verbatim:?}");
+        assert!(!verbatim.contains(&0xFFFD), "{verbatim:?}");
+        assert_eq!(verbatim.last(), Some(&0));
     }
 }

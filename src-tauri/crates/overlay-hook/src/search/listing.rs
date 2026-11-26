@@ -8,21 +8,22 @@ use gobbo_overlay_core::{
 use rustc_hash::FxHashMap;
 use std::ffi::c_void;
 use std::fs;
-use std::os::windows::ffi::OsStrExt;
 use std::path::Path;
 use std::ptr::{null, null_mut};
 use std::sync::Arc;
-use windows_sys::Win32::Foundation::{CloseHandle, FILETIME, HANDLE, INVALID_HANDLE_VALUE};
+use windows_sys::Win32::Foundation::{
+    CloseHandle, ERROR_NO_MORE_FILES, FILETIME, GetLastError, HANDLE, INVALID_HANDLE_VALUE,
+};
 use windows_sys::Win32::Storage::FileSystem::{
     CreateFileW, FILE_ATTRIBUTE_DIRECTORY, FILE_FLAG_BACKUP_SEMANTICS, FILE_ID_BOTH_DIR_INFO,
     FILE_LIST_DIRECTORY, FILE_READ_ATTRIBUTES, FILE_SHARE_DELETE, FILE_SHARE_READ,
     FILE_SHARE_WRITE, FIND_FIRST_EX_CASE_SENSITIVE, FIND_FIRST_EX_ON_DISK_ENTRIES_ONLY,
     FileIdBothDirectoryInfo, FileIdBothDirectoryRestartInfo, FindClose, FindExInfoBasic,
-    FindExInfoStandard, FindExSearchLimitToDirectories, FindFirstFileExW, FindNextFileW,
-    GetFileInformationByHandleEx, OPEN_EXISTING, WIN32_FIND_DATAW,
+    FindExInfoStandard, FindExSearchLimitToDirectories, FindExSearchNameMatch, FindFirstFileExW,
+    FindNextFileW, GetFileInformationByHandleEx, OPEN_EXISTING, WIN32_FIND_DATAW,
 };
 
-use crate::paths::{find_exact, visible, with_pattern};
+use crate::paths::{find_exact, parent_rel, visible, with_pattern};
 use crate::state::Mount;
 use crate::text::same_folded_wide;
 use crate::win32::PreserveLastError;
@@ -51,37 +52,57 @@ pub(crate) fn has_visible_entries(mount: &Mount, rel: &str) -> bool {
     mount
         .layer_paths()
         .filter(|(layer, _)| *layer != Layer::Upper)
-        .any(|(_, base)| {
-            let base = join(base, rel);
-            fs::read_dir(base).is_ok_and(|entries| {
-                entries.filter_map(Result::ok).any(|entry| {
-                    let name = entry.file_name();
-                    let mut units = [0u16; 260];
-                    let mut length = 0;
-
-                    for unit in name.encode_wide() {
-                        if length == units.len() {
-                            break;
-                        }
-
-                        units[length] = unit;
-                        length += 1;
-                    }
-
-                    !whiteouts.hides_child_units_in_visible_folder(rel, &units[..length])
-                })
-            })
-        })
+        .any(|(_, base)| any_visible_entry(&join(base, rel), rel, Some(&whiteouts)))
 }
 
 /// Whether one folder has an entry at all, stopping at the first one. A copy-up temporary file is not an entry.
 fn any_entry(folder: &Path) -> bool {
-    crate::stat_io();
-    fs::read_dir(folder).is_ok_and(|entries| {
-        entries
-            .filter_map(Result::ok)
-            .any(|entry| !entry.file_name().to_str().is_some_and(is_copy_temp_name))
-    })
+    any_visible_entry(folder, "", None)
+}
+
+/// Whether one folder has an entry that a listing shows. The system listing reports a name at a time in UTF-16, so no
+/// `OsString` is built for entries we only look at to answer "is there one".
+fn any_visible_entry(folder: &Path, rel: &str, whiteouts: Option<&Whiteouts>) -> bool {
+    let (handle, mut data) = find_first(
+        folder,
+        "",
+        "*",
+        FindExInfoStandard,
+        FindExSearchNameMatch,
+        0,
+    );
+
+    if handle == INVALID_HANDLE_VALUE {
+        return false;
+    }
+
+    let mut found = false;
+
+    loop {
+        if entry_visible(crate::win32::find_data_name(&data), rel, whiteouts) {
+            found = true;
+            break;
+        }
+        crate::stat_io();
+        // SAFETY: the handle came from `find_first` and `data` is writable.
+        if unsafe { FindNextFileW(handle, &raw mut data) } == 0 {
+            break;
+        }
+    }
+    // SAFETY: the handle came from `FindFirstFileExW` and is closed once.
+    unsafe { FindClose(handle) };
+    found
+}
+
+/// Whether one name counts as a visible entry. An empty name is not an entry: a zero record can come back from a batch
+/// fill, and it must not make an empty folder look populated. `FindFirstFileW` also reports `.` and `..`, which
+/// `read_dir` did not; a copy-up temporary file is never a game-visible name, and a whiteout can hide a lower child.
+fn entry_visible(name: &[u16], rel: &str, whiteouts: Option<&Whiteouts>) -> bool {
+    !name.is_empty()
+        && !is_dot_name(name)
+        && !is_copy_temp(name)
+        && whiteouts
+            .is_none_or(|whiteouts| !whiteouts.hides_child_units_in_visible_folder(rel, name))
 }
 
 /// The first entry of `base\rel\mask` in one layer. The caller closes the handle.
@@ -132,7 +153,8 @@ pub(crate) fn has_entry(
     }
 
     loop {
-        if !is_dot_name(crate::win32::find_data_name(&data)) {
+        let name = crate::win32::find_data_name(&data);
+        if !is_dot_name(name) && !is_copy_temp(name) {
             // SAFETY: the handle came from `find_first` and is closed once.
             unsafe { FindClose(handle) };
             return true;
@@ -228,29 +250,39 @@ impl Taken {
 /// entries needs about a dozen calls instead of one `FindNextFileW` per entry; `MAX_LISTINGS` bounds the total memory.
 const BATCH_BYTES: usize = 8 * 1024;
 
+/// The outcome of trying a batch pass. `Empty` is distinct from `Fallback`: the folder really has no entries, so
+/// reopening it through the find stream cannot find a spelling either.
+enum BatchOpen<'a> {
+    Reader(BatchReader<'a>),
+    Empty,
+    Fallback,
+}
+
 /// The root layer read in batches with `GetFileInformationByHandleEx`, used by the spelling pass. The information class
 /// has no search mask, so the caller's mask is applied in user mode; an ASCII name is matched without a `String`.
-struct BatchReader {
+struct BatchReader<'a> {
     handle: HANDLE,
-    /// The batch buffer; `u64` gives it the eight-byte alignment the records require.
+    /// The batch buffer; `u64` gives it the eight-byte alignment the records require. It is allocated only when the
+    /// first batch fills, so an empty root pays for no heap buffer.
     buffer: Vec<u64>,
     offset: usize,
     started: bool,
     done: bool,
-    mask: String,
+    /// Borrowed: the caller's mask lives for the whole listing, so an exact-name spelling pass builds no `String`.
+    mask: &'a str,
     with_short_names: bool,
 }
 
-impl BatchReader {
-    /// Opens the folder for a batch pass. `None` when the arguments need the find stream, the path is not ASCII, or the
-    /// volume does not answer the batch; the caller then uses `find_first` and `FindNextFileW`.
-    fn open(base: &Path, rel: &str, mask: &str, level: i32, flags: u32) -> Option<Self> {
+impl<'a> BatchReader<'a> {
+    /// Opens the folder for a batch pass. `Fallback` when the arguments need the find stream, the path is not ASCII,
+    /// or the volume does not answer the batch; `Empty` when the folder has no entries at all.
+    fn open(base: &Path, rel: &str, mask: &'a str, level: i32, flags: u32) -> BatchOpen<'a> {
         if !batch_supported(level, flags) {
-            return None;
+            return BatchOpen::Fallback;
         }
         // A non-ASCII folder or base path measured slower through the batch handle than through the find stream.
         if !rel.is_ascii() || !base.to_str().is_some_and(str::is_ascii) {
-            return None;
+            return BatchOpen::Fallback;
         }
         // The hook's own open must pass through the file hooks. The caller normally holds the guard; this covers a
         // direct call as well.
@@ -271,27 +303,64 @@ impl BatchReader {
         };
 
         if handle == INVALID_HANDLE_VALUE {
-            return None;
+            return BatchOpen::Fallback;
         }
 
-        let mut reader = Self {
-            handle,
-            buffer: vec![0u64; BATCH_BYTES / 8],
-            offset: 0,
-            started: false,
-            done: false,
-            mask: mask.to_string(),
-            with_short_names: level == FindExInfoStandard,
+        // The first batch goes to the stack: an empty folder must not allocate the 8 KiB buffer or open the folder a
+        // second time through the find stream. The guard above covers this internal query too.
+        let mut first = [0u64; BATCH_BYTES / 8];
+        crate::stat_io();
+        // SAFETY: `first` is writable for `BATCH_BYTES` bytes and eight-byte aligned; the handle is an open folder.
+        let filled = unsafe {
+            GetFileInformationByHandleEx(
+                handle,
+                FileIdBothDirectoryRestartInfo,
+                first.as_mut_ptr().cast(),
+                BATCH_BYTES as u32,
+            )
         };
 
-        if !reader.fill() {
-            // An empty folder or a volume that does not answer the batch: the find stream is the fallback.
+        if filled == 0 {
+            // SAFETY: `GetLastError` only reads the error of the calling thread, right after the call that set it.
+            let error = unsafe { GetLastError() };
             // SAFETY: the handle was opened above and is not stored anywhere else.
             unsafe { CloseHandle(handle) };
-            return None;
+            return if error == ERROR_NO_MORE_FILES {
+                BatchOpen::Empty
+            } else {
+                BatchOpen::Fallback
+            };
         }
 
-        Some(reader)
+        // Some volumes answer TRUE with only dot entries for an empty folder. A spelling pass over those would find no
+        // name to change, so close the handle rather than let the caller open the folder again through the find stream.
+        let mut offset = 0;
+        let mut visible = false;
+
+        while let Some(data) = record_at(&first, &mut offset, false) {
+            if entry_visible(crate::win32::find_data_name(&data), rel, None) {
+                visible = true;
+                break;
+            }
+        }
+
+        if !visible {
+            // SAFETY: the handle was opened above and is not stored anywhere else.
+            unsafe { CloseHandle(handle) };
+            return BatchOpen::Empty;
+        }
+
+        let mut buffer = vec![0u64; BATCH_BYTES / 8];
+        buffer.copy_from_slice(&first);
+        BatchOpen::Reader(Self {
+            handle,
+            buffer,
+            offset: 0,
+            started: true,
+            done: false,
+            mask,
+            with_short_names: level == FindExInfoStandard,
+        })
     }
 
     /// Fills the buffer with the next batch. The first call restarts the query at the beginning of the folder.
@@ -337,44 +406,7 @@ impl BatchReader {
         if self.offset >= self.bytes() && !self.fill() {
             return None;
         }
-        // SAFETY: the buffer is eight-byte aligned, `offset` is an eight-byte multiple, and the system wrote one
-        // `FILE_ID_BOTH_DIR_INFO` there with its name inside the buffer.
-        let info = unsafe {
-            &*self
-                .buffer
-                .as_ptr()
-                .cast::<u8>()
-                .add(self.offset)
-                .cast::<FILE_ID_BOTH_DIR_INFO>()
-        };
-        let name_length = info.FileNameLength as usize / 2;
-        let name = unsafe { std::slice::from_raw_parts(info.FileName.as_ptr(), name_length) };
-        let next = info.NextEntryOffset as usize;
-        self.offset = if next == 0 {
-            self.bytes()
-        } else {
-            self.offset.saturating_add(next)
-        };
-
-        let mut data: WIN32_FIND_DATAW = unsafe { std::mem::zeroed() };
-        data.dwFileAttributes = info.FileAttributes;
-        data.ftCreationTime = filetime(info.CreationTime as u64);
-        data.ftLastAccessTime = filetime(info.LastAccessTime as u64);
-        data.ftLastWriteTime = filetime(info.LastWriteTime as u64);
-        data.nFileSizeHigh = (info.EndOfFile as u64 >> 32) as u32;
-        data.nFileSizeLow = info.EndOfFile as u32;
-
-        for (slot, unit) in data.cFileName.iter_mut().zip(name) {
-            *slot = *unit;
-        }
-
-        if self.with_short_names {
-            let short_length = (info.ShortNameLength.max(0) as usize / 2).min(info.ShortName.len());
-            data.cAlternateFileName[..short_length]
-                .copy_from_slice(&info.ShortName[..short_length]);
-        }
-
-        Some(data)
+        record_at(&self.buffer, &mut self.offset, self.with_short_names)
     }
 
     /// The next entry that matches the caller's mask.
@@ -382,18 +414,69 @@ impl BatchReader {
         loop {
             let data = self.next_raw()?;
 
-            if wildcard_match_units(&self.mask, crate::win32::find_data_name(&data)) {
+            if wildcard_match_units(self.mask, crate::win32::find_data_name(&data)) {
                 return Some(data);
             }
         }
     }
 }
 
-impl Drop for BatchReader {
+impl Drop for BatchReader<'_> {
     fn drop(&mut self) {
         // SAFETY: the handle was opened in `open` and is closed once, here.
         unsafe { CloseHandle(self.handle) };
     }
+}
+
+/// The next record of one filled batch at `offset`, advancing it past the record. The batch can be the stack buffer of
+/// the first fill or the reader's heap buffer; neither is refilled here.
+fn record_at(
+    buffer: &[u64],
+    offset: &mut usize,
+    with_short_names: bool,
+) -> Option<WIN32_FIND_DATAW> {
+    let bytes = std::mem::size_of_val(buffer);
+
+    if *offset >= bytes {
+        return None;
+    }
+
+    // SAFETY: the buffer is eight-byte aligned, `offset` is an eight-byte multiple within it, and the system wrote one
+    // `FILE_ID_BOTH_DIR_INFO` there with its name inside the buffer.
+    let info = unsafe {
+        &*buffer
+            .as_ptr()
+            .cast::<u8>()
+            .add(*offset)
+            .cast::<FILE_ID_BOTH_DIR_INFO>()
+    };
+    let name_length = info.FileNameLength as usize / 2;
+    let name = unsafe { std::slice::from_raw_parts(info.FileName.as_ptr(), name_length) };
+    let next = info.NextEntryOffset as usize;
+    *offset = if next == 0 {
+        bytes
+    } else {
+        offset.saturating_add(next)
+    };
+
+    let mut data: WIN32_FIND_DATAW = unsafe { std::mem::zeroed() };
+    data.dwFileAttributes = info.FileAttributes;
+    data.ftCreationTime = filetime(info.CreationTime as u64);
+    data.ftLastAccessTime = filetime(info.LastAccessTime as u64);
+    data.ftLastWriteTime = filetime(info.LastWriteTime as u64);
+    data.nFileSizeHigh = (info.EndOfFile as u64 >> 32) as u32;
+    data.nFileSizeLow = info.EndOfFile as u32;
+
+    for (slot, unit) in data.cFileName.iter_mut().zip(name) {
+        *slot = *unit;
+    }
+
+    if with_short_names {
+        let short_length = (info.ShortNameLength.max(0) as usize / 2).min(info.ShortName.len());
+        data.cAlternateFileName[..short_length].copy_from_slice(&info.ShortName[..short_length]);
+    }
+
+    Some(data)
 }
 
 /// Whether the batch can replace the find stream for these arguments. A case-sensitive or on-disk-only search keeps the
@@ -499,11 +582,8 @@ pub(crate) struct ListingLayers {
 // listing.
 unsafe impl Send for ListingLayers {}
 
-/// The entries of a game-relative folder for a listing: the dots, the upper and staging layers read now, and the root
-/// layer as a stream. The listing starts with `.` and `..`, as the Win32 listing does and as a plain NTFS folder lists
-/// them. The layers are merged by the system listing call itself. The pattern filters the names in each layer, so the
-/// hook does not walk and match every entry by hand. `allow_direct` lets a caller that can return a real find handle take
-/// the game folder unchanged. `own` is the folder path a caller already probed for the dot entries.
+/// The entries of a game-relative folder for a listing, when the caller has not already probed the folder. See
+/// `find_layers_own` for the arguments.
 #[expect(
     clippy::too_many_arguments,
     reason = "the caller already has the listing arguments; grouping them would add a struct used once"
@@ -518,6 +598,40 @@ pub(crate) fn find_layers(
     allow_direct: bool,
     own: Option<&Path>,
 ) -> ListingLayers {
+    find_layers_own(
+        mount,
+        rel,
+        mask,
+        level,
+        search,
+        flags,
+        allow_direct,
+        own,
+        None,
+    )
+}
+
+/// The entries of a game-relative folder for a listing: the dots, the upper and staging layers read now, and the root
+/// layer as a stream. The listing starts with `.` and `..`, as the Win32 listing does and as a plain NTFS folder lists
+/// them. The layers are merged by the system listing call itself. The pattern filters the names in each layer, so the
+/// hook does not walk and match every entry by hand. `allow_direct` lets a caller that can return a real find handle take
+/// the game folder unchanged. `own` is the folder path a caller already probed; `own_attributes` are the attributes that
+/// probe reported, so the dot entry for the folder needs no second filesystem call.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the caller already has the listing arguments; grouping them would add a struct used once"
+)]
+pub(super) fn find_layers_own(
+    mount: &Mount,
+    rel: &str,
+    mask: &str,
+    level: i32,
+    search: i32,
+    flags: u32,
+    allow_direct: bool,
+    own: Option<&Path>,
+    own_attributes: Option<u32>,
+) -> ListingLayers {
     // The internal listing calls set their own last error; keep the caller's value for the success path.
     let _last_error = PreserveLastError::capture();
     let whiteouts = mount.whiteouts_snapshot();
@@ -525,7 +639,7 @@ pub(crate) fn find_layers(
     let directories_only = search == FindExSearchLimitToDirectories;
     // Only this function adds the dots, so a caller cannot accidentally add them twice. `own` is the folder path a
     // caller already probed; without one the dots probe the folder and its parent themselves.
-    let mut taken = Taken::leading(dot_entries(mount, rel, mask, own));
+    let mut taken = Taken::leading(dot_entries(mount, rel, mask, own, own_attributes));
 
     for (layer, base) in mount.layer_paths() {
         if layer != Layer::Upper && hidden_folder {
@@ -681,7 +795,7 @@ fn apply_spellings(
             }
 
             let name = crate::win32::find_data_name(&taken.entries[index]);
-            let Some(lower) = staging_spelling(mount, rel, name, whiteouts) else {
+            let Some(lower) = staging_spelling(mount, rel, name, whiteouts, flags) else {
                 continue;
             };
             taken.entries[index].cFileName = lower.cFileName;
@@ -699,7 +813,8 @@ fn apply_spellings(
         }
 
         let name = crate::win32::find_data_name(&taken.entries[index]);
-        let Some(lower) = lower_spelling(mount, rel, layer, name, whiteouts, hidden_folder) else {
+        let Some(lower) = lower_spelling(mount, rel, layer, name, whiteouts, hidden_folder, flags)
+        else {
             continue;
         };
         taken.entries[index].cFileName = lower.cFileName;
@@ -735,16 +850,21 @@ fn apply_root_spellings(
         .zip(&taken.layers)
         .filter(|(_, layer)| **layer != Layer::Root)
         .count();
-    if let Some(mut batch) = BatchReader::open(base, rel, mask, level, flags) {
-        while let Some(data) = batch.next() {
-            spell_entry(taken, rel, whiteouts, &data, &mut found, &mut remaining);
+    match BatchReader::open(base, rel, mask, level, flags) {
+        BatchOpen::Reader(mut batch) => {
+            while let Some(data) = batch.next() {
+                spell_entry(taken, rel, whiteouts, &data, &mut found, &mut remaining);
 
-            if remaining == 0 {
-                break;
+                if remaining == 0 {
+                    break;
+                }
             }
-        }
 
-        return found;
+            return found;
+        }
+        // The folder has no entries: a second open through the find stream would find no spelling either.
+        BatchOpen::Empty => return found,
+        BatchOpen::Fallback => {}
     }
 
     let (handle, mut data) = find_first(base, rel, mask, level, search, flags);
@@ -802,11 +922,12 @@ fn staging_spelling(
     rel: &str,
     name: &[u16],
     whiteouts: &Whiteouts,
+    flags: u32,
 ) -> Option<WIN32_FIND_DATAW> {
     let (_, base) = mount
         .layer_paths()
         .find(|(layer, _)| *layer == Layer::Staging)?;
-    let data = find_exact(base, rel, name)?;
+    let data = find_exact(base, rel, name, flags)?;
 
     if whiteouts.hides_child_units_in_visible_folder(rel, crate::win32::find_data_name(&data)) {
         return None;
@@ -825,6 +946,7 @@ fn lower_spelling(
     name: &[u16],
     whiteouts: &Whiteouts,
     hidden_folder: bool,
+    flags: u32,
 ) -> Option<WIN32_FIND_DATAW> {
     let order: &[Layer] = match layer {
         Layer::Upper => &[Layer::Root, Layer::Staging],
@@ -840,7 +962,7 @@ fn lower_spelling(
         let Some((_, base)) = mount.layer_paths().find(|(found, _)| found == wanted) else {
             continue;
         };
-        let Some(data) = find_exact(base, rel, name) else {
+        let Some(data) = find_exact(base, rel, name, flags) else {
             continue;
         };
         // Both lower layers are hidden by a whiteout alike: a whiteout hides the name in the staging layer too.
@@ -855,10 +977,17 @@ fn lower_spelling(
 }
 
 /// The `.` and `..` entries that a listing of a game-relative folder starts with, as the system lists them: `.` has the
-/// folder's own details, and `..` the folder above. The game folder's `..` is the folder that holds it. A mask that does
-/// not match a name leaves that entry out. The layers never add these entries (see `is_dot_name`).
-fn dot_entries(mount: &Mount, rel: &str, mask: &str, own: Option<&Path>) -> Vec<WIN32_FIND_DATAW> {
-    let parent_rel = rel.rsplit_once('\\').map_or("", |(parent, _)| parent);
+/// folder's own attributes, and `..` the folder above. The game folder's `..` is the folder that holds it. A mask that
+/// does not match a name leaves that entry out. The layers never add these entries (see `is_dot_name`). `own_attributes`
+/// are the attributes a caller already got from `shown`, so `.` needs no metadata call.
+fn dot_entries(
+    mount: &Mount,
+    rel: &str,
+    mask: &str,
+    own: Option<&Path>,
+    own_attributes: Option<u32>,
+) -> Vec<WIN32_FIND_DATAW> {
+    let parent = parent_rel(rel);
     // The caller has usually probed the folder already (`shown`); reuse that path instead of probing it again.
     let own = own.map(Path::to_path_buf).or_else(|| {
         if rel.is_empty() {
@@ -869,16 +998,20 @@ fn dot_entries(mount: &Mount, rel: &str, mask: &str, own: Option<&Path>) -> Vec<
     });
     let above = if rel.is_empty() {
         mount.guest.parent().map(Path::to_path_buf)
-    } else if parent_rel.is_empty() {
+    } else if parent.is_empty() {
         Some(mount.guest.clone())
     } else {
-        visible(mount, parent_rel).map(|(_, path)| path)
+        visible(mount, parent).map(|(_, path)| path)
     };
     let mut entries = Vec::with_capacity(2);
 
-    for (dot, source) in [(".", own), ("..", above)] {
-        if let Some(source) = source
-            && wildcard_match(mask, dot)
+    for (dot, source, attributes) in [(".", own, own_attributes), ("..", above, None)] {
+        if !wildcard_match(mask, dot) {
+            continue;
+        }
+        if let Some(attributes) = attributes {
+            entries.push(find_data_attributes(dot, attributes));
+        } else if let Some(source) = source
             && let Ok(meta) = fs::metadata(&source)
         {
             entries.push(find_data(dot, &meta));
@@ -918,12 +1051,28 @@ pub(super) fn find_data(name: &str, meta: &fs::Metadata) -> WIN32_FIND_DATAW {
     data.ftLastWriteTime = filetime(meta.last_write_time());
     data.nFileSizeHigh = (meta.file_size() >> 32) as u32;
     data.nFileSizeLow = meta.file_size() as u32;
-    // At most 259 units: the last slot of the 260 is the terminator, which stays zero.
-    for (slot, unit) in data.cFileName.iter_mut().zip(name.encode_utf16().take(259)) {
-        *slot = unit;
-    }
+    set_find_name(&mut data, name);
 
     data
+}
+
+/// The `WIN32_FIND_DATAW` of a dot entry whose attributes the caller already knows. The attribute query did not report
+/// times or size, and asking the disk again is the cost this avoids; those fields stay zero for this synthetic entry.
+fn find_data_attributes(name: &str, attributes: u32) -> WIN32_FIND_DATAW {
+    // SAFETY: `WIN32_FIND_DATAW` is plain data; all zeros is a valid value that the fields below then fill in.
+    let mut data: WIN32_FIND_DATAW = unsafe { std::mem::zeroed() };
+    data.dwFileAttributes = attributes;
+    set_find_name(&mut data, name);
+    data
+}
+
+/// Writes a name into `cFileName`, leaving the last slot as the terminator. A name longer than the field is cut at
+/// `cFileName.len() - 1`, so no unit overwrites the terminator and no intermediate buffer is built.
+fn set_find_name(data: &mut WIN32_FIND_DATAW, name: &str) {
+    let cap = data.cFileName.len() - 1;
+    for (slot, unit) in data.cFileName.iter_mut().zip(name.encode_utf16().take(cap)) {
+        *slot = unit;
+    }
 }
 
 /// A file time as the two halves of `FILETIME`.
@@ -936,6 +1085,7 @@ fn filetime(value: u64) -> FILETIME {
 
 #[cfg(test)]
 mod tests {
+    use gobbo_overlay_core::copy_temp_name;
     use windows_sys::Win32::Storage::FileSystem::{FindExInfoStandard, FindExSearchNameMatch};
 
     use super::*;
@@ -949,6 +1099,14 @@ mod tests {
         }
 
         data
+    }
+
+    fn reader<'a>(base: &'a Path, mask: &'a str, level: i32) -> BatchReader<'a> {
+        match BatchReader::open(base, "", mask, level, 0) {
+            BatchOpen::Reader(reader) => reader,
+            BatchOpen::Empty => panic!("the test folder has no entries"),
+            BatchOpen::Fallback => panic!("the batch was refused for the test folder"),
+        }
     }
 
     #[test]
@@ -1019,7 +1177,7 @@ mod tests {
 
         fs::write(base.join("note.bin"), b"x").unwrap();
 
-        let mut reader = BatchReader::open(&base, "", "*.txt", FindExInfoStandard, 0).unwrap();
+        let mut reader = reader(&base, "*.txt", FindExInfoStandard);
         let mut names = Vec::new();
 
         while let Some(data) = reader.next() {
@@ -1054,7 +1212,7 @@ mod tests {
             ("*.txt", FindExInfoStandard),
             ("file1??.txt", FindExInfoBasic),
         ] {
-            let mut batch = BatchReader::open(&base, "", mask, level, 0).unwrap();
+            let mut batch = reader(&base, mask, level);
             let mut batch_names = Vec::new();
 
             while let Some(data) = batch.next() {
@@ -1164,6 +1322,14 @@ mod tests {
     }
 
     #[test]
+    fn a_long_name_with_known_attributes_is_cut_before_the_terminator() {
+        let data = find_data_attributes(&"a".repeat(300), FILE_ATTRIBUTE_DIRECTORY);
+        assert_eq!(data.cFileName[258], u16::from(b'a'));
+        assert_eq!(data.cFileName[259], 0);
+        assert_eq!(data.dwFileAttributes, FILE_ATTRIBUTE_DIRECTORY);
+    }
+
+    #[test]
     fn a_file_time_is_split_into_its_two_halves() {
         let time = filetime(0x0123_4567_89AB_CDEF);
         assert_eq!(time.dwLowDateTime, 0x89AB_CDEF);
@@ -1199,6 +1365,14 @@ mod tests {
             let units: Vec<u16> = other.encode_utf16().collect();
             assert!(!is_copy_temp(&units), "{other}");
         }
+    }
+
+    #[test]
+    fn a_name_from_the_core_generator_is_hidden_from_a_listing() {
+        let name = copy_temp_name(7, 9);
+        let units = wide(std::ffi::OsStr::new(&name));
+        // `wide` adds the terminator that `find_data_name` leaves out of the slice the listing checks.
+        assert!(is_copy_temp(&units[..units.len() - 1]), "{name}");
     }
 
     #[test]
@@ -1247,5 +1421,186 @@ mod tests {
         assert!(!names.iter().any(|name| name == "root00.BIN"), "{names:?}");
         drop(layers);
         fs::remove_dir_all(&base).unwrap();
+    }
+
+    #[test]
+    fn a_case_sensitive_listing_keeps_the_upper_spelling() {
+        let base = std::env::temp_dir().join(format!("gobbo-listing-case-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&base);
+        let root = base.join("game");
+        let upper = base.join("upper");
+        fs::create_dir_all(&root).unwrap();
+        fs::create_dir_all(&upper).unwrap();
+        fs::write(root.join("a.txt"), b"root").unwrap();
+        fs::write(upper.join("A.txt"), b"upper").unwrap();
+
+        let mount = Mount::new(
+            "game".to_string(),
+            root.clone(),
+            gobbo_overlay_core::Layers::new(root, None, upper),
+            Whiteouts::default(),
+        );
+        let names = |flags: u32| {
+            let layers = find_layers(
+                &mount,
+                "",
+                "*",
+                FindExInfoStandard,
+                FindExSearchNameMatch,
+                flags,
+                false,
+                None,
+            );
+            layers
+                .taken
+                .entries
+                .iter()
+                .map(|data| String::from_utf16(crate::win32::find_data_name(data)).unwrap())
+                .collect::<Vec<_>>()
+        };
+
+        let folded = names(0);
+        assert!(folded.iter().any(|name| name == "a.txt"), "{folded:?}");
+        assert!(!folded.iter().any(|name| name == "A.txt"), "{folded:?}");
+
+        let exact = names(FIND_FIRST_EX_CASE_SENSITIVE);
+        assert!(exact.iter().any(|name| name == "A.txt"), "{exact:?}");
+        assert!(!exact.iter().any(|name| name == "a.txt"), "{exact:?}");
+
+        fs::remove_dir_all(&base).unwrap();
+    }
+
+    #[test]
+    fn a_known_folder_attribute_builds_the_dot_entry_without_a_probe() {
+        let base = std::env::temp_dir().join(format!("gobbo-listing-dot-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&base);
+        let guest = base.join("guest");
+        fs::create_dir_all(&guest).unwrap();
+        let mount = Mount::new(
+            "game".to_string(),
+            guest,
+            gobbo_overlay_core::Layers::new(base.join("game"), None, base.join("upper")),
+            Whiteouts::default(),
+        );
+        // The path does not exist: a metadata call would drop the entry, so its presence proves the attributes were
+        // used instead.
+        let missing = base.join("does-not-exist");
+        let entries = dot_entries(
+            &mount,
+            "",
+            "*",
+            Some(&missing),
+            Some(FILE_ATTRIBUTE_DIRECTORY),
+        );
+        let dot = entries
+            .iter()
+            .find(|data| crate::win32::find_data_name(data) == [u16::from(b'.')])
+            .unwrap();
+        assert_eq!(dot.dwFileAttributes, FILE_ATTRIBUTE_DIRECTORY);
+        assert_eq!(dot.ftCreationTime.dwLowDateTime, 0);
+        fs::remove_dir_all(&base).unwrap();
+    }
+
+    #[test]
+    fn a_nested_folder_gets_dot_dot_from_the_parent_in_the_relative_path() {
+        use std::os::windows::fs::MetadataExt;
+
+        let base =
+            std::env::temp_dir().join(format!("gobbo-listing-parent-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&base);
+        let guest = base.join("guest");
+        let root = base.join("game");
+        fs::create_dir_all(&guest).unwrap();
+        fs::create_dir_all(root.join("archive")).unwrap();
+        let mount = Mount::new(
+            "game".to_string(),
+            guest,
+            gobbo_overlay_core::Layers::new(root.clone(), None, base.join("upper")),
+            Whiteouts::default(),
+        );
+
+        let entries = dot_entries(
+            &mount,
+            r"archive\sub",
+            "*",
+            None,
+            Some(FILE_ATTRIBUTE_DIRECTORY),
+        );
+        let dot_dot = entries
+            .iter()
+            .find(|data| crate::win32::find_data_name(data) == [u16::from(b'.'), u16::from(b'.')])
+            .unwrap();
+        // The `..` entry carries the metadata of `archive`, the parent named by the relative path.
+        let parent = fs::metadata(root.join("archive")).unwrap();
+        let written = filetime(parent.last_write_time());
+        assert_eq!(dot_dot.dwFileAttributes, parent.file_attributes());
+        assert_eq!(dot_dot.ftLastWriteTime.dwLowDateTime, written.dwLowDateTime);
+        assert_eq!(
+            dot_dot.ftLastWriteTime.dwHighDateTime,
+            written.dwHighDateTime
+        );
+        fs::remove_dir_all(&base).unwrap();
+    }
+
+    #[test]
+    fn a_stale_copy_temp_is_not_an_entry_of_a_layer() {
+        let base = std::env::temp_dir().join(format!("gobbo-listing-temp-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&base);
+        let root = base.join("game");
+        let upper = base.join("upper");
+        fs::create_dir_all(&root).unwrap();
+        fs::create_dir_all(&upper).unwrap();
+        fs::write(root.join(".gobbo-copy-1-1.tmp"), b"x").unwrap();
+
+        let mount = Mount::new(
+            "game".to_string(),
+            root.clone(),
+            gobbo_overlay_core::Layers::new(root.clone(), None, upper),
+            Whiteouts::default(),
+        );
+        let probe = || {
+            has_entry(
+                &mount,
+                Layer::Root,
+                "",
+                "*",
+                FindExInfoStandard,
+                FindExSearchNameMatch,
+                0,
+            )
+        };
+        assert!(!probe());
+        fs::write(root.join("real.bin"), b"x").unwrap();
+        assert!(probe());
+        fs::remove_dir_all(&base).unwrap();
+    }
+
+    #[test]
+    fn an_empty_root_needs_no_find_stream_fallback() {
+        let base = std::env::temp_dir().join(format!("gobbo-listing-empty-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&base);
+        fs::create_dir_all(&base).unwrap();
+        assert!(matches!(
+            BatchReader::open(&base, "", "*", FindExInfoStandard, 0),
+            BatchOpen::Empty
+        ));
+        fs::remove_dir_all(&base).unwrap();
+    }
+
+    #[test]
+    fn only_visible_names_count_as_entries() {
+        let mut whiteouts = Whiteouts::default();
+        whiteouts.hide("folder\\hidden.bin");
+        let units = |name: &str| name.encode_utf16().collect::<Vec<_>>();
+
+        assert!(!entry_visible(&units("."), "", None));
+        assert!(!entry_visible(&units(".."), "", None));
+        assert!(!entry_visible(&units(".gobbo-copy-1-1.tmp"), "", None));
+        assert!(entry_visible(&units("plain.bin"), "", None));
+        assert!(!entry_visible(
+            &units("hidden.bin"),
+            "folder",
+            Some(&whiteouts)
+        ));
     }
 }

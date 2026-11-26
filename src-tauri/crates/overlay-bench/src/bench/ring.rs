@@ -57,17 +57,15 @@ pub(super) fn run() -> Result<(), Box<dyn Error>> {
     for _ in 0..READS {
         let start = Instant::now();
         let (decisions, total) = gobbo_overlay_decisions::read_last(&path, 100)?;
+        let elapsed = start.elapsed();
 
+        // Check after the timer stops: a fixture check is not part of the read being measured.
         if total as usize != RECORDS || decisions.len() != 100 {
             return Err("the ring benchmark read the wrong number of decisions".into());
         }
 
         reads
-            .record(
-                u64::try_from(start.elapsed().as_nanos())
-                    .unwrap_or(u64::MAX)
-                    .max(1),
-            )
+            .record(u64::try_from(elapsed.as_nanos()).unwrap_or(u64::MAX).max(1))
             .map_err(|error| error.to_string())?;
     }
 

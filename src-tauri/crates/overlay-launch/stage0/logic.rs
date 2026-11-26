@@ -27,6 +27,8 @@ const FILE_ATTRIBUTE_DIRECTORY: u32 = 0x10;
 /// The access bits that write, delete or change a file. A call with any of them passes through.
 const WRITE_ACCESS: u32 = 0x0000_0002 // FILE_WRITE_DATA
     | 0x0000_0004 // FILE_APPEND_DATA
+    | 0x0000_0010 // FILE_WRITE_EA
+    | 0x0000_0100 // FILE_WRITE_ATTRIBUTES
     | 0x0001_0000 // DELETE
     | 0x0004_0000 // WRITE_DAC
     | 0x0008_0000 // WRITE_OWNER
@@ -245,8 +247,8 @@ pub unsafe fn redirect(
     }
     // SAFETY: the buffer holds `units` UTF-16 units, as the length says.
     let path = unsafe { core::slice::from_raw_parts(name.buffer as *const u16, units) };
-    let game = &config.game[..config.game_units as usize];
-    let layer = &config.layer[..config.layer_units as usize];
+    let game = config.game.get(..config.game_units as usize)?;
+    let layer = config.layer.get(..config.layer_units as usize)?;
 
     if !starts_with_ascii_ignore_case(path, &NT_PREFIX) {
         return None;
@@ -365,6 +367,19 @@ mod tests {
     }
 
     #[test]
+    fn writing_extended_attributes_is_not_a_read() {
+        // FILE_WRITE_EA and FILE_WRITE_ATTRIBUTES can change the file on an otherwise read-only open or create.
+        assert!(!reads_only(Kind::Open, 0x10, 0));
+        assert!(!reads_only(Kind::Create, 0x10, FILE_OPEN));
+    }
+
+    #[test]
+    fn writing_attributes_is_not_a_read() {
+        assert!(!reads_only(Kind::Open, 0x100, 0));
+        assert!(!reads_only(Kind::Create, 0x100, FILE_OPEN));
+    }
+
+    #[test]
     fn the_kind_codes_round_trip() {
         for kind in [Kind::Open, Kind::Create, Kind::Query] {
             assert_eq!(Kind::from_code(kind.code()), Some(kind));
@@ -392,5 +407,65 @@ mod tests {
     fn the_32_bit_structures_have_the_32_bit_sizes() {
         assert_eq!(size_of::<ObjectAttributes>(), 24);
         assert_eq!(size_of::<UnicodeString>(), 8);
+    }
+
+    /// A configuration is written by the launcher, but a stray write must not make the shim panic: a length outside
+    /// the fixed buffers leaves the call to the loader.
+    #[test]
+    fn an_out_of_range_prefix_length_passes_the_call_through() {
+        unsafe extern "system" fn refuse(_attributes: usize, _information: usize) -> i32 {
+            -1
+        }
+
+        let mut name = wide(r"\??\C:\Games\example\file.dll");
+        let units = (name.len() * 2) as u16;
+        let text = UnicodeString {
+            length: units,
+            maximum_length: units,
+            buffer: name.as_mut_ptr() as usize,
+        };
+        let attributes = ObjectAttributes {
+            length: size_of::<ObjectAttributes>() as u32,
+            root: 0,
+            name: &raw const text as usize,
+            attributes: 0,
+            security_descriptor: 0,
+            security_quality_of_service: 0,
+        };
+        let mut work = Work {
+            kind: Kind::Open.code(),
+            access: 0,
+            disposition: 0,
+            reserved: 0,
+            redirected: attributes,
+            name: UnicodeString {
+                length: 0,
+                maximum_length: 0,
+                buffer: 0,
+            },
+            probe: attributes,
+            information: [0; 8],
+            units: [0; WORK_UNITS],
+        };
+        let mut config = Config::OFF;
+        config.enabled = 1;
+        // SAFETY: the strings, attributes and work area are locals alive for the whole call.
+        let mut call = |config: &Config| unsafe {
+            redirect(config, &raw const attributes as usize, &mut work, refuse)
+        };
+
+        config.game_units = PREFIX_UNITS as u32 + 1;
+        assert!(
+            call(&config).is_none(),
+            "a game prefix outside the buffer was used"
+        );
+
+        config.game_units = NT_PREFIX.len() as u32;
+        config.game[..NT_PREFIX.len()].copy_from_slice(&NT_PREFIX);
+        config.layer_units = PREFIX_UNITS as u32 + 1;
+        assert!(
+            call(&config).is_none(),
+            "a layer prefix outside the buffer was used"
+        );
     }
 }

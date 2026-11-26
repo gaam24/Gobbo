@@ -42,8 +42,9 @@ pub(crate) fn own_module() -> Option<*mut c_void> {
     OWN_BASE.get().map(|base| *base as *mut c_void)
 }
 
-/// Reads the loaded modules once, at install. A module loaded later is not in the cache; the trace falls back to the
-/// loader for it, while the crash path reports the address alone.
+/// Reads the loaded modules once, at install, when a diagnostic needs them: per-call tracing, the first-chance crash
+/// report, an in-process dump or the out-of-process dumper. A module loaded later is not in the cache; the trace falls
+/// back to the loader for it, while the crash path reports the address alone (see `locate_in`).
 pub(crate) fn remember_modules() {
     if MODULES.get().is_some() {
         return;
@@ -177,6 +178,13 @@ mod tests {
     #[test]
     fn an_offset_is_written_in_hex_after_the_module_name() {
         assert_eq!(offset_text("game.exe", 0x1f40), "game.exe+0x1f40");
+    }
+
+    /// The crash report uses `locate_cached` even when no diagnostic needed the table at install. With no module to
+    /// name it falls back to the address, without asking the loader from the crash path.
+    #[test]
+    fn an_address_without_a_cached_module_is_shown_on_its_own() {
+        assert_eq!(locate_in(None, 0x1f40), "0x1f40");
     }
 
     #[test]

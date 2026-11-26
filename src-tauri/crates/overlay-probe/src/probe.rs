@@ -1,7 +1,10 @@
 //! The probe checks themselves. Every check writes only under `__gobbo_probe_<pid>` and reads the physical layer copies
 //! to prove what the hook did; the game folder must stay without that folder.
+//!
+//! The probe's folder is removed from the game, staging and upper layers at the end of the run.
 
 use std::collections::BTreeMap;
+use std::ffi::{OsStr, OsString};
 use std::fs::{self, OpenOptions};
 use std::io::{Error, Write};
 use std::path::{Path, PathBuf};
@@ -14,24 +17,47 @@ use crate::{Check, REPORT_FLAG, Report};
 /// from `winerror.h`; it is written out rather than imported so this crate stays plain std on Linux.
 const ERROR_ACCESS_DENIED: i32 = 5;
 
-/// Runs the probe and prints/writes its JSON report.
-pub fn main() {
-    let mut report_path = None;
-    let mut args = std::env::args().skip(1);
+/// What the command line asks the probe to do.
+enum Arguments {
+    /// Print the usage line and stop before any check runs.
+    Help,
+    /// Run every check, optionally writing the report to a path.
+    Run(Option<PathBuf>),
+}
+
+/// Parses the arguments as OS strings, so a report path that is not valid Unicode reaches `fs::write` unchanged.
+fn parse_args(mut args: impl Iterator<Item = OsString>) -> Result<Arguments, OsString> {
+    let mut report = None;
 
     while let Some(arg) = args.next() {
-        match arg.as_str() {
-            REPORT_FLAG => report_path = args.next().map(PathBuf::from),
-            "--help" | "-h" => {
-                println!("overlay-probe [{REPORT_FLAG} <path>]");
-                return;
-            }
-            other => {
-                eprintln!("overlay-probe: unknown argument: {other}");
-                std::process::exit(2);
-            }
+        if arg.as_os_str() == OsStr::new(REPORT_FLAG) {
+            report = args.next().map(PathBuf::from);
+        } else if arg.as_os_str() == OsStr::new("--help") || arg.as_os_str() == OsStr::new("-h") {
+            return Ok(Arguments::Help);
+        } else {
+            return Err(arg);
         }
     }
+
+    Ok(Arguments::Run(report))
+}
+
+/// Runs the probe and prints/writes its JSON report.
+pub fn main() {
+    let args = match parse_args(std::env::args_os().skip(1)) {
+        Ok(args) => args,
+        Err(arg) => {
+            eprintln!("overlay-probe: unknown argument: {}", arg.to_string_lossy());
+            std::process::exit(2);
+        }
+    };
+    let report_path = match args {
+        Arguments::Help => {
+            println!("overlay-probe [{REPORT_FLAG} <path>]");
+            return;
+        }
+        Arguments::Run(path) => path,
+    };
 
     let report = run();
     let text = match serde_json::to_string_pretty(&report) {
@@ -92,12 +118,13 @@ fn run() -> Report {
     check(&mut checks, "copy-up", copy_up(&game, &upper, &staging));
     check(&mut checks, "whiteout", whiteout(&game, &staging, &upper));
     check(&mut checks, "list", list(&game));
-    check(&mut checks, "link refusal", link_refusal(&game));
+    check(&mut checks, "link refusal", link_refusal(&game, &upper));
 
     // Cleanup is best effort: a failed check has already been reported, and a unique folder name means a leftover
-    // cannot affect the next run.
+    // cannot affect the next run. Only this probe's folder is removed from each layer, never the layer itself.
     let _ = fs::remove_dir_all(&game);
     let _ = fs::remove_dir_all(&staging);
+    let _ = fs::remove_dir_all(&upper);
 
     Report {
         ok: checks.iter().all(|item| item.ok),
@@ -274,9 +301,11 @@ fn list(game: &Path) -> Result<(), String> {
 }
 
 /// A hard link from outside the game to a name inside it is refused with `ERROR_ACCESS_DENIED`, the hook's documented
-/// refusal. Any other failure is carried as the check's detail instead of being reported as a pass.
-fn link_refusal(game: &Path) -> Result<(), String> {
-    let source = std::env::temp_dir().join(format!("gobbo-probe-{}.txt", std::process::id()));
+/// refusal. The source lives in the probe's own folder of the upper layer, outside the game path. Any other failure is
+/// carried as the check's detail instead of being reported as a pass.
+fn link_refusal(game: &Path, upper: &Path) -> Result<(), String> {
+    io(fs::create_dir_all(upper))?;
+    let source = upper.join("link-source.txt");
     io(fs::write(&source, b"source"))?;
     let target = game.join("hard.txt");
     let linked = fs::hard_link(&source, &target);
@@ -295,4 +324,47 @@ fn link_refusal(game: &Path) -> Result<(), String> {
 /// Turns an `io::Result` into the probe's error text.
 fn io<T>(result: Result<T, Error>) -> Result<T, String> {
     result.map_err(|error| error.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_report_flag_takes_the_next_path() {
+        let args = [REPORT_FLAG, r"C:\Users\me\report.json"]
+            .into_iter()
+            .map(OsString::from);
+        let Ok(Arguments::Run(Some(path))) = parse_args(args) else {
+            panic!("the report flag names a path");
+        };
+        assert_eq!(path, PathBuf::from(r"C:\Users\me\report.json"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_non_unicode_report_path_is_kept() {
+        use std::os::windows::ffi::OsStringExt;
+
+        let odd = OsString::from_wide(&[0xD800]);
+        let args = [OsString::from(REPORT_FLAG), odd.clone()].into_iter();
+        let Ok(Arguments::Run(Some(path))) = parse_args(args) else {
+            panic!("the report flag names a path");
+        };
+        assert_eq!(path.as_os_str(), odd.as_os_str());
+    }
+
+    #[test]
+    fn an_unknown_argument_is_reported_without_running() {
+        let args = std::iter::once(OsString::from("--bogus"));
+        assert_eq!(parse_args(args).err(), Some(OsString::from("--bogus")));
+    }
+
+    #[test]
+    fn help_stops_before_the_checks() {
+        for flag in ["--help", "-h"] {
+            let args = std::iter::once(OsString::from(flag));
+            assert!(matches!(parse_args(args), Ok(Arguments::Help)));
+        }
+    }
 }

@@ -22,6 +22,13 @@ pub(crate) unsafe extern "system" fn final_path(
     size: u32,
     flags: u32,
 ) -> u32 {
+    // A null buffer is the caller's bug. Pass it to the original before any classification or write, so the answer is
+    // exactly the one the unmodified program would get.
+    if buffer.is_null() {
+        let original = original!(get_final_path, 0);
+        // SAFETY: the original receives the program's own arguments.
+        return unsafe { original.call(handle, buffer, size, flags) };
+    }
     let _guard = Guard::enter();
     let volume = flags & VOLUME_NAME_MASK;
     // The common forms read the DOS path once and stay in UTF-16: a path outside the layers is written back as it is,
@@ -51,20 +58,20 @@ pub(crate) unsafe extern "system" fn final_path(
                     return write_units(buffer, size, path);
                 }
             } else {
-                let translated = match volume {
-                    VOLUME_NAME_DOS => Some(&actual[..length]),
-                    VOLUME_NAME_NONE => {
-                        without_volume_units(&actual[..length], &mut mapped).map(|n| &mapped[..n])
-                    }
-                    VOLUME_NAME_NT => original_path_units(handle, VOLUME_NAME_NT, &mut mapped)
-                        .map(|n| &mapped[..n]),
-                    _ => None,
-                };
-
-                if let Some(path) = translated {
+                // An outside handle keeps Windows' own answer. The DOS path above was read only to classify the
+                // handle; DOS and no-volume forms can be written from it directly. The NT form cannot be derived here,
+                // so ask the original once with the caller's flags and let it write straight into the caller's buffer
+                // instead of querying a second form into a temporary buffer.
+                if let Some(length) = outside_from_dos(volume, &actual[..length], &mut mapped) {
                     drop(last_error);
-                    return write_units(buffer, size, path);
+                    return write_units(buffer, size, &mapped[..length]);
                 }
+                drop(last_error);
+                let original = original!(get_final_path, 0);
+                // SAFETY: the caller's buffer holds `size` units, and the original writes at most that many.
+                let length = unsafe { original.call(handle, buffer, size, flags) };
+                let _last_error = PreserveLastError::capture();
+                return length;
             }
         }
     }
@@ -83,6 +90,11 @@ pub(crate) unsafe extern "system" fn final_path(
 /// Writes a UTF-16 answer into the program's buffer with the convention of `GetFinalPathNameByHandleW`: the length
 /// without the terminator, or the size needed when the buffer is too small.
 fn write_units(buffer: *mut u16, size: u32, path: &[u16]) -> u32 {
+    // The hook hands a null buffer to the original before reaching here. Never dereference one in any case.
+    if buffer.is_null() {
+        return 0;
+    }
+
     let needed = path.len() as u32 + 1;
 
     if size < needed {
@@ -95,6 +107,22 @@ fn write_units(buffer: *mut u16, size: u32, path: &[u16]) -> u32 {
     }
 
     path.len() as u32
+}
+
+/// The answer for a handle outside every mount when the DOS path has already been read. DOS is written as it came and
+/// no-volume drops the drive; `None` means the form needs its own query with the caller's flags. No allocation.
+fn outside_from_dos(volume: u32, dos: &[u16], out: &mut [u16; 520]) -> Option<usize> {
+    match volume {
+        VOLUME_NAME_DOS => {
+            if dos.len() > out.len() {
+                return None;
+            }
+            out[..dos.len()].copy_from_slice(dos);
+            Some(dos.len())
+        }
+        VOLUME_NAME_NONE => without_volume_units(dos, out),
+        _ => None,
+    }
 }
 
 /// The game path for the handle, in the form `flags` asks for. `None` when the handle names a path outside the layers,
@@ -135,5 +163,26 @@ mod tests {
         assert_eq!(&buffer[..4], &[0, 0, 0, 0]);
         assert_eq!(write_units(buffer.as_mut_ptr(), 8, &text), 5);
         assert_eq!(&buffer[..6], &[97, 98, 99, 100, 101, 0]);
+    }
+
+    #[test]
+    fn a_null_output_buffer_is_never_dereferenced() {
+        let text: Vec<u16> = "abcde".encode_utf16().collect();
+        assert_eq!(write_units(std::ptr::null_mut(), 8, &text), 0);
+    }
+
+    #[test]
+    fn an_outside_answer_comes_from_the_dos_path_except_for_the_nt_form() {
+        let dos: Vec<u16> = r"\\?\C:\Game\a.txt".encode_utf16().collect();
+        let mut out = [0u16; 520];
+
+        let length = outside_from_dos(VOLUME_NAME_DOS, &dos, &mut out).unwrap();
+        assert_eq!(&out[..length], dos.as_slice());
+
+        let length = outside_from_dos(VOLUME_NAME_NONE, &dos, &mut out).unwrap();
+        assert_eq!(String::from_utf16(&out[..length]).unwrap(), r"\Game\a.txt");
+
+        // The NT form cannot be built from a DOS path here: the caller asks the original once with its own flags.
+        assert_eq!(outside_from_dos(VOLUME_NAME_NT, &dos, &mut out), None);
     }
 }

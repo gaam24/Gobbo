@@ -29,8 +29,8 @@ use std::time::Instant;
 
 use gobbo_overlay_core::wide;
 use windows_sys::Win32::Foundation::{
-    CloseHandle, FALSE, HANDLE, HANDLE_FLAG_INHERIT, SetHandleInformation, TRUE, WAIT_OBJECT_0,
-    WAIT_TIMEOUT,
+    CloseHandle, FALSE, HANDLE, HANDLE_FLAG_INHERIT, SetHandleInformation, TRUE, WAIT_FAILED,
+    WAIT_OBJECT_0, WAIT_TIMEOUT,
 };
 use windows_sys::Win32::System::Threading::{
     CREATE_SUSPENDED, CREATE_UNICODE_ENVIRONMENT, CreateEventW, CreateProcessW,
@@ -442,11 +442,59 @@ pub fn inject32(pid: u32, tid: u32, hook: &Path) -> io::Result<()> {
         ));
     }
 
-    let status = std::process::Command::new(&helper)
+    let mut child = std::process::Command::new(&helper)
         .arg(pid.to_string())
         .arg(tid.to_string())
         .arg(hook)
-        .status()?;
+        .spawn()?;
+    // The game stays suspended until this helper has set the x86 context. A helper that hangs must not leave it that
+    // way forever; the launcher stops the process on the error below. Waiting on the process handle instead of polling
+    // `try_wait` keeps the same deadline without waking every 10 ms while the helper works.
+    let deadline =
+        Instant::now() + std::time::Duration::from_millis(u64::from(HOOK_LOAD_TIMEOUT_MS));
+    let timed_out = || {
+        io::Error::new(
+            io::ErrorKind::TimedOut,
+            format!("the 32-bit overlay injector did not finish in pid {pid}"),
+        )
+    };
+    let remaining = deadline.saturating_duration_since(Instant::now());
+    if remaining.is_zero() {
+        let _ = child.kill();
+        let _ = child.wait();
+        return Err(timed_out());
+    }
+    let millis = u32::try_from(remaining.as_millis()).unwrap_or(HOOK_LOAD_TIMEOUT_MS);
+    // SAFETY: `as_raw_handle` is the process handle `child` owns until it is reaped by `wait` below. One wait covers the
+    // whole remaining budget, so there is no polling loop.
+    let status = match unsafe { WaitForSingleObject(child.as_raw_handle(), millis) } {
+        WAIT_OBJECT_0 => match child.wait() {
+            Ok(status) => status,
+            Err(error) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(error);
+            }
+        },
+        WAIT_TIMEOUT => {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(timed_out());
+        }
+        WAIT_FAILED => {
+            let error = io::Error::last_os_error();
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(error);
+        }
+        unexpected => {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(io::Error::other(format!(
+                "waiting for the 32-bit overlay injector in pid {pid} returned {unexpected}"
+            )));
+        }
+    };
     if !status.success() {
         return Err(io::Error::other(format!(
             "the 32-bit overlay injector failed in pid {pid} ({status})"

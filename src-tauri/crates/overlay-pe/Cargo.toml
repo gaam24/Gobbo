@@ -10,6 +10,10 @@ publish = false
 [lib]
 name = "gobbo_overlay_pe"
 
+[features]
+# Minimal PE fixtures shared with the launcher's tests. Never enabled by a shipped build.
+test-support = []
+
 [dev-dependencies]
 proptest = "1"
 

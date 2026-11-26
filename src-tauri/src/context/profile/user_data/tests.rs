@@ -9,7 +9,7 @@ use crate::games::GameDef;
 use crate::test_support::scratch;
 use std::collections::BTreeMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 fn fixture(name: &str) -> (Data, GameDef, Settings, PathBuf) {
     let base = scratch!(name);
@@ -122,7 +122,7 @@ fn the_legacy_copy_list_uses_the_known_owned_prefix_root() {
         &data.profile_state("p1"),
     )
     .unwrap();
-    let inside = |path: &Path| {
+    let inside = |path: &std::path::Path| {
         crate::context::profile::data::inside_user_data(&data, &game, &settings, path)
     };
 

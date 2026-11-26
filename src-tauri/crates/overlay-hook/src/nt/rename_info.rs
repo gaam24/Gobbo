@@ -41,12 +41,15 @@ pub(super) fn parse_rename(bytes: &[u8], class: u32) -> Option<RenameInfo> {
             .try_into()
             .ok()?,
     ) as usize;
+    // A caller can put any length in the structure. On x86 the addition can wrap, which would let a huge length past
+    // the check and panic on the slice below; refuse it instead.
+    let end = RENAME_NAME_AT.checked_add(name_bytes)?;
 
-    if RENAME_NAME_AT + name_bytes > bytes.len() {
+    if end > bytes.len() {
         return None;
     }
 
-    let (pairs, _) = bytes[RENAME_NAME_AT..RENAME_NAME_AT + name_bytes].as_chunks::<2>();
+    let (pairs, _) = bytes[RENAME_NAME_AT..end].as_chunks::<2>();
     let units: Vec<u16> = pairs.iter().map(|pair| u16::from_ne_bytes(*pair)).collect();
     Some(RenameInfo {
         replace,
@@ -56,19 +59,21 @@ pub(super) fn parse_rename(bytes: &[u8], class: u32) -> Option<RenameInfo> {
 }
 
 /// The rename structure that passes on `name`: the flags of `header` (its first four bytes), no root directory, and the
-/// new name. The name is absolute, so NT takes it without a root.
-pub(super) fn build_rename(header: &[u8], name: &[u16]) -> Vec<u8> {
-    let mut renamed = vec![0u8; RENAME_NAME_AT + name.len() * 2];
+/// new name. The name is absolute, so NT takes it without a root. `None` when the name cannot be counted in a
+/// `UNICODE_STRING` byte length without overflowing or truncating it.
+pub(super) fn build_rename(header: &[u8], name: &[u16]) -> Option<Vec<u8>> {
+    let bytes = name.len().checked_mul(2)?;
+    let length = u32::try_from(bytes).ok()?;
+    let mut renamed = vec![0u8; RENAME_NAME_AT.checked_add(bytes)?];
     renamed[..4].copy_from_slice(&header[..4]);
-    renamed[RENAME_LENGTH_AT..RENAME_LENGTH_AT + 4]
-        .copy_from_slice(&((name.len() * 2) as u32).to_ne_bytes());
+    renamed[RENAME_LENGTH_AT..RENAME_LENGTH_AT + 4].copy_from_slice(&length.to_ne_bytes());
     let (pairs, _) = renamed[RENAME_NAME_AT..].as_chunks_mut::<2>();
 
     for (at, unit) in pairs.iter_mut().zip(name) {
         *at = unit.to_ne_bytes();
     }
 
-    renamed
+    Some(renamed)
 }
 
 #[cfg(test)]
@@ -146,10 +151,20 @@ mod tests {
     }
 
     #[test]
+    fn a_maximum_name_length_in_a_short_buffer_is_refused_without_wrapping() {
+        let mut bytes = structure(0, 0, "abc");
+        bytes[RENAME_LENGTH_AT..RENAME_LENGTH_AT + 4].copy_from_slice(&u32::MAX.to_ne_bytes());
+        assert_eq!(parse_rename(&bytes, FILE_RENAME_INFORMATION), None);
+        bytes[RENAME_LENGTH_AT..RENAME_LENGTH_AT + 4]
+            .copy_from_slice(&(u32::MAX - 3).to_ne_bytes());
+        assert_eq!(parse_rename(&bytes, FILE_RENAME_INFORMATION_EX), None);
+    }
+
+    #[test]
     fn a_built_rename_reads_back_with_the_new_name_and_no_root() {
         let header = structure(FILE_RENAME_REPLACE_IF_EXISTS, 0x99, "old");
         let new_name: Vec<u16> = "\\??\\C:\\new".encode_utf16().collect();
-        let built = build_rename(&header, &new_name);
+        let built = build_rename(&header, &new_name).expect("the name fits in the structure");
         assert_eq!(
             parse_rename(&built, FILE_RENAME_INFORMATION_EX),
             Some(RenameInfo {

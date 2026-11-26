@@ -22,7 +22,7 @@ use windows_sys::Win32::System::LibraryLoader::{
     GetModuleFileNameW, GetModuleHandleW, GetProcAddress,
 };
 
-use super::{COLUMNS, HOOK_BUILD_COMMAND, MAX_COPY_UP, MAX_LIST, MAX_WHITEOUT, Mode, layout};
+use super::{HOOK_BUILD_COMMAND, MAX_COPY_UP, MAX_LIST, MAX_WHITEOUT, Mode, Row, layout};
 
 /// Every allocation of the worker process since the last reset.
 static WORKER_ALLOCATIONS: AtomicU64 = AtomicU64::new(0);
@@ -132,19 +132,20 @@ unsafe fn export<T: Copy>(module: *mut std::ffi::c_void, name: &[u8]) -> Option<
     Some(unsafe { std::mem::transmute_copy(&function) })
 }
 
-/// One measured operation.
-struct Stats {
-    p50: u64,
-    p95: u64,
-    p99: u64,
-    mean: u64,
-    worker_allocs: f64,
-    hook_allocs: f64,
-    hook_bytes: f64,
-    spelling: f64,
-    probes: f64,
-    locks: f64,
-    io: f64,
+/// Counts the entries of `folder` for a listing measurement. A changed or unreadable fixture is reported as an error,
+/// never as a panic inside the timed operation.
+fn count_directory(folder: &Path, expected: usize) -> Result<(), Box<dyn Error>> {
+    let entries = fs::read_dir(folder)
+        .map_err(|error| format!("could not list {}: {error}", folder.display()))?;
+    let count = entries.count();
+    if count != expected {
+        return Err(format!(
+            "the {} fixture changed: expected {expected} entries, got {count}",
+            folder.display()
+        )
+        .into());
+    }
+    Ok(())
 }
 
 /// Runs every operation and writes the result file.
@@ -210,35 +211,39 @@ pub(super) fn run(
     let mut out = BufWriter::new(File::create(result)?);
     write_header(&mut out)?;
 
-    let stats = measure(iterations, warmup, hook, |_| {
+    let row = measure("open_read", iterations, warmup, hook, |_| {
         let _ = File::open(&read);
+        Ok(())
     })?;
-    write_stats(&mut out, "open_read", &stats)?;
+    row.write_csv(&mut out)?;
 
-    let stats = measure(iterations, warmup, hook, |_| {
+    let row = measure("open_read_relative", iterations, warmup, hook, |_| {
         let _ = File::open("read/a.bin");
+        Ok(())
     })?;
-    write_stats(&mut out, "open_read_relative", &stats)?;
+    row.write_csv(&mut out)?;
 
     // A file that only the game folder has: the overlay read stays in the root layer and must not re-encode its name.
     let root_read = input.join(layout::WRITE).join("w.bin");
-    let stats = measure(iterations, warmup, hook, |_| {
+    let row = measure("open_read_root", iterations, warmup, hook, |_| {
         let _ = File::open(&root_read);
+        Ok(())
     })?;
-    write_stats(&mut out, "open_read_root", &stats)?;
+    row.write_csv(&mut out)?;
 
     // A handle path of a file in this mode's tree. The hook answers it from the layer mapping (active) or passes the
     // program's path through (outside); neither should allocate a `String` or call Windows twice.
     if let Ok(file) = File::open(&read) {
         let handle = file.as_raw_handle();
         let mut path = [0u16; 520];
-        let stats = measure(iterations, warmup, hook, |_| {
+        let row = measure("get_final_path", iterations, warmup, hook, |_| {
             // SAFETY: `handle` is the open file, and `path` is a writable buffer of `path.len()` units.
             let _ = unsafe {
                 GetFinalPathNameByHandleW(handle, path.as_mut_ptr(), path.len() as u32, 0)
             };
+            Ok(())
         })?;
-        write_stats(&mut out, "get_final_path", &stats)?;
+        row.write_csv(&mut out)?;
     }
 
     // A handle outside every mount: the hook must write the program's path back without a `String`, a second system
@@ -246,18 +251,19 @@ pub(super) fn run(
     if let Ok(file) = File::open(outside_folder.join(layout::READ).join("a.bin")) {
         let handle = file.as_raw_handle();
         let mut path = [0u16; 520];
-        let stats = measure(iterations, warmup, hook, |_| {
+        let row = measure("get_final_path_outside", iterations, warmup, hook, |_| {
             // SAFETY: `handle` is the open file, and `path` is a writable buffer of `path.len()` units.
             let _ = unsafe {
                 GetFinalPathNameByHandleW(handle, path.as_mut_ptr(), path.len() as u32, 0)
             };
+            Ok(())
         })?;
-        write_stats(&mut out, "get_final_path_outside", &stats)?;
+        row.write_csv(&mut out)?;
     }
 
     // The current program's module path: outside every mount, so it is the no-allocation path of the module hook.
     let mut module = [0u16; 1024];
-    let stats = measure(iterations, warmup, hook, |_| {
+    let row = measure("get_module_file_name", iterations, warmup, hook, |_| {
         // SAFETY: a null module asks for this program, and `module` is writable for `module.len()` units.
         let _ = unsafe {
             GetModuleFileNameW(
@@ -266,8 +272,9 @@ pub(super) fn run(
                 module.len() as u32,
             )
         };
+        Ok(())
     })?;
-    write_stats(&mut out, "get_module_file_name", &stats)?;
+    row.write_csv(&mut out)?;
 
     // NtCreateFile with a directory handle as the root: the name is joined onto the handle's path. The handle to a folder
     // outside every mount must not allocate in the hook; the handle to the game folder is redirected (active).
@@ -287,29 +294,33 @@ pub(super) fn run(
             let _root = HandleGuard(root);
 
             let name: Vec<u16> = r"read\a.bin".encode_utf16().collect();
-            let stats = measure(iterations, warmup, hook, |_| {
+            let row = measure(operation, iterations, warmup, hook, |_| {
                 let _ = nt_open_relative(create, root, &name);
+                Ok(())
             })?;
-            write_stats(&mut out, operation, &stats)?;
+            row.write_csv(&mut out)?;
         }
     }
 
-    let stats = measure(iterations, warmup, hook, |_| {
+    let row = measure("metadata", iterations, warmup, hook, |_| {
         let _ = fs::metadata(&read);
+        Ok(())
     })?;
-    write_stats(&mut out, "metadata", &stats)?;
+    row.write_csv(&mut out)?;
 
-    let stats = measure(iterations, warmup, hook, |_| {
+    let row = measure("missing", iterations, warmup, hook, |_| {
         let _ = fs::metadata(&missing);
+        Ok(())
     })?;
-    write_stats(&mut out, "missing", &stats)?;
+    row.write_csv(&mut out)?;
 
-    let stats = measure(iterations, warmup, hook, |_| {
+    let row = measure("open_write", iterations, warmup, hook, |_| {
         let _ = OpenOptions::new().write(true).open(&write_path);
+        Ok(())
     })?;
-    write_stats(&mut out, "open_write", &stats)?;
+    row.write_csv(&mut out)?;
 
-    let stats = measure(iterations, warmup, hook, |_| {
+    let row = measure("write_4k", iterations, warmup, hook, |_| {
         if let Ok(mut file) = OpenOptions::new()
             .write(true)
             .create(true)
@@ -318,80 +329,81 @@ pub(super) fn run(
         {
             let _ = file.write_all(&buffer);
         }
+        Ok(())
     })?;
-    write_stats(&mut out, "write_4k", &stats)?;
+    row.write_csv(&mut out)?;
 
-    let stats = measure(lower.len() as u64, 0, hook, |index| {
+    let row = measure("copy_up", lower.len() as u64, 0, hook, |index| {
         if let Some(path) = lower.get(index as usize) {
             let _ = OpenOptions::new().append(true).open(path);
         }
+        Ok(())
     })?;
-    write_stats(&mut out, "copy_up", &stats)?;
+    row.write_csv(&mut out)?;
 
-    let stats = measure(deletes.len() as u64, 0, hook, |index| {
+    let row = measure("whiteout", deletes.len() as u64, 0, hook, |index| {
         if let Some(path) = deletes.get(index as usize) {
             let _ = fs::remove_file(path);
         }
+        Ok(())
     })?;
-    write_stats(&mut out, "whiteout", &stats)?;
+    row.write_csv(&mut out)?;
 
     // The active game folder merges 64 game files and 16 mod files; the baseline process and the pass-through folder
     // see only the 64 game files.
-    let stats = measure(iterations.min(MAX_LIST), warmup, hook, |_| {
-        if let Ok(entries) = fs::read_dir(&list) {
-            let count = entries.count();
-            assert_eq!(count, expected_list, "the list fixture changed");
-        }
+    let row = measure("list", iterations.min(MAX_LIST), warmup, hook, |_| {
+        count_directory(&list, expected_list)
     })?;
-    write_stats(&mut out, "list", &stats)?;
+    row.write_csv(&mut out)?;
 
     // A folder of 1000 files that only the game folder has (or only the folder outside it): the listing is merged
     // from the layers, and the root layer is read entry by entry.
     let big = input.join(layout::BIG);
-    let stats = measure(iterations.min(MAX_LIST), warmup, hook, |_| {
-        if let Ok(entries) = fs::read_dir(&big) {
-            let count = entries.count();
-            assert_eq!(count, 1000, "the big fixture changed");
-        }
+    let row = measure("list_1000", iterations.min(MAX_LIST), warmup, hook, |_| {
+        count_directory(&big, 1000)
     })?;
-    write_stats(&mut out, "list_1000", &stats)?;
+    row.write_csv(&mut out)?;
 
     // The same 1000 game names, with 200 of them overridden by the mod layer. Every override asks the lower layers for
     // the spelling the game keeps, which is the cost the spelling rule adds to a modded listing.
     let modded = input.join(layout::BIG_MODDED);
-    let stats = measure(iterations.min(MAX_LIST), warmup, hook, |_| {
-        if let Ok(entries) = fs::read_dir(&modded) {
-            let count = entries.count();
-            assert_eq!(count, 1000, "the big_modded fixture changed");
-        }
-    })?;
-    write_stats(&mut out, "list_modded", &stats)?;
+    let row = measure(
+        "list_modded",
+        iterations.min(MAX_LIST),
+        warmup,
+        hook,
+        |_| count_directory(&modded, 1000),
+    )?;
+    row.write_csv(&mut out)?;
 
     // The same 1000 game names with only ten overrides: exact lower-layer searches are cheaper than one root pass
     // when the root folder is much larger than the number of modded entries.
     let modded_few = input.join(layout::BIG_MODDED_FEW);
-    let stats = measure(iterations.min(MAX_LIST), warmup, hook, |_| {
-        if let Ok(entries) = fs::read_dir(&modded_few) {
-            let count = entries.count();
-            assert_eq!(count, 1000, "the big_modded_few fixture changed");
-        }
-    })?;
-    write_stats(&mut out, "list_modded_few", &stats)?;
+    let row = measure(
+        "list_modded_few",
+        iterations.min(MAX_LIST),
+        warmup,
+        hook,
+        |_| count_directory(&modded_few, 1000),
+    )?;
+    row.write_csv(&mut out)?;
 
     // Polish names exercise the fold rule without a `String` on the common path: a prefix classification, a whiteout
     // check, and a duplicate check in the listing.
     let nonascii = input.join(layout::NONASCII);
-    let stats = measure(iterations, warmup, hook, |_| {
+    let row = measure("metadata_nonascii", iterations, warmup, hook, |_| {
         let _ = fs::metadata(nonascii.join("ąć.bin"));
+        Ok(())
     })?;
-    write_stats(&mut out, "metadata_nonascii", &stats)?;
-    let stats = measure(iterations.min(MAX_LIST), warmup, hook, |_| {
-        if let Ok(entries) = fs::read_dir(&nonascii) {
-            let count = entries.count();
-            assert_eq!(count, 65, "the non-ASCII fixture changed");
-        }
-    })?;
-    write_stats(&mut out, "list_nonascii", &stats)?;
+    row.write_csv(&mut out)?;
+    let row = measure(
+        "list_nonascii",
+        iterations.min(MAX_LIST),
+        warmup,
+        hook,
+        |_| count_directory(&nonascii, 65),
+    )?;
+    row.write_csv(&mut out)?;
 
     // The NT directory query reads a folder through `NtQueryDirectoryFile`, which the hook merges from the layers and
     // streams in batches instead of materializing the whole folder.
@@ -400,38 +412,59 @@ pub(super) fn run(
         let _folder = HandleGuard(folder);
         let mut status_block = [0usize; 2];
         let mut entries = vec![0u8; 4096];
-        let stats = measure(iterations.min(MAX_LIST), warmup, hook, |_| {
-            assert_eq!(
-                nt_count(query, folder, &mut entries, &mut status_block),
-                1000,
-                "the NT listing fixture changed"
-            );
-        })?;
-        write_stats(&mut out, "list_nt_1000", &stats)?;
+        let row = measure(
+            "list_nt_1000",
+            iterations.min(MAX_LIST),
+            warmup,
+            hook,
+            |_| {
+                let count = nt_count(query, folder, &mut entries, &mut status_block);
+                if count != 1000 {
+                    return Err(format!(
+                        "the NT listing fixture changed: expected 1000 entries, got {count}"
+                    )
+                    .into());
+                }
+                Ok(())
+            },
+        )?;
+        row.write_csv(&mut out)?;
         // The same folder with 200 overrides: the merged snapshot, not the plain handle.
         let modded_handle = open_directory(&modded)?;
         let _modded = HandleGuard(modded_handle);
-        let stats = measure(iterations.min(MAX_LIST), warmup, hook, |_| {
-            assert_eq!(
-                nt_count(query, modded_handle, &mut entries, &mut status_block),
-                1000,
-                "the modded NT listing fixture changed"
-            );
-        })?;
-        write_stats(&mut out, "list_nt_modded", &stats)?;
+        let row = measure(
+            "list_nt_modded",
+            iterations.min(MAX_LIST),
+            warmup,
+            hook,
+            |_| {
+                let count = nt_count(query, modded_handle, &mut entries, &mut status_block);
+                if count != 1000 {
+                    return Err(format!(
+                        "the modded NT listing fixture changed: expected 1000 entries, got {count}"
+                    )
+                    .into());
+                }
+                Ok(())
+            },
+        )?;
+        row.write_csv(&mut out)?;
     }
 
     out.flush()?;
     Ok(())
 }
 
-/// Measures `operation` `iterations` times, with the worker and hook allocation counters reset around each call.
+/// Measures `name` `iterations` times, with the worker and hook allocation counters reset around each call. It returns
+/// the one schema row the caller writes, so the measured values never pass through a second set of fields.
+/// An operation that reports an error stops the worker with that error instead of unwinding through the measurement.
 fn measure(
+    name: &str,
     iterations: u64,
     warmup: u64,
     hook: Option<HookCounters>,
-    mut operation: impl FnMut(u64),
-) -> Result<Stats, Box<dyn Error>> {
+    mut operation: impl FnMut(u64) -> Result<(), Box<dyn Error>>,
+) -> Result<Row, Box<dyn Error>> {
     let mut histogram = Histogram::<u64>::new(3).map_err(|error| error.to_string())?;
     let mut worker_total = 0u64;
     let mut hook_total = 0u64;
@@ -442,7 +475,7 @@ fn measure(
     let mut io_total = 0u64;
 
     for _ in 0..warmup {
-        operation(0);
+        operation(0)?;
     }
 
     for index in 0..iterations {
@@ -457,7 +490,7 @@ fn measure(
         }
 
         let start = Instant::now();
-        operation(index);
+        operation(index)?;
         let elapsed = u64::try_from(start.elapsed().as_nanos()).unwrap_or(u64::MAX);
         worker_total = worker_total.saturating_add(WORKER_ALLOCATIONS.load(Ordering::Relaxed));
 
@@ -486,7 +519,8 @@ fn measure(
     }
 
     let count = iterations.max(1) as f64;
-    Ok(Stats {
+    Ok(Row {
+        operation: name.to_string(),
         p50: histogram.value_at_quantile(0.50),
         p95: histogram.value_at_quantile(0.95),
         p99: histogram.value_at_quantile(0.99),
@@ -501,35 +535,9 @@ fn measure(
     })
 }
 
-/// Writes the CSV header from the shared column list.
+/// Writes the CSV header from the one shared column list.
 fn write_header(out: &mut impl Write) -> std::io::Result<()> {
-    writeln!(out, "{}", COLUMNS.join(","))
-}
-
-/// Writes one CSV row. The values line up with `COLUMNS`, which owns the schema and its width.
-fn write_stats(out: &mut impl Write, operation: &str, stats: &Stats) -> std::io::Result<()> {
-    let values = [
-        operation.to_string(),
-        stats.p50.to_string(),
-        stats.p95.to_string(),
-        stats.p99.to_string(),
-        stats.mean.to_string(),
-        format!("{:.2}", stats.worker_allocs),
-        format!("{:.2}", stats.hook_allocs),
-        format!("{:.2}", stats.hook_bytes),
-        format!("{:.2}", stats.spelling),
-        format!("{:.2}", stats.probes),
-        format!("{:.2}", stats.locks),
-        format!("{:.2}", stats.io),
-    ];
-
-    if values.len() != COLUMNS.len() {
-        return Err(std::io::Error::other(
-            "the result row does not match the column schema",
-        ));
-    }
-
-    writeln!(out, "{}", values.join(","))
+    writeln!(out, "{}", Row::columns().join(","))
 }
 
 /// The `UNICODE_STRING` and `OBJECT_ATTRIBUTES` of an NT open. The pointers are plain pointers, so both bitnesses lay the
@@ -607,7 +615,7 @@ fn nt_query_directory_file() -> Option<NtQueryDirectoryFileFn> {
     unsafe { export::<NtQueryDirectoryFileFn>(module.cast(), b"NtQueryDirectoryFile\0") }
 }
 
-/// Counts the entries of one NT directory query, restarting at the beginning. `.` and `..` are not counted: a plain NT
+/// Counts the entries of one NT directory, restarting at the beginning. `.` and `..` are not counted: a plain NT
 /// folder does not return them, while a merged snapshot adds them.
 fn nt_count(
     query: NtQueryDirectoryFileFn,
@@ -645,7 +653,7 @@ fn nt_count(
         let mut offset = 0usize;
 
         loop {
-            if offset + 12 > entries.len() {
+            if offset > entries.len().saturating_sub(12) {
                 break;
             }
 
@@ -658,7 +666,7 @@ fn nt_count(
             ) as usize;
             let start = offset + 12;
 
-            if start + name_length > entries.len() {
+            if start > entries.len().saturating_sub(name_length) {
                 break;
             }
 
@@ -672,7 +680,7 @@ fn nt_count(
                 break;
             }
 
-            offset += next;
+            offset = offset.saturating_add(next);
         }
     }
 
@@ -778,10 +786,10 @@ const NT_FILE_SYNCHRONOUS_IO_NONALERT: u32 = 0x20;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bench::Row;
 
-    fn sample_stats() -> Stats {
-        Stats {
+    fn sample_row() -> Row {
+        Row {
+            operation: "open_read".to_string(),
             p50: 1_250,
             p95: 2_500,
             p99: 3_750,
@@ -799,39 +807,26 @@ mod tests {
     #[test]
     fn a_written_row_parses_back_to_the_same_stats() {
         let mut out = Vec::new();
-        let stats = sample_stats();
-        write_stats(&mut out, "open_read", &stats).unwrap();
+        let row = sample_row();
+        row.write_csv(&mut out).unwrap();
         let line = String::from_utf8(out).unwrap();
 
-        let row = super::super::parse_row(line.trim_end()).unwrap();
-        assert_eq!(
-            row,
-            Row {
-                operation: "open_read".to_string(),
-                p50: stats.p50,
-                p95: stats.p95,
-                p99: stats.p99,
-                mean: stats.mean,
-                worker_allocs: stats.worker_allocs,
-                hook_allocs: stats.hook_allocs,
-                hook_bytes: stats.hook_bytes,
-                spelling: stats.spelling,
-                probes: stats.probes,
-                locks: stats.locks,
-                io: stats.io,
-            }
-        );
+        assert_eq!(Row::from_csv(line.trim_end()).unwrap(), row);
     }
 
     #[test]
     fn a_row_with_the_wrong_field_count_is_refused() {
         let mut out = Vec::new();
-        write_stats(&mut out, "open_read", &sample_stats()).unwrap();
+        sample_row().write_csv(&mut out).unwrap();
         let line = String::from_utf8(out).unwrap();
         let short = line.trim_end().rsplit_once(',').unwrap().0;
 
-        let error = super::super::parse_row(short).unwrap_err();
-        assert!(error.to_string().contains(&COLUMNS.len().to_string()));
+        let error = Row::from_csv(short).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains(&Row::columns().len().to_string())
+        );
         assert!(error.to_string().contains(short));
     }
 
@@ -841,5 +836,47 @@ mod tests {
         assert_eq!(Mode::parse("pass-through").unwrap(), Mode::PassThrough);
         assert_eq!(Mode::parse("active").unwrap(), Mode::Active);
         assert!(Mode::parse("other").is_err());
+    }
+
+    #[test]
+    fn a_changed_listing_fixture_is_an_error_not_a_panic() {
+        let folder =
+            std::env::temp_dir().join(format!("overlay-bench-listing-test-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&folder);
+        fs::create_dir_all(&folder).unwrap();
+        fs::write(folder.join("a.bin"), b"x").unwrap();
+
+        let error = count_directory(&folder, 2).unwrap_err();
+        let _ = fs::remove_dir_all(&folder);
+
+        assert!(error.to_string().contains("expected 2 entries, got 1"));
+    }
+
+    #[test]
+    fn measure_propagates_a_warmup_error() {
+        let result = measure("test", 1, 2, None, |_| Err("warmup failed".into()));
+        let Err(error) = result else {
+            panic!("a failing warm-up must fail the measurement");
+        };
+        assert!(error.to_string().contains("warmup failed"));
+    }
+
+    #[test]
+    fn measure_propagates_a_measured_operation_error() {
+        let calls = std::cell::Cell::new(0);
+        let result = measure("test", 3, 0, None, |_| {
+            calls.set(calls.get() + 1);
+            if calls.get() == 2 {
+                Err("operation failed".into())
+            } else {
+                Ok(())
+            }
+        });
+        let Err(error) = result else {
+            panic!("a failing operation must fail the measurement");
+        };
+
+        assert!(error.to_string().contains("operation failed"));
+        assert_eq!(calls.get(), 2);
     }
 }

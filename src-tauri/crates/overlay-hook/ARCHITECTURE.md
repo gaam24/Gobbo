@@ -55,9 +55,10 @@ These are not suggestions. A change that breaks one of them is a bug, even if th
    notifications and returns. Settings, layers, whiteouts, diagnostics, crash reporting, module ranges and hooks are
    initialized by the exported `GobboOverlayInit`, which the launcher's stub calls after `LoadLibraryExW` returns and
    before the loader resolves the program's static imports. It runs outside the loader lock; it must not create threads
-   or call loader APIs that need the process to be initialized. The one exception is the thread of the crash filter and, in a
-   dev build, the trace thread: they start after the detours are enabled (`diag::start_background_threads`), so the enable
-   sees one thread and needs no suspension (section 3).
+   or call loader APIs that need the process to be initialized. The one exception is the thread of the crash filter and
+   the trace flusher: the flusher starts only when a log is named (the dev default, or an explicit `GOBBO_OVERLAY_LOG`
+   in a release build) and no thread starts when the log is unset or `off`. Both start after the detours are enabled
+   (`diag::start_background_threads`), so the enable sees one thread and needs no suspension (section 3).
 7. **Hook installation is observable and all-or-nothing for the essential set.** Each hook has a status
    (`created`/`enabled`/`disabled`/`failed(reason)`). If an essential hook cannot be installed, the launcher must not
    silently start an unhooked game.
@@ -116,7 +117,7 @@ CreateProcessW (launcher, CREATE_SUSPENDED)
             - hand the loader stubs back from stage 0 (`early.rs`) before the detours are created
             - create all detours
             - enable the detours in one transaction; with one thread in the process nothing is suspended (`detours::enable`)
-            - start the crash filter thread and, in a dev build, the trace thread (`diag::start_background_threads`)
+            - start the crash filter thread and, when a log is named, the trace flusher thread (`diag::start_background_threads`)
             - record whether the internal process hook is active
             - write session.json
             - open the decision ring (so the report's own writes are not game decisions)

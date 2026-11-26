@@ -1,9 +1,10 @@
 //! Switches and counts for finding what the hook does. The environment is read once, at the first use, so a hooked call
-//! never reads it. Each switch is an environment variable, and in a dev build it is on by default:
+//! never reads it. Each switch is an environment variable, and some are on by default in a dev build:
 //! - `GOBBO_OVERLAY_LOG`: a trace with the decisions and errors of the hook (see `trace_line`). Written in batches.
 //!   Each line has its number, its time, its thread, and for a call the place in the program that made it.
-//! - `GOBBO_OVERLAY_CALLS`: one line per hooked call and result, plus the detailed count report. Off by default even in
-//!   a dev build: the stack walk and the line per call made games unplayable and distorted measurements.
+//! - `GOBBO_OVERLAY_CALLS`: one line per hooked call and result, and the counts behind the detailed report when
+//!   `GOBBO_OVERLAY_DIAG` names a file. Off by default even in a dev build: the stack walk and the line per call made
+//!   games unplayable and distorted measurements.
 //! - `GOBBO_OVERLAY_PASS`: a line for every write, delete or rename that passes through because its path is outside the
 //!   game folder. Off by default: games write saves and settings outside the folder normally.
 //! - `GOBBO_OVERLAY_RING`: a file-backed ring of the decisions (write, copy-up, whiteout, missing, refuse and
@@ -29,8 +30,8 @@
 //! A switch set to a path writes there. Set to `off` (or empty), it writes nothing, also in a dev build. Unset, a dev
 //! build writes next to the other Gobbo files, in `%LOCALAPPDATA%\Gobbo\overlay`: `<game>.<pid>.trace.log`,
 //! `<game>.<pid>.counts.txt` and `<game>.<pid>.crash.txt`, where `<game>` is the name of the program that loaded the hook
-//! and `<pid>` its process id. A trace file that reaches 64 MB is moved to `<game>.<pid>.old.log`. A new process removes
-//! the files older than three days, and all but the 200 newest (see `prune`).
+//! and `<pid>` its process id. A trace file that reaches 64 MB is moved to `<game>.<pid>.trace.old.log`. A new process
+//! removes the files older than three days, and all but the 200 newest (see `prune`).
 //!
 //! - `settings`: the switches, read once.
 //! - `counts`: the counts of the calls, and the report they are written to.
@@ -72,16 +73,14 @@ pub(crate) fn start_background_threads() {
     allow_flusher();
 }
 
-/// Set when a crash report starts. The trace and the counts stop then, so a crash inside them cannot wait for a lock that
-/// its own thread holds.
+/// A sticky latch set once a crash report starts and never cleared: it records that a report was written and is separate
+/// from the bounded append suppression. The trace, the counts and the ring pause only
+/// while a report or a trace batch is appended, through `writer::reporting()`; that bounded suppression keeps a crash
+/// inside those writers from waiting for a lock its own thread holds, and lets a handled first-chance exception resume
+/// normal diagnostics afterwards.
 static CRASHING: AtomicBool = AtomicBool::new(false);
 
-/// Whether a crash report is being written.
-pub(crate) fn crashing() -> bool {
-    CRASHING.load(Ordering::Relaxed)
-}
-
-/// Marks the start of a crash report (see `crash`).
+/// Marks the start of a crash report (see `crash`). The latch is separate from the bounded append suppression.
 fn start_crash_report() {
     CRASHING.store(true, Ordering::Relaxed);
 }
