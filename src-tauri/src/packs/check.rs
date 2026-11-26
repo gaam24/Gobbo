@@ -39,7 +39,7 @@ pub fn check_pack(
     }
 
     for id in &options.profiles {
-        let profile = profiles.get(id)?;
+        let profile = profiles.profile(id)?;
         let listed = crate::library::mods_of(profile, &library, &game);
 
         for entry in &profile.mods {

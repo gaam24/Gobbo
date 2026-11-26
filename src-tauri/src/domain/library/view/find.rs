@@ -9,7 +9,7 @@ use super::LibraryView;
 use crate::domain::library::ModVersion;
 use crate::domain::naming::match_key;
 use crate::domain::pack::{PackArchive, PackMod};
-use crate::domain::pathkey::fold_case;
+use crate::domain::pathkey::fold_case_into;
 use crate::domain::source::{ProviderId, SourceMod};
 
 /// How the library mod was recognised, strongest first.
@@ -152,6 +152,12 @@ impl<'a> LibraryView<'a> {
         self.find_with(FindQuery::of(wanted), imported)
     }
 
+    /// Finds the family and folder of the library mod `wanted` describes, for a profile entry. `None` when the wanted
+    /// version is missing or the library has no match.
+    pub fn find_entry(&self, wanted: &PackMod) -> Option<(String, String)> {
+        self.find(wanted, None)?.entry()
+    }
+
     /// Finds the library mod `query` describes under its comparison policy. The strict policy is the one `find` uses;
     /// the other two let a profile importer keep its own matching rule without scanning the library itself.
     pub fn find_with(
@@ -219,14 +225,15 @@ impl<'a> LibraryView<'a> {
     fn find_folded(&self, query: &FindQuery<'_>) -> Option<Found<'a>> {
         let family = self.family_of_source_folded(query.provider?, query.mod_id?)?;
         let version = query.version.and_then(|label| {
-            let wanted = fold_case(label);
+            let mut wanted = String::new();
+            let mut known = String::new();
+            fold_case_into(label, &mut wanted);
             self.library.versions.values().find(|version| {
                 version.family == family
-                    && version
-                        .info
-                        .version
-                        .as_deref()
-                        .is_some_and(|known| fold_case(known) == wanted)
+                    && version.info.version.as_deref().is_some_and(|text| {
+                        fold_case_into(text, &mut known);
+                        known.as_str() == wanted.as_str()
+                    })
             })
         });
         Some(Found {

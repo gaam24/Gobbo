@@ -6,9 +6,8 @@ use std::path::Path;
 use serde::Serialize;
 
 use crate::context::Data;
+use crate::domain::storage::StorageMode;
 use crate::infra::storage;
-
-pub use crate::domain::storage::StorageMode;
 
 /// The data folder, its mode, and the file that records the choice.
 #[derive(Debug, Clone, Serialize, specta::Type)]

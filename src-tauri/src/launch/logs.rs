@@ -8,14 +8,14 @@ use gobbo_overlay_core::Layers;
 
 use crate::context::Data;
 use crate::context::load_settings;
+use crate::context::target::deployment_root;
 use crate::deploy::overlay::Session;
-use crate::deploy::target::deployment_root;
 use crate::domain::pathkey::path_key;
 use crate::games::{GameDef, LogKind, LogSource};
 use crate::infra::clock;
 use crate::infra::fs::{self, WalkErrors};
 use crate::infra::text;
-use crate::launch::report::GameLog;
+use crate::launch::model::GameLog;
 
 /// How many lines of one log the console keeps.
 const LOG_LINES: usize = 80;

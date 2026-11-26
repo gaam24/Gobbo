@@ -12,4 +12,4 @@ pub use id::{DownloadRoute, ProviderId, SourceAuthKind, SourceCapabilities};
 pub use page::{
     SourceAccount, SourceLinkStatus, SourceLinksReport, SourceMeta, SourceProviderInfo, SourceStats,
 };
-pub use reference::{SourceLink, SourceMod, SourceRef, SourceRequirement, SourceSync};
+pub use reference::{SourceLink, SourceMod, SourceRef, SourceRequirement, SourceSync, family_key};

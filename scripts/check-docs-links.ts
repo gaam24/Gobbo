@@ -6,7 +6,8 @@ import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 /// a moved file, a dead anchor or an image without alt text, not about the network.
 
 const ROOT = join(import.meta.dir, "..");
-const SKIP = new Set([".git", "node_modules", "target", "dist", "dist-release", "plans", "gen", "overlay-hook"]);
+// Installed external skills live here; their links are not part of this project's documentation.
+const SKIP = new Set([".git", "node_modules", "target", "dist", "dist-release", "plans", "gen", "overlay-hook", ".agents"]);
 const STALE = ["src/service/", "service/target.rs", "service/run/"];
 const EXTERNAL = /^(?:https?|mailto|tel|data):/i;
 const FENCE = /```[\s\S]*?```/g;

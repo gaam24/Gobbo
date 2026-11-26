@@ -82,7 +82,14 @@ impl CollectionCounts {
                 Some(CollectionItemStatus::Unsupported) => {
                     counts.unsupported = counts.unsupported.saturating_add(1);
                 }
-                _ => counts.pending = counts.pending.saturating_add(1),
+                None
+                | Some(
+                    CollectionItemStatus::Missing
+                    | CollectionItemStatus::Queued
+                    | CollectionItemStatus::InLibrary
+                    | CollectionItemStatus::DifferentVersion { .. }
+                    | CollectionItemStatus::InLibraryDifferentVersion { .. },
+                ) => counts.pending = counts.pending.saturating_add(1),
             }
         }
 

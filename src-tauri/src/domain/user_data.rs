@@ -52,7 +52,7 @@ impl Isolation {
 }
 
 /// One resolved user-data set for one profile. The service fills the paths; the deployment and the overlay only read
-/// them. `real` is the folder the game knows, `upper` the profile's writable layer and `store` the copy used when the
+/// them. `real` is the folder the game knows, `upper` the profile's writable layer and `store` the copy used when
 /// the platform cannot redirect.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Set {
@@ -78,7 +78,7 @@ pub struct Set {
 
 impl Set {
     /// Whether the set is an isolated redirect, so the caller must write to `upper` instead of `real`.
-    pub const fn redirects(&self) -> bool {
+    pub const fn is_redirected(&self) -> bool {
         self.isolated && matches!(self.mode, Mode::Redirect)
     }
 
@@ -92,7 +92,7 @@ impl Set {
     /// keeps the real path, because the copy is made around the launch.
     pub fn write_path(&self, path: &Path) -> Option<PathBuf> {
         let relative = self.relative(path)?;
-        Some(if self.redirects() {
+        Some(if self.is_redirected() {
             self.upper.join(relative)
         } else {
             path.to_path_buf()

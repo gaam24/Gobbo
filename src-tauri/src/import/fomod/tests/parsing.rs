@@ -71,3 +71,17 @@ fn decodes_utf8_and_utf16_xml() {
     // Plain UTF-8 without a BOM comes back unchanged
     assert_eq!(decode(utf8.as_bytes()).expect("UTF-8 without a BOM"), utf8);
 }
+
+#[test]
+fn a_broken_document_keeps_the_parser_error_and_its_code() {
+    let error = parse("<config><moduleName>").expect_err("the document is not well formed");
+    let FomodError::Xml(source) = &error else {
+        panic!("a malformed document must be an XML error");
+    };
+    assert!(!source.to_string().is_empty());
+
+    let app: crate::error::AppError = error.into();
+    assert_eq!(app.code, "fomod.parse_failed");
+    assert_eq!(app.kind, crate::error::ErrorKind::Permanent);
+    assert!(!app.params["detail"].is_empty());
+}

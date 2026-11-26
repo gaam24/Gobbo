@@ -137,7 +137,7 @@ pub(super) fn download_error(error: AppError) -> AppError {
 
     match error.params.get("code").map(String::as_str) {
         Some("410") => AppError::user("nexus.link_expired"),
-        Some("403" | "404") => AppError::user(crate::error::DOWNLOAD_UNAVAILABLE),
+        Some("403" | "404") => AppError::user(crate::providers::nexus::DOWNLOAD_UNAVAILABLE),
         _ => error,
     }
 }
@@ -154,7 +154,7 @@ mod tests {
             .kind(ErrorKind::Permanent);
         assert_eq!(
             download_error(error).code,
-            crate::error::DOWNLOAD_UNAVAILABLE
+            crate::providers::nexus::DOWNLOAD_UNAVAILABLE
         );
         let expired = AppError::new("http.status")
             .with("code", 410)

@@ -23,18 +23,18 @@ pub struct BisectView {
 /// The search of the active profile, for the status.
 pub fn bisect_view(data: &Data, library: &Library, profile: &str) -> Option<BisectView> {
     let search = read(data).filter(|search| search.profile == profile)?;
-    let name = |id: &String| {
+    let name = |id: &str| {
         library
             .families
             .get(id)
-            .map_or_else(|| id.clone(), |family| family.name.clone())
+            .map_or_else(|| id.to_string(), |family| family.name.clone())
     };
     let left = search.suspects.len();
     Some(BisectView {
         step: search.step,
         steps_left: if left <= 1 { 0 } else { (left - 1).bit_width() },
         suspects: u32::try_from(left).unwrap_or(u32::MAX),
-        testing: search.testing.iter().map(name).collect(),
+        testing: search.testing.iter().map(|id| name(id)).collect(),
         found: (left == 1).then(|| name(&search.suspects[0])),
     })
 }

@@ -2,8 +2,10 @@
 
 use serde::Serialize;
 
+/// The result of an apply as the window sees it.
 #[derive(Debug, Serialize, specta::Type)]
 pub struct ApplyView {
+    /// How many files the deployment placed.
     pub files: u32,
 }
 

@@ -3,7 +3,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::install::check_install;
-use super::problems::{Problems, is_variant};
+use super::problems::{Problems, Section, duplicate_problems, is_variant};
 use crate::domain::deploy::Deploy;
 use crate::domain::pathkey;
 use crate::domain::pattern;
@@ -17,50 +17,68 @@ impl LoaderDef {
         let mut problems = Problems::default();
 
         if self.schema != 1 {
-            problems.push(format!("unknown schema version: {}", self.schema));
+            problems.push_in(
+                Section::Loader,
+                format!("unknown schema version: {}", self.schema),
+            );
         }
 
         if let Some(min) = &self.min_gobbo {
-            problems.min_gobbo("loader", min);
+            problems.min_gobbo(Section::Loader, "loader", min);
         }
 
         if !is_valid_id(&self.id) {
-            problems.push(format!(
-                "loader id must contain only lowercase letters, digits or '-': {:?}",
-                self.id
-            ));
+            problems.push_in(
+                Section::Loader,
+                format!(
+                    "loader id must contain only lowercase letters, digits or '-': {:?}",
+                    self.id
+                ),
+            );
         }
 
         if self.name.trim().is_empty() {
-            problems.push("loader name is empty".to_string());
+            problems.push_in(Section::Loader, "loader name is empty".to_string());
         }
 
         if self.variants.is_empty() {
             if self.default_variant.is_some() {
-                problems.push("default_variant is set but the loader has no variants".to_string());
+                problems.push_in(
+                    Section::Loader,
+                    "default_variant is set but the loader has no variants".to_string(),
+                );
             }
         } else if let Some(name) = self.default_variant.as_deref() {
             if !self.variants.contains_key(name) {
-                problems.push(format!(
-                    "default_variant {name:?} is not one of the variants"
-                ));
+                problems.push_in(
+                    Section::Loader,
+                    format!("default_variant {name:?} is not one of the variants"),
+                );
             }
         } else {
-            problems.push("a loader with variants needs default_variant".to_string());
+            problems.push_in(
+                Section::Loader,
+                "a loader with variants needs default_variant".to_string(),
+            );
         }
 
         for name in self.variants.keys() {
             if !is_variant(name) {
-                problems.push(format!(
-                    "variant name must contain only lowercase letters, digits, '-', '_' or '.': {name:?}"
-                ));
+                problems.push_in(
+                    Section::Loader,
+                    format!(
+                        "variant name must contain only lowercase letters, digits, '-', '_' or '.': {name:?}"
+                    ),
+                );
             }
         }
 
         check_loader_root(&self.deploy, "loader", &mut problems);
-        problems.0.extend(duplicate_problems(&self.deploy));
-        problems.relative("required file", &self.requires);
-        problems.requirements("loader", &self.requirements);
+        problems
+            .0
+            .extend(duplicate_problems(&self.deploy, Section::Loader));
+        problems.relative(Section::Loader, "required file", &self.requires);
+        problems.requirements(Section::Loader, "loader", &self.requirements);
         check_config_mirror(
             self.config_mirror.as_ref(),
             "loader",
@@ -69,7 +87,7 @@ impl LoaderDef {
             &mut problems,
         );
         if let Some(install) = &self.install {
-            check_install("loader install", install, &mut problems);
+            check_install(Section::Loader, "loader install", install, &mut problems);
         }
 
         for (name, variant) in &self.variants {
@@ -82,11 +100,22 @@ impl LoaderDef {
                 &mut problems,
             );
             check_loader_root(&variant.deploy, &what, &mut problems);
-            problems.0.extend(duplicate_problems(&variant.deploy));
-            problems.relative(&format!("{what} required file"), &variant.requires);
-            problems.requirements(&what, &variant.requirements);
+            problems
+                .0
+                .extend(duplicate_problems(&variant.deploy, Section::Loader));
+            problems.relative(
+                Section::Loader,
+                &format!("{what} required file"),
+                &variant.requires,
+            );
+            problems.requirements(Section::Loader, &what, &variant.requirements);
             if let Some(install) = &variant.install {
-                check_install(&format!("{what} install"), install, &mut problems);
+                check_install(
+                    Section::Loader,
+                    &format!("{what} install"),
+                    install,
+                    &mut problems,
+                );
             }
         }
 
@@ -94,40 +123,12 @@ impl LoaderDef {
             check_engine(engine, &self.variants, &mut problems);
         }
 
-        problems.0
+        problems
+            .0
+            .into_iter()
+            .map(|problem| problem.message)
+            .collect()
     }
-}
-
-/// The duplicate rules that a merge would hide: two places with one folder name, two aliases with one name, or one
-/// root file listed twice. Each layer is checked before the layers are merged.
-pub(in crate::games) fn duplicate_problems(deploy: &Deploy) -> Vec<String> {
-    let mut problems = Problems::default();
-    let mut dirs = BTreeSet::new();
-    let places = deploy.slots.iter().map(|slot| &slot.dir);
-
-    for dir in places.chain(deploy.mirror.iter().map(|mirror| &mirror.dir)) {
-        if !dirs.insert(dir.to_lowercase()) {
-            problems.push(format!("folder {dir:?} is a slot or mirror twice"));
-        }
-    }
-
-    let mut aliases = BTreeSet::new();
-
-    for name in deploy.aliases.keys() {
-        if !aliases.insert(pathkey::path_key(name)) {
-            problems.push(format!("alias {name:?} is repeated (case is ignored)"));
-        }
-    }
-
-    let mut names = BTreeSet::new();
-
-    for name in &deploy.root_files {
-        if !names.insert(pathkey::path_key(name)) {
-            problems.push(format!("root file {name:?} is listed twice"));
-        }
-    }
-
-    problems.0
 }
 
 /// `config_mirror` names a real folder of this preset: a relative game path that the base rules declare (or, for a
@@ -144,7 +145,11 @@ fn check_config_mirror(
         return;
     };
 
-    problems.relative(&format!("{what} config_mirror"), std::iter::once(folder));
+    problems.relative(
+        Section::Loader,
+        &format!("{what} config_mirror"),
+        std::iter::once(folder),
+    );
 
     let mut declared: Vec<&str> = Vec::new();
 
@@ -157,18 +162,24 @@ fn check_config_mirror(
     let key = pathkey::path_key(folder);
 
     if !declared.iter().any(|dir| pathkey::path_key(dir) == key) {
-        problems.push(format!(
-            "{what} config_mirror {folder:?} is not a slot, mirror or alias target of the preset"
-        ));
+        problems.push_in(
+            Section::Loader,
+            format!(
+                "{what} config_mirror {folder:?} is not a slot, mirror or alias target of the preset"
+            ),
+        );
     }
 }
 
 /// A loader never chooses the deployment root; the game does, because only it knows where its mods live.
 fn check_loader_root(deploy: &Deploy, what: &str, problems: &mut Problems) {
     if deploy.root.is_some() || deploy.root_linux.is_some() {
-        problems.push(format!(
-            "{what} cannot set deploy.root or deploy.root_linux; the game owns the deployment root"
-        ));
+        problems.push_in(
+            Section::Loader,
+            format!(
+                "{what} cannot set deploy.root or deploy.root_linux; the game owns the deployment root"
+            ),
+        );
     }
 }
 
@@ -180,7 +191,7 @@ fn check_engine(
     problems: &mut Problems,
 ) {
     if engine.name.trim().is_empty() {
-        problems.push("engine name is empty".to_string());
+        problems.push_in(Section::Loader, "engine name is empty".to_string());
     }
 
     check_engine_markers("engine", &engine.markers, problems);
@@ -188,9 +199,10 @@ fn check_engine(
     if let Some(name) = &engine.variant
         && !variants.contains_key(name)
     {
-        problems.push(format!(
-            "engine variant {name:?} is not one of the variants"
-        ));
+        problems.push_in(
+            Section::Loader,
+            format!("engine variant {name:?} is not one of the variants"),
+        );
     }
 
     let mut named = BTreeSet::new();
@@ -199,11 +211,14 @@ fn check_engine(
         let what = format!("engine variant {:?}", candidate.variant);
 
         if !variants.contains_key(&candidate.variant) {
-            problems.push(format!("{what} is not one of the variants"));
+            problems.push_in(
+                Section::Loader,
+                format!("{what} is not one of the variants"),
+            );
         }
 
         if !named.insert(candidate.variant.as_str()) {
-            problems.push(format!("{what} is listed twice"));
+            problems.push_in(Section::Loader, format!("{what} is listed twice"));
         }
 
         if candidate
@@ -211,7 +226,7 @@ fn check_engine(
             .as_deref()
             .is_some_and(|label| label.trim().is_empty())
         {
-            problems.push(format!("{what} label is empty"));
+            problems.push_in(Section::Loader, format!("{what} label is empty"));
         }
 
         check_engine_markers(&what, &candidate.markers, problems);
@@ -220,9 +235,10 @@ fn check_engine(
     if let Some(root) = &engine.root
         && (!root.starts_with("*/") || !pattern::is_valid(root) || root.contains('|'))
     {
-        problems.push(format!(
-            "engine root must be a folder pattern that starts with */: {root:?}"
-        ));
+        problems.push_in(
+            Section::Loader,
+            format!("engine root must be a folder pattern that starts with */: {root:?}"),
+        );
     }
 }
 
@@ -230,14 +246,15 @@ fn check_engine(
 /// Alternatives are joined with `|`, so an empty one (`a.dll|` or `a.dll||a.so`) is an error.
 fn check_engine_markers(what: &str, markers: &[String], problems: &mut Problems) {
     if markers.is_empty() {
-        problems.push(format!("{what} needs at least one marker"));
+        problems.push_in(Section::Loader, format!("{what} needs at least one marker"));
     }
 
     for marker in markers {
         if !marker_alternatives(marker).all(pattern::is_valid) {
-            problems.push(format!(
-                "{what} marker is not a folder pattern inside the game: {marker:?}"
-            ));
+            problems.push_in(
+                Section::Loader,
+                format!("{what} marker is not a folder pattern inside the game: {marker:?}"),
+            );
         }
     }
 }

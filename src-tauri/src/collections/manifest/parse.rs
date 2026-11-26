@@ -8,7 +8,7 @@ use crate::domain::collection::{
     CollectionUpdatePolicy, PLAN_FORMAT, order_items,
 };
 use crate::error::AppError;
-use crate::infra::archive::{Archive, Entry};
+use crate::infra::archive::{Archive, ArchiveEntry};
 use crate::providers::CollectionRevision;
 
 use super::items::{ApiIndex, item_from_api, item_from_manifest};
@@ -46,7 +46,7 @@ pub fn plan_from_api(revision: &CollectionRevision, game_key: &str) -> Collectio
 
     for module in &revision.mods {
         let key = unique_key(
-            format!("{}:{}", revision.info.provider, module.mod_id),
+            crate::domain::source::family_key(&revision.info.provider, &module.mod_id),
             module.file_id.clone(),
             &mut seen,
         );
@@ -117,7 +117,7 @@ pub fn plan_from_api(revision: &CollectionRevision, game_key: &str) -> Collectio
 }
 
 fn manifest_entry(archive: &Archive) -> Result<usize, AppError> {
-    let candidates: Vec<&Entry> = archive
+    let candidates: Vec<&ArchiveEntry> = archive
         .entries()
         .iter()
         .filter(|entry| !entry.is_dir && entry.name.rsplit('/').next() == Some("collection.json"))

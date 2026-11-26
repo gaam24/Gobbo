@@ -17,6 +17,7 @@ pub use lock::lock_index;
 
 use crate::error::{AppError, ErrorKind, MOD_MISSING};
 
+/// The file name of the library index in the game's state folder.
 pub const INDEX_FILE: &str = "library.json";
 
 /// A mod family that is not in the library index. The interface should not offer it, but a stale list can.

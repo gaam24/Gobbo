@@ -5,7 +5,7 @@
 use tauri::AppHandle;
 use tauri_plugin_deep_link::DeepLinkExt;
 
-use crate::domain::source::{SourceLinkStatus, SourceLinksReport};
+use crate::domain::source::{ProviderId, SourceLinkStatus, SourceLinksReport};
 use crate::error::{AppError, ErrorKind};
 use crate::providers;
 
@@ -28,10 +28,10 @@ const fn action(taken: bool, registered: bool) -> Action {
 
 /// The provider and scheme pairs the settings take, in the registry order. Every provider with links is included when
 /// its id is in `taken`, so a new provider needs no change here.
-fn taken_schemes(taken: &[String]) -> Vec<(String, &'static str)> {
+fn taken_schemes(taken: &[ProviderId]) -> Vec<(String, &'static str)> {
     providers::providers()
         .iter()
-        .filter(|provider| taken.iter().any(|id| id.as_str() == provider.id().as_str()))
+        .filter(|provider| taken.contains(&provider.id()))
         .flat_map(|provider| {
             let id = provider.id().as_str().to_string();
             provider
@@ -44,7 +44,7 @@ fn taken_schemes(taken: &[String]) -> Vec<(String, &'static str)> {
 
 /// Makes Gobbo the handler of every scheme the settings take, when another program has it. A failure for one scheme
 /// does not stop the others; the answer says what the system does now and which providers Gobbo took back.
-pub fn repair(app: &AppHandle, taken: &[String]) -> SourceLinksReport {
+pub fn repair(app: &AppHandle, taken: &[ProviderId]) -> SourceLinksReport {
     let before = status(app, taken);
     #[cfg(any(windows, target_os = "linux"))]
     {
@@ -94,7 +94,7 @@ fn link_error(scheme: &str, detail: impl std::fmt::Display) -> AppError {
 
 /// The handler the system has for each scheme the settings take, without changing anything.
 #[cfg(any(windows, target_os = "linux"))]
-pub fn status(app: &AppHandle, taken: &[String]) -> Vec<SourceLinkStatus> {
+pub fn status(app: &AppHandle, taken: &[ProviderId]) -> Vec<SourceLinkStatus> {
     let links = app.deep_link();
     taken_schemes(taken)
         .into_iter()
@@ -108,18 +108,18 @@ pub fn status(app: &AppHandle, taken: &[String]) -> Vec<SourceLinkStatus> {
 
 /// The handler the system has for each scheme the settings take, without changing anything.
 #[cfg(not(any(windows, target_os = "linux")))]
-pub fn status(_app: &AppHandle, _taken: &[String]) -> Vec<SourceLinkStatus> {
+pub fn status(_app: &AppHandle, _taken: &[ProviderId]) -> Vec<SourceLinkStatus> {
     Vec::new()
 }
 
 /// Makes the system handlers match the settings. A registration that fails stops the save, so the switch does not
 /// claim a handler the system does not have.
 #[cfg(any(windows, target_os = "linux"))]
-pub fn apply(app: &AppHandle, taken: &[String]) -> Result<(), AppError> {
+pub fn apply(app: &AppHandle, taken: &[ProviderId]) -> Result<(), AppError> {
     let links = app.deep_link();
 
     for provider in providers::providers() {
-        let wanted = taken.iter().any(|id| id.as_str() == provider.id().as_str());
+        let wanted = taken.contains(&provider.id());
 
         for &scheme in provider.schemes() {
             let registered = links.is_registered(scheme).unwrap_or(false);
@@ -145,14 +145,14 @@ pub fn apply(app: &AppHandle, taken: &[String]) -> Result<(), AppError> {
 
 /// Makes the system handlers match the settings. Nothing can be registered on this platform.
 #[cfg(not(any(windows, target_os = "linux")))]
-pub fn apply(_app: &AppHandle, _taken: &[String]) -> Result<(), AppError> {
+pub fn apply(_app: &AppHandle, _taken: &[ProviderId]) -> Result<(), AppError> {
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::{Action, action, repaired_providers, taken_schemes};
-    use crate::domain::source::SourceLinkStatus;
+    use crate::domain::source::{ProviderId, SourceLinkStatus};
 
     fn status(provider: &str, scheme: &str, registered: bool) -> SourceLinkStatus {
         SourceLinkStatus {
@@ -172,7 +172,7 @@ mod tests {
 
     #[test]
     fn every_provider_with_links_is_checked_when_taken() {
-        let schemes = taken_schemes(&["nexus".to_string(), "thunderstore".to_string()]);
+        let schemes = taken_schemes(&[ProviderId::from("nexus"), ProviderId::from("thunderstore")]);
         assert!(schemes.contains(&("nexus".to_string(), "nxm")));
         assert!(schemes.contains(&("thunderstore".to_string(), "ror2mm")));
         assert_eq!(schemes.len(), 2);
@@ -181,7 +181,7 @@ mod tests {
     #[test]
     fn a_provider_left_out_is_not_checked() {
         assert_eq!(
-            taken_schemes(&["thunderstore".to_string()]),
+            taken_schemes(&[ProviderId::from("thunderstore")]),
             vec![("thunderstore".to_string(), "ror2mm")]
         );
         assert!(taken_schemes(&[]).is_empty());

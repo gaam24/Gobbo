@@ -1,4 +1,4 @@
-use crate::commands::blocking;
+use crate::commands::helpers::blocking;
 use crate::domain::source::{SourceAccount, SourceProviderInfo};
 use crate::error::AppError;
 use crate::providers;
@@ -42,6 +42,13 @@ pub async fn save_source_key(provider: String, key: String) -> Result<(), AppErr
         let Some(account) = source.credential_account() else {
             return Ok(());
         };
+        // A replaced or cleared key makes its cached account tier stale. Drop it so the next download validates the
+        // key now in the credential store instead of reusing the old account's pacing.
+        if provider == crate::providers::nexus::ID
+            && let Ok(Some(old_key)) = providers::saved_key(source)
+        {
+            crate::providers::nexus::forget_tier(&old_key);
+        }
         crate::infra::credentials::save(account, &key)
     })
     .await

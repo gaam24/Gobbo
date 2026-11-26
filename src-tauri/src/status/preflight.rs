@@ -7,8 +7,8 @@ use serde::Serialize;
 
 use crate::context::Data;
 use crate::context::load_settings;
+use crate::context::target::deployment_root;
 use crate::deploy::overlay;
-use crate::deploy::target::deployment_root;
 use crate::domain::pathkey::path_key;
 use crate::error::{AppError, Message};
 use crate::infra::disk;

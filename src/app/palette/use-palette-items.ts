@@ -282,7 +282,10 @@ export function usePaletteItems(): () => PaletteItem[] {
 				label: t("games.openFolder"),
 				disabled: !gameStatus.settings.game_root,
 				reason: reasonWhen(!gameStatus.settings.game_root, t("palette.reason.noGameFolder")),
-				run: () => openFolderPath(gameStatus.settings.game_root),
+				run: () => {
+					const root = gameStatus.settings.game_root;
+					if (root) void openFolderPath(root);
+				},
 			},
 			{
 				id: "library-folder",

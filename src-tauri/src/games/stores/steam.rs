@@ -85,7 +85,7 @@ pub fn find_all(game: &GameDef, libraries: &[PathBuf]) -> Vec<super::super::dete
                 .map(|root| super::super::detect::Found {
                     game_root: root.display().to_string(),
                     library: library.display().to_string(),
-                    store: "steam".to_string(),
+                    store: super::Store::Steam.name().to_string(),
                 })
                 .collect::<Vec<_>>()
         })

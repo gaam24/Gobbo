@@ -2,8 +2,8 @@
 
 use std::path::{Path, PathBuf};
 
+use crate::context::target::deployment_root;
 use crate::context::{Data, load_settings};
-use crate::deploy::target::deployment_root;
 use crate::games;
 
 /// Whether the interface may open this path in the system file manager. Only Gobbo's own data folder and the folders

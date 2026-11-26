@@ -9,7 +9,7 @@ use crate::error::{AppError, DOWNLOAD_CANCELLED};
 use crate::providers;
 use crate::providers::fetch::{Fetch as FetchRequest, fetch_with_progress};
 
-use super::super::model::{DownloadState, DownloadView};
+use super::super::model::{DownloadState, DownloadView, download_name};
 use super::super::progress::Meter;
 use super::game::game_for_link;
 use super::{DownloadEvent, Downloads, archive_name};
@@ -22,10 +22,7 @@ impl Downloads {
             .and_then(|provider| provider.parse_link(link).ok())
             .map_or_else(
                 || link.to_string(),
-                |link| match link.game_key {
-                    Some(key) => format!("{key} {}", link.source.mod_id),
-                    None => link.source.mod_id,
-                },
+                |link| download_name(link.game_key.as_deref(), &link.source.mod_id),
             );
         let view = DownloadView::new(name, DownloadState::Downloading);
         let (id, stop) = self.push(view, Some(link.to_string()));
@@ -102,7 +99,7 @@ impl Downloads {
         let resolved = downloaded.source;
         let size = size_kb(fs::metadata(&path).map_or(0, |meta| meta.len()));
         let name = path.file_name().map_or_else(
-            || format!("{game_key} {}", resolved.mod_id),
+            || download_name(Some(&game_key), &resolved.mod_id),
             |name| name.to_string_lossy().into_owned(),
         );
         let path = path.display().to_string();

@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use crate::domain::library::{ModInfo, ModInfoEdit, ModVersion};
 use crate::domain::profiles::entry::ProfileMod;
-use crate::domain::profiles::{Entry, Profile, Profiles, Row};
+use crate::domain::profiles::{ListedMod, Profile, Profiles, Row};
 
 /// A fresh folder for the test that calls it, named after the calling module: `scratch!("name")`.
 macro_rules! scratch {
@@ -185,7 +185,7 @@ pub fn profile_mods(folders: &[&str], slot: &str) -> Vec<ProfileMod> {
 pub fn profile(id: &str, mods: &[(&str, &str)]) -> Profile {
     let mods = mods
         .iter()
-        .map(|(family, folder)| Entry {
+        .map(|(family, folder)| ListedMod {
             id: (*family).to_string(),
             folder: (*folder).to_string(),
             enabled: true,
@@ -255,6 +255,7 @@ pub fn target(base: &Path) -> crate::deploy::Target {
         game_root: root,
         settings: None,
         order_file: None,
+        order_format: None,
         state: base.join("state"),
         user_data: Vec::new(),
     }

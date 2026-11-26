@@ -1,6 +1,6 @@
 //! Where a game's mods go: the deployment target, built from the game definition and the settings.
 
-pub use crate::context::target::{deployment_root, settings_file};
+use crate::context::target::{deployment_root, settings_file};
 
 use crate::context::Data;
 use crate::context::Settings;
@@ -27,7 +27,7 @@ pub struct FolderReadiness {
 
 impl FolderReadiness {
     /// Whether every folder the deployment needs exists.
-    pub const fn all(&self) -> bool {
+    pub const fn is_complete(&self) -> bool {
         self.game && self.settings && self.mods
     }
 }
@@ -102,11 +102,13 @@ pub fn target_for(
         .as_ref()
         .filter(|order| !order.uses_settings_folder())
         .map(|order| order.file.clone());
+    let order_format = game.load_order.as_ref().map(|order| order.format);
     Ok(Target {
         root: deployment_root(data, game, settings)?,
         game_root: PathBuf::from(settings.game_root.trim()),
         settings: settings_path,
         order_file,
+        order_format,
         state,
         user_data,
     })
@@ -174,7 +176,7 @@ pub fn is_ready(
         settings,
         settings_redirected(game, settings, &sets),
     )
-    .all()
+    .is_complete()
         && deployment_root(data, game, settings).is_ok()
 }
 
@@ -209,6 +211,26 @@ mod tests {
         let redirected = folder_readiness(&data, &game, &settings, true);
         assert!(redirected.settings);
         assert!(without.game && redirected.game);
+    }
+
+    #[test]
+    fn a_target_carries_the_format_of_the_game_load_order() {
+        use crate::games::definition::OrderFormat;
+
+        let base = scratch!("target-order-format");
+        let settings = folders(&base);
+        let data = Data::new(base.join("data"));
+        let profile = Profile::new("p1".into(), "Default".into(), Vec::new());
+
+        let slot = crate::test_support::games::slot();
+        let target = target_for(&data, &slot, &settings, base.join("state"), &profile).unwrap();
+        assert_eq!(target.order_format, Some(OrderFormat::ModsSettings));
+        assert_eq!(target.order_file, None);
+
+        let ue4ss = crate::test_support::games::load(crate::test_support::games::UE4SS_ORDER_ID);
+        let target = target_for(&data, &ue4ss, &settings, base.join("state"), &profile).unwrap();
+        assert_eq!(target.order_format, Some(OrderFormat::Ue4ssModsTxt));
+        assert_eq!(target.order_file.as_deref(), Some("Mods/mods.txt"));
     }
 
     #[test]

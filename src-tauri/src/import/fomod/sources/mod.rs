@@ -3,7 +3,8 @@
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use super::errors::FomodError;
-use super::model::{Choice, ModuleConfig, Pattern};
+use super::model::{ModuleConfig, Pattern};
+use crate::domain::fomod::Choice;
 
 mod choices;
 mod conditions;

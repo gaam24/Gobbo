@@ -8,7 +8,7 @@ use crate::domain::collection::{
     CollectionUpdatePolicy,
 };
 use crate::domain::fomod::Choice;
-use crate::domain::profiles::Entry as ProfileEntry;
+use crate::domain::profiles::ListedMod;
 use std::collections::BTreeMap;
 
 fn item(key: &str, optional: bool, phase: u32) -> CollectionItem {
@@ -96,8 +96,8 @@ fn origin_with(
     }
 }
 
-fn entry(id: &str) -> ProfileEntry {
-    ProfileEntry {
+fn entry(id: &str) -> ListedMod {
+    ListedMod {
         id: id.into(),
         folder: format!("{id}-1"),
         enabled: true,
@@ -172,7 +172,7 @@ fn a_new_profile_takes_the_selected_members_and_skips_the_optional_one() {
     let view = start_with_plan(&root, "full-root", &request, plan).unwrap();
     assert_eq!(view.origin.excluded, ["optional"]);
     let profiles = load_profiles(&data).unwrap();
-    let profile = profiles.get(&view.profile).unwrap();
+    let profile = profiles.profile(&view.profile).unwrap();
     assert_eq!(profile.collections.len(), 1);
     assert_eq!(profile.waiting.len(), 1);
     assert_eq!(profile.waiting[0].entry.name, "Required");
@@ -189,7 +189,7 @@ fn removing_a_collection_keeps_mods_it_did_not_add_and_mods_another_collection_l
     {
         let mut profiles = load_profiles(&data).unwrap();
         let active = profiles.active.clone();
-        let profile = profiles.get_mut(&active).unwrap();
+        let profile = profiles.profile_mut(&active).unwrap();
         profile.mods = vec![entry("own"), entry("added"), entry("shared")];
         profile.collections = vec![
             origin("example", &["added", "shared"], &["own", "added", "shared"]),
@@ -201,7 +201,7 @@ fn removing_a_collection_keeps_mods_it_did_not_add_and_mods_another_collection_l
     let active = load_profiles(&data).unwrap().active;
     remove(&root, "full-root", &active, "nexus:full-root:example").unwrap();
     let profiles = load_profiles(&data).unwrap();
-    let profile = profiles.get(&active).unwrap();
+    let profile = profiles.profile(&active).unwrap();
     let ids: Vec<&str> = profile.mods.iter().map(|entry| entry.id.as_str()).collect();
     assert_eq!(ids, ["own", "shared"]);
     assert_eq!(profile.collections.len(), 1);
@@ -253,7 +253,7 @@ fn removing_a_collection_keeps_a_waiting_mod_that_only_shares_a_name() {
     );
     remove(&root, "full-root", &profile_id, "nexus:full-root:example").unwrap();
     let profiles = load_profiles(&data).unwrap();
-    let profile = profiles.get(&profile_id).unwrap();
+    let profile = profiles.profile(&profile_id).unwrap();
     assert_eq!(profile.waiting.len(), 1);
     assert_eq!(profile.waiting[0].entry.family, "nexus:9");
     assert_eq!(profile.waiting[0].entry.name, "Shared Name");
@@ -295,13 +295,13 @@ fn update_request(
 
 fn seed_profile(
     data: &Data,
-    mods: Vec<ProfileEntry>,
+    mods: Vec<ListedMod>,
     collections: Vec<CollectionOrigin>,
     waiting: Vec<crate::domain::pack::WaitingMod>,
 ) -> String {
     let mut profiles = load_profiles(data).unwrap();
     let id = profiles.active.clone();
-    let profile = profiles.get_mut(&id).unwrap();
+    let profile = profiles.profile_mut(&id).unwrap();
     profile.mods = mods;
     profile.collections = collections;
     profile.waiting = waiting;
@@ -333,7 +333,7 @@ fn an_update_switches_off_a_member_the_new_revision_removed() {
     assert_eq!(view.origin.disabled, ["removed"]);
     assert!(!view.origin.families.contains(&"removed".to_string()));
     let profiles = load_profiles(&data).unwrap();
-    let profile = profiles.get(&profile_id).unwrap();
+    let profile = profiles.profile(&profile_id).unwrap();
     let enabled = |id: &str| {
         profile
             .mods
@@ -374,7 +374,7 @@ fn a_member_the_new_revision_brings_back_is_enabled_again() {
     let view = start_with_plan(&root, "full-root", &request, plan).unwrap();
     assert!(view.origin.disabled.is_empty());
     let profiles = load_profiles(&data).unwrap();
-    let profile = profiles.get(&profile_id).unwrap();
+    let profile = profiles.profile(&profile_id).unwrap();
     assert!(
         profile
             .mods
@@ -406,7 +406,7 @@ fn a_mod_the_user_disabled_while_still_a_member_is_left_alone() {
     let view = start_with_plan(&root, "full-root", &request, plan).unwrap();
     assert!(view.origin.disabled.is_empty());
     let profiles = load_profiles(&data).unwrap();
-    let profile = profiles.get(&profile_id).unwrap();
+    let profile = profiles.profile(&profile_id).unwrap();
     assert!(
         !profile
             .mods
@@ -439,7 +439,7 @@ fn a_mod_shared_with_another_collection_is_not_switched_off() {
     let view = start_with_plan(&root, "full-root", &request, plan).unwrap();
     assert!(view.origin.disabled.is_empty());
     let profiles = load_profiles(&data).unwrap();
-    let profile = profiles.get(&profile_id).unwrap();
+    let profile = profiles.profile(&profile_id).unwrap();
     assert!(
         profile
             .mods
@@ -470,7 +470,7 @@ fn a_limited_plan_does_not_switch_anything_off() {
     let view = start_with_plan(&root, "full-root", &request, plan).unwrap();
     assert!(view.origin.disabled.is_empty());
     let profiles = load_profiles(&data).unwrap();
-    let profile = profiles.get(&profile_id).unwrap();
+    let profile = profiles.profile(&profile_id).unwrap();
     assert!(
         profile
             .mods
@@ -526,7 +526,7 @@ fn a_new_file_of_the_same_mod_is_not_treated_as_removed() {
     let view = start_with_plan(&root, "full-root", &request, plan).unwrap();
     assert!(view.origin.disabled.is_empty());
     let profiles = load_profiles(&data).unwrap();
-    let profile = profiles.get(&profile_id).unwrap();
+    let profile = profiles.profile(&profile_id).unwrap();
     assert!(
         profile
             .mods

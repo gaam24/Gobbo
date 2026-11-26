@@ -111,8 +111,10 @@ pub fn run() {
                 let settings = crate::settings::config::load_app_settings(data.inner());
                 crate::settings::config::apply_efficiency(
                     settings.efficiency_mode,
-                    window.is_focused().unwrap_or(true),
-                    window.is_minimized().unwrap_or(false),
+                    crate::settings::config::WindowState::from_window(
+                        window.is_focused().unwrap_or(true),
+                        window.is_minimized().unwrap_or(false),
+                    ),
                 );
             }
         })
@@ -161,8 +163,10 @@ pub fn run() {
             if let Some(window) = app.get_webview_window("main") {
                 crate::settings::config::apply_efficiency(
                     settings.efficiency_mode,
-                    window.is_focused().unwrap_or(true),
-                    window.is_minimized().unwrap_or(false),
+                    crate::settings::config::WindowState::from_window(
+                        window.is_focused().unwrap_or(true),
+                        window.is_minimized().unwrap_or(false),
+                    ),
                 );
             }
 

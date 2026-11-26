@@ -39,7 +39,7 @@ pub fn run_steps(
     let planned = mod_steps::plan(&steps, &enabled, phase);
     let game_root = Path::new(settings.game_root.trim());
     let session = overlay_session_state(data)?.map(|state| {
-        let deployment = crate::deploy::target::deployment_root(data, game, settings)
+        let deployment = crate::context::target::deployment_root(data, game, settings)
             .unwrap_or_else(|_| game_root.to_path_buf());
         (
             Session::with_roots(&state, &deployment, game_root, Vec::new()),

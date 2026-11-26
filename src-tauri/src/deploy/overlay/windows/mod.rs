@@ -17,12 +17,13 @@ use gobbo_overlay_launch::{Hooked, stage0};
 
 use super::{
     CRASH_DUMP_FILE, DllReport, InjectedDll, LaunchTimings, Session, clear_decisions,
-    decisions_base, mount_config, mounts_path,
+    decisions_base,
 };
-use crate::deploy::DeployError;
+use crate::deploy::error::DeployError;
 use crate::domain::resolver::DeployPlan;
 use crate::error::{FileError, Message};
 use crate::infra::store::write_atomic;
+pub use mounts::{mount_config, mounts_path};
 
 /// Checks that the hook DLL is there before anything is written: a deployment without it would not redirect the game.
 pub fn check(_session: &Session) -> Result<(), DeployError> {
@@ -63,7 +64,7 @@ pub fn start(
     // The hook reads every mount from one file. The three environment variables below stay for `gobbo run` and for
     // tests that start the hook without a session; the file wins when both are present.
     let mounts_path = mounts_path(&session.state);
-    let mounts = serde_json::to_vec(&mount_config(session)).map_err(DeployError::Json)?;
+    let mounts = serde_json::to_vec(&mount_config(session)?).map_err(DeployError::Json)?;
     std::fs::create_dir_all(&session.state).map_err(|e| FileError::new(&session.state, e))?;
     write_atomic(&mounts_path, &mounts)?;
     // Start the 32-bit helper now, so its process start and socket bind overlap the program read and the sweep.
@@ -349,7 +350,12 @@ fn sweep_stale_copies(session: &Session) {
         return;
     }
 
-    for mount in mount_config(session).mounts {
+    let Ok(config) = mount_config(session) else {
+        crate::infra::log::warn("overlay: invalid mount config; skipping the stale copy sweep");
+        return;
+    };
+
+    for mount in config.mounts() {
         remove_copy_temps(&mount.upper);
     }
 }
@@ -381,6 +387,7 @@ fn remove_copy_temps(folder: &Path) {
 
 mod dump;
 mod dump32;
+mod mounts;
 mod placement;
 
 use placement::{hook_dll, hook_dll32};

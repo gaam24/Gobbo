@@ -265,12 +265,21 @@ unsafe fn call_moved(
     name: &[u16],
     call: impl FnOnce(*const ObjectAttributes) -> i32,
 ) -> i32 {
-    let bytes = (name.len() * 2) as u16;
+    let Some(bytes) = name
+        .len()
+        .checked_mul(2)
+        .and_then(|bytes| u16::try_from(bytes).ok())
+    else {
+        // A name too long for a `UNICODE_STRING` byte count must not be truncated into a different file; pass the
+        // program's own attributes through to the original call instead.
+        return call(attributes);
+    };
     let unicode = UnicodeString {
         length: bytes,
         maximum_length: bytes,
         buffer: name.as_ptr(),
     };
+    // SAFETY: the caller guarantees `attributes` points to a valid `OBJECT_ATTRIBUTES`; it is copied by value.
     let mut moved = unsafe { *attributes };
     moved.object_name = &unicode;
     // The new name is absolute: the directory handle of the program must not come with it, or NT refuses the call.

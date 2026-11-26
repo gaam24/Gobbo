@@ -2,6 +2,7 @@
 
 use crate::error::{AppError, ErrorKind};
 
+/// Decodes installer text as UTF-8 or UTF-16, using the byte order mark when present.
 pub fn decode(bytes: &[u8]) -> Result<String, AppError> {
     if bytes.starts_with(&[0xEF, 0xBB, 0xBF]) {
         return Ok(String::from_utf8_lossy(&bytes[3..]).into_owned());

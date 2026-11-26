@@ -23,53 +23,58 @@ mod heroic;
 mod lutris;
 pub mod steam;
 
-/// The stores whose install folders Gobbo can recognise.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Type)]
-#[serde(rename_all = "snake_case")]
-pub enum Store {
-    Gog,
-    Epic,
-    Heroic,
-    Legendary,
-    Lutris,
+/// Generates the store enum and everything that reads its variants from the same list, so a new store cannot be added
+/// to one of them without the others.
+macro_rules! stores {
+    ($(($variant:ident, $name:literal, $display:literal)),+ $(,)?) => {
+        /// The stores whose install folders Gobbo can recognise, plus Steam and the folders no store claims.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Type)]
+        #[serde(rename_all = "snake_case")]
+        pub enum Store {
+            $($variant),+,
+        }
+
+        impl Store {
+            /// The stores in the order a saved source is compared with them.
+            pub const ALL: &'static [Self] = &[$(Self::$variant),+];
+
+            /// The name the window and the saved settings use for this store.
+            pub const fn name(self) -> &'static str {
+                match self {
+                    $(Self::$variant => $name),+,
+                }
+            }
+
+            /// The name shown for this store, for example in a game's subtitle.
+            pub const fn display_name(self) -> &'static str {
+                match self {
+                    $(Self::$variant => $display),+,
+                }
+            }
+
+            /// The store a saved source names, when it names one of the stores Gobbo knows.
+            pub fn from_name(name: &str) -> Option<Self> {
+                Self::ALL.iter().copied().find(|store| store.name() == name)
+            }
+        }
+
+        impl From<&str> for Store {
+            /// A saved name that names no store means a manual install, as it does for a missing source.
+            fn from(name: &str) -> Self {
+                Self::from_name(name).unwrap_or(Self::Manual)
+            }
+        }
+    };
 }
 
-impl Store {
-    /// The stores in the order a saved source is compared with them.
-    const ALL: [Self; 5] = [
-        Self::Gog,
-        Self::Epic,
-        Self::Heroic,
-        Self::Legendary,
-        Self::Lutris,
-    ];
-
-    /// The name the window and the saved settings use for this store.
-    pub const fn name(self) -> &'static str {
-        match self {
-            Self::Gog => "gog",
-            Self::Epic => "epic",
-            Self::Heroic => "heroic",
-            Self::Legendary => "legendary",
-            Self::Lutris => "lutris",
-        }
-    }
-
-    /// The name shown for this store, for example in a game's subtitle.
-    pub const fn display_name(self) -> &'static str {
-        match self {
-            Self::Gog => "GOG",
-            Self::Epic => "Epic",
-            Self::Heroic => "Heroic",
-            Self::Legendary => "Legendary",
-            Self::Lutris => "Lutris",
-        }
-    }
-
-    /// The store the saved source names, when it is one of the stores that keep a game folder.
-    pub fn from_name(name: &str) -> Option<Self> {
-        Self::ALL.into_iter().find(|store| store.name() == name)
-    }
+stores! {
+    (Steam, "steam", "Steam"),
+    (Gog, "gog", "GOG"),
+    (Epic, "epic", "Epic"),
+    (Heroic, "heroic", "Heroic"),
+    (Legendary, "legendary", "Legendary"),
+    (Lutris, "lutris", "Lutris"),
+    (Manual, "manual", "Manual"),
 }
 
 /// The definition list a candidate's id is compared with.
@@ -122,29 +127,126 @@ fn with_minigalaxy(mut folders: StoreFolders) -> StoreFolders {
     folders
 }
 
+/// One store whose installed folders can be turned into candidates. A new store is added by implementing this trait
+/// and adding an entry to [`ADAPTERS`]; the scan itself does not change.
+trait StoreAdapter: Send + Sync {
+    /// The store this adapter reads.
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "the adapter registry test checks store identity; the scan only needs candidates"
+        )
+    )]
+    fn store(&self) -> Store;
+
+    /// The candidates this store names in `folders`, in the order detection prefers them.
+    fn candidates(&self, folders: &StoreFolders) -> Vec<Candidate>;
+}
+
+/// Epic's launcher manifests and its older install list.
+struct EpicAdapter;
+
+impl StoreAdapter for EpicAdapter {
+    fn store(&self) -> Store {
+        Store::Epic
+    }
+
+    fn candidates(&self, folders: &StoreFolders) -> Vec<Candidate> {
+        let mut out = Vec::new();
+        epic::read(&mut out, folders);
+        out
+    }
+}
+
+/// Heroic's Epic and GOG install lists. A GOG game installed through Heroic still carries its GOG product id.
+struct HeroicAdapter;
+
+impl StoreAdapter for HeroicAdapter {
+    fn store(&self) -> Store {
+        Store::Heroic
+    }
+
+    fn candidates(&self, folders: &StoreFolders) -> Vec<Candidate> {
+        let mut out = Vec::new();
+        for heroic in &folders.heroic {
+            heroic::read(&mut out, heroic);
+        }
+        out
+    }
+}
+
+/// Standalone Legendary's Epic install list, read by Heroic's reader but owned by `Store::Legendary`.
+struct LegendaryAdapter;
+
+impl StoreAdapter for LegendaryAdapter {
+    fn store(&self) -> Store {
+        Store::Legendary
+    }
+
+    fn candidates(&self, folders: &StoreFolders) -> Vec<Candidate> {
+        let mut out = Vec::new();
+        if let Some(legendary) = &folders.legendary {
+            heroic::read_legendary(&mut out, legendary);
+        }
+        out
+    }
+}
+
+/// Lutris's database, on the platforms where Lutris runs.
+#[cfg(not(windows))]
+struct LutrisAdapter;
+
+#[cfg(not(windows))]
+impl StoreAdapter for LutrisAdapter {
+    fn store(&self) -> Store {
+        Store::Lutris
+    }
+
+    fn candidates(&self, folders: &StoreFolders) -> Vec<Candidate> {
+        let mut out = Vec::new();
+        for lutris in &folders.lutris {
+            lutris::read(&mut out, lutris);
+        }
+        out
+    }
+}
+
+/// GOG's registry pairs and its library folders, in that order.
+struct GogAdapter;
+
+impl StoreAdapter for GogAdapter {
+    fn store(&self) -> Store {
+        Store::Gog
+    }
+
+    fn candidates(&self, folders: &StoreFolders) -> Vec<Candidate> {
+        let mut out = gog::registry(&folders.gog_registry);
+        gog::read(&mut out, &folders.gog_libraries);
+        out
+    }
+}
+
+/// The stores detection reads, in the order a scan prefers when two stores claim one folder: the launchers that
+/// manage an install come first, the plain `goggame-*.info` folders last. The GOG adapter keeps the registry pairs
+/// before the library folders.
+static ADAPTERS: &[&dyn StoreAdapter] = &[
+    &EpicAdapter,
+    &HeroicAdapter,
+    &LegendaryAdapter,
+    #[cfg(not(windows))]
+    &LutrisAdapter,
+    &GogAdapter,
+];
+
 /// Every installed game the stores in `folders` name. A missing or unreadable store file simply adds nothing; the order
 /// is the order a scan prefers when two stores claim one folder: the launchers that manage an install come first, the
 /// plain `goggame-*.info` folders last.
 pub fn candidates_in(folders: &StoreFolders) -> Vec<Candidate> {
-    let mut out = Vec::new();
-    epic::read(&mut out, folders);
-
-    for heroic in &folders.heroic {
-        heroic::read(&mut out, heroic);
-    }
-
-    if let Some(legendary) = &folders.legendary {
-        heroic::read_legendary(&mut out, legendary);
-    }
-
-    #[cfg(not(windows))]
-    for lutris in &folders.lutris {
-        lutris::read(&mut out, lutris);
-    }
-
-    out.extend(gog::registry(&folders.gog_registry));
-    gog::read(&mut out, &folders.gog_libraries);
-    out
+    ADAPTERS
+        .iter()
+        .flat_map(|adapter| adapter.candidates(folders))
+        .collect()
 }
 
 /// Whether the candidate belongs to this game: the store id must be one the definition opted into, and the folder must
@@ -167,6 +269,40 @@ mod tests {
     use super::*;
     use crate::test_support::games as test_games;
     use crate::test_support::{scratch, write};
+
+    #[test]
+    fn every_store_round_trips_through_its_name() {
+        for &store in Store::ALL {
+            assert_eq!(Store::from_name(store.name()), Some(store));
+            assert!(!store.display_name().is_empty(), "{store:?}");
+        }
+    }
+
+    #[test]
+    fn the_adapter_registry_names_each_candidate_store_once_in_scan_order() {
+        let stores: Vec<_> = ADAPTERS.iter().map(|adapter| adapter.store()).collect();
+
+        // An adapter names a store Gobbo knows, and no two adapters name the same one.
+        for &store in &stores {
+            assert!(Store::ALL.contains(&store), "{store:?}");
+            assert_eq!(
+                stores.iter().filter(|found| **found == store).count(),
+                1,
+                "{store:?} has more than one adapter"
+            );
+        }
+
+        // Steam has its own detection and Manual is the fallback when no store is named, so neither is an adapter.
+        assert!(!stores.contains(&Store::Steam));
+        assert!(!stores.contains(&Store::Manual));
+
+        // Every store that can produce candidates has one adapter, in the order a scan prefers them.
+        let mut expected = vec![Store::Epic, Store::Heroic, Store::Legendary];
+        #[cfg(not(windows))]
+        expected.push(Store::Lutris);
+        expected.push(Store::Gog);
+        assert_eq!(stores, expected);
+    }
 
     /// An install with the fixture's markers, so a candidate matches when its id is opted into.
     fn install(root: &Path) {

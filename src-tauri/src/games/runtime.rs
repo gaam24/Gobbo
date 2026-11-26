@@ -10,6 +10,8 @@ use serde::Serialize;
 use specta::Type;
 
 use super::GameDef;
+use super::prefix::effective_source;
+use super::stores::Store;
 
 /// How an install starts on this computer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Type)]
@@ -23,20 +25,26 @@ pub enum Runtime {
     Native,
 }
 
-/// The runtime of the install in `game_root`, whose effective store is `source`.
+/// The runtime of the install in `game_root`, whose saved source is `source`. An empty or unknown source resolves
+/// through [`effective_source`], so an old install with a Steam app id still uses Steam's prefix.
 pub fn of(game: &GameDef, game_root: &Path, source: &str) -> Runtime {
-    of_for(crate::platform::is_windows(), game, game_root, source)
+    of_for(
+        crate::platform::is_windows(),
+        game,
+        game_root,
+        effective_source(source, &game.detect.steam_app_ids),
+    )
 }
 
 /// [`of`] with the platform given, so both sides can be tested on one machine. Windows always starts the program
 /// directly. On Linux a native install starts directly wherever it comes from; a Windows program goes through Proton —
 /// the Steam prefix for a Steam install, another prefix for everything else.
-pub fn of_for(is_windows: bool, game: &GameDef, game_root: &Path, source: &str) -> Runtime {
+pub fn of_for(is_windows: bool, game: &GameDef, game_root: &Path, store: Store) -> Runtime {
     if is_windows || is_native_install(game, game_root) {
         return Runtime::Native;
     }
 
-    if source == "steam" {
+    if store == Store::Steam {
         Runtime::SteamProton
     } else {
         Runtime::OwnedProton
@@ -119,11 +127,41 @@ mod tests {
     fn windows_always_starts_a_program_directly() {
         let base = scratch!("runtime-windows");
         write(&base.join("Game.exe"), "MZ");
-        for source in ["steam", "gog", "epic", "heroic", "lutris", "manual"] {
+        for store in [
+            Store::Steam,
+            Store::Gog,
+            Store::Epic,
+            Store::Heroic,
+            Store::Lutris,
+            Store::Manual,
+        ] {
             assert_eq!(
-                of_for(true, &two_builds(), &base, source),
+                of_for(true, &two_builds(), &base, store),
                 Runtime::Native,
-                "{source}"
+                "{store:?}"
+            );
+        }
+    }
+
+    /// The store of a Windows build decides which Proton prefix it uses, for every store Gobbo knows.
+    #[test]
+    fn every_store_sends_a_windows_build_to_the_right_proton_prefix() {
+        let base = scratch!("runtime-every-store");
+        write(&base.join("Game.exe"), "MZ");
+        let mut game = two_builds();
+        game.detect.linux_markers.clear();
+
+        for &store in Store::ALL {
+            let expected = if store == Store::Steam {
+                Runtime::SteamProton
+            } else {
+                Runtime::OwnedProton
+            };
+            assert_eq!(
+                of_for(false, &game, &base, store),
+                expected,
+                "{}",
+                store.display_name()
             );
         }
     }
@@ -134,8 +172,14 @@ mod tests {
         let base = scratch!("runtime-windows-build");
         write(&base.join("Game.exe"), "MZ");
         let game = two_builds();
-        assert_eq!(of_for(false, &game, &base, "steam"), Runtime::SteamProton);
-        assert_eq!(of_for(false, &game, &base, "gog"), Runtime::OwnedProton);
+        assert_eq!(
+            of_for(false, &game, &base, Store::Steam),
+            Runtime::SteamProton
+        );
+        assert_eq!(
+            of_for(false, &game, &base, Store::Gog),
+            Runtime::OwnedProton
+        );
     }
 
     #[test]
@@ -143,11 +187,11 @@ mod tests {
         let base = scratch!("runtime-native-build");
         write(&base.join("Game.x86_64"), "\x7fELF");
         let game = two_builds();
-        for source in ["steam", "gog", "heroic", "manual"] {
+        for store in [Store::Steam, Store::Gog, Store::Heroic, Store::Manual] {
             assert_eq!(
-                of_for(false, &game, &base, source),
+                of_for(false, &game, &base, store),
                 Runtime::Native,
-                "{source}"
+                "{store:?}"
             );
         }
     }
@@ -158,7 +202,7 @@ mod tests {
         write(&base.join("Game.x86_64"), "\x7fELF");
         let mut game = two_builds();
         game.detect.linux_markers.clear();
-        assert_eq!(of_for(false, &game, &base, "steam"), Runtime::Native);
+        assert_eq!(of_for(false, &game, &base, Store::Steam), Runtime::Native);
     }
 
     #[test]
@@ -169,11 +213,14 @@ mod tests {
         game.executables[0].path = "bin/game".into();
         game.executables[0].path_linux = None;
         write(&base.join("bin/game"), "#!/bin/sh\n");
-        assert_eq!(of_for(false, &game, &base, "manual"), Runtime::Native);
+        assert_eq!(of_for(false, &game, &base, Store::Manual), Runtime::Native);
 
         // A PE file is a Windows program even without the usual extension.
         write(&base.join("bin/game"), "MZ\x00\x00");
-        assert_eq!(of_for(false, &game, &base, "manual"), Runtime::OwnedProton);
+        assert_eq!(
+            of_for(false, &game, &base, Store::Manual),
+            Runtime::OwnedProton
+        );
     }
 
     #[test]
@@ -182,7 +229,10 @@ mod tests {
         std::fs::create_dir_all(&base).unwrap();
         let mut game = two_builds();
         game.executables[0].path_linux = None;
-        assert_eq!(of_for(false, &game, &base, "epic"), Runtime::OwnedProton);
+        assert_eq!(
+            of_for(false, &game, &base, Store::Epic),
+            Runtime::OwnedProton
+        );
     }
 
     #[test]
@@ -191,6 +241,6 @@ mod tests {
         std::fs::create_dir_all(&base).unwrap();
         let mut game = two_builds();
         game.detect.linux_markers.clear();
-        assert_eq!(of_for(false, &game, &base, "steam"), Runtime::Native);
+        assert_eq!(of_for(false, &game, &base, Store::Steam), Runtime::Native);
     }
 }

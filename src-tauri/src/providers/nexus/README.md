@@ -33,8 +33,9 @@ Nexus uses several ids that look alike. Mixing them is the easiest way to get a 
 3. `api/client.rs` asks v3 for signed CDN links. The request is **never retried after an HTTP answer**: the endpoint
    records a download on Nexus.
 4. `download/file.rs` tries every CDN location into a unique `.part` file, rejects an HTML page, takes the name from
-   `Content-Disposition`/URL/type in `download/target.rs`, and replaces the target atomically.
-5. `download/sidecar.rs` writes the `.source.json` that names the provider, mod and file for the import.
+   `Content-Disposition`/URL/type through the shared target rules in `providers/download.rs`, which `download/file.rs`
+   imports, and replaces the target atomically. `download/mod.rs` re-exports only `download_into`.
+5. `infra/sidecar.rs` writes the `.source.json` that names the provider, mod and file for the import.
 
 An expired website key (HTTP 410), an invalid one (400), a quarantined file (403) and a rejected API key (401) are
 separate errors, so the window can tell the user what to do.

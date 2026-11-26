@@ -71,6 +71,7 @@ pub struct SourceLookup<'view, 'data, 'list> {
 }
 
 impl<'view, 'data, 'list> SourceLookup<'view, 'data, 'list> {
+    /// Builds a lookup over the library's families and the enabled mods of the profile list.
     pub fn new(view: &'view LibraryView<'data>, listed: &'list [ProfileMod]) -> Self {
         let mut enabled = rustc_hash::FxHashSet::default();
         let mut enabled_order = Vec::new();
@@ -361,17 +362,18 @@ pub fn relation_warnings_with(
 
         for other in &family.incompatible {
             if enabled.contains(other.as_str()) {
-                let pair = if *id <= other.as_str() {
-                    ((*id).to_string(), other.clone())
+                let (first, second) = if *id <= other.as_str() {
+                    (*id, other.as_str())
                 } else {
-                    (other.clone(), (*id).to_string())
+                    (other.as_str(), *id)
                 };
+                let pair = (first.to_string(), second.to_string());
 
-                if pairs.insert(pair.clone()) {
+                if pairs.insert(pair) {
                     warnings.push(
                         Message::new("relations.conflict")
-                            .with("first", lookup.family_name(&pair.0))
-                            .with("second", lookup.family_name(&pair.1)),
+                            .with("first", lookup.family_name(first))
+                            .with("second", lookup.family_name(second)),
                     );
                 }
             }

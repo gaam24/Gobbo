@@ -256,10 +256,17 @@ pub unsafe fn redirect(
     let rel = relative_under(under, &game[NT_PREFIX.len()..])?;
     // The candidate: the layer's prefix (`\??\` and the layer folder) and the relative path.
     let length = candidate(layer, rel, &mut work.units)?;
+    let Some(bytes) = length
+        .checked_mul(2)
+        .and_then(|bytes| u16::try_from(bytes).ok())
+    else {
+        // A name whose byte count does not fit a `UNICODE_STRING` must not be truncated; leave the call to the loader.
+        return None;
+    };
     let name_address = &raw const work.name as usize;
     work.name = UnicodeString {
-        length: (length * 2) as u16,
-        maximum_length: (length * 2) as u16,
+        length: bytes,
+        maximum_length: bytes,
         buffer: work.units.as_mut_ptr() as usize,
     };
     work.probe = ObjectAttributes {

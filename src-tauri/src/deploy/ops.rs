@@ -10,20 +10,20 @@ use crate::context::load_stopped;
 use crate::context::profile::lock_profiles;
 use crate::context::profile::state as profile_state;
 use crate::context::running::game_running_at;
-use crate::deploy::ApplyView;
-use crate::deploy::DeployError;
-use crate::deploy::DeployProgress;
-use crate::deploy::DeployStage;
-use crate::deploy::apply_with_progress;
+use crate::deploy::apply::apply_with_progress;
+use crate::deploy::error::DeployError;
+use crate::deploy::model::ApplyView;
+use crate::deploy::model::DeployProgress;
+use crate::deploy::model::DeployStage;
 use crate::deploy::overlay;
-use crate::deploy::plan_with_mode;
 use crate::deploy::state_is_overlay;
 use crate::deploy::target::journal_roots;
 use crate::deploy::target::target_for;
-use crate::deploy::undo;
+use crate::deploy::undo::undo;
 use crate::deploy::undo_blocked_while_running;
-use crate::domain::profiles::Entry as ProfileEntry;
+use crate::domain::profiles::ListedMod;
 use crate::domain::resolver::PlanMode;
+use crate::domain::resolver::plan_with_mode;
 use crate::error::AppError;
 use crate::error::Message;
 use crate::error::deployment_active;
@@ -34,6 +34,7 @@ use crate::infra::clock::now_seconds;
 use crate::infra::tasks::stop_if;
 use crate::library::active_mods;
 
+/// Deploys the active profile of a game, placing its files in the layer and recording the result in its metadata.
 pub fn apply_deployment(root: &Data, game_id: &str) -> Result<ApplyView, AppError> {
     apply_deployment_with_progress(root, game_id, &mut |_| {})
 }
@@ -153,7 +154,7 @@ pub fn apply_deployment_cancellable(
     // under the lock and write only the deployment metadata; every other field comes from the fresh read.
     let deployed_id = profiles.active.clone();
     let deployed_profile = profiles.active();
-    let deployed_mods: Vec<ProfileEntry> = profiles.active().enabled_mods();
+    let deployed_mods: Vec<ListedMod> = profiles.active().enabled_mods();
     let winners = profiles.active().winners.clone();
     let deployed_at = now_seconds();
     let still_exists = {

@@ -9,8 +9,9 @@ mod native;
 
 use native::{Answer, Buttons, Level};
 
+use crate::domain::storage::StorageMode;
 use crate::error::AppError;
-use crate::infra::storage::{self, PromptContext, Resolved, StorageLocation, StorageMode};
+use crate::infra::storage::{self, PromptContext, Resolved, StorageLocation};
 
 /// What the start does after the storage question.
 #[derive(Debug)]

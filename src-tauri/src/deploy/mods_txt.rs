@@ -9,7 +9,8 @@ use std::path::Path;
 use rustc_hash::FxHashSet;
 
 use super::settings;
-use crate::deploy::{DeployError, Target};
+use crate::deploy::Target;
+use crate::deploy::error::DeployError;
 use crate::domain::pathkey::path_key;
 use crate::domain::resolver::{DeployPlan, SettingsRow};
 use crate::error::FileError;
@@ -298,6 +299,7 @@ mod tests {
             PlanMode::Full,
         );
         let mut target = crate::test_support::target(&base);
+        target.order_format = Some(crate::games::definition::OrderFormat::Ue4ssModsTxt);
         target.order_file = Some(rel.to_string());
         let mods = target.state.join("mods");
         let layer_list = mods.join(rel);

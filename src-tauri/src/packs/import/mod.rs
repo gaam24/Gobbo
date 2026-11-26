@@ -16,7 +16,7 @@ use crate::context::profile::history::save_profiles;
 use crate::context::profile::lock_profiles;
 use crate::domain::library::LibraryView;
 use crate::domain::pack::WaitingMod;
-use crate::domain::profiles::Entry as ProfileEntry;
+use crate::domain::profiles::ListedMod;
 use crate::domain::profiles::ModGroup;
 use crate::domain::profiles::PackOrigin;
 use crate::domain::profiles::Separator;
@@ -162,7 +162,7 @@ pub fn import_pack_with_progress(
                 continue;
             }
 
-            state.mods.push(ProfileEntry {
+            state.mods.push(ListedMod {
                 id: family.clone(),
                 folder: folder.clone(),
                 enabled: entry.enabled,
@@ -244,7 +244,7 @@ pub fn import_pack_with_progress(
             view.profiles_created += 1;
             (profiles.create_unique(&pack.name)?, true)
         };
-        let profile = profiles.get_mut(&id)?;
+        let profile = profiles.profile_mut(&id)?;
         profile.restore_list(state);
         // An older pack has no choices: a new profile keeps the definition defaults and an existing one keeps its
         // local choices. A pack that carries them reproduces the author's profile. Set ids the receiver's game no

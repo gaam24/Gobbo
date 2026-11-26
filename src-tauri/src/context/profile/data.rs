@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use super::store::{self, Entry, OwnerFile, Store};
+use super::store::{self, MaterializedPath, OwnerFile, ProfileStore};
 use crate::context::target::{path_context, settings_file};
 use crate::context::{Data, Settings};
 use crate::domain::naming;
@@ -95,9 +95,7 @@ pub fn paths(data: &Data, game: &GameDef, settings: &Settings) -> Vec<String> {
     paths
 }
 
-/// Whether `path` is a user-data root or lies below one. Windows compares ignoring case; Linux compares the paths as
-/// they are.
-/// Drops the paths a user-data set owns. An old manifest from before the set was declared must not touch them.
+/// Drops the paths a user-data set owns, even from an old manifest written before the set was declared.
 fn without_user_data(
     data: &Data,
     game: &GameDef,
@@ -110,17 +108,17 @@ fn without_user_data(
         .collect()
 }
 
-fn inside_user_data(data: &Data, game: &GameDef, settings: &Settings, path: &Path) -> bool {
-    if game.user_data.is_empty() {
-        return false;
-    }
-
-    let context = path_context(data, game, settings);
-    game.user_data.iter().any(|set| {
-        context
-            .resolve(set.path_for_platform())
-            .is_ok_and(|root| pathkey::is_inside(&root, path))
-    })
+/// Whether `path` is a user-data root or lies below one. Windows compares ignoring case; Linux compares the paths as
+/// they are.
+pub(super) fn inside_user_data(
+    data: &Data,
+    game: &GameDef,
+    settings: &Settings,
+    path: &Path,
+) -> bool {
+    crate::context::profile::user_data::real_roots(data, game, settings)
+        .into_iter()
+        .any(|(_, root)| root.is_ok_and(|root| pathkey::is_inside(&root, path)))
 }
 
 /// Makes `target` the materialized profile. The owner's data is saved first. On the first run the current real
@@ -161,7 +159,7 @@ pub fn capture_settings(
         return Ok(());
     }
 
-    store::capture(&[Entry {
+    store::capture(&[MaterializedPath {
         store: store_path(data, profile, &path),
         real: file,
     }])
@@ -186,12 +184,12 @@ struct DataStore<'a> {
     settings: &'a Settings,
 }
 
-impl Store for DataStore<'_> {
+impl ProfileStore for DataStore<'_> {
     fn owner(&self) -> OwnerFile {
         OWNER
     }
 
-    fn entries(&self, data: &Data, profile: &str) -> Result<Vec<Entry>, AppError> {
+    fn entries(&self, data: &Data, profile: &str) -> Result<Vec<MaterializedPath>, AppError> {
         let paths = without_user_data(
             data,
             self.game,
@@ -200,7 +198,7 @@ impl Store for DataStore<'_> {
         );
         Ok(paths
             .into_iter()
-            .map(|path| Entry {
+            .map(|path| MaterializedPath {
                 store: store_path(data, profile, &path),
                 real: PathBuf::from(path),
             })
@@ -237,7 +235,7 @@ fn write_manifest(data: &Data, profile: &str, paths: &[String]) -> Result<(), Ap
 }
 
 #[cfg(test)]
-#[allow(
+#[expect(
     clippy::literal_string_with_formatting_args,
     reason = "path templates contain braces, not format arguments"
 )]

@@ -30,6 +30,7 @@ fn a_redirect_settings_file_starts_from_the_lower_copy() {
         game_root: base.join("game"),
         settings: Some(upper.join("mods.settings")),
         order_file: None,
+        order_format: Some(OrderFormat::ModsSettings),
         state: base.join("state"),
         user_data: vec![UserDataSet {
             id: "documents".into(),
@@ -213,11 +214,11 @@ fn undo_cleans_up_after_an_interrupted_apply() {
 
     // Interruption after linking the first file, before the settings are written.
     journal
-        .append(&Entry::DirCreated { path: dir.clone() })
+        .append(&JournalOp::DirCreated { path: dir.clone() })
         .unwrap();
     fs::create_dir(&dir).unwrap();
     journal
-        .append(&Entry::FileDeployed {
+        .append(&JournalOp::FileDeployed {
             path: dir.join("x.ws"),
         })
         .unwrap();
@@ -236,11 +237,11 @@ fn an_interrupted_apply_is_repaired_before_the_next_apply() {
     let journal = Journal::new(f.target.state.join(JOURNAL_FILE));
     let dir = f.root.join("Mods/modA");
     journal
-        .append(&Entry::DirCreated { path: dir.clone() })
+        .append(&JournalOp::DirCreated { path: dir.clone() })
         .unwrap();
     fs::create_dir_all(&dir).unwrap();
     journal
-        .append(&Entry::FileDeployed {
+        .append(&JournalOp::FileDeployed {
             path: dir.join("x.ws"),
         })
         .unwrap();
@@ -266,12 +267,12 @@ fn undo_leaves_a_folder_where_a_deployed_file_was() {
     fs::create_dir_all(&replaced).unwrap();
     fs::write(&removed, "deployed").unwrap();
     journal
-        .append(&Entry::FileDeployed {
+        .append(&JournalOp::FileDeployed {
             path: replaced.clone(),
         })
         .unwrap();
     journal
-        .append(&Entry::FileDeployed {
+        .append(&JournalOp::FileDeployed {
             path: removed.clone(),
         })
         .unwrap();
@@ -296,7 +297,7 @@ fn undo_leaves_a_file_where_a_created_folder_was() {
     fs::create_dir_all(&f.root).unwrap();
     fs::write(&replaced, "user file").unwrap();
     journal
-        .append(&Entry::DirCreated {
+        .append(&JournalOp::DirCreated {
             path: replaced.clone(),
         })
         .unwrap();
@@ -318,11 +319,11 @@ fn the_next_apply_repairs_a_damaged_completion_marker() {
     let journal = Journal::new(f.target.state.join(JOURNAL_FILE));
     let dir = f.root.join("Mods/modA");
     journal
-        .append(&Entry::DirCreated { path: dir.clone() })
+        .append(&JournalOp::DirCreated { path: dir.clone() })
         .unwrap();
     fs::create_dir_all(&dir).unwrap();
     journal
-        .append(&Entry::FileDeployed {
+        .append(&JournalOp::FileDeployed {
             path: dir.join("x.ws"),
         })
         .unwrap();
@@ -346,7 +347,7 @@ fn undo_repairs_a_damaged_completion_marker() {
     let journal = Journal::new(f.target.state.join(JOURNAL_FILE));
     let dir = f.root.join("Mods/modA");
     journal
-        .append(&Entry::DirCreated { path: dir.clone() })
+        .append(&JournalOp::DirCreated { path: dir.clone() })
         .unwrap();
     fs::create_dir_all(&dir).unwrap();
     fs::write(f.target.state.join(DEPLOYMENT_FILE), b"{ not json").unwrap();

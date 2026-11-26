@@ -4,7 +4,7 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::deploy::DeployError;
+use crate::deploy::error::DeployError;
 use crate::error::FileError;
 
 /// The hook's file name for the architecture of this Gobbo process.

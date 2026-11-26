@@ -4,12 +4,12 @@
 
 use std::collections::BTreeSet;
 use std::fs;
-use std::path::PathBuf;
 
+use super::super::GameOrigin;
+use super::super::layers::{DefinitionLayer, DefinitionLayers};
 use super::super::loaders::{
     EngineDef, LoaderDef, LoaderRules, merge_lists, with_requirement_paths,
 };
-use super::super::{GameOrigin, catalog_loaders_dir, loaders_dir, user_loaders_dir};
 use super::{LoaderEngineVariantView, LoaderEngineView, LoaderPresetView, LoaderVariantView};
 use crate::domain::deploy::Deploy;
 
@@ -17,25 +17,16 @@ use crate::domain::deploy::Deploy;
 /// preset in an earlier folder replaces the same id in a later one. An invalid file is returned with its problems
 /// instead of hiding the rest, so the window can name the file the user needs to fix.
 pub fn loader_presets() -> Vec<LoaderPresetView> {
-    let mut dirs = Vec::with_capacity(3);
-
-    if let Some(user) = user_loaders_dir() {
-        dirs.push((user, GameOrigin::User));
-    }
-
-    if let Some(catalog) = catalog_loaders_dir() {
-        dirs.push((catalog, GameOrigin::Official));
-    }
-
-    dirs.push((loaders_dir().to_path_buf(), GameOrigin::Bundled));
-    presets_from(&dirs)
+    presets_from(DefinitionLayers::current().loader_layers())
 }
 
-pub(super) fn presets_from(dirs: &[(PathBuf, GameOrigin)]) -> Vec<LoaderPresetView> {
+pub(super) fn presets_from(dirs: &[DefinitionLayer]) -> Vec<LoaderPresetView> {
     let mut seen = BTreeSet::new();
     let mut presets = Vec::new();
 
-    for (dir, origin) in dirs {
+    for layer in dirs {
+        let dir = &layer.path;
+        let origin = layer.origin;
         let Ok(entries) = fs::read_dir(dir) else {
             continue;
         };
@@ -54,14 +45,14 @@ pub(super) fn presets_from(dirs: &[(PathBuf, GameOrigin)]) -> Vec<LoaderPresetVi
             let text = match fs::read_to_string(&path) {
                 Ok(text) => text,
                 Err(error) => {
-                    presets.push(failed_preset(id, *origin, error.to_string()));
+                    presets.push(failed_preset(id, origin, error.to_string()));
                     continue;
                 }
             };
             let loader = match LoaderDef::parse(&text) {
                 Ok(loader) => loader,
                 Err(error) => {
-                    presets.push(failed_preset(id, *origin, error.to_string()));
+                    presets.push(failed_preset(id, origin, error.to_string()));
                     continue;
                 }
             };
@@ -75,7 +66,7 @@ pub(super) fn presets_from(dirs: &[(PathBuf, GameOrigin)]) -> Vec<LoaderPresetVi
                 presets.push(LoaderPresetView {
                     id: id.to_string(),
                     name: loader.name,
-                    origin: *origin,
+                    origin,
                     default_variant: loader.default_variant,
                     requires: with_requirement_paths(loader.requires, &loader.requirements),
                     places: places_of(&loader.deploy),
@@ -101,7 +92,7 @@ pub(super) fn presets_from(dirs: &[(PathBuf, GameOrigin)]) -> Vec<LoaderPresetVi
             presets.push(LoaderPresetView {
                 id: loader.id,
                 name: loader.name,
-                origin: *origin,
+                origin,
                 default_variant: loader.default_variant,
                 requires: with_requirement_paths(loader.requires, &loader.requirements),
                 places: places_of(&loader.deploy),

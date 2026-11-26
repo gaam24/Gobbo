@@ -121,7 +121,7 @@ pub(super) fn install_one(
 /// shared `acquire` path, so a member ends in the library exactly as the same file from a link does: `choices` (the
 /// window's) or the curator's stored ones pick the FOMOD options, else the wizard is asked for; a file the library
 /// already holds is not fetched again. The member's patches are applied to the new folder.
-#[allow(
+#[expect(
     clippy::too_many_arguments,
     reason = "a member import has the collection, the archive, its source, the choices, progress and cancellation"
 )]

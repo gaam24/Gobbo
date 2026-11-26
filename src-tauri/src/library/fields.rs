@@ -14,6 +14,7 @@ pub struct FamilyFields {
 }
 
 impl FamilyFields {
+    /// Copies the shared fields out of a family, or the empty fields when the mod has no family.
     pub fn of(family: Option<&Family>) -> Self {
         family.map_or_else(Self::default, |family| Self {
             notes: family.notes.clone(),

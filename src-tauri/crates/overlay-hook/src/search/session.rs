@@ -60,10 +60,34 @@ impl Search {
 /// the table unlocked; the table lock is held only to find or remove a listing.
 static SEARCHES: LazyLock<Mutex<FxHashMap<usize, Arc<Mutex<Search>>>>> =
     LazyLock::new(|| Mutex::new(FxHashMap::default()));
+/// The maximum number of live listings. A new listing at the cap passes to the original call instead of evicting a
+/// live handle, so a program that forgets to close handles cannot grow the table and no enumeration is reset.
+const MAX_SEARCHES: usize = 128;
 /// The first handle of our listings. It has the high bit set and an odd value, so it is neither a normal kernel handle
 /// (which is aligned) nor a plausible small handle; it also fits a 32-bit `usize`.
 const SEARCH_BASE: usize = (1usize << (usize::BITS - 8)) | 1;
 static NEXT_SEARCH: AtomicUsize = AtomicUsize::new(SEARCH_BASE);
+
+/// Hands out the next handle key. The counter counts up from `SEARCH_BASE`; a value outside the valid window is never
+/// handed out, because the table may still hold an entry with that key from an earlier pass through the window.
+fn next_search_key() -> usize {
+    loop {
+        let key = NEXT_SEARCH.fetch_add(1, Ordering::Relaxed);
+
+        if (SEARCH_BASE..=usize::MAX - 1).contains(&key) {
+            return key;
+        }
+
+        // Only the thread that still sees its own post-fetch value may reset; a failed CAS means another thread
+        // already moved the counter, so this thread just takes a fresh key.
+        let _ = NEXT_SEARCH.compare_exchange(
+            key.wrapping_add(1),
+            SEARCH_BASE,
+            Ordering::Relaxed,
+            Ordering::Relaxed,
+        );
+    }
+}
 
 /// Whether a handle can be one of our listings. A real handle is small and aligned; this check runs before the lock, so a
 /// real handle never pays for the table.
@@ -207,7 +231,8 @@ pub(crate) unsafe extern "system" fn find_close(handle: *mut c_void) -> i32 {
 }
 
 /// Starts a listing for a pattern such as `C:\Game\data\*`, when the folder is inside the game folder. The first entry
-/// goes into `data`. `None` means the pattern is outside the game folder, and the original call runs.
+/// goes into `data`. `None` means the pattern is outside the game folder or all listing slots are live, and the
+/// original call runs.
 ///
 /// # Safety
 /// `name` must be a NUL-terminated UTF-16 pattern, and `data` must be writable.
@@ -218,6 +243,7 @@ unsafe fn start_search(
     search: i32,
     flags: u32,
 ) -> Option<*mut c_void> {
+    // SAFETY: the callers pass the program's NUL-terminated pattern; `place` reads it and copies what it keeps.
     let place = unsafe { place(name) }?;
     let mount = place.mount;
     let pattern = place.rel;
@@ -232,6 +258,7 @@ unsafe fn start_search(
     let layers = find_layers(mount, rel, mask, level, search, flags, true, Some(&own));
 
     if let Some((handle, first)) = layers.direct {
+        // SAFETY: `data` is the program's `WIN32_FIND_DATAW` output, writable for one entry; `first` is plain data.
         unsafe { *data = first };
         return Some(handle);
     }
@@ -242,16 +269,29 @@ unsafe fn start_search(
         root: layers.root,
     };
 
+    // SAFETY: `data` is writable for one `WIN32_FIND_DATAW` for the duration of the call; the listing keeps no borrow.
     if !unsafe { listing.advance_into(data) } {
         return Some(no_entries(ERROR_FILE_NOT_FOUND));
     }
 
-    let key = NEXT_SEARCH.fetch_add(1, Ordering::Relaxed);
     crate::stat_lock();
-    SEARCHES
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner)
-        .insert(key, Arc::new(Mutex::new(listing)));
+    let mut searches = SEARCHES.lock().unwrap_or_else(PoisonError::into_inner);
+
+    // After a full wrap a key can still be live in the table, so the table is the final authority on collisions.
+    let key = loop {
+        let key = next_search_key();
+        if !searches.contains_key(&key) {
+            break key;
+        }
+    };
+
+    // A live search is never evicted: when the table is full, leave it to the original call rather than resetting an
+    // enumeration the program is still reading.
+    if searches.len() >= MAX_SEARCHES {
+        return None;
+    }
+
+    searches.insert(key, Arc::new(Mutex::new(listing)));
     Some(key as *mut c_void)
 }
 

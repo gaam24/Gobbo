@@ -1,8 +1,8 @@
 //! Loader package rules: a name and version for the interface, a check path, an HTTPS source with a SHA-256, and paths
 //! that stay inside the deployment root.
 
-use super::problems::Problems;
-use crate::games::definition::Install;
+use super::problems::{Problems, Section};
+use crate::games::definition::LoaderPackage;
 
 impl crate::games::definition::GameDef {
     /// The merged package must be complete; each layer's paths, link and hash were checked where they were read.
@@ -11,7 +11,7 @@ impl crate::games::definition::GameDef {
             return;
         };
         let label = "install";
-        check_install(label, install, problems);
+        check_install(Section::Install, label, install, problems);
 
         for (field, value) in [
             ("name", &install.name),
@@ -19,26 +19,40 @@ impl crate::games::definition::GameDef {
             ("url", &install.url),
         ] {
             if value.trim().is_empty() {
-                problems.push(format!("{label}: {field} is empty"));
+                problems.push_in(Section::Install, format!("{label}: {field} is empty"));
             }
         }
 
         if install.check.is_empty() {
-            problems.push(format!(
-                "{label}: needs at least one check path that proves the loader is there"
-            ));
+            problems.push_in(
+                Section::Loader,
+                format!("{label}: needs at least one check path that proves the loader is there"),
+            );
         }
     }
 }
 
 /// The rules that hold for every layer of a package: an HTTPS link with a SHA-256, and paths that stay inside the
 /// deployment root and are valid on both systems.
-pub(in crate::games) fn check_install(label: &str, install: &Install, problems: &mut Problems) {
-    problems.relative(&format!("{label} check path"), &install.check);
-    problems.relative(&format!("{label} needed_by folder"), &install.needed_by);
+pub(in crate::games) fn check_install(
+    section: Section,
+    label: &str,
+    install: &LoaderPackage,
+    problems: &mut Problems,
+) {
+    problems.relative(section, &format!("{label} check path"), &install.check);
+    problems.relative(
+        section,
+        &format!("{label} needed_by folder"),
+        &install.needed_by,
+    );
 
     if !install.to.trim().is_empty() {
-        problems.relative(&format!("{label} folder"), std::iter::once(&install.to));
+        problems.relative(
+            section,
+            &format!("{label} folder"),
+            std::iter::once(&install.to),
+        );
     }
 
     for path in install
@@ -48,20 +62,29 @@ pub(in crate::games) fn check_install(label: &str, install: &Install, problems: 
         .chain(std::iter::once(&install.to))
     {
         if !path_characters_ok(path) {
-            problems.push(format!("{label}: path has an invalid name: {path:?}"));
+            problems.push_in(
+                section,
+                format!("{label}: path has an invalid name: {path:?}"),
+            );
         }
     }
 
     if !install.url.trim().is_empty() {
         if !install.url.starts_with("https://") {
-            problems.push(format!("{label}: url must be https: {:?}", install.url));
+            problems.push_in(
+                section,
+                format!("{label}: url must be https: {:?}", install.url),
+            );
         }
 
         if !is_sha256(&install.sha256) {
-            problems.push(format!(
-                "{label}: sha256 must be 64 hex digits: {:?}",
-                install.sha256
-            ));
+            problems.push_in(
+                section,
+                format!(
+                    "{label}: sha256 must be 64 hex digits: {:?}",
+                    install.sha256
+                ),
+            );
         }
     }
 }
@@ -81,6 +104,7 @@ fn path_characters_ok(path: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use super::Section;
     use crate::games::definition::GameDef;
     use crate::test_support::games::SLOT;
 
@@ -92,7 +116,12 @@ mod tests {
             ),
             1,
         );
-        GameDef::parse(&text).unwrap().validate()
+        GameDef::parse(&text)
+            .unwrap()
+            .validate()
+            .into_iter()
+            .map(|problem| problem.message)
+            .collect()
     }
 
     fn source(url: &str, sha256: &str) -> String {
@@ -130,12 +159,23 @@ mod tests {
         assert!(
             problems
                 .iter()
-                .any(|problem| problem.contains("version is empty"))
+                .any(|problem| problem.message.contains("version is empty"))
         );
         assert!(
             problems
                 .iter()
-                .any(|problem| problem.contains("check path"))
+                .any(|problem| problem.message.contains("check path"))
         );
+    }
+
+    #[test]
+    fn a_missing_check_path_is_reported_in_the_loader_section() {
+        let text = SLOT.replacen("[deploy]", "[install]\nname = \"Loader\"\n\n[deploy]", 1);
+        let problems = GameDef::parse(&text).unwrap().validate();
+        let found = problems
+            .iter()
+            .find(|problem| problem.message.contains("check path"))
+            .expect("the merged package has no check path");
+        assert_eq!(found.section, Section::Loader);
     }
 }

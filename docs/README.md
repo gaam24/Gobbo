@@ -48,6 +48,7 @@ The [README](../README.md) is the front door: what Gobbo is, what it does and ho
 | [Loader presets](../loaders/README.md)                                        | Shared layouts such as BepInEx.                                                                  |
 | [Overlay hook architecture](../src-tauri/crates/overlay-hook/ARCHITECTURE.md) | The invariants, hook table, path model and diagnostics contract.                                 |
 | [Backend module map](../src-tauri/docs/module-map.md)                         | Modules, layers and where a change belongs.                                                      |
+| [Module recipe](architecture/module-recipe.md)                               | How a grown module is split: the `mod.rs` façade, the file vocabulary and the 400-line gate.     |
 | [Nexus client](../src-tauri/src/providers/nexus/README.md)                    | The API client, downloads and errors.                                                            |
 | [UI components](../src/components/ui/README.md)                               | The generated shadcn layer and its allowed extensions.                                           |
 

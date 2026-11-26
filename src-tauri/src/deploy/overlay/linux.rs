@@ -9,7 +9,7 @@ use std::process::{Child, Command, ExitStatus, Stdio};
 use std::sync::OnceLock;
 
 use super::Session;
-use crate::deploy::DeployError;
+use crate::deploy::error::DeployError;
 use crate::error::FileError;
 
 /// `unshare` exits 125 when it cannot create the namespace, before the probe command ever runs. A user namespace that

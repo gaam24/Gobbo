@@ -10,6 +10,7 @@
 mod apply;
 mod error;
 mod mods_txt;
+mod order;
 #[cfg(test)]
 mod plan;
 mod progress;
@@ -24,11 +25,11 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::domain::user_data::Set as UserDataSet;
+use crate::games::definition::OrderFormat;
 
 pub use crate::domain::resolver::plan_with_mode;
 #[cfg(any(test, feature = "bench"))]
 pub use apply::apply;
-pub use apply::apply_with_progress;
 #[cfg(test)]
 pub use apply::write_settings;
 pub use error::DeployError;
@@ -44,7 +45,7 @@ use crate::domain::resolver::{DeployPlan, SettingsRow};
 #[cfg(test)]
 use crate::games::Deploy;
 #[cfg(test)]
-use journal::Entry;
+use journal::JournalOp;
 
 use crate::context::data::JOURNAL_FILE;
 
@@ -79,6 +80,9 @@ pub struct Target {
     /// An order file inside the deployment root, relative to it (UE4SS's `mods.txt`). Gobbo writes it into the
     /// profile's mod layer after the mods are placed. `None` when the order is in the settings folder or absent.
     pub order_file: Option<String>,
+    /// The format of the game's load order. It decides which of the order writers a deployment uses: `None` when the
+    /// game has no load order, so no order file is written.
+    pub order_format: Option<OrderFormat>,
     /// The Gobbo state folder: the journal and the overlay layer.
     pub state: PathBuf,
     /// The user-data sets of the active profile. Empty for a game that declares none. The overlay uses the redirect
@@ -86,8 +90,10 @@ pub struct Target {
     pub user_data: Vec<UserDataSet>,
 }
 
+/// The counts from applying a deployment plan, returned by the engine to its callers.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct ApplyReport {
+    /// How many files the apply placed in the deployment layer.
     pub files: usize,
 }
 

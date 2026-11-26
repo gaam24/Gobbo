@@ -28,8 +28,8 @@ const OPTIONS: &[(&str, &str, &str)] = &[
 const EXCLUSIVE: &[(&str, &str)] = &[("antilag", "low_latency")];
 
 /// The ids of the options this computer offers: all of them on Linux, none on Windows.
-pub fn available() -> Vec<String> {
-    if cfg!(windows) {
+pub fn available(is_windows: bool) -> Vec<String> {
+    if is_windows {
         return Vec::new();
     }
 
@@ -116,18 +116,16 @@ mod tests {
         list.iter().map(|id| (*id).to_string()).collect()
     }
 
-    #[cfg(not(windows))]
     #[test]
     fn linux_offers_every_catalogued_option() {
         // The catalogue can grow without breaking this test; what it guards is that Linux filters none of it out.
         let catalogue: Vec<String> = OPTIONS.iter().map(|(id, _, _)| (*id).to_string()).collect();
-        assert_eq!(available(), catalogue);
+        assert_eq!(available(false), catalogue);
     }
 
-    #[cfg(windows)]
     #[test]
     fn windows_offers_no_proton_option() {
-        assert!(available().is_empty());
+        assert!(available(true).is_empty());
     }
 
     #[test]

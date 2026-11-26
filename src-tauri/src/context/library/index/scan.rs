@@ -176,6 +176,18 @@ fn scan_one(library_dir: &Path, folder: &str) -> Result<(Vec<String>, u64), AppE
     scan_files(library_dir, folder)
 }
 
+/// A worker panic becomes the same `unexpected` error, with the panic text when it was a string.
+fn worker_panic(payload: Box<dyn std::any::Any + Send>) -> AppError {
+    let text = payload
+        .downcast_ref::<&str>()
+        .map(|text| (*text).to_string())
+        .or_else(|| payload.downcast_ref::<String>().cloned())
+        .unwrap_or_else(|| "non-string panic".to_string());
+    let detail = format!("a library scan worker panicked: {text}");
+    crate::infra::log::warn(&detail);
+    AppError::unexpected(detail)
+}
+
 /// Scans the folders in parallel and returns their files and sizes in the original order. The work is mostly metadata
 /// and directory reads, so a small number of workers helps without contending for the disk. Both a full rescan and the
 /// deployment refresh use this one implementation; only the rescan reads `info.json` afterwards.
@@ -210,13 +222,38 @@ pub(super) fn scan_folders(
         let mut scanned = Vec::with_capacity(folders.len());
 
         for handle in handles {
-            let mut part = handle
-                .join()
-                .map_err(|_| AppError::unexpected("a library scan worker panicked"))?;
+            let mut part = handle.join().map_err(worker_panic)?;
             scanned.append(&mut part);
         }
 
         Ok(scanned)
     })?;
     scanned.into_iter().collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_worker_panic_keeps_string_text_and_falls_back_for_other_payloads() {
+        let error = worker_panic(Box::new("bad folder"));
+        assert_eq!(error.code, "unexpected");
+        assert_eq!(
+            error.params["detail"],
+            "a library scan worker panicked: bad folder"
+        );
+
+        let error = worker_panic(Box::new("owned text".to_string()));
+        assert_eq!(
+            error.params["detail"],
+            "a library scan worker panicked: owned text"
+        );
+
+        let error = worker_panic(Box::new(42_u32));
+        assert_eq!(
+            error.params["detail"],
+            "a library scan worker panicked: non-string panic"
+        );
+    }
 }

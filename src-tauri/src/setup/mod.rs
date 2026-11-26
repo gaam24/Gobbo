@@ -18,7 +18,7 @@ use crate::context::{Data, Settings};
 use crate::domain::library::{Library, ModVersion};
 use crate::domain::pathkey::path_key;
 use crate::domain::profiles::Profile;
-use crate::games::{GameDef, Install};
+use crate::games::{GameDef, LoaderPackage};
 
 pub use install::install;
 
@@ -57,6 +57,7 @@ pub struct LoaderCopyView {
     pub enabled: bool,
 }
 
+/// Where the loader stands for the game: absent, already in the library, or an older official release to update.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
 pub enum LoaderSetupState {
@@ -119,7 +120,7 @@ pub fn view(
 }
 
 /// Whether a library version ships every check file of the package.
-fn is_loader_copy(version: &ModVersion, install: &Install) -> bool {
+fn is_loader_copy(version: &ModVersion, install: &LoaderPackage) -> bool {
     install.check.iter().all(|check| {
         let check = path_key(check);
         version.files.iter().any(|file| path_key(file) == check)
@@ -127,7 +128,7 @@ fn is_loader_copy(version: &ModVersion, install: &Install) -> bool {
 }
 
 /// Whether a version was unpacked from the exact release the definition names.
-fn is_official(version: &ModVersion, install: &Install) -> bool {
+fn is_official(version: &ModVersion, install: &LoaderPackage) -> bool {
     version
         .archive
         .as_deref()
@@ -136,7 +137,7 @@ fn is_official(version: &ModVersion, install: &Install) -> bool {
 
 /// An enabled copy that the official install put there for an older definition: no mod site is its source and its
 /// version is not the one the definition names now. A copy from a mod site is the user's pick and is never "outdated".
-fn is_older_official(library: &Library, copy: &LoaderCopyView, install: &Install) -> bool {
+fn is_older_official(library: &Library, copy: &LoaderCopyView, install: &LoaderPackage) -> bool {
     if copy.official {
         return false;
     }
@@ -156,7 +157,7 @@ fn is_older_official(library: &Library, copy: &LoaderCopyView, install: &Install
 }
 
 /// The library copies of the loader, the enabled one first, then the official release, then the newest import.
-fn copies(library: &Library, profile: &Profile, install: &Install) -> Vec<LoaderCopyView> {
+fn copies(library: &Library, profile: &Profile, install: &LoaderPackage) -> Vec<LoaderCopyView> {
     let enabled: BTreeSet<&str> = profile
         .mods
         .iter()

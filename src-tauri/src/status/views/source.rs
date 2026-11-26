@@ -69,16 +69,12 @@ pub struct UpdateReport {
 impl UpdateReport {
     /// Fills what the library decides for the report: whether the latest version is installed and in which folder, and
     /// whether it is an update. A provider file id is exact, so it is preferred over the version string.
-    pub fn with_library(
-        mut self,
-        view: &crate::domain::library::LibraryView<'_>,
-        latest_file: Option<&str>,
-    ) -> Self {
+    pub fn with_library(mut self, view: &crate::domain::library::LibraryView<'_>) -> Self {
         self.installed_folder = view
             .installed_latest_folder(
                 &self.id,
                 &self.provider,
-                latest_file,
+                self.latest_file_id.as_deref(),
                 self.latest.as_deref(),
             )
             .map(str::to_string);

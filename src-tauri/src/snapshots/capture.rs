@@ -46,7 +46,7 @@ pub(super) fn create_in(
     kind: SnapshotKind,
 ) -> Result<SnapshotView, AppError> {
     let profiles = load_profiles(&scope.game)?;
-    let name = profiles.get(profile)?.name.clone();
+    let name = profiles.profile(profile)?.name.clone();
     let created_at = now_seconds();
     let id = format!("{created_at}-{}", unique_suffix());
     let dir = scope.dir(&id);
@@ -70,7 +70,7 @@ pub(super) fn create_in(
     }
 }
 
-#[allow(
+#[expect(
     clippy::too_many_arguments,
     reason = "the values are the manifest fields this function fills"
 )]
@@ -86,18 +86,18 @@ fn capture(
     dir: &Path,
 ) -> Result<Manifest, AppError> {
     let profiles = load_profiles(&scope.game)?;
-    let profile_view = profiles.get(profile)?;
+    let profile_view = profiles.profile(profile)?;
     let state = scope.game.profile_state(profile);
     let sets = user_data::sets(&scope.game, game, settings, profile_view, &state)?;
     let mut manifest_sets = Vec::new();
 
     for set in sets.iter().filter(|set| set.isolated) {
-        let (target, source) = if set.redirects() {
+        let (target, source) = if set.is_redirected() {
             (Target::Upper, &set.upper)
         } else {
             (Target::Copy, &set.store)
         };
-        let (whiteouts, whiteouts_journal, seeded) = if set.redirects() {
+        let (whiteouts, whiteouts_journal, seeded) = if set.is_redirected() {
             (
                 read_optional(&user_data::whiteouts(&set.upper))?,
                 read_optional(&user_data::whiteouts_journal(&set.upper))?,

@@ -168,7 +168,7 @@ fn find_game(archive: &Archive) -> Option<(String, usize)> {
 fn read_text(
     archive: &Archive,
     index: usize,
-    entry: &crate::infra::archive::Entry,
+    entry: &crate::infra::archive::ArchiveEntry,
     limit: u64,
 ) -> Result<String, AppError> {
     if entry.size > limit {

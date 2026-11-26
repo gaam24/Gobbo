@@ -45,7 +45,12 @@ pub fn unpack_tool(game_root: &Path, tool: &Tool, archive_path: &Path) -> Result
         // The prefix is ASCII and ends with `/`, so the cut is on a character boundary.
         let relative = &name[strip..];
 
-        if !is_game_relative(relative) || !crate::domain::naming::is_safe_relative_path(relative) {
+        if !is_game_relative(relative)
+            || !crate::domain::naming::is_safe_relative_path(
+                relative,
+                crate::platform::is_windows(),
+            )
+        {
             return Err(bad_archive(format!("unsafe path in the archive: {name}")));
         }
 

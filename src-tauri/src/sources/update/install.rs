@@ -100,7 +100,7 @@ fn selected_choices(root: &Data, game_id: &str, family: &str) -> Result<Vec<Choi
 /// it: the new ones, or the folder that already had this exact file. `update_mod` and a requirement both need it, so
 /// the provider check and the progress rule live here once. An installer archive without `kept` choices fails with
 /// `import.needs_choice`, naming the downloaded file for the window's wizard.
-#[allow(
+#[expect(
     clippy::too_many_arguments,
     reason = "a download has the source, its archive name, the kept choices, cancellation and progress"
 )]

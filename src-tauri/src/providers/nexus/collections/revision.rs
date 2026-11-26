@@ -36,7 +36,7 @@ pub(super) fn revision_from_api(
 
 /// A missing collection is the collection `kind` of the one Nexus 404 code. The slug is kept for detail.
 fn collection_not_found(slug: &str) -> AppError {
-    AppError::user(crate::error::NEXUS_NOT_FOUND)
+    AppError::user(crate::providers::nexus::NEXUS_NOT_FOUND)
         .with("kind", "collection")
         .with("slug", slug)
 }
@@ -69,7 +69,7 @@ fn parse_revision_response(
     };
     let revision_number = revision
         .revision_number
-        .and_then(Id::u32)
+        .and_then(Id::as_u32)
         .or(requested)
         .ok_or_else(|| bad_response("the revision has no number"))?;
     let latest = collection
@@ -78,13 +78,13 @@ fn parse_revision_response(
         .unwrap_or_else(|| revision.clone());
     let latest_revision = latest
         .revision_number
-        .and_then(Id::u32)
+        .and_then(Id::as_u32)
         .unwrap_or(revision_number);
     let mod_count = revision
         .mod_count
-        .and_then(Id::u32)
+        .and_then(Id::as_u32)
         .unwrap_or_else(|| u32::try_from(revision.mod_files.len()).unwrap_or(u32::MAX));
-    let total_size_kb = revision.total_size.map_or(0, Id::kb);
+    let total_size_kb = revision.total_size.map_or(0, Id::as_kb);
     let info = CollectionInfo {
         provider: crate::providers::nexus::ID.to_string(),
         game_key: link.game_key.clone(),
@@ -141,8 +141,8 @@ fn parse_revision_response(
                 .as_ref()
                 .and_then(|file| file.r#mod.as_ref())
                 .and_then(|module| module.mod_id)
-                .and_then(Id::u32),
-            entry.file_id.and_then(Id::u32),
+                .and_then(Id::as_u32),
+            entry.file_id.and_then(Id::as_u32),
             entry.file,
         ) else {
             continue;
@@ -150,7 +150,7 @@ fn parse_revision_response(
         let module = file.r#mod.unwrap_or_default();
         let size_kb = file
             .size_in_bytes
-            .map_or_else(|| file.size.map_or(0, Id::kb), Id::kb);
+            .map_or_else(|| file.size.map_or(0, Id::as_kb), Id::as_kb);
         mods.push(CollectionMod {
             mod_id: mod_id.to_string(),
             file_id: file_id.to_string(),
@@ -179,7 +179,7 @@ fn parse_revision_response(
     let mut revisions = Vec::new();
 
     for revision in collection.revisions {
-        let Some(number) = revision.revision_number.and_then(Id::u32) else {
+        let Some(number) = revision.revision_number.and_then(Id::as_u32) else {
             continue;
         };
 
@@ -199,8 +199,8 @@ fn parse_revision_response(
                 .as_deref()
                 .and_then(crate::infra::clock::unix_time),
             latest: revision.latest.unwrap_or(number == latest_revision),
-            mod_count: revision.mod_count.and_then(Id::u32).unwrap_or(0),
-            total_size_kb: revision.total_size.map_or(0, Id::kb),
+            mod_count: revision.mod_count.and_then(Id::as_u32).unwrap_or(0),
+            total_size_kb: revision.total_size.map_or(0, Id::as_kb),
         });
     }
 

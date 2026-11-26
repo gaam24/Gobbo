@@ -6,7 +6,7 @@ const ROOT = join(import.meta.dir, "../src-tauri/src");
 
 /// The layers below the feature modules, in the order of `src-tauri/AGENTS.md`. A file may use its own layer and every
 /// layer below it; a feature module is above all of them and is never imported from here.
-const LAYERS = ["error", "domain", "infra", "platform", "providers", "context"] as const;
+const LAYERS = ["error", "domain", "infra", "migrations", "platform", "providers", "context"] as const;
 type Layer = (typeof LAYERS)[number];
 
 /// Modules a layer may use although they are not below it: the context reads the game definitions and runs the
@@ -15,6 +15,7 @@ const EXTRA: Record<Layer, readonly string[]> = {
 	error: [],
 	domain: [],
 	infra: [],
+	migrations: [],
 	platform: [],
 	providers: [],
 	context: ["games", "migrations"],

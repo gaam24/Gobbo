@@ -3,11 +3,11 @@
 //! orchestrate a library and its profiles, so they live in `sources::update`; this module stays a client that does not
 //! know the library.
 
-pub mod api;
-pub mod archive_name;
-pub mod collections;
-pub mod download;
-pub mod files;
+mod api;
+mod archive_name;
+mod collections;
+mod download;
+mod files;
 mod key;
 mod link;
 mod page;
@@ -25,6 +25,17 @@ pub use key::{ACCOUNT as KEY_ACCOUNT, required as required_key, validate_key};
 pub use link::{NxmError, parse_nxm};
 pub use page::{ModPage, mod_details};
 pub use requirements::{ModRequirement, file_requirements};
+
+/// A file the provider refuses to serve for moderation or quarantine reasons. This is *not* an entitlement failure:
+/// use `PAYMENT_REQUIRED` when the account tier is the cause.
+pub const DOWNLOAD_UNAVAILABLE: &str = "nexus.download_unavailable";
+
+/// The provider rejected the key it was given.
+pub const KEY_REJECTED: &str = "nexus.key_rejected";
+
+/// A provider 404. The `kind` param says what was not found (`mod`, `file` or `collection`), so one code per provider
+/// family replaces a code per endpoint.
+pub const NEXUS_NOT_FOUND: &str = "nexus.not_found";
 
 // ---------------------------------------------------------------------------------------------
 // The provider adapter. Every Nexus-specific mapping lives here; the rest of the app sees generic source types.
@@ -46,6 +57,7 @@ use crate::providers::link::is_slug;
 use crate::providers::{
     CollectionSource, PAYMENT_REQUIRED, SourceDownloadRequest, SourceDownloaded, SourceProvider,
 };
+use sha2::{Digest, Sha256};
 
 /// A Nexus mod id that is not a positive number.
 pub fn bad_id(id: &str) -> AppError {
@@ -62,26 +74,54 @@ pub const ID: &str = "nexus";
 const FREE_MAX: u32 = 200;
 const FREE_WINDOW: Duration = Duration::from_mins(5);
 
-/// Validated account tiers, keyed by API key. A validation is one network call, so its answer is kept for the life
-/// of the process; a failed check is remembered as free, which is the conservative pacing rule.
+/// Validated account tiers, keyed by a digest of the API key rather than the key itself: a raw credential must not
+/// stay in process memory in a cache. A validation is one network call, so its answer is kept for the life of the
+/// process; a failed check is remembered as free, which is the conservative pacing rule. The map holds only a few
+/// digests so repeated key changes cannot grow it without bound.
 static TIERS: std::sync::OnceLock<Mutex<BTreeMap<String, AccountTier>>> =
     std::sync::OnceLock::new();
+
+/// How many account tiers the cache keeps. Only the key currently in the credential store is used at a time, so a
+/// handful is enough to cover a validation and a recent key change.
+const MAX_TIERS: usize = 4;
+
+/// The stable cache key for a credential. A SHA-256 digest never holds the key itself or reveals it in memory, and it
+/// makes two equal keys share one entry.
+fn tier_key(api_key: &str) -> String {
+    faster_hex::hex_string(&Sha256::digest(api_key.as_bytes()))
+}
 
 /// Records the tier of an account. A download that Nexus refuses for a paid file records the account as free, so the
 /// rest of the run routes it through the browser.
 fn remember_tier(api_key: &str, premium: bool) {
+    let digest = tier_key(api_key);
+    let mut tiers = TIERS
+        .get_or_init(|| Mutex::new(BTreeMap::new()))
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner);
+
+    if !tiers.contains_key(&digest) && tiers.len() >= MAX_TIERS {
+        // Evict one digest by key order; the cache is a small convenience, not a record of every account.
+        tiers.pop_first();
+    }
+    tiers.insert(
+        digest,
+        if premium {
+            AccountTier::Premium
+        } else {
+            AccountTier::Free
+        },
+    );
+}
+
+/// Drops the cached tier of a key that is being replaced or cleared, so the next download validates the key now in
+/// the credential store instead of reusing the old account's pacing. Neither the key nor its digest is logged.
+pub fn forget_tier(api_key: &str) {
     TIERS
         .get_or_init(|| Mutex::new(BTreeMap::new()))
         .lock()
         .unwrap_or_else(PoisonError::into_inner)
-        .insert(
-            api_key.to_string(),
-            if premium {
-                AccountTier::Premium
-            } else {
-                AccountTier::Free
-            },
-        );
+        .remove(&tier_key(api_key));
 }
 
 /// The tier a download is made with. Without a cached answer this validates the key once; an unreachable API is
@@ -107,7 +147,7 @@ fn cached_tier(api_key: &str) -> Option<AccountTier> {
         .get_or_init(|| Mutex::new(BTreeMap::new()))
         .lock()
         .unwrap_or_else(PoisonError::into_inner)
-        .get(api_key)
+        .get(&tier_key(api_key))
         .copied()
 }
 
@@ -343,6 +383,41 @@ pub(super) fn meta_from_page(page: &ModPage) -> SourceMeta {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn tiers_share_by_key_and_are_forgotten_with_it() {
+        let key = String::from("test-tier-key-one");
+        let same = key.clone();
+        let other = String::from("test-tier-key-two");
+
+        forget_tier(&key);
+        forget_tier(&other);
+
+        remember_tier(&key, true);
+        // Two equal keys share one cached answer, keyed by their digest.
+        assert_eq!(cached_tier(&same), Some(AccountTier::Premium));
+        // A different key stays unknown until it is validated.
+        assert_eq!(cached_tier(&other), None);
+        remember_tier(&other, false);
+        assert_eq!(cached_tier(&other), Some(AccountTier::Free));
+        assert_eq!(cached_tier(&key), Some(AccountTier::Premium));
+
+        forget_tier(&key);
+        assert_eq!(cached_tier(&key), None);
+        assert_eq!(cached_tier(&other), Some(AccountTier::Free));
+
+        // Repeated key changes cannot grow the cache without bound.
+        for n in 0..(MAX_TIERS * 2) {
+            remember_tier(&format!("test-tier-change-{n}"), false);
+        }
+        let len = TIERS
+            .get_or_init(|| Mutex::new(BTreeMap::new()))
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .len();
+        assert!(len <= MAX_TIERS, "the tier cache grew to {len} entries");
+        forget_tier(&other);
+    }
 
     #[test]
     fn only_the_free_tier_has_a_download_ceiling() {

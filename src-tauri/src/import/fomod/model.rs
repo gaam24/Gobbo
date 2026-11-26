@@ -5,9 +5,6 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-/// The user's choice from the wizard: an option in a group, by the group's place in the installer.
-pub use crate::domain::fomod::Choice;
-
 /// A parsed `ModuleConfig.xml` in a form that can resolve the choices and conditions.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModuleConfig {
@@ -41,10 +38,9 @@ pub struct Group {
 /// How many options a group lets the user pick, from the `type` attribute of `<group>`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "snake_case")]
-// The names mirror the `type` attribute of `group` in ModuleConfig.xml, spec for spec.
-#[allow(
+#[expect(
     clippy::enum_variant_names,
-    reason = "the variants mirror the installer format, not an internal naming choice"
+    reason = "the names mirror the `type` attribute of `group` in ModuleConfig.xml, spec for spec, so the variants mirror the installer format rather than an internal naming choice"
 )]
 pub enum GroupKind {
     SelectAny,
@@ -99,7 +95,7 @@ pub enum OptionKind {
 /// The rule a visible group breaks, as the wizard shows it. The import turns the same problem into its message code.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Type)]
 #[serde(rename_all = "snake_case")]
-#[allow(
+#[expect(
     clippy::enum_variant_names,
     reason = "the codes mirror the wizard's group rules: pick one, at least one, at most one"
 )]

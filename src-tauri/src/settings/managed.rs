@@ -1,5 +1,5 @@
-//! The games the user added to Gobbo: checking a game folder, adding a game with its folder, removing it from the list
-//! and restoring or deleting the data of a removed game. The folders and their reading are in `context::managed`.
+//! The commands that change the games the user added: check a game folder, add a game with its folder, remove it from
+//! the list, and restore or delete the data of a removed game. The folder store is in `context::managed`.
 
 use crate::context::managed::{ManagedGame, managed_games, restore_removed};
 use crate::context::{Data, Settings, idle_data, save_settings};
@@ -82,10 +82,9 @@ pub fn add_game(root: &Data, game_id: &str, game_root: &str) -> Result<Vec<Manag
     let install = detect::classify_install(&home, &path);
     let mut settings = Settings {
         game_root,
-        source: install.store.to_string(),
-        prefix_dir: install.prefix_text(),
         ..current
     };
+    crate::context::settings::apply_install(&mut settings, &install, true);
     let prefix = crate::context::target::prefix(root, &game, &settings);
     let under_proton =
         crate::context::target::runtime(&game, &settings) != crate::games::runtime::Runtime::Native;
@@ -160,6 +159,7 @@ mod tests {
 
     use super::add_game;
     use crate::context::{Data, Settings, load_settings, save_settings};
+    use crate::games::stores::Store;
     use crate::test_support::games as test_games;
     use crate::test_support::{scratch, write};
 
@@ -313,13 +313,13 @@ dir = "Mods"
 
     #[test]
     fn moving_the_game_folder_takes_the_store_prefix_unless_the_same_save_picks_one() {
-        let install = crate::games::detect::Install {
-            store: "heroic",
+        let install = crate::games::detect::StoreInstall {
+            store: Store::Heroic,
             prefix: Some(PathBuf::from("/prefixes/Slot/pfx")),
         };
         assert_eq!(install.prefix_text(), "/prefixes/Slot/pfx");
-        let none = crate::games::detect::Install {
-            store: "manual",
+        let none = crate::games::detect::StoreInstall {
+            store: Store::Manual,
             prefix: None,
         };
         assert_eq!(none.prefix_text(), "");

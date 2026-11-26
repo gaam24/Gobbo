@@ -5,9 +5,9 @@
 A provider is an adapter, not a branch. The rest of the app sees `SourceRef`, `SourceMeta` and
 `SourceRequirement`; it never names the service.
 
-1. Create `providers/<id>/` with a `SourceProvider` implementation. Keep the service's records inside that folder and
-   map them to the generic types in `domain::source`.
-2. Register it in `PROVIDERS` in `providers/mod.rs`. Add a `Case` to `providers/testing.rs` with a public mod id, page
+1. Create `providers/<id>/` with a `SourceProvider` implementation (the trait is in `providers/port.rs`). Keep the
+   service's records inside that folder and map them to the generic types in `domain::source`.
+2. Register it in `PROVIDERS` in `providers/registry.rs`. Add a `Case` to `providers/testing.rs` with a public mod id, page
    URL, deep link and archive name; `check_all` fails until every registered provider has one.
 3. Use the shared pieces: `infra::http` for requests (`GOBBO_HTTP_TRACE=1` prints every request with keys and signed
    links redacted), `sources::downloads` for the queue and state, `infra::sidecar` for the `<archive>.source.json`
@@ -27,6 +27,19 @@ A provider is an adapter, not a branch. The rest of the app sees `SourceRef`, `S
    `DownloadPolicy::Unlimited`, and Nexus overrides it for free accounts. The shared queue reads the policy, so the
    rule stays on the provider instead of in the download code.
 
+### Adding a store
+
+A store is an adapter, not a branch in detection.
+
+1. Implement `StoreAdapter` in `games/stores/mod.rs` (or a submodule for a store with several readers) and add one entry
+   to the static `ADAPTERS` list in scan order. `candidates_in` picks it up; the scan itself does not change.
+2. Add the store to the `stores!` list in `games/stores/mod.rs` so `name`, `display_name`, `ALL` and `from_name` stay in
+   step, and to `platform::store_folders` for the folder it keeps games in. Steam keeps its own detection and `Manual`
+   is the fallback, so neither is an adapter.
+3. Add the store's id list to the definition's detect fields in `games/definition/` and its `IdKind` in
+   `games/stores/mod.rs` when a candidate carries an id: a folder with the right markers is never taken for a game that
+   did not opt into it.
+
 ### Adding a feature
 
 A feature is a vertical module: its commands, use case and engine live in one folder, and the shared layers
@@ -38,7 +51,7 @@ A feature is a vertical module: its commands, use case and engine live in one fo
 3. Add a command in that module's `commands.rs` with `game_commands!` when it runs for one game; register its
    `alias::name` in `src-tauri/commands.txt` and add its `allow-*` to `capabilities/default.json`. The single list in
    `commands.txt` generates both the handler registration and the permissions.
-4. If the window needs new data, add a view type in `status/views/` and fill it in `status/mod_views/` or `status/`
+4. If the window needs new data, add a view type in `status/views/` and fill it in `status/mod_builders/` or `status/`
    instead of sending a second call.
 5. Add the strings to `src/locales/en.ts` and `src/locales/pl.ts`; an error code without a translation shows the code.
 6. Add the test next to the use case. A shared fixture goes in `test_support.rs`; a cross-module flow goes in

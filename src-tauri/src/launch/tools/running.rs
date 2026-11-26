@@ -132,6 +132,7 @@ pub fn run_tool(
     // watcher does not have to wait for the program to appear in the process list. The pipeline still reports the exit,
     // and the notice turns a cancelled flag into a null code and the `cancelled` task state.
     let watcher = Box::new(move |process: crate::platform::Process| {
+        // Detached on purpose: the watcher ends when the tool's process is gone, and app exit does not join it.
         std::thread::spawn(move || watch_tool_cancel(cancel, process));
     });
     let _outcome = crate::launch::pipeline::run(

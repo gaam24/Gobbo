@@ -5,6 +5,7 @@
 use super::*;
 
 use crate::deploy::ops::apply_deployment;
+use crate::deploy::ops::undo_deployment;
 use crate::deploy::overlay::Session;
 use crate::launch::start::overlay_session_state;
 use crate::test_support::require_overlay_namespaces;
@@ -91,6 +92,29 @@ fn unreal_mods_are_served_under_the_project_folder_and_the_game_stays_clean() {
     assert!(
         !f.game_root.join("Project/Binaries").exists(),
         "the loader and its mods must not be written into the game folder"
+    );
+
+    // Undo takes the prepared layer away; the game folder and the profile stay as they were before the apply.
+    undo_deployment(&f.data, UNREAL_GAME).unwrap();
+    assert!(
+        !f.game_root
+            .join("Project/Content/Paks/~mods/BetterBeast.pak")
+            .exists(),
+        "the pak must not be in the game folder after undo"
+    );
+    assert!(
+        !f.game_root.join("Project/Binaries").exists(),
+        "the loader and its mods must not be in the game folder after undo"
+    );
+    assert!(
+        !status(&f.data, UNREAL_GAME).unwrap().deployed,
+        "the profile must not be deployed after undo"
+    );
+    assert!(
+        overlay_session_state(&f.data.game(UNREAL_GAME))
+            .unwrap()
+            .is_none(),
+        "the overlay layer must be gone after undo"
     );
     let _ = fs::remove_dir_all(&base);
 }

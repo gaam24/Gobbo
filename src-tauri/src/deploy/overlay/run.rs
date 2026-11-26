@@ -7,8 +7,8 @@ use std::path::Path;
 use super::session::Session;
 use super::{Running, start};
 use crate::context::data::JOURNAL_FILE;
-use crate::deploy::DeployError;
-use crate::deploy::journal::{Entry, Journal};
+use crate::deploy::error::DeployError;
+use crate::deploy::journal::{Journal, JournalOp};
 use crate::error::FileError;
 use crate::games::Step;
 use gobbo_overlay_core::join;
@@ -123,7 +123,7 @@ pub fn run_step(
     let journal = Journal::new(state.join(JOURNAL_FILE));
 
     for rel in &step.outputs {
-        journal.append(&Entry::FileDeployed {
+        journal.append(&JournalOp::FileDeployed {
             path: join(&layers.upper, rel),
         })?;
     }

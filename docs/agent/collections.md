@@ -24,7 +24,7 @@ The feature module is `src-tauri/src/collections/`:
 
 ## Provider port
 
-`providers::CollectionSource` is the provider-neutral port (`src-tauri/src/providers/mod.rs`). A provider advertises it
+`providers::CollectionSource` is the provider-neutral port (`src-tauri/src/providers/port.rs`). A provider advertises it
 with `SourceCapabilities.collections` and returns an adapter from `SourceProvider::collection()`. The Nexus adapter is
 `providers/nexus/collections/`: it parses website and `nxm://` collection links, reads the GraphQL revision, downloads
 the archive through the signed v2 link and builds the page URL. No other module knows the Nexus API.

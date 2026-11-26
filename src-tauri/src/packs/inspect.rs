@@ -19,7 +19,6 @@ use crate::domain::profiles::Profiles;
 use crate::error::AppError;
 use crate::error::ErrorKind;
 use crate::error::io_at;
-use crate::library::waiting::find_version;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::fs;
@@ -126,7 +125,7 @@ pub fn inspect_pack(root: &Data, game_id: &str, path: &Path) -> Result<PackPrevi
 
             total += 1;
 
-            if find_version(&view, entry).is_some() {
+            if view.find_entry(entry).is_some() {
                 have += 1;
             } else if entry
                 .archive
@@ -168,14 +167,14 @@ pub(super) fn pack_update(
     let resolved: Vec<(&PackMod, Option<(String, String)>)> = profile
         .mods
         .iter()
-        .map(|entry| (entry, find_version(view, entry)))
+        .map(|entry| (entry, view.find_entry(entry)))
         .collect();
     let name_of = |id: &str| {
         view.family_name(id)
             .map_or_else(|| id.to_string(), str::to_string)
     };
     // The existing list is indexed once. A scan of it for every pack mod made this quadratic.
-    let mut existing_by_family: rustc_hash::FxHashMap<&str, &crate::domain::profiles::Entry> =
+    let mut existing_by_family: rustc_hash::FxHashMap<&str, &crate::domain::profiles::ListedMod> =
         rustc_hash::FxHashMap::default();
     for entry in &existing.mods {
         existing_by_family.entry(entry.id.as_str()).or_insert(entry);
@@ -226,7 +225,6 @@ pub mod bench {
     use super::{LibraryView, PackMod};
     use crate::domain::library::{Family, Library, ModInfo, ModInfoEdit, ModVersion};
     use crate::domain::source::{ProviderId, SourceMod};
-    use crate::library::waiting::find_version;
     use std::sync::Arc;
 
     pub struct PackFixture {
@@ -329,7 +327,7 @@ pub mod bench {
             let view = LibraryView::new(&self.library);
             self.entries
                 .iter()
-                .filter(|entry| find_version(&view, entry).is_some())
+                .filter(|entry| view.find_entry(entry).is_some())
                 .count()
         }
     }

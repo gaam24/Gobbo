@@ -12,7 +12,7 @@ use crate::acquire::{Acquired, Choices, Origin, Request, acquire};
 use crate::context::{Data, Settings};
 use crate::domain::library::ModInfoEdit;
 use crate::error::{AppError, io_at};
-use crate::games::{GameDef, Install};
+use crate::games::{GameDef, LoaderPackage};
 use crate::infra::http::download;
 use crate::infra::io::digest_file;
 use crate::infra::tasks::{cancelled, stop_if};
@@ -99,7 +99,7 @@ pub fn install(
 fn download_and_import(
     data: &Data,
     game: &GameDef,
-    install: &Install,
+    install: &LoaderPackage,
     cancel: &AtomicBool,
     progress: &mut dyn FnMut(u32),
 ) -> Result<String, AppError> {
@@ -168,7 +168,7 @@ fn file_name(url: &str) -> String {
         .to_string()
 }
 
-fn verify(path: &Path, install: &Install) -> Result<(), AppError> {
+fn verify(path: &Path, install: &LoaderPackage) -> Result<(), AppError> {
     let bytes = fs::metadata(path).map_err(io_at(path))?.len();
 
     if let Some(expected) = install.size

@@ -101,11 +101,11 @@ fn count(value: usize) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::profiles::Entry;
+    use crate::domain::profiles::ListedMod;
     use std::collections::BTreeMap;
 
-    fn entry(id: &str, folder: &str, enabled: bool, priority: Option<u32>) -> Entry {
-        Entry {
+    fn entry(id: &str, folder: &str, enabled: bool, priority: Option<u32>) -> ListedMod {
+        ListedMod {
             id: id.into(),
             folder: folder.into(),
             enabled,
@@ -114,7 +114,7 @@ mod tests {
     }
 
     fn state(
-        mods: Vec<Entry>,
+        mods: Vec<ListedMod>,
         separators: Vec<Separator>,
         winners: BTreeMap<String, String>,
     ) -> ListState {

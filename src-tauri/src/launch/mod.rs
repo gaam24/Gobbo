@@ -5,6 +5,7 @@ pub mod changes;
 pub mod commands;
 pub mod executable;
 pub mod logs;
+mod model;
 pub mod output;
 mod pipeline;
 #[cfg(not(windows))]
@@ -16,14 +17,16 @@ pub mod tools;
 pub mod watch;
 
 use std::path::Path;
+use std::time::Duration;
 
 use crate::context::Data;
 use crate::context::Settings;
 use crate::context::load_profiles;
 use crate::context::profile::state as profile_state;
 use crate::context::profile::user_data;
+use crate::context::state_lock::lock_state_wait;
+use crate::context::target::deployment_root;
 use crate::deploy::overlay::Session;
-use crate::deploy::target::deployment_root;
 use crate::error::AppError;
 use crate::games::GameDef;
 use crate::infra::clock::now_seconds;
@@ -88,13 +91,28 @@ pub fn overlay_session(
     Ok(Session::with_roots(state, &root, game_root, sets))
 }
 
+/// How long the post-exit save waits for another writer before it gives up. Together with the overlay release wait,
+/// this is the longest post-exit work can hold a quit; the quit budget leaves a margin above their sum.
+const FINISH_LOCK_TIMEOUT: Duration = Duration::from_secs(10);
+
 /// Saves the profile's data after the game or a tool exits, and closes the launch report. A failure to save data
 /// is reported on stderr; it must not hide the game's exit. `state_root` is the app data root, because `data` is a
 /// game-level handle and its own folder does not hold `gobbo.lock`.
 fn finish_launch(data: &Data, game: &GameDef, settings: &Settings, state_root: &Path) {
+    finish_launch_with(data, game, settings, state_root, FINISH_LOCK_TIMEOUT);
+}
+
+/// `finish_launch` with an explicit lock budget, so a test can keep a blocked save short.
+fn finish_launch_with(
+    data: &Data,
+    game: &GameDef,
+    settings: &Settings,
+    state_root: &Path,
+    timeout: Duration,
+) {
     // The wait thread runs after the command returned, so no lock from the launch is still held: take the one that
     // serializes the real profile files against an apply, undo or restore in this or another Gobbo process.
-    let saved = crate::context::lock_state(state_root)
+    let saved = lock_state_wait(state_root, timeout)
         .and_then(|_state| profile_state::capture_current(data, game, settings));
     if let Err(error) = saved {
         crate::infra::log::error(format!("could not save the profile state: {error}"));
@@ -111,7 +129,7 @@ mod tests {
     use std::fs;
 
     #[test]
-    fn the_post_exit_save_locks_the_app_root_and_reenters_it_on_one_thread() {
+    fn the_post_exit_save_waits_for_the_app_root_lock_then_saves() {
         let root = Data::new(scratch!("finish-launch-lock"));
         let game = crate::test_support::games::slot();
         let data = root.game(&game.id);
@@ -129,18 +147,25 @@ mod tests {
             .profile_state("p1")
             .join("data")
             .join(naming::path_hash(&real.display().to_string()));
-        let _held = crate::context::lock_state(&root.dir).unwrap();
+        let held = crate::context::lock_state(&root.dir).unwrap();
 
         // A same-thread call re-enters the root lock and saves the data.
         finish_launch(&data, &game, &settings, &root.dir);
         assert!(saved.is_file());
         fs::remove_file(&saved).unwrap();
 
-        // The app root is the lock, not the game folder: another thread sees it held and writes nothing.
+        // The app root is the lock, not the game folder: another thread waits, but a short budget still expires
+        // without writing, so an exit is never held by a writer that will not release.
         let (sender, receiver) = std::sync::mpsc::channel();
         std::thread::scope(|scope| {
             scope.spawn(|| {
-                finish_launch(&data, &game, &settings, &root.dir);
+                finish_launch_with(
+                    &data,
+                    &game,
+                    &settings,
+                    &root.dir,
+                    Duration::from_millis(30),
+                );
                 sender.send(()).unwrap();
             });
         });
@@ -149,5 +174,10 @@ mod tests {
             !saved.exists(),
             "the blocked save must not write the profile store"
         );
+
+        // Once the holder releases the root lock, the waiting save goes through.
+        drop(held);
+        finish_launch(&data, &game, &settings, &root.dir);
+        assert!(saved.is_file(), "the save must follow the released lock");
     }
 }

@@ -217,7 +217,7 @@ fn a_pack_carries_the_isolation_choices_of_its_profile() {
     let saved = load_profiles(&target.data.game(game)).unwrap();
     assert_eq!(
         saved
-            .get(&imported.id)
+            .profile(&imported.id)
             .unwrap()
             .user_data_isolation("documents"),
         Isolation::Shared
@@ -580,7 +580,7 @@ fn add_groups_to_active(source: &Fixture) -> Vec<String> {
     let data = source.data.game(SLOT_GAME);
     let profile_id = source.active_id(SLOT_GAME);
     let mut profiles = load_profiles(&data).unwrap();
-    let profile = profiles.get_mut(&profile_id).unwrap();
+    let profile = profiles.profile_mut(&profile_id).unwrap();
     let members = status(&source.data, SLOT_GAME)
         .unwrap()
         .mods
@@ -618,7 +618,7 @@ fn imported_profile(target: &Fixture) -> crate::domain::profiles::Profile {
         .id;
     load_profiles(&target.data.game(SLOT_GAME))
         .unwrap()
-        .get(&id)
+        .profile(&id)
         .unwrap()
         .clone()
 }
@@ -748,7 +748,7 @@ fn a_winner_and_a_group_of_a_mod_still_waiting_name_it_until_it_joins() {
     let data = source.data.game(SLOT_GAME);
     let mut profiles = load_profiles(&data).unwrap();
     profiles
-        .get_mut(&source.active_id(SLOT_GAME))
+        .profile_mut(&source.active_id(SLOT_GAME))
         .unwrap()
         .winners =
         std::collections::BTreeMap::from([("textures/a.dds".to_string(), family_a.clone())]);

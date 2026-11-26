@@ -116,7 +116,7 @@ pub fn mod_versions(
     let record = library.version(folder)?;
     let view = LibraryView::new(&library);
     let profiles_view = ProfilesView::new(&profiles);
-    Ok(super::mod_views::version_views(
+    Ok(super::mod_builders::version_views(
         &library,
         &view,
         &profiles_view,
@@ -142,7 +142,7 @@ pub fn mod_details(root: &Data, game_id: &str, folder: &str) -> Result<ModDetail
     let lookup = SourceLookup::new(&view, &listed);
     let mod_steps = crate::launch::steps::load_mod_steps(&data)?;
     let routes = download_routes([library.families.get(&family)]);
-    let context = super::mod_views::ExtrasContext {
+    let context = super::mod_builders::ExtrasContext {
         lookup: &lookup,
         mod_steps: &mod_steps,
         routes: &routes,
@@ -229,8 +229,8 @@ pub fn mod_details(root: &Data, game_id: &str, folder: &str) -> Result<ModDetail
         .collect();
 
     let profiles_view = ProfilesView::new(&profiles);
-    let versions = super::mod_views::version_views(&library, &view, &profiles_view, &family);
-    let extras = super::mod_views::mod_extras(
+    let versions = super::mod_builders::version_views(&library, &view, &profiles_view, &family);
+    let extras = super::mod_builders::mod_extras(
         folder,
         library.families.get(&family),
         Some(record),
@@ -240,7 +240,7 @@ pub fn mod_details(root: &Data, game_id: &str, folder: &str) -> Result<ModDetail
     Ok(ModDetails {
         folder: folder.to_string(),
         info: record.info.clone(),
-        sources: super::mod_views::source_details(
+        sources: super::mod_builders::source_details(
             library.families.get(&family),
             &game,
             &library,
@@ -279,7 +279,7 @@ pub fn mod_extras(
             .filter_map(|folder| library.versions.get(folder))
             .map(|record| library.families.get(&record.family)),
     );
-    let context = super::mod_views::ExtrasContext {
+    let context = super::mod_builders::ExtrasContext {
         lookup: &lookup,
         mod_steps: &mod_steps,
         routes: &routes,
@@ -290,7 +290,7 @@ pub fn mod_extras(
         let Some(record) = library.versions.get(folder) else {
             continue;
         };
-        extras.push(super::mod_views::mod_extras(
+        extras.push(super::mod_builders::mod_extras(
             folder,
             library.families.get(&record.family),
             Some(record),

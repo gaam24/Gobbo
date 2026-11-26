@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 
 use crate::domain::profiles::Profiles;
 use crate::error::AppError;
@@ -10,14 +11,57 @@ use crate::context::settings::{Settings, load_settings};
 
 use super::{Data, cached};
 
+/// The number of tries a startup migration gets when another writer holds the state lock.
+const MIGRATE_ATTEMPTS: u32 = 20;
+/// The pause between two tries: a short window a second process holds, not a long apply.
+const MIGRATE_RETRY_DELAY: Duration = Duration::from_millis(100);
+
 /// Opens the data folder for this process: the shared caches, the file-layout migrations, the archive names of the
 /// libraries and the stale temp files. `archive_names` is the providers' reader (`providers::archive_name_from`).
 pub fn open(dir: PathBuf, archive_names: ArchiveLabels<'_>) -> Result<Data, AppError> {
+    open_with_budget(dir, archive_names, MIGRATE_ATTEMPTS, MIGRATE_RETRY_DELAY)
+}
+
+/// `open` with the retry budget passed in, so a test can walk the busy paths quickly.
+fn open_with_budget(
+    dir: PathBuf,
+    archive_names: ArchiveLabels<'_>,
+    attempts: u32,
+    delay: Duration,
+) -> Result<Data, AppError> {
     let data = Data::with_cache(dir);
-    crate::context::managed::migrate(&data)?;
+    let migration = migrate_with_retries(&data, attempts, delay);
+    // The caller builds a fallback Data from the error, so it must already be labelled and cleaned on both paths.
     name_archives(&data, archive_names);
     data.clean_stale_temps();
+    migration?;
     Ok(data)
+}
+
+/// Retries only `state.busy`, up to `attempts` tries. Logs once that a writer was in the way and once if it still
+/// fails, rather than one line per retry, and returns the migration's own error unchanged.
+fn migrate_with_retries(data: &Data, attempts: u32, delay: Duration) -> Result<(), AppError> {
+    let mut tried = 0;
+    loop {
+        match crate::context::managed::migrate(data) {
+            Ok(()) => return Ok(()),
+            Err(error) if error.code == "state.busy" && tried + 1 < attempts => {
+                if tried == 0 {
+                    crate::infra::log::info("the data folders are busy; retrying the migration");
+                }
+                tried += 1;
+                std::thread::sleep(delay);
+            }
+            Err(error) => {
+                if tried > 0 {
+                    crate::infra::log::warn(format!(
+                        "the data folders stayed busy after {attempts} tries: {error}"
+                    ));
+                }
+                return Err(error);
+            }
+        }
+    }
 }
 
 /// Names the archives of every game's library that have no label yet. It runs on every start, like the file-layout
@@ -146,6 +190,9 @@ mod tests {
     use crate::test_support::{games as test_games, scratch};
     use std::collections::BTreeMap;
     use std::fs;
+    use std::path::Path;
+    use std::sync::mpsc;
+    use std::time::SystemTime;
 
     #[test]
     fn a_library_without_labels_is_named_once_and_saved_with_them() {
@@ -266,6 +313,121 @@ mod tests {
         assert_eq!(
             loaded.versions["modA"].info.version.as_deref(),
             Some("1.0.0")
+        );
+    }
+
+    /// An index as an older Gobbo wrote it: the archive has no label yet.
+    fn unnamed_archive(root: &Data) {
+        let data = root.game(test_games::SLOT_ID);
+        let game = test_games::slot();
+        let folder = data.library().join("modA");
+        fs::create_dir_all(folder.join("content")).unwrap();
+        fs::write(folder.join("content/x.ws"), "a").unwrap();
+        let mut library = Library::default();
+        let mut version = scan_mod(&data.library(), "modA", &game).unwrap();
+        version.archive = Some("sha-a".into());
+        version.parsed_sources.insert(
+            crate::domain::source::ProviderId::new("nexus"),
+            "12345".into(),
+        );
+        library.versions.insert("modA".into(), version);
+        library.archives.insert(
+            "sha-a".into(),
+            Archive {
+                original_name: "Example Mod 12345 1.2.0 2026-01-01T00-00Z example-token.zip".into(),
+                file: "sha-a.zip".into(),
+                named: None,
+                source_files: BTreeMap::new(),
+                source_parts: BTreeMap::new(),
+                skipped: Vec::new(),
+                skipped_total: 0,
+            },
+        );
+        library.save(&data.index()).unwrap();
+    }
+
+    /// A temp file old enough that the startup cleanup removes it.
+    fn stale_temp(root: &Path) -> PathBuf {
+        let path = root.join("library.json.1-0.tmp");
+        fs::write(&path, "old").unwrap();
+        let two_hours_ago = SystemTime::now() - Duration::from_hours(2);
+        fs::OpenOptions::new()
+            .write(true)
+            .open(&path)
+            .unwrap()
+            .set_modified(two_hours_ago)
+            .unwrap();
+        path
+    }
+
+    #[test]
+    fn a_busy_migration_is_retried_and_the_opened_data_is_labelled_and_clean() {
+        test_games::install();
+        let base = scratch!("open-busy-retry");
+        unnamed_archive(&Data::with_cache(base.clone()));
+        let stale = stale_temp(&base);
+
+        let (locked, locked_rx) = mpsc::channel();
+        let (start, start_rx) = mpsc::channel();
+        std::thread::scope(|scope| {
+            let base_path = &base;
+            scope.spawn(move || {
+                let _lock = crate::context::lock_state(base_path).unwrap();
+                locked.send(()).unwrap();
+                start_rx.recv().unwrap();
+                std::thread::sleep(Duration::from_millis(60));
+            });
+            locked_rx.recv().unwrap();
+            start.send(()).unwrap();
+
+            let data = open_with_budget(
+                base.clone(),
+                &crate::providers::archive_name_from,
+                10,
+                Duration::from_millis(10),
+            )
+            .unwrap();
+            let index = data.game(test_games::SLOT_ID).index();
+            assert!(
+                fs::read_to_string(index).unwrap().contains("\"named\""),
+                "the index is labelled after the retry"
+            );
+        });
+        assert!(!stale.exists(), "the stale temp is removed");
+    }
+
+    #[test]
+    fn a_migration_that_stays_busy_returns_its_error_after_cleaning() {
+        test_games::install();
+        let base = scratch!("open-busy-failure");
+        let stale = stale_temp(&base);
+
+        let (locked, locked_rx) = mpsc::channel();
+        let (release, release_rx) = mpsc::channel();
+        let error = std::thread::scope(|scope| {
+            let base_path = &base;
+            scope.spawn(move || {
+                let _lock = crate::context::lock_state(base_path).unwrap();
+                locked.send(()).unwrap();
+                release_rx.recv().unwrap();
+            });
+            locked_rx.recv().unwrap();
+            let result = open_with_budget(
+                base.clone(),
+                &crate::providers::archive_name_from,
+                2,
+                Duration::from_millis(1),
+            );
+            release.send(()).unwrap();
+            match result {
+                Err(error) => error,
+                Ok(_) => panic!("a held state lock must fail the migration"),
+            }
+        });
+        assert_eq!(error.code, "state.busy");
+        assert!(
+            !stale.exists(),
+            "cleanup runs even when the migration failed"
         );
     }
 }

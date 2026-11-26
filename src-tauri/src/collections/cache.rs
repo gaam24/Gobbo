@@ -113,11 +113,11 @@ mod tests {
         CollectionInfo {
             revision_label: String::new(),
             provider: "nexus".into(),
-            game_key: "cyberpunk2077".into(),
-            slug: "n0nymh".into(),
+            game_key: "example-game".into(),
+            slug: "example-author".into(),
             revision: 49,
             latest_revision: 49,
-            name: "CET+Essentials".into(),
+            name: "Example collection".into(),
             author: None,
             summary: String::new(),
             description: String::new(),
@@ -136,7 +136,7 @@ mod tests {
     fn the_cache_path_is_built_from_safe_components() {
         let data = Data::new(crate::test_support::scratch!("collection-cache"));
         let path = dir(&data, &info());
-        assert!(path.ends_with("nexus/cyberpunk2077/n0nymh/r49"));
+        assert!(path.ends_with("nexus/example-game/example-author/r49"));
         let mut unsafe_info = info();
         unsafe_info.slug = "../escape".into();
         let path = dir(&data, &unsafe_info);

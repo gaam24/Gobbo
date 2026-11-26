@@ -107,7 +107,7 @@ fn a_bad_loader_reference_is_a_definition_problem() {
     assert!(
         game.validate()
             .iter()
-            .any(|problem| problem.contains("loader id")),
+            .any(|problem| problem.message.contains("loader id")),
         "{:?}",
         game.validate()
     );
@@ -117,7 +117,7 @@ fn a_bad_loader_reference_is_a_definition_problem() {
     assert!(
         game.validate()
             .iter()
-            .any(|problem| problem.contains("loader variant")),
+            .any(|problem| problem.message.contains("loader variant")),
         "{:?}",
         game.validate()
     );
@@ -360,11 +360,14 @@ fn a_duplicate_inside_one_layer_is_not_hidden_by_the_merge() {
         1,
     );
     let game = GameDef::parse(&duplicate_slots).unwrap();
-    let problems = super::super::validate::duplicate_problems(&game.deploy);
+    let problems = super::super::validate::duplicate_problems(
+        &game.deploy,
+        super::super::validate::Section::Deploy,
+    );
     assert!(
         problems
             .iter()
-            .any(|problem| problem.contains("slot or mirror twice")),
+            .any(|problem| problem.message.contains("slot or mirror twice")),
         "{problems:?}"
     );
 

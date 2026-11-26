@@ -4,7 +4,7 @@
 use crate::context::Data;
 use crate::context::Loaded;
 use crate::context::load_game;
-use crate::domain::profiles::Entry as ProfileEntry;
+use crate::domain::profiles::ListedMod;
 use crate::error::AppError;
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
@@ -45,25 +45,16 @@ pub fn compare_profiles(
     let Loaded {
         library, profiles, ..
     } = load_game(root, game_id)?;
-    let left = profiles.get(first)?;
-    let right = profiles.get(second)?;
+    let left = profiles.profile(first)?;
+    let right = profiles.profile(second)?;
 
-    let side = |entry: &ProfileEntry| CompareSide {
+    let side = |entry: &ListedMod| CompareSide {
         folder: entry.folder.clone(),
         version: crate::library::version_of(&library, entry),
         enabled: entry.enabled,
     };
-    let name = |entry: &ProfileEntry| {
-        library
-            .versions
-            .get(&entry.folder)
-            .map(|version| version.info.name.clone())
-            .filter(|name| !name.is_empty())
-            .unwrap_or_else(|| entry.id.clone())
-    };
-
     // Build the right list's index once; the old lookup walked it for every entry of the left list.
-    let mut right_by_id: BTreeMap<&str, &ProfileEntry> = BTreeMap::new();
+    let mut right_by_id: BTreeMap<&str, &ListedMod> = BTreeMap::new();
 
     for entry in &right.mods {
         right_by_id.entry(entry.id.as_str()).or_insert(entry);
@@ -85,7 +76,7 @@ pub fn compare_profiles(
 
         rows.push(CompareRow {
             id: entry.id.clone(),
-            name: name(entry),
+            name: crate::library::listed_mod_name(&library, entry),
             first: Some(first_side),
             second: second_side,
         });
@@ -98,7 +89,7 @@ pub fn compare_profiles(
 
         rows.push(CompareRow {
             id: entry.id.clone(),
-            name: name(entry),
+            name: crate::library::listed_mod_name(&library, entry),
             first: None,
             second: Some(side(entry)),
         });

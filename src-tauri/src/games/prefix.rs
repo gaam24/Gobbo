@@ -6,20 +6,27 @@ use std::path::{Path, PathBuf};
 
 use super::GameDef;
 use super::runtime::Runtime;
+use super::stores::Store;
 use super::stores::steam;
 use crate::context::Data;
 
 /// The effective store of an install: the saved source, or a fallback for installs saved before the source existed.
-/// An old install with a Steam app id is Steam; one without is a manual folder.
-pub const fn effective_source<'a>(source: &'a str, steam_app_ids: &[u32]) -> &'a str {
+/// An old install with a Steam app id is Steam; one without is a manual folder. A saved name that names no store is
+/// treated as a manual folder, so an unknown source never turns into a Steam install.
+pub fn effective_source(source: &str, steam_app_ids: &[u32]) -> Store {
     if !source.is_empty() {
-        return source;
+        return Store::from_name(source).unwrap_or_else(|| {
+            crate::infra::log::warn(format!(
+                "unknown saved install source {source:?}; using manual"
+            ));
+            Store::Manual
+        });
     }
 
     if steam_app_ids.is_empty() {
-        "manual"
+        Store::Manual
     } else {
-        "steam"
+        Store::Steam
     }
 }
 
@@ -73,10 +80,19 @@ mod tests {
     #[test]
     fn an_empty_source_falls_back_to_steam_only_with_an_app_id() {
         let ids = [1001];
-        assert_eq!(effective_source("gog", &ids), "gog");
-        assert_eq!(effective_source("steam", &[]), "steam");
-        assert_eq!(effective_source("", &ids), "steam");
-        assert_eq!(effective_source("", &[]), "manual");
+        assert_eq!(effective_source("gog", &ids), Store::Gog);
+        assert_eq!(effective_source("steam", &[]), Store::Steam);
+        assert_eq!(effective_source("", &ids), Store::Steam);
+        assert_eq!(effective_source("", &[]), Store::Manual);
+        // An unknown saved name stays a non-Steam install rather than inheriting the app id's store.
+        assert_eq!(effective_source("unknown", &ids), Store::Manual);
+    }
+
+    #[test]
+    fn an_unknown_saved_source_stays_manual() {
+        let ids = [1001];
+        assert_eq!(effective_source("unknown", &ids), Store::Manual);
+        assert_eq!(effective_source("not-a-store", &[]), Store::Manual);
     }
 
     #[test]

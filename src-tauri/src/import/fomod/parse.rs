@@ -11,9 +11,7 @@ use super::model::{
 /// Parses the `ModuleConfig.xml` content. Versions without `installSteps` (only `requiredInstall`) give
 /// a "Required" step with one group, so the wizard has something to show.
 pub fn parse(xml: &str) -> Result<ModuleConfig, FomodError> {
-    let doc = roxmltree::Document::parse(xml).map_err(|e| FomodError::Parse {
-        message: e.to_string(),
-    })?;
+    let doc = roxmltree::Document::parse(xml)?;
     let root = doc.root_element();
 
     if root.tag_name().name() != "config" {

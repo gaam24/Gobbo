@@ -58,3 +58,17 @@ All notable changes to this project are documented in this file. The format foll
 - **Every problem of a game definition is listed.** The check used to show only the first eight.
 
 ## v0.2.1 (Unreleased)
+
+### Changed
+
+- **Profile comparison names a mod by its family name.** A mod with several versions now shows the same name in the comparison as in the list history.
+
+### Fixed
+
+- **A manual Proton install keeps its saves in one place before the first launch.** Gobbo no longer treats a save folder as two separate paths to copy.
+- **A partial game settings file no longer resets every folder.** Gobbo keeps the folders the file still has and fills the missing ones with empty defaults.
+- **Too many profile redirects stop the launch before the game starts.** Gobbo reports the problem instead of starting the game without the redirects.
+- **An oversized update archive says why it was refused.** Gobbo reports the size or entry limit instead of calling the archive damaged.
+- **Making a mod from the overwrite folder reports a folder it cannot resolve.** Gobbo no longer reads the wrong place when it cannot work out where mods go.
+- **An unrecognised saved store is shown as a manual install.** Gobbo no longer labels the game with a Steam app id it cannot confirm.
+- **Gobbo waits briefly if its data folders are busy at startup.** A short lock from another window no longer stops the app from opening.

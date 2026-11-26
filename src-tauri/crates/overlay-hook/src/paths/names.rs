@@ -78,7 +78,12 @@ pub(crate) struct Place {
 /// # Safety
 /// `name` must be a NUL-terminated UTF-16 string, or null.
 pub(crate) unsafe fn place(name: *const u16) -> Option<Place> {
-    place_units(unsafe { units(name) }?)
+    // SAFETY: `place` promises `name` is null or NUL-terminated; `units_len` only walks that string.
+    let length = unsafe { units_len(name) }?;
+    // SAFETY: `units_len` checked `name` non-null and walked exactly `length` units to the terminator. The slice is
+    // consumed by `place_units`, which copies everything it keeps into an owned `String`; nothing borrows from `name`.
+    let units = unsafe { slice::from_raw_parts(name, length) };
+    place_units(units)
 }
 
 /// The same as `place`, for a full path the hook already built as text.
@@ -174,7 +179,14 @@ fn full_path_units<'a>(name: &[u16], output: &'a mut [u16]) -> Option<&'a [u16]>
 /// # Safety
 /// `name` must be a NUL-terminated UTF-16 string, or null.
 pub(crate) unsafe fn unsafe_name(name: *const u16) -> bool {
-    unsafe { units(name) }.is_some_and(unsafe_units)
+    // SAFETY: `unsafe_name` promises `name` is null or NUL-terminated; `units_len` only walks that string.
+    let Some(length) = (unsafe { units_len(name) }) else {
+        return false;
+    };
+    // SAFETY: `units_len` checked `name` non-null and walked exactly `length` units to the terminator. The slice is
+    // consumed by `unsafe_units` inside this call and no reference to it is kept.
+    let units = unsafe { slice::from_raw_parts(name, length) };
+    unsafe_units(units)
 }
 
 /// The UTF-16 form of `unsafe_name`. It is also used for NT object names after `\??\` has been kept: the caller passes
@@ -249,27 +261,33 @@ fn word_ci(units: &[u16], ascii: &[u8]) -> bool {
         && (units.len() == ascii.len() || units[ascii.len()] == u16::from(b'\\'))
 }
 
-/// The UTF-16 units of a NUL-terminated name, without allocating. The caller keeps the name alive for the returned
-/// slice.
+/// The length in UTF-16 units of a NUL-terminated name, without allocating. The caller builds the slice from `name`
+/// and this length, so no reference with an arbitrary lifetime escapes this helper.
 ///
 /// # Safety
-/// `name` must be null or point to a NUL-terminated UTF-16 string that outlives the returned slice.
-unsafe fn units<'a>(name: *const u16) -> Option<&'a [u16]> {
+/// `name` must be null or point to a NUL-terminated UTF-16 string that outlives the caller's use of it.
+unsafe fn units_len(name: *const u16) -> Option<usize> {
     if name.is_null() {
         return None;
     }
 
     let mut length = 0;
 
-    while unsafe { *name.add(length) } != 0 {
+    loop {
+        // SAFETY: `name` is non-null, and `length` has not passed the terminator: the loop returns at the first zero and
+        // refuses a name that would need more than 32_768 units before reading past that point.
+        let unit = unsafe { *name.add(length) };
+
+        if unit == 0 {
+            return Some(length);
+        }
+
         length += 1;
 
         if length > 32_768 {
             return None;
         }
     }
-
-    Some(unsafe { slice::from_raw_parts(name, length) })
 }
 
 /// Classifies an absolute name against the cached long root and, when 8.3 names exist, its short form. Nothing is

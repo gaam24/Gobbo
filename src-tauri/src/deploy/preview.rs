@@ -7,7 +7,7 @@ use crate::context::load_game;
 use crate::deploy::overlay;
 use crate::deploy::target::build_plan_with_mode;
 use crate::domain::library::LibraryView;
-use crate::domain::profiles::Entry as ProfileEntry;
+use crate::domain::profiles::ListedMod;
 use crate::domain::resolver::PlanMode;
 use crate::error::AppError;
 use crate::error::Message;
@@ -15,6 +15,7 @@ use crate::library::active_mods;
 use crate::library::relations::{SourceLookup, relation_warnings};
 use serde::Serialize;
 
+/// What applying the active list would do, compared with the deployment the game has now.
 #[derive(Debug, Serialize, specta::Type)]
 pub struct DeployPreview {
     /// The active profile is deployed now, so the deployment replaces it.
@@ -38,6 +39,7 @@ pub struct DeployPreview {
     pub warnings: Vec<Message>,
 }
 
+/// Builds the deployment preview for the window, without writing any file.
 pub fn preview_deployment(root: &Data, game_id: &str) -> Result<DeployPreview, AppError> {
     let Loaded {
         game,
@@ -99,7 +101,7 @@ pub fn preview_deployment(root: &Data, game_id: &str) -> Result<DeployPreview, A
     }
 
     let now = profile.enabled_mods();
-    let before: &[ProfileEntry] = if replaces {
+    let before: &[ListedMod] = if replaces {
         &profile.deployed_mods
     } else {
         &[]

@@ -16,7 +16,7 @@ use crate::profiles::actions::{
     delete_profile, rename_profile, set_load_order, set_mod_version, set_profile_user_data,
     switch_profile,
 };
-use crate::profiles::history::preview::preview_restore;
+use crate::profiles::history::preview_restore;
 use crate::settings::managed::{add_game, check_game_folder, remove_game};
 use crate::snapshots::{
     create_manual, delete as delete_snapshot, list as list_snapshots, preview_public,

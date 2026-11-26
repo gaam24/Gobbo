@@ -35,10 +35,10 @@ const fn inherit_by_default() -> bool {
 }
 
 impl UserData {
-    /// The folder template for this platform. Windows uses `path`; Linux prefers a non-empty `path_linux`, because a
-    /// Windows path that names `{local_low}` is not meaningful there.
-    pub fn path_for_platform(&self) -> &str {
-        prefer_linux(&self.path, self.path_linux.as_deref(), !cfg!(windows))
+    /// The folder template for the platform named by `is_windows`. Windows uses `path`; Linux prefers a non-empty
+    /// `path_linux`, because a Windows path that names `{local_low}` is not meaningful there.
+    pub fn path_for_platform(&self, is_windows: bool) -> &str {
+        prefer_linux(&self.path, self.path_linux.as_deref(), !is_windows)
     }
 
     /// The template a Linux build uses: `path_linux` when it is not empty, otherwise `path`.
@@ -123,9 +123,10 @@ pub struct Executable {
 }
 
 impl Executable {
-    /// The program for this platform. Windows always uses `path`; Linux prefers a non-empty `path_linux`.
-    pub fn path_for_platform(&self) -> &str {
-        prefer_linux(&self.path, self.path_linux.as_deref(), !cfg!(windows))
+    /// The program for the platform named by `is_windows`. Windows always uses `path`; Linux prefers a non-empty
+    /// `path_linux`.
+    pub fn path_for_platform(&self, is_windows: bool) -> &str {
+        prefer_linux(&self.path, self.path_linux.as_deref(), !is_windows)
     }
 }
 
@@ -170,4 +171,69 @@ pub enum OrderFormat {
     /// One line per mod folder, `Name : 1` or `Name : 0`, in the order the lines come (UE4SS's `mods.txt`). The file
     /// lives in the deployment root and is written into the profile's mod layer, so the game folder stays untouched.
     Ue4ssModsTxt,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn set(path_linux: Option<&str>) -> UserData {
+        UserData {
+            id: "saves".to_string(),
+            kind: Kind::Saves,
+            path: "base/Game".to_string(),
+            path_linux: path_linux.map(str::to_string),
+            mode: Mode::Redirect,
+            default: Isolation::Shared,
+            inherit: true,
+        }
+    }
+
+    fn executable(path_linux: Option<&str>) -> Executable {
+        Executable {
+            name: "Game".to_string(),
+            path: "Game.exe".to_string(),
+            path_linux: path_linux.map(str::to_string),
+            args: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn user_data_windows_uses_the_base_path_and_linux_the_native_path() {
+        let set = set(Some("native/Game"));
+        assert_eq!(set.path_for_platform(true), "base/Game");
+        assert_eq!(set.path_for_platform(false), "native/Game");
+        assert_eq!(set.linux_path(), "native/Game");
+    }
+
+    #[test]
+    fn user_data_falls_back_to_the_base_path_when_linux_has_no_native_path() {
+        let blank = set(Some("  "));
+        assert_eq!(blank.path_for_platform(true), "base/Game");
+        assert_eq!(blank.path_for_platform(false), "base/Game");
+        assert_eq!(blank.linux_path(), "base/Game");
+
+        let missing = set(None);
+        assert_eq!(missing.path_for_platform(true), "base/Game");
+        assert_eq!(missing.path_for_platform(false), "base/Game");
+        assert_eq!(missing.linux_path(), "base/Game");
+    }
+
+    #[test]
+    fn executable_windows_uses_the_base_path_and_linux_the_native_path() {
+        let executable = executable(Some("Game.x86_64"));
+        assert_eq!(executable.path_for_platform(true), "Game.exe");
+        assert_eq!(executable.path_for_platform(false), "Game.x86_64");
+    }
+
+    #[test]
+    fn executable_falls_back_to_the_base_path_when_linux_has_no_native_path() {
+        let blank = executable(Some("  "));
+        assert_eq!(blank.path_for_platform(true), "Game.exe");
+        assert_eq!(blank.path_for_platform(false), "Game.exe");
+
+        let missing = executable(None);
+        assert_eq!(missing.path_for_platform(true), "Game.exe");
+        assert_eq!(missing.path_for_platform(false), "Game.exe");
+    }
 }

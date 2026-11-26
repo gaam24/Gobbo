@@ -424,7 +424,7 @@ mod tests {
         after
             .active_mut()
             .mods
-            .push(crate::domain::profiles::Entry {
+            .push(crate::domain::profiles::ListedMod {
                 id: "a".into(),
                 folder: "a".into(),
                 enabled: true,

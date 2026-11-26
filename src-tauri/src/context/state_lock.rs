@@ -8,7 +8,7 @@
 use std::cell::Cell;
 use std::fs::{File, OpenOptions};
 use std::path::Path;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crate::error::{AppError, io_at};
 
@@ -20,6 +20,8 @@ const LOCK_FILE: &str = "gobbo.lock";
 /// apply; a real writer elsewhere still gets `state.busy` after this wait.
 const RETRIES: u32 = 25;
 const RETRY_DELAY: Duration = Duration::from_millis(2);
+/// How often `lock_state_wait` tries again while another thread or process holds the lock.
+const WAIT_RETRY: Duration = Duration::from_millis(25);
 
 thread_local! {
     /// How many locks this thread holds. The first call takes the OS lock; a nested call only increments this.
@@ -86,6 +88,21 @@ pub fn lock_state(root: &Path) -> Result<StateLock, AppError> {
     }
 }
 
+/// Takes the state lock, retrying a busy lock until `timeout` expires. A thread that already holds the lock re-enters
+/// it at once, as with [`lock_state`]; a caller that never gets it keeps the final `state.busy`.
+pub fn lock_state_wait(root: &Path, timeout: Duration) -> Result<StateLock, AppError> {
+    let deadline = Instant::now() + timeout;
+    loop {
+        match lock_state(root) {
+            Ok(guard) => return Ok(guard),
+            Err(error) if error.code == "state.busy" && Instant::now() < deadline => {
+                std::thread::sleep(WAIT_RETRY);
+            }
+            Err(error) => return Err(error),
+        }
+    }
+}
+
 fn release_depth() {
     DEPTH.with(|depth| depth.set(depth.get().saturating_sub(1)));
 }
@@ -118,6 +135,31 @@ mod tests {
 
         drop(outer);
         assert!(lock_state(&root).is_ok());
+    }
+
+    #[test]
+    fn waiting_for_the_lock_outlives_a_short_busy_period() {
+        let root = scratch!("state-lock-wait");
+        let (held_tx, held_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
+        let shared = &root;
+        std::thread::scope(|scope| {
+            scope.spawn(move || {
+                let guard = lock_state(shared).unwrap();
+                held_tx.send(()).unwrap();
+                release_rx.recv().unwrap();
+                drop(guard);
+            });
+            held_rx.recv().unwrap();
+            assert_eq!(
+                lock_state_wait(&root, Duration::from_millis(20))
+                    .err()
+                    .map(|error| error.code),
+                Some("state.busy".to_owned())
+            );
+            release_tx.send(()).unwrap();
+            assert!(lock_state_wait(&root, Duration::from_secs(1)).is_ok());
+        });
     }
 
     #[test]

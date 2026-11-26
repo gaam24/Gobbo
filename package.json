@@ -17,7 +17,7 @@
 		"build:overlay-hook": "bun scripts/build-overlay-hook.ts",
 		"package": "bun scripts/package-release.ts",
 		"lint": "biome check && oxlint --type-aware && tsc --noEmit && bun run e2e:types && bun run guard && bun run deadcode",
-		"guard": "bun scripts/check-layers.ts && bun scripts/check-agent-policy.ts && bun scripts/check-data-boundary.ts && bun scripts/check-overlay-invariants.ts && bun scripts/check-generated.ts",
+		"guard": "bun scripts/check-layers.ts && bun scripts/check-agent-policy.ts && bun scripts/check-data-boundary.ts && bun scripts/check-module-shape.ts && bun scripts/check-overlay-invariants.ts && bun scripts/check-generated.ts",
 		"lint:fix": "biome check --write && oxlint --type-aware --fix",
 		"test": "bun test",
 		"e2e": "bun scripts/e2e-run.ts",

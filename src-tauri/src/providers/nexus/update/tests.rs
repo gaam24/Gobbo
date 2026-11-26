@@ -1,6 +1,6 @@
 //! Tests of the Nexus update engine: the worker index, requirements, file matching and the generic conversion.
 
-use super::requirements::{as_requirements, newest_match, with_mod_level};
+use super::requirements::{into_requirements, newest_match, with_mod_level};
 use super::workers::take_index;
 use super::*;
 use crate::domain::source::SourceRef;
@@ -44,7 +44,7 @@ fn workers_never_get_the_same_index() {
 
 #[test]
 fn alternatives_share_a_group_and_the_read_is_remembered() {
-    let found = as_requirements(vec![
+    let found = into_requirements(vec![
         vec![ModRequirement {
             mod_id: 5,
             name: "Five".into(),

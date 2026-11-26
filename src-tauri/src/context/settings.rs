@@ -25,8 +25,10 @@ pub const CONFIG_FILE: &str = "config.json";
 #[derive(Debug, Default, Clone, Serialize, Deserialize, specta::Type)]
 pub struct Settings {
     /// The game folder, for example `.../The Witcher 3`.
+    #[serde(default)]
     pub game_root: String,
     /// The folder with `mods.settings`. Empty when the game does not use it.
+    #[serde(default)]
     pub settings_dir: String,
     /// The folder that holds the game's mods when it is not the game folder, for example
     /// `%APPDATA%/MyGame`. Empty means "use the definition or the game folder".
@@ -85,6 +87,19 @@ impl Settings {
     }
 }
 
+/// Applies a detected install to the settings: its store is always saved, its prefix only when the caller asks for it.
+pub fn apply_install(
+    settings: &mut Settings,
+    install: &crate::games::detect::StoreInstall,
+    replace_prefix: bool,
+) {
+    settings.source = install.store.name().to_string();
+
+    if replace_prefix {
+        settings.prefix_dir = install.prefix_text();
+    }
+}
+
 /// Reads a game's settings. A missing file means the default settings.
 pub fn load_settings(data: &Data) -> Settings {
     let path = data.config();
@@ -122,11 +137,8 @@ fn write_settings(root: &Data, game_id: &str, settings: Settings) -> Result<(), 
         let home = crate::games::paths::home();
         let path = std::path::Path::new(settings.game_root.trim());
         let install = crate::games::detect::classify_install(&home, path);
-        settings.source = install.store.to_string();
-
-        if settings.prefix_dir == previous.prefix_dir {
-            settings.prefix_dir = install.prefix_text();
-        }
+        let replace_prefix = settings.prefix_dir == previous.prefix_dir;
+        apply_install(&mut settings, &install, replace_prefix);
     }
     let settings = Settings {
         game_root: settings.game_root,
@@ -163,7 +175,7 @@ pub fn set_proton_option(
     option: &str,
     on: bool,
 ) -> Result<(), AppError> {
-    if !crate::domain::proton_options::available()
+    if !crate::domain::proton_options::available(crate::platform::is_windows())
         .iter()
         .any(|id| id == option)
     {
@@ -235,5 +247,28 @@ mod tests {
             settings.paths(),
             ["/game", "/settings", "/mods", "/proton", "/prefix"]
         );
+    }
+
+    #[test]
+    fn a_config_file_with_one_folder_loads_with_defaults() {
+        use crate::infra::json;
+        use crate::test_support::scratch;
+
+        let only_root: Settings = serde_json::from_str(r#"{"game_root":"/game"}"#).unwrap();
+        assert_eq!(only_root.game_root, "/game");
+        assert_eq!(only_root.settings_dir, "");
+
+        let only_dir: Settings = serde_json::from_str(r#"{"settings_dir":"/settings"}"#).unwrap();
+        assert_eq!(only_dir.game_root, "");
+        assert_eq!(only_dir.settings_dir, "/settings");
+
+        // The real read path keeps a file it cannot parse as `.broken`; a partial file must not take that route.
+        let dir = scratch!("partial-config");
+        let path = dir.join("config.json");
+        std::fs::write(&path, r#"{"game_root":"/game"}"#).unwrap();
+        let loaded: Settings = json::read_json_or_default(&path);
+        assert_eq!(loaded.game_root, "/game");
+        assert_eq!(loaded.settings_dir, "");
+        assert!(!dir.join("config.json.broken").exists());
     }
 }

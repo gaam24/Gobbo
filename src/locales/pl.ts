@@ -2782,6 +2782,8 @@ const pl = {
 		},
 		update: {
 			archive_invalid: "Archiwum aktualizacji jest uszkodzone: {{detail}}",
+			archive_too_large: "Po rozpakowaniu archiwum aktualizacji zajmie {{bytes}} bajtów, a Gobbo przyjmuje najwyżej {{limit}}.",
+			archive_too_many_entries: "Archiwum aktualizacji ma {{count}} pozycji, a Gobbo przyjmuje najwyżej {{limit}}.",
 			failed: "Nie udało się zaktualizować: {{detail}}",
 			not_available: "Nie ma nowszej wersji do pobrania.",
 			unsupported: "Dla tego systemu nie ma archiwum aktualizacji wersji portable.",

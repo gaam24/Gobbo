@@ -82,11 +82,11 @@ impl ApiError {
         let (code, kind) = self.code();
         let mut error = AppError::new(code).kind(kind);
 
-        if code == crate::error::NEXUS_NOT_FOUND {
+        if code == crate::providers::nexus::NEXUS_NOT_FOUND {
             error = error.with("kind", self.endpoint.not_found_kind());
         }
 
-        if code == crate::error::KEY_REJECTED {
+        if code == crate::providers::nexus::KEY_REJECTED {
             error = error.with("provider", super::super::ID);
         }
 
@@ -115,22 +115,26 @@ impl ApiError {
             }
             (Some(400 | 422), _) => ("nexus.bad_request", ErrorKind::Permanent),
             (Some(401), _) | (Some(403 | 404), Endpoint::Key) => {
-                (crate::error::KEY_REJECTED, ErrorKind::UserAction)
+                (crate::providers::nexus::KEY_REJECTED, ErrorKind::UserAction)
             }
             // A signed link asked without a free-user key means the account tier is the problem, not the file.
             (Some(403), Endpoint::DownloadLink { has_key: false }) => {
                 (crate::error::PAYMENT_REQUIRED, ErrorKind::UserAction)
             }
             // With a free-user key the tier was already accepted; a refusal here is moderation or quarantine.
-            (Some(403), Endpoint::DownloadLink { has_key: true }) => {
-                (crate::error::DOWNLOAD_UNAVAILABLE, ErrorKind::UserAction)
-            }
+            (Some(403), Endpoint::DownloadLink { has_key: true }) => (
+                crate::providers::nexus::DOWNLOAD_UNAVAILABLE,
+                ErrorKind::UserAction,
+            ),
             (Some(403), Endpoint::Collection) => {
                 ("nexus.collection_forbidden", ErrorKind::UserAction)
             }
             (Some(403), _) => ("nexus.forbidden", ErrorKind::UserAction),
             // All 404s are the same meaning ("not found"); the `kind` param names the endpoint in `into_app`.
-            (Some(404), _) => (crate::error::NEXUS_NOT_FOUND, ErrorKind::Permanent),
+            (Some(404), _) => (
+                crate::providers::nexus::NEXUS_NOT_FOUND,
+                ErrorKind::Permanent,
+            ),
             (Some(410), Endpoint::DownloadLink { .. }) => {
                 ("nexus.link_expired", ErrorKind::UserAction)
             }
@@ -170,19 +174,22 @@ mod tests {
     fn a_quarantined_file_is_not_a_rejected_api_key() {
         let error =
             ApiError::status(Endpoint::DownloadLink { has_key: true }, 403, None).into_app();
-        assert_eq!(error.code, crate::error::DOWNLOAD_UNAVAILABLE);
+        assert_eq!(error.code, crate::providers::nexus::DOWNLOAD_UNAVAILABLE);
     }
 
     #[test]
     fn every_404_uses_one_code_with_the_endpoint_as_its_kind() {
         let missing_mod = ApiError::status(Endpoint::Mod, 404, None).into_app();
-        assert_eq!(missing_mod.code, crate::error::NEXUS_NOT_FOUND);
+        assert_eq!(missing_mod.code, crate::providers::nexus::NEXUS_NOT_FOUND);
         assert_eq!(missing_mod.params["kind"], "mod");
         let missing_file = ApiError::status(Endpoint::File, 404, None).into_app();
-        assert_eq!(missing_file.code, crate::error::NEXUS_NOT_FOUND);
+        assert_eq!(missing_file.code, crate::providers::nexus::NEXUS_NOT_FOUND);
         assert_eq!(missing_file.params["kind"], "file");
         let missing_collection = ApiError::status(Endpoint::Collection, 404, None).into_app();
-        assert_eq!(missing_collection.code, crate::error::NEXUS_NOT_FOUND);
+        assert_eq!(
+            missing_collection.code,
+            crate::providers::nexus::NEXUS_NOT_FOUND
+        );
         assert_eq!(missing_collection.params["kind"], "collection");
     }
 

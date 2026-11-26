@@ -6,7 +6,7 @@ use crate::context::Data;
 use crate::context::Settings;
 use crate::error::AppError;
 use crate::games::paths;
-use crate::games::prefix::{effective_source, prefix_of};
+use crate::games::prefix::prefix_of;
 use crate::games::runtime::Runtime;
 use crate::games::{GAME_TEMPLATE, GameDef};
 
@@ -21,11 +21,7 @@ pub fn settings_file(game: &GameDef, settings: &Settings) -> Option<PathBuf> {
 /// How this install starts on this computer. Every caller asks here, so launch, tools, steps and the deployment root
 /// never disagree.
 pub fn runtime(game: &GameDef, settings: &Settings) -> Runtime {
-    crate::games::runtime::of(
-        game,
-        Path::new(settings.game_root.trim()),
-        effective_source(&settings.source, &game.detect.steam_app_ids),
-    )
+    crate::games::runtime::of(game, Path::new(settings.game_root.trim()), &settings.source)
 }
 
 /// The Wine prefix this install's paths resolve with, when it has one: the Steam prefix for a Steam install under

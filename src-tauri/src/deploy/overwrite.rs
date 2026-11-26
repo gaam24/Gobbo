@@ -11,10 +11,10 @@ use crate::context::profile::history::save_profiles;
 use crate::context::profile::lock_profiles;
 use crate::context::running::game_running;
 use crate::context::size_kb;
+use crate::context::target::deployment_root;
 use crate::deploy::overlay::Session;
-use crate::deploy::target::deployment_root;
 use crate::domain::library::Family;
-use crate::domain::profiles::Entry as ProfileEntry;
+use crate::domain::profiles::ListedMod;
 use crate::error::AppError;
 use crate::error::game_running as game_is_running_error;
 use crate::error::io_at;
@@ -31,6 +31,7 @@ pub struct OverwriteFile {
     pub size_kb: u32,
 }
 
+/// The folder of the active profile's overwrite layer and the files it holds.
 #[derive(Debug, Serialize, specta::Type)]
 pub struct OverwriteView {
     /// The folder of the layer, for opening it in the file manager.
@@ -54,6 +55,7 @@ pub fn has_overwrite_for(data: &Data, profile: &str) -> bool {
     fs::read_dir(overwrite_dir_for(data, profile)).is_ok_and(|mut entries| entries.next().is_some())
 }
 
+/// The files of the active profile's overwrite layer, listed for the window.
 pub fn overwrite_files(root: &Data, game_id: &str) -> Result<OverwriteView, AppError> {
     games::load(game_id)?;
     let data = root.game(game_id);
@@ -90,13 +92,10 @@ pub fn overwrite_to_mod(root: &Data, game_id: &str, name: &str) -> Result<(), Ap
         return Err(AppError::user("overwrite.name_empty"));
     }
 
-    let inner = deployment_root(&data, &game, &settings)
-        .ok()
-        .and_then(|root| {
-            root.strip_prefix(settings.game_root.trim())
-                .ok()
-                .map(Path::to_path_buf)
-        })
+    let deploy_root = deployment_root(&data, &game, &settings)?;
+    let inner = deploy_root
+        .strip_prefix(settings.game_root.trim())
+        .map(Path::to_path_buf)
         .unwrap_or_default();
     let source = overwrite_dir(&data).join(&inner);
     let files = if source.is_dir() {
@@ -143,7 +142,7 @@ pub fn overwrite_to_mod(root: &Data, game_id: &str, name: &str) -> Result<(), Ap
     active.remove_mods(|entry| entry.id == id);
     active.mods.insert(
         0,
-        ProfileEntry {
+        ListedMod {
             id,
             folder,
             enabled: true,

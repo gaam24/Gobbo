@@ -16,7 +16,7 @@ pub const OPTIONAL_PHASE: u32 = 666;
 pub enum CollectionSource {
     /// A file of a registered provider: a Nexus file or a Thunderstore package version. The provider downloads it.
     Provider {
-        provider: String,
+        provider: ProviderId,
         mod_id: String,
         file_id: String,
         /// The persistent part id (a Nexus `mod_file_id`), when the manifest already names it.
@@ -85,8 +85,12 @@ impl CollectionItem {
         match &self.source {
             CollectionSource::Provider {
                 provider, mod_id, ..
-            } => format!("{provider}:{mod_id}"),
-            _ => self.key.clone(),
+            } => crate::domain::source::family_key(provider.as_str(), mod_id),
+            CollectionSource::Bundle { .. }
+            | CollectionSource::Direct { .. }
+            | CollectionSource::Browse { .. }
+            | CollectionSource::Manual
+            | CollectionSource::Unsupported { .. } => self.key.clone(),
         }
     }
 
@@ -105,7 +109,7 @@ impl CollectionItem {
             part_id,
         } = &self.source
         {
-            let provider = ProviderId::new(provider.as_str());
+            let provider = provider.clone();
             source_files.insert(provider.clone(), file_id.clone());
 
             if let Some(part_id) = part_id {
@@ -166,8 +170,12 @@ impl CollectionItem {
                 mod_id,
                 file_id,
                 ..
-            } => Some((provider, mod_id, file_id)),
-            _ => None,
+            } => Some((provider.as_str(), mod_id, file_id)),
+            CollectionSource::Bundle { .. }
+            | CollectionSource::Direct { .. }
+            | CollectionSource::Browse { .. }
+            | CollectionSource::Manual
+            | CollectionSource::Unsupported { .. } => None,
         }
     }
 
@@ -175,7 +183,11 @@ impl CollectionItem {
     pub fn bundle_path(&self) -> Option<String> {
         match &self.source {
             CollectionSource::Bundle { path, .. } => Some(path.trim_matches('/').to_string()),
-            _ => None,
+            CollectionSource::Provider { .. }
+            | CollectionSource::Direct { .. }
+            | CollectionSource::Browse { .. }
+            | CollectionSource::Manual
+            | CollectionSource::Unsupported { .. } => None,
         }
     }
 }

@@ -170,7 +170,7 @@ fn remainder_start(source: &[&str], entry: &[&str]) -> Option<usize> {
 fn virtual_game_path(original: &str, source: &str, destination: &str) -> String {
     let fallback = || original.to_string();
 
-    if !crate::domain::naming::is_safe_relative_path(destination) {
+    if !crate::domain::naming::is_safe_relative_path(destination, crate::platform::is_windows()) {
         return fallback();
     }
 
@@ -190,9 +190,9 @@ fn virtual_game_path(original: &str, source: &str, destination: &str) -> String 
 
     if source_parts.is_empty()
         || entry_parts.len() != original_parts.len()
-        || original_parts
-            .iter()
-            .any(|part| !crate::domain::naming::is_safe_component(part))
+        || original_parts.iter().any(|part| {
+            !crate::domain::naming::is_safe_component(part, crate::platform::is_windows())
+        })
     {
         return fallback();
     }

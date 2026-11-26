@@ -78,7 +78,7 @@ fn min_gobbo_refuses_a_definition_for_a_newer_app_and_a_malformed_number() {
     assert!(
         problems
             .iter()
-            .any(|problem| problem.contains("needs Gobbo 999.0.0")),
+            .any(|problem| problem.message.contains("needs Gobbo 999.0.0")),
         "{problems:?}"
     );
 
@@ -86,7 +86,7 @@ fn min_gobbo_refuses_a_definition_for_a_newer_app_and_a_malformed_number() {
     assert!(
         problems
             .iter()
-            .any(|problem| problem.contains("release number")),
+            .any(|problem| problem.message.contains("release number")),
         "{problems:?}"
     );
 }
@@ -105,7 +105,7 @@ fn a_schema_above_the_supported_one_is_refused() {
     assert!(
         problems
             .iter()
-            .any(|problem| problem.contains("unknown schema version")),
+            .any(|problem| problem.message.contains("unknown schema version")),
         "{problems:?}"
     );
 }

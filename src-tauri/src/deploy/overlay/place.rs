@@ -5,7 +5,7 @@ use std::fs;
 use std::io;
 use std::path::Path;
 
-use crate::deploy::DeployError;
+use crate::deploy::error::DeployError;
 use crate::error::FileError;
 
 /// Puts the file in `dst` as a hardlink to `src`. A hardlink that fails because the two places cannot share a file

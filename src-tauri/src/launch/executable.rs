@@ -6,6 +6,7 @@ use crate::error::{AppError, game_folder_missing};
 use crate::games::Executable;
 use crate::games::GameDef;
 
+/// Checks that the game folder exists before a launch; the deployment-only folders are not required.
 pub fn check_start(settings: &Settings) -> Result<(), AppError> {
     if !is_dir(&settings.game_root) {
         return Err(game_folder_missing());
@@ -104,17 +105,15 @@ mod tests {
     }
 
     #[test]
-    fn the_linux_program_is_used_only_on_linux() {
+    fn the_platform_argument_selects_the_native_program() {
         let executable = Executable {
             name: "Game".to_string(),
             path: "Game.exe".to_string(),
             path_linux: Some("Game.x86_64".to_string()),
             args: Vec::new(),
         };
-        #[cfg(windows)]
-        assert_eq!(executable.path_for_platform(), "Game.exe");
-        #[cfg(not(windows))]
-        assert_eq!(executable.path_for_platform(), "Game.x86_64");
+        assert_eq!(executable.path_for_platform(true), "Game.exe");
+        assert_eq!(executable.path_for_platform(false), "Game.x86_64");
 
         let fallback = Executable {
             name: "Game".to_string(),
@@ -122,7 +121,8 @@ mod tests {
             path_linux: Some("  ".to_string()),
             args: Vec::new(),
         };
-        assert_eq!(fallback.path_for_platform(), "Game.exe");
+        assert_eq!(fallback.path_for_platform(true), "Game.exe");
+        assert_eq!(fallback.path_for_platform(false), "Game.exe");
     }
 
     #[test]

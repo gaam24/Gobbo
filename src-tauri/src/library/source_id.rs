@@ -35,7 +35,7 @@ pub fn set_mod_source(
             family.clear_source(&provider);
             return Ok(());
         };
-        let target = format!("{provider}:{mod_id}");
+        let target = crate::domain::source::family_key(provider.as_str(), &mod_id);
         // Typing the page id an addon already belongs to must not merge it into another part of that page.
         let same_page = family
             .source(provider_id)

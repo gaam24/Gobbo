@@ -13,7 +13,7 @@ pub use file_names::{
     file_name_from_url, is_invalid_name_char, is_safe_component, is_windows_component,
     safe_file_name, safe_limited_file_name,
 };
-pub use hashes::{path_hash, short_hash};
+pub use hashes::{digest_hex_prefix, path_hash, short_hash};
 pub use import::imported;
 pub use keys::{clean, compact_component, deploy_name, match_key, slug};
 pub use labels::requirement_label;

@@ -130,7 +130,7 @@ pub fn restore_profile(
 }
 
 #[cfg(test)]
-#[allow(
+#[expect(
     clippy::literal_string_with_formatting_args,
     reason = "path templates contain braces, not format arguments"
 )]
@@ -196,7 +196,7 @@ default = "isolated"
 
         for id in ["p1", second.as_str()] {
             profiles
-                .get_mut(id)
+                .profile_mut(id)
                 .unwrap()
                 .set_user_data_isolation("saves", Isolation::Isolated);
         }
@@ -220,7 +220,7 @@ default = "isolated"
                 &self.data,
                 &self.game,
                 &self.settings,
-                self.profiles.get(profile)?,
+                self.profiles.profile(profile)?,
             )
         }
 

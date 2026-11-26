@@ -79,7 +79,7 @@ pub fn bad_id(mod_id: &str) -> AppError {
 /// The package or the version is not on Thunderstore. This is the one 404 code of the provider, paired with
 /// `nexus.not_found` across the provider family.
 pub fn not_found() -> AppError {
-    AppError::user(crate::error::THUNDERSTORE_NOT_FOUND)
+    AppError::user(crate::providers::thunderstore::THUNDERSTORE_NOT_FOUND)
 }
 
 /// The server sent something that is not the expected data.

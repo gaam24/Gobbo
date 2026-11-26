@@ -149,7 +149,7 @@ mod tests {
 
     use super::super::presets::presets_from;
     use super::*;
-    use crate::games::GameOrigin;
+    use crate::games::{GameOrigin, layers::DefinitionLayer};
     use crate::test_support::{scratch, write};
 
     /// A preset with two engine markers, a variant that the folder shows by its own marker, and a project folder.
@@ -205,7 +205,10 @@ root = "*/Content/Paks"
             write(&dir.join(format!("{id}.toml")), text);
         }
 
-        presets_from(&[(dir, GameOrigin::Bundled)])
+        presets_from(&[DefinitionLayer {
+            path: dir,
+            origin: GameOrigin::Bundled,
+        }])
     }
 
     /// A game folder with the given files (relative paths with `/`), in a fresh scratch folder.

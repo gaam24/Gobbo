@@ -10,7 +10,7 @@ fn a_game_needs_a_place_for_its_mods() {
     assert!(
         game.validate()
             .iter()
-            .any(|e| e.contains("at least one slot or mirror"))
+            .any(|e| e.message.contains("at least one slot or mirror"))
     );
 }
 
@@ -216,7 +216,11 @@ fn a_root_file_is_a_bare_name_that_compares_like_a_path() {
 fn a_profile_data_path_must_be_a_template() {
     let mut game = GameDef::parse(SLOT).unwrap();
     game.profile_data = vec!["saves".to_string()];
-    assert!(game.validate().iter().any(|e| e.contains("profile_data")));
+    assert!(
+        game.validate()
+            .iter()
+            .any(|e| e.message.contains("profile_data"))
+    );
 }
 
 #[test]
@@ -238,7 +242,7 @@ fn a_user_data_path_inside_the_game_is_refused() {
     assert!(
         game.validate()
             .iter()
-            .any(|problem| problem.contains("inside the game folder"))
+            .any(|problem| problem.message.contains("inside the game folder"))
     );
 }
 
@@ -258,7 +262,7 @@ fn a_user_data_linux_template_is_checked_too() {
     assert!(
         problems
             .iter()
-            .any(|problem| problem.contains("path_linux")),
+            .any(|problem| problem.message.contains("path_linux")),
         "{problems:?}"
     );
 }
@@ -285,7 +289,9 @@ fn user_data_overlap_uses_each_platforms_effective_template() {
     ];
     let problems = game.validate();
     assert!(
-        problems.iter().any(|problem| problem.contains("overlap")),
+        problems
+            .iter()
+            .any(|problem| problem.message.contains("overlap")),
         "{problems:?}"
     );
 }
@@ -357,7 +363,7 @@ fn a_game_without_an_executable_is_refused() {
     assert!(
         game.validate()
             .iter()
-            .any(|problem| problem.contains("at least one executable"))
+            .any(|problem| problem.message.contains("at least one executable"))
     );
 }
 
@@ -368,7 +374,7 @@ fn a_deploy_root_must_start_with_a_path_variable() {
     assert!(
         game.validate()
             .iter()
-            .any(|problem| problem.contains("must start with a path variable"))
+            .any(|problem| problem.message.contains("must start with a path variable"))
     );
 }
 
@@ -381,6 +387,6 @@ fn overlapping_slots_or_mirrors_are_refused() {
     assert!(
         game.validate()
             .iter()
-            .any(|problem| problem.contains("overlap"))
+            .any(|problem| problem.message.contains("overlap"))
     );
 }

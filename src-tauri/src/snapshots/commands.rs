@@ -7,7 +7,7 @@ use crate::snapshots::{
     restore_public,
 };
 
-crate::commands::game_commands! {
+crate::commands::macros::game_commands! {
     /// Every snapshot of the game, newest first.
     query snapshots() -> Vec<SnapshotView> = |root, game| Ok(list(root, game));
 
@@ -24,7 +24,7 @@ pub async fn create_snapshot(
     game: String,
     profile: String,
 ) -> Result<SnapshotView, AppError> {
-    crate::commands::for_game(data, game, move |root, game| {
+    crate::commands::helpers::for_game(data, game, move |root, game| {
         create_manual(root, game, &profile)
     })
     .await
@@ -38,7 +38,7 @@ pub async fn restore_snapshot(
     game: String,
     id: String,
 ) -> Result<RestoreOutcome, AppError> {
-    crate::commands::for_game(data, game, move |root, game| {
+    crate::commands::helpers::for_game(data, game, move |root, game| {
         restore_public(root, game, &id)
     })
     .await
@@ -52,5 +52,5 @@ pub async fn delete_snapshot(
     game: String,
     id: String,
 ) -> Result<(), AppError> {
-    crate::commands::for_game(data, game, move |root, game| delete(root, game, &id)).await
+    crate::commands::helpers::for_game(data, game, move |root, game| delete(root, game, &id)).await
 }

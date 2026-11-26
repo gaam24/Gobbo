@@ -6,6 +6,12 @@ use specta::Type;
 use super::id::ProviderId;
 use super::page::SourceMeta;
 
+/// The family key of a provider page. The one rule shared by every place that names a family from a provider and a
+/// mod id: a waiting entry, a saved source id, a status row, a collection key and a plan key.
+pub fn family_key(provider: &str, mod_id: &str) -> String {
+    format!("{provider}:{mod_id}")
+}
+
 /// A mod on a provider, the exact file when one is known, and the stable part it belongs to.
 ///
 /// `file_id` names one version; `part_id` names the provider's update chain, for example a Nexus `mod_file_id`.

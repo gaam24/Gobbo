@@ -3,40 +3,48 @@
 - `app/mod.rs`: `run()`, the Tauri builder, plugins and setup. `app/cli.rs`: `gobbo run <game> -- <program>`.
   `app/storage_prompt.rs`: the first-start storage question, shown before Tauri so the data root, window state and
   webview profile are fixed before the window exists. Its `storage_prompt/native/` holds the platform dialog: GTK on
-  the main thread on Linux, `rfd` on Windows and macOS. `app/bindings.rs`: writes and checks `../src/bindings.ts`.
+  the main thread on Linux, `rfd` on Windows and macOS. `app/bindings.rs`: writes and checks `../../src/bindings.ts`.
 - `bench_api.rs`: fixtures for `benches/backend.rs` (including a realistic multi-version library with long
   descriptions and a deployed journal); compiled only with the `bench` feature, never in a release build.
   The criterion harness is `benches/backend.rs`; `benches/alloc.rs` counts allocations with `dhat` (and
   `tests/alloc_budget.rs` keeps the ceilings), `benches/instructions.rs` runs `iai-callgrind` on Linux, and the
   `bench-mimalloc` feature swaps the allocator of the benchmark binary for the F6 experiment.
-- `commands/`: `mod.rs` keeps the shared `blocking`, `for_game` and `change` helpers and the `game_commands!` macro. The
+- `commands/`: `mod.rs` is only the area-command imports and `builder()`; `helpers.rs` holds the shared `blocking`,
+  `for_game` and `change` helpers, and `macros.rs` the `game_commands!` macro. The
   handler list itself comes from `src-tauri/commands.txt`, the one registry `build.rs` uses to generate both the
   `collect_commands![...]` invocation `builder()` includes and the command permissions. Every command module lives in
   the module it serves; this layer is only the registration point.
-- Modules: each folder owns its commands, use cases and engine. `games/` (the definition model in `definition/`, the
-  loader presets in `loaders.rs`, validation, the scan in `detect.rs`, one adapter per store in `stores/`
-  (`Store::display_name` and `Store::from_name` are read by `status/build.rs` for the store shown in the window;
-  Steam's libraries and Proton data in `stores/steam.rs`; where each store keeps its files comes from
-  `platform::store_folders`),
-  how an install starts in `runtime.rs`, paths, the catalog
+- Modules: each folder owns its commands, use cases and engine. `games/` (the definition model in `definition/`
+  (`LoaderPackage` for a loader release; `UserData`/`Executable` resolve their folder with `path_for_platform`), the
+  loader presets in `loaders/`, validation, the scan in `detect/`
+  (`StoreInstall` for a folder's store and prefix; `Found.store` stays a serialized string), one adapter per store in
+  `stores/` behind the `StoreAdapter` trait and the static `ADAPTERS` list (a new store is an adapter and a registry
+  entry, plus the platform folder and detect id where needed), `Store` from one `stores!` list that includes `Steam`
+  and `Manual` and gives `name`, `display_name`, `ALL` and `from_name` (`prefix::effective_source` returns that
+  `Store` for a saved source, and `status/build/mod.rs` shows its display name; Steam's libraries and Proton data in
+  `stores/steam.rs`; where each store keeps its files comes from `platform::store_folders`), the user / official /
+  bundled precedence in `layers.rs` (`GameOrigin`, `DefinitionLayer`, `DefinitionLayers`) and the raw definition
+  folders in `dirs.rs`,
+  how an install starts in `runtime.rs`, the path templates in `paths/`, the catalog
   in `catalog.rs`, the official catalog downloaded from GitHub in `remote/` (the manifest fetch, the schema gate and
   the checksummed install), the catalog commands and the definition editor in `editor/` (the engine a folder matches, from the `[engine]` tables of the loader presets, is `editor/engine.rs`); the import dry run is
   `import/preview.rs`),
   `library/` (mutations: rescan, delete, metadata, the manual source id in `source_id.rs`, generic `fields.rs`,
   `relations.rs` for the requirement checks and warnings, `sync.rs` keeping each profile in step
   with the library, `waiting.rs` for pack mods that wait for an archive and the settle step that puts them in the list), `deploy/` (`plan.rs`, `apply.rs`,
-  `progress.rs` with the one progress and throttling rule for an apply, `error.rs`, `journal.rs` with the undo log,
+  `progress.rs` with the one progress and throttling rule for an apply, `error.rs`, `journal/` with the undo log,
   the `deployment.json` completion marker and the `JournalRoots` check (only a valid marker of this or an older schema
   counts as applied; a missing, damaged or newer one leaves an interrupted apply for undo or the next apply to repair;
   a torn last line or an unknown `op` is skipped and logged instead of blocking undo; every entry path is confined to
   the game root, the profile's layer folders and the settings file before undo changes anything),
-  preview, target, overwrite, `remove.rs` for removing a mod that may be deployed; `overlay/` for the layer and the
-  hardlink helper that builds it), `acquire/` (the one path that brings a mod archive into the library for every feature: exact-file check, fetch,
+  preview, target, `order.rs` (dispatches `Target.order_format` to the settings writer or, for UE4SS's `mods.txt`, the
+  layer writer; no load order writes nothing), overwrite, `remove.rs` for removing a mod that may be deployed;
+  `overlay/` for the layer and the hardlink helper that builds it), `acquire/` (the one path that brings a mod archive into the library for every feature: exact-file check, fetch,
   FOMOD choices, import, download cleanup), `import/` (`model.rs` with `ChoiceNeeded`, the archive and FOMOD answers
   needed before an import can finish, the install plan and its `apply.rs`, `install/roots.rs` with `base_roots` for the
   game's top-level folders, FOMOD parser, tool unpack, wizard, reinstall, `report.rs` for the
   archive-versus-installed-folder report, `skipped.rs` for the capped record of files no rule took, and `flow/` with the
-  archive lifecycle: working folder, preparation and commit), `launch/` (start, Proton, tools, steps, changes,
+  archive lifecycle: working folder, preparation and commit), `launch/` (`start/`, Proton, tools, steps, changes,
   report, output, watch, and `commands.rs` for starting, stopping and running a game), `infra/disk.rs` (free space for
   the setup check), `profiles/` (`actions/`, with the list and lifecycle in `mod.rs` and the user-data move in
   `user_data.rs`, bisect
@@ -44,7 +52,8 @@
   `commands.rs`), `packs/` (the reader with its `import/` folder for bundled archives), `collections/` (the collection
   recipe of any provider with the capability: `manifest/` reads and validates `collection.json`, `inspect.rs` opens a
   revision and its archive, `status.rs` derives each member's state through the shared `LibraryView::find`, `session/`
-  owns the profile and its waiting entries, `download/` runs the automatic and guided loops with one `import_member`
+  owns the profile and its waiting entries, `controller/` drives each round and its prompt, `download/` runs the
+  automatic and guided loops with one `import_member`
   step that brings a member in through `acquire::acquire` (which imports via `import::import_batch`;
   `import::import_archive` is only the single-archive wrapper for tests and benches), matching members through
   `LibraryView::find`; `commands/` holds the collection commands, and `bundle.rs`, `external.rs` and `patch.rs` handle
@@ -52,14 +61,14 @@
   metadata refresh, provider-neutral update checks, and the shared download queue in `downloads/` (`queue/` with its
   state, link resolution, dedup, claim and install parts), `status/`
   (read model, with the status builder in `build/` (its `mods.rs` and `tools.rs` parts), the one derived game stage in `stage.rs`, the setup checklist in
-  `preflight.rs`, the bisect view in `bisect.rs`, the step choices in `steps.rs`, the mod views in `mod_views/` and the
-  view types in `views/`), `tray/` (the native system tray: `view.rs` builds the menu description from the status,
+  `preflight.rs`, the bisect view in `bisect.rs`, the step choices in `steps.rs`, the mod builders in `mod_builders/` and the
+  view types in `views/`), `tray/` (the native system tray: `view/` builds the menu description from the status,
   tasks and running games, `menu.rs` turns it into a native menu, `actions.rs` calls the existing use cases, `labels.rs`
   holds the words the window sends, and `state.rs` remembers the last game and busy state), `settings/`
   (app settings, the OS handlers of the provider download links in `links.rs`,
   the games the user added, restored, removed and their storage in `managed.rs`), `setup/` (the loader package a game
   can install: the setup view, the verified download, its import as a library mod and turning it on), `diagnostics/`, `snapshots/` (the
-  snapshot manifest, capture, restore and view, with the command entry points in `mod.rs`; a snapshot holds the
+  snapshot manifest, capture, `restore/` and view, with the command entry points in `mod.rs`; a snapshot holds the
   profile's list and user-data choices, the legacy store, every isolated set and the overwrite layer), `overwrite/`
   and `mods/`.
   `launch/pipeline.rs` is the one recorded run shared by a game, a tool and `gobbo run`: report, steps, start, wait,
@@ -78,12 +87,12 @@
   queries and the `library.json` load/save, `index/scan.rs` with the scan, `folders.rs`, and the index lock. Its rescan
   takes the archive naming as a parameter, so the context does not depend on the providers. The pure model and view
   live in `domain::library`. `profile/`
-  the copy list, user-data sets, owner files and their shared switching lifecycle in `store.rs` (each switch is
-  journaled and recovers an interrupted one), the kept history and the bisect search file. `profiles/actions/user_data.rs` also
+  the copy list, user-data sets, owner files and their shared switching lifecycle in `store.rs` (the `ProfileStore`
+  trait — not `games::stores::Store`; each switch is journaled and recovers an interrupted one), the kept history and the bisect search file. `profiles/actions/user_data.rs` also
   moves an isolated redirect set back into the real folder and reports its on-demand size. `Data`
   keeps the read-through caches of `library.json`, `profiles.json`, `config.json`, the library folder listing and the
   journal's owned paths, and the index/folder comparison while both inputs stay the same (`infra/memo.rs`). The game
-  definition has one process-wide cache in `games/mod.rs`, shared through `Arc`. A status reads the shared `Arc` of the
+  definition has one process-wide cache in `games/cache.rs`, shared through `Arc`. A status reads the shared `Arc` of the
   parsed profiles when it is already in step with the library,
   so it does not clone the whole list. Every
   save of `profiles.json` goes through `Data::save_profiles`, which puts the written value into the cache: two quick
@@ -94,21 +103,25 @@
   same public module functions as the window.
 - `domain/`: `archive.rs` (the pure parser for Nexus archive names and the one archive-extension rule), `deploy.rs`
   (the `Deploy`, `Slot`, `Mirror` and `Shared` rules a `game.toml` is parsed into, and the questions `resolver` asks
-  about them), `deployment.rs` (the `deployment.json` record and the schema version this build trusts),
-  `library/` (the pure `Library`, `Family`, `ModVersion`, `Archive`, `ModInfo` and `LibraryView`, whose `view/find.rs` is the one rule that
+  about them), `deployment_record.rs` (the `deployment.json` record and the schema version this build trusts),
+  `layout.rs` (`LayoutProfile` and `Materialized`: the pure summary rule the library builds and the resolver reads),
+  `library/` (the pure `Library`, `Family`, `ModVersion`, `Archive` and `ModInfo` in `model/`, and `LibraryView`, whose `view/find.rs` is the one rule that
   matches a wanted mod to the library through `find`, `find_with` and its `FindQuery`/`MatchPolicy` for the strict,
-  folded and key comparisons; the disk lives in `context::library`), `source/`
+  folded and key comparisons; it stores `LayoutProfile` from `layout.rs` without importing `resolver`; the disk lives in `context::library`), `source/`
   (provider-neutral `ProviderId`, `SourceRef`, `SourceMod`, `SourceMeta`, `SourceRequirement`, `SourceSync`;
   `SourceMeta::checked` in `page.rs` is the one merge-and-stamp rule for a page a check stored;
   `SourceRef.part_id` names a provider's persistent installable file group, such as a Nexus `mod_file_id`, so two parts
   of one page stay separate; the library, profiles and packs store this model, and each provider maps its own records
-  to it), `resolver/` (the deployment plan: `planner.rs` with `PlanMode`, `model.rs`, `shared.rs`, and `own_folder.rs`,
-  the rule for which mods get a folder of their own, shared by the planner and the load order window), `profiles/`
+  to it), `resolver/` (the deployment plan: `planner/` with `PlanMode`, `model/`, `shared.rs` and `layout.rs` (which
+  builds `LayoutProfile`), and `own_folder.rs` (`is_orderable`, the rule for which mods get a folder of their own,
+  shared by the planner and the load order window)), `profiles/`
   (`profile.rs` for one profile and its list, `set/` for the set and its operations, `entry.rs` for one mod in a
   profile, `view.rs` for the family/version indexes, `diff.rs` for the one comparison of two lists, `history.rs` for
   the compact summary of a list change),
   `user_data.rs` (the universal `Kind`/`Mode`/`Isolation` and the resolved `Set`),
-  `naming/` (library and game folder names, safe file names and the relative-path rule), `pathkey.rs`, `pattern.rs` (the
+  `proton_options.rs` (the available Proton versions, with the platform passed in),
+  `naming/` (library and game folder names, safe file names and the relative-path rule, each taking the platform as
+  a parameter), `pathkey.rs` (`same_path`, the one path comparison on both platforms), `pattern.rs` (the
   folder patterns of the loader engine rules, matched by path key, with the listing passed in), `version.rs`,
   `mod_steps.rs` (the per-mod step file and the `Phase` the launch runs), `arguments.rs`, `fomod.rs` (the wizard
   choices, keyed by step and group position, kept with a version), `pack.rs` (a pack mod and its waiting entry; the
@@ -116,10 +129,10 @@
 - `infra/`: `store.rs` (archive names, reservations, atomic writes, stale temp cleanup), `json.rs` (the one read and
   write policy for state files: a temp file is synced before its rename and the parent folder is synced on Unix),
   `deployment.rs` (reading the completion marker: a missing, damaged or newer one is not applied and stays on disk),
-  `storage.rs` (the portable/global/custom data roots and the choice file),
-  `credentials.rs` (the OS keyring, one account per provider), `io.rs`
-  (chunked copies, progress and digests), `text.rs` (the tail reader), `fs/` (the shared walk, file listings,
-  removal and tree copy; a replace is staged and keeps one previous generation for a profile store), `clock.rs` (the
+  `storage/` (the portable/global/custom data roots and the choice file),
+  `tasks/` (cancellation flags and the task registry), `credentials.rs` (the OS keyring, one account per provider),
+  `io.rs` (chunked copies, progress and digests), `text.rs` (the tail reader), `fs/` (the shared walk, file listings,
+  removal and the `copy/` tree merge; a replace is staged and keeps one previous generation for a profile store), `clock.rs` (the
   one wall clock and the RFC 3339 parser),
   `file_cache.rs` (the one-entry cache keyed by a path's length and modification time), `profiles_file.rs`
   (`profiles.json`), `archive.rs` (zip, 7z, rar), `http/` (the shared client and download), `log.rs` (the app's `gobbo.log`, one rotated backup and
@@ -128,9 +141,10 @@
   folders, the keys and display names in `compatibilitytool.vdf`, and the library fallback), `windows.rs`, and
   `mount_table.rs` (the Linux mount-table parser the overlay session check reads). The Linux process list owns the
   overlay session check, so the platform layer never imports `deploy`.
-- `providers/`: the external mod services behind one port. `mod.rs` holds `SourceProvider` (whose `download_policy`
+- `providers/`: the external mod services behind one port. `port.rs` holds `SourceProvider` (whose `download_policy`
   defaults to `DownloadPolicy::Unlimited` for an `AccountTier`), `SourceCapabilities`, the download/update request
-  and result types, the `CollectionSource` port and the registry. `providers/testing.rs` is the contract every adapter must
+  and result types and the `CollectionSource` port; `registry.rs` owns `PROVIDERS` and the lookup by id, `routing.rs`
+  resolves keys and download routes, and `mod.rs` is the façade. `providers/testing.rs` is the contract every adapter must
   pass: it checks the id, the registry, the capabilities, the link schemes, the page URL, the sample deep link and the
   sample archive name, and fails when a registered provider has no case. `providers/download.rs` is the archive-download
   rule the adapters share (not Thunderstore's `download.rs`): it picks the archive's name and free target from the CDN
@@ -148,7 +162,7 @@
   `download.rs` (the archive in the downloads folder, with its sidecar) and `collections.rs` (modpacks: the page link,
   the dependency list as the collection plan, and the version packed into a revision). `providers/nexus/` owns the whole Nexus adapter: `mod.rs`
   maps the port (key account, page URL, deep link, metadata, download, update check), and its submodules are the client
-  and engine (`api/`, `download/` with `file.rs` and `target.rs`, `types.rs` for the Nexus records,
+  and engine (`api/`, `download/` with `file.rs` and `mod.rs`, `types.rs` for the Nexus records,
   `update/` with the page and requirement reads, `files/` for file groups and their `mod_file_id` parts
   (`mod.rs`, `parse.rs`, `order.rs`, `matching.rs`),
   `requirements.rs`, `page.rs`, `key.rs`, `link.rs`, `text.rs`, `collections/` for the collection revision, archive

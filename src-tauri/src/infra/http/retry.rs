@@ -4,6 +4,20 @@ use std::time::Duration;
 
 use crate::error::AppError;
 
+use super::helpers::DOWNLOAD_RETRY_CAP_SECS;
+
+/// The server's `Retry-After` as a wait, with the five-second fallback and the download cap. A producer may store an
+/// uncapped number, so the budget clamps it here before sleeping.
+fn retry_delay(error: &AppError) -> Duration {
+    let seconds = error
+        .params
+        .get("retry_after")
+        .and_then(|value| value.parse::<u64>().ok())
+        .unwrap_or(5)
+        .min(DOWNLOAD_RETRY_CAP_SECS);
+    Duration::from_secs(seconds)
+}
+
 /// The 429 retry budget of one file download. Two extra tries are enough for a short server-side cooldown; the
 /// budget is shared by every link of one download so a single operation cannot sleep for an unbounded number of
 /// answers. It holds configuration, not game state.
@@ -30,14 +44,9 @@ impl RateRetry {
             match attempt() {
                 Err(error) if error.code == "http.rate_limited" && self.left > 0 => {
                     // The download already normalized the server's answer, so this only reads the number it stored;
-                    // a value from another producer still gets the same five-second fallback.
-                    let seconds = error
-                        .params
-                        .get("retry_after")
-                        .and_then(|value| value.parse::<u64>().ok())
-                        .unwrap_or(5);
+                    // a value from another producer still gets the same five-second fallback and the download cap.
                     self.left -= 1;
-                    std::thread::sleep(Duration::from_secs(seconds));
+                    std::thread::sleep(retry_delay(&error));
                 }
                 other => return other,
             }
@@ -50,6 +59,12 @@ mod tests {
     use super::*;
     use crate::infra::http::download::{download_with_info, response, serve_answers};
     use crate::test_support::scratch;
+
+    #[test]
+    fn a_long_retry_after_is_capped_without_sleeping() {
+        let error = AppError::new("http.rate_limited").with("retry_after", "999999");
+        assert_eq!(retry_delay(&error), Duration::from_secs(300));
+    }
 
     #[test]
     fn a_rate_limited_download_retries_and_succeeds_on_the_next_answer() {

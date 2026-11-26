@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use super::in_use;
 #[cfg(not(windows))]
@@ -14,22 +14,18 @@ use super::place::place;
 use super::report::{layer_prefix, write_layer_dlls};
 #[cfg(windows)]
 use super::windows::check;
-use crate::deploy::apply::{layer_jobs, write_settings};
-use crate::deploy::journal::{Entry, Journal, JournalRoots};
-use crate::deploy::mods_txt::write_order;
-use crate::deploy::{
-    ApplyReport, DeployError, DeployProgress, DeployStage, Target, scan, state_is_overlay, undo,
-};
-use crate::domain::pathkey::path_key;
+use crate::deploy::apply::layer_jobs;
+use crate::deploy::error::DeployError;
+use crate::deploy::journal::{Journal, JournalOp, JournalRoots};
+use crate::deploy::model::{DeployProgress, DeployStage};
+use crate::deploy::order;
+use crate::deploy::undo::undo;
+use crate::deploy::{ApplyReport, Target, scan, state_is_overlay};
+use crate::domain::pathkey::path_key_into;
 use crate::domain::resolver::DeployPlan;
 use crate::domain::user_data::Set as UserDataSet;
-use crate::error::AppError;
-use crate::error::FileError;
-use crate::error::Message;
-use crate::error::game_running as game_is_running_error;
+use crate::error::{AppError, FileError, Message, game_running as game_is_running_error};
 use gobbo_overlay_core::Layers;
-#[cfg(windows)]
-use gobbo_overlay_core::{MountConfig, MountSpec};
 
 /// The folders of one overlay session, directly under the profile's state folder. `overwrite` and `.work`
 /// stay between sessions, because `overwrite` holds the game's writes.
@@ -55,6 +51,7 @@ pub struct Session {
 }
 
 impl Session {
+    /// A session for a deployment root that is also the game folder, with no user-data redirects.
     pub fn at(state: &Path, root: &Path) -> Self {
         Self::with_roots(state, root, root, Vec::new())
     }
@@ -112,37 +109,7 @@ impl Session {
     /// The isolated redirects that add a mount outside the game folder.
     #[cfg(windows)]
     pub fn redirects(&self) -> impl Iterator<Item = &UserDataSet> {
-        self.user_data.iter().filter(|set| set.redirects())
-    }
-}
-
-/// The JSON file the hook reads instead of the three single-root environment variables. It is written before every
-/// launch, so a profile switch never leaves a stale mount set behind.
-#[cfg(windows)]
-pub fn mounts_path(state: &Path) -> PathBuf {
-    state.join("overlay-mounts.json")
-}
-
-/// The mount set of this session: the game folder plus every isolated redirect. The game is always the first mount.
-#[cfg(windows)]
-pub fn mount_config(session: &Session) -> MountConfig {
-    let mut mounts = vec![MountSpec {
-        id: MountSpec::GAME_ID.to_string(),
-        guest: session.view_root().to_path_buf(),
-        root: session.view_root().to_path_buf(),
-        staging: Some(session.mods.clone()),
-        upper: session.overwrite.clone(),
-    }];
-    mounts.extend(session.redirects().map(|set| MountSpec {
-        id: set.id.clone(),
-        guest: set.real.clone(),
-        root: set.base.clone(),
-        staging: None,
-        upper: set.upper.clone(),
-    }));
-    MountConfig {
-        version: MountConfig::VERSION,
-        mounts,
+        self.user_data.iter().filter(|set| set.is_redirected())
     }
 }
 
@@ -173,12 +140,11 @@ pub fn prepare_with_progress(
     progress: &mut dyn FnMut(DeployProgress),
 ) -> Result<ApplyReport, DeployError> {
     supported()?;
-    let session = Session::with_roots(
-        &target.state,
-        &target.root,
-        &target.game_root,
-        target.user_data.clone(),
-    );
+    #[cfg(windows)]
+    let user_data = target.user_data.clone();
+    #[cfg(not(windows))]
+    let user_data = Vec::new();
+    let session = Session::with_roots(&target.state, &target.root, &target.game_root, user_data);
     // Each platform checks what its mount or its hook needs, before the first write.
     check(&session)?;
     // The layer mirrors the deployment root. A root inside the game folder (`{game}/Data`) is a folder inside the
@@ -225,7 +191,7 @@ pub fn prepare_with_progress(
     };
 
     // The entry goes in before the first write, so an interrupted session can be undone.
-    journal.append(&Entry::LayerPrepared {
+    journal.append(&JournalOp::LayerPrepared {
         mods: session.mods.clone(),
         overwrite: session.overwrite.clone(),
     })?;
@@ -245,12 +211,13 @@ pub fn prepare_with_progress(
         ));
     }
 
-    let mut known_dirs = rustc_hash::FxHashSet::default();
+    let mut known_dirs: rustc_hash::FxHashSet<PathBuf> = rustc_hash::FxHashSet::default();
     crate::deploy::progress::write_jobs(
         &jobs,
         progress,
         |job| {
-            if known_dirs.insert(job.dir.clone()) {
+            if !known_dirs.contains(&job.dir) {
+                known_dirs.insert(job.dir.clone());
                 fs::create_dir_all(&job.dir).map_err(|e| FileError::new(&job.dir, e))?;
             }
 
@@ -268,8 +235,7 @@ pub fn prepare_with_progress(
         report.files,
         report.files,
     ));
-    write_settings(journal, target, &plan.settings)?;
-    write_order(plan, library, target, &base)?;
+    order::write(journal, target, plan, library, &base)?;
     write_layer_dlls(&session, plan, &inner);
     Ok(report)
 }
@@ -328,13 +294,18 @@ pub(in crate::deploy) fn matches_plan(
     }
     // The scan lists the layer's files with `/` and sorted, so the plan's paths take the same form.
     let prefix = layer_prefix(inner);
-    let rewritten = order_file
-        .filter(|_| !plan.settings.is_empty())
-        .map(|rel| path_key(&format!("{prefix}{rel}")));
-    let is_rewritten = |layered: &str| {
-        rewritten
-            .as_deref()
-            .is_some_and(|key| path_key(layered) == key)
+    let mut rewritten_key = String::new();
+    let rewritten = order_file.filter(|_| !plan.settings.is_empty()).map(|rel| {
+        let path = format!("{prefix}{rel}");
+        path_key_into(&path, &mut rewritten_key)
+    });
+    let mut layered_key = String::new();
+    let mut is_rewritten = |layered: &str| {
+        rewritten.as_ref().is_some_and(|range| {
+            layered_key.clear();
+            path_key_into(layered, &mut layered_key);
+            rewritten_key[range.start..range.end] == layered_key[..]
+        })
     };
     let mut planned = Vec::with_capacity(plan.files.len());
 
@@ -369,11 +340,46 @@ fn same_file(src: &Path, dst: &Path) -> bool {
 
 /// How often `wait_released` looks at the overlay again.
 const RELEASE_POLL: Duration = Duration::from_secs(1);
+/// The longest a post-exit wait holds the running marker: a process that outlived its launcher must not leave the app
+/// showing a game as running forever. Quit budgets this together with the post-exit save's lock wait.
+const RELEASE_TIMEOUT: Duration = Duration::from_secs(20);
 
 /// Waits while an overlay of the game folder `root` is still used by a process that outlived its launcher. The game counts
 /// as running until its last process has ended. Returns at once when no overlay is mounted there.
 pub fn wait_released(root: &Path) {
+    wait_released_with(root, RELEASE_TIMEOUT, in_use);
+}
+
+/// `wait_released` with an explicit budget and use check. On a timeout it logs a warning and returns, so the caller
+/// clears its running marker even when an overlay process never went away.
+pub fn wait_released_with(root: &Path, timeout: Duration, in_use: impl Fn(&Path) -> bool) {
+    let started = Instant::now();
     while in_use(root) {
+        if started.elapsed() >= timeout {
+            crate::infra::log::warn(format!(
+                "overlay: {} is still in use after {} s; continuing",
+                root.display(),
+                timeout.as_secs()
+            ));
+            return;
+        }
         thread::sleep(RELEASE_POLL);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::cell::Cell;
+
+    use super::*;
+
+    #[test]
+    fn a_zero_timeout_returns_while_the_overlay_is_still_in_use() {
+        let calls = Cell::new(0);
+        wait_released_with(Path::new("unused-game-folder"), Duration::ZERO, |_| {
+            calls.set(calls.get() + 1);
+            true
+        });
+        assert_eq!(calls.get(), 1);
     }
 }

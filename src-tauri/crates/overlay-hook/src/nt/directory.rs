@@ -429,13 +429,9 @@ unsafe fn query(
         crate::stat_lock();
         let mut listings = LISTINGS.lock().unwrap_or_else(PoisonError::into_inner);
 
-        if listings.len() >= MAX_LISTINGS
-            && let Some(oldest) = listings
-                .iter()
-                .min_by_key(|(_, entry)| entry.used())
-                .map(|(handle, _)| *handle)
-        {
-            listings.remove(&oldest);
+        // At the cap, a new handle passes to the original instead of evicting a live enumeration.
+        if listings.len() >= MAX_LISTINGS && !listings.contains_key(&(handle as usize)) {
+            return None;
         }
 
         listings.insert(
@@ -478,13 +474,10 @@ unsafe fn query(
         crate::stat_lock();
         listings = LISTINGS.lock().unwrap_or_else(PoisonError::into_inner);
 
-        if listings.len() >= MAX_LISTINGS
-            && let Some(oldest) = listings
-                .iter()
-                .min_by_key(|(_, entry)| entry.used())
-                .map(|(handle, _)| *handle)
-        {
-            listings.remove(&oldest);
+        // At the cap, a new handle passes to the original instead of evicting a live enumeration. A handle already in
+        // the table only replaces its own entry, so its restart or changed path still rebuilds as before.
+        if listings.len() >= MAX_LISTINGS && !listings.contains_key(&(handle as usize)) {
+            return None;
         }
 
         listings.insert(
@@ -571,6 +564,10 @@ fn mask(name: *const UnicodeString) -> Option<Cow<'static, str>> {
 
 /// Formats up to `length` bytes of entries starting at `start` into `info`. The result is the status, the number of
 /// bytes written, and how many entries were consumed.
+///
+/// # Safety
+/// `info` must be writable for `length` bytes and be the buffer the program passed to `NtQueryDirectoryFile`, valid for
+/// the duration of that call. The caller's NT buffer contract also covers the `IO_STATUS_BLOCK` written by `query`.
 fn respond(
     class: u32,
     entries: &[WIN32_FIND_DATAW],
@@ -587,7 +584,14 @@ fn respond(
         return (STATUS_INVALID_INFO_CLASS, 0, 0);
     }
 
-    let buffer = unsafe { std::slice::from_raw_parts_mut(info.cast::<u8>(), length as usize) };
+    // A `usize` that cannot hold the byte count is an impossible buffer for this process; refuse it instead of
+    // truncating a valid listing into a smaller slice.
+    let Ok(length) = usize::try_from(length) else {
+        return (STATUS_INVALID_PARAMETER, 0, 0);
+    };
+    // SAFETY: the caller guarantees `info` points to `length` writable bytes, and `length` is now the exact byte count
+    // the program passed. The slice lives only until `nt_listing::fill` returns.
+    let buffer = unsafe { std::slice::from_raw_parts_mut(info.cast::<u8>(), length) };
 
     match nt_listing::fill(
         class,

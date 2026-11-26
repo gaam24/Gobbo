@@ -1,7 +1,7 @@
 use tauri::State;
 use tauri::ipc::Channel;
 
-use crate::commands::{channel_sink_with_progress, for_game, run_task};
+use crate::commands::helpers::{channel_sink_with_progress, for_game, run_task};
 use crate::context::Data;
 use crate::domain::source::SourceRef;
 use crate::error::AppError;
@@ -25,7 +25,7 @@ pub async fn install_requirement(
     run_task(
         data,
         &tasks,
-        key.as_str().to_string(),
+        key,
         game,
         kind::REQUIREMENT,
         move |root, game, flag, handle| {
@@ -73,7 +73,7 @@ pub async fn install_requirements(
     run_task(
         data,
         &tasks,
-        key.as_str().to_string(),
+        key,
         game,
         kind::REQUIREMENT,
         move |root, game, flag, handle| {

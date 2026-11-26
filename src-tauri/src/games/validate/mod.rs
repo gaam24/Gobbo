@@ -14,11 +14,11 @@ use crate::domain::pathkey;
 use crate::games::definition::{GameDef, SUPPORTED_SCHEMA};
 use gobbo_overlay_core::MountSpec;
 
-pub(in crate::games) use loader::duplicate_problems;
+pub(in crate::games) use problems::{Problem, Section, duplicate_problems};
 
 impl GameDef {
     /// The problems with this definition. An empty list means it is valid.
-    pub fn validate(&self) -> Vec<String> {
+    pub(in crate::games) fn validate(&self) -> Vec<Problem> {
         let mut problems = Problems::default();
         self.check_identity(&mut problems);
         self.check_loader(&mut problems);
@@ -36,34 +36,46 @@ impl GameDef {
 
     fn check_identity(&self, problems: &mut Problems) {
         if self.schema == 0 || self.schema > SUPPORTED_SCHEMA {
-            problems.push(format!("unknown schema version: {}", self.schema));
+            problems.push_in(
+                Section::General,
+                format!("unknown schema version: {}", self.schema),
+            );
         }
 
         if let Some(min) = &self.min_gobbo {
-            problems.min_gobbo("game", min);
+            problems.min_gobbo(Section::Source, "game", min);
         }
 
         if !crate::games::is_valid_id(&self.id) {
-            problems.push(format!(
-                "game id must contain only lowercase letters, digits or '-': {:?}",
-                self.id
-            ));
+            problems.push_in(
+                Section::General,
+                format!(
+                    "game id must contain only lowercase letters, digits or '-': {:?}",
+                    self.id
+                ),
+            );
         }
 
         if self.name.trim().is_empty() {
-            problems.push("game name is empty");
+            problems.push_in(Section::General, "game name is empty");
         }
 
         for (provider, game) in &self.providers {
             if !crate::games::is_valid_id(provider) {
-                problems.push(format!(
-                    "provider id must contain only lowercase letters, digits or '-': {provider:?}"
-                ));
+                problems.push_in(
+                    Section::General,
+                    format!(
+                        "provider id must contain only lowercase letters, digits or '-': {provider:?}"
+                    ),
+                );
             }
 
             match &game.key {
                 Some(key) if is_provider_key(key) => {}
-                _ => problems.push(format!("provider {provider} needs a key for this game")),
+                _ => problems.push_in(
+                    Section::General,
+                    format!("provider {provider} needs a key for this game"),
+                ),
             }
         }
     }
@@ -76,28 +88,43 @@ impl GameDef {
         };
 
         if !crate::games::is_valid_id(loader.id()) {
-            problems.push(format!(
-                "loader id must contain only lowercase letters, digits or '-': {:?}",
-                loader.id()
-            ));
+            problems.push_in(
+                Section::Loader,
+                format!(
+                    "loader id must contain only lowercase letters, digits or '-': {:?}",
+                    loader.id()
+                ),
+            );
         }
 
         if let Some(variant) = loader.variant()
             && !is_variant(variant)
         {
-            problems.push(format!(
-                "loader variant must contain only lowercase letters, digits, '-', '_' or '.': {variant:?}"
-            ));
+            problems.push_in(
+                Section::Loader,
+                format!(
+                    "loader variant must contain only lowercase letters, digits, '-', '_' or '.': {variant:?}"
+                ),
+            );
         }
     }
 
     fn check_detect(&self, problems: &mut Problems) {
-        problems.relative("detect marker", &self.detect.markers);
-        problems.relative("detect linux marker", &self.detect.linux_markers);
-        problems.relative("required file", &self.requires);
-        problems.requirements("game", &self.requirements);
-        problems.relative("executable", self.executables.iter().map(|exe| &exe.path));
+        problems.relative(Section::Detection, "detect marker", &self.detect.markers);
         problems.relative(
+            Section::Detection,
+            "detect linux marker",
+            &self.detect.linux_markers,
+        );
+        problems.relative(Section::Detection, "required file", &self.requires);
+        problems.requirements(Section::Detection, "game", &self.requirements);
+        problems.relative(
+            Section::Detection,
+            "executable",
+            self.executables.iter().map(|exe| &exe.path),
+        );
+        problems.relative(
+            Section::Detection,
             "Linux executable",
             self.executables
                 .iter()
@@ -105,16 +132,20 @@ impl GameDef {
         );
 
         if self.executables.is_empty() {
-            problems.push("a game needs at least one executable".to_string());
+            problems.push_in(
+                Section::Detection,
+                "a game needs at least one executable".to_string(),
+            );
         }
 
         for path in &self.profile_data {
-            problems.template("profile_data", path);
+            problems.template(Section::UserData, "profile_data", path);
 
             if !path.trim().starts_with('{') {
-                problems.push(format!(
-                    "profile_data must start with a path variable: {path:?}"
-                ));
+                problems.push_in(
+                    Section::UserData,
+                    format!("profile_data must start with a path variable: {path:?}"),
+                );
             }
         }
     }
@@ -124,38 +155,55 @@ impl GameDef {
     /// paths for this installation.
     fn check_user_data(&self, problems: &mut Problems) {
         if self.user_data.len() > 7 {
-            problems.push("a game may declare at most 7 user_data sets".to_string());
+            problems.push_in(
+                Section::UserData,
+                "a game may declare at most 7 user_data sets".to_string(),
+            );
         }
 
         let mut ids = BTreeSet::new();
 
         for set in &self.user_data {
             if !crate::games::is_valid_id(&set.id) {
-                problems.push(format!(
-                    "user_data id must contain only lowercase letters, digits or '-': {:?}",
-                    set.id
-                ));
+                problems.push_in(
+                    Section::UserData,
+                    format!(
+                        "user_data id must contain only lowercase letters, digits or '-': {:?}",
+                        set.id
+                    ),
+                );
             }
 
             if set.id == MountSpec::GAME_ID {
-                problems.push(format!(
-                    "user_data id {:?} is reserved for the game mount",
-                    MountSpec::GAME_ID
-                ));
+                problems.push_in(
+                    Section::UserData,
+                    format!(
+                        "user_data id {:?} is reserved for the game mount",
+                        MountSpec::GAME_ID
+                    ),
+                );
             }
 
             if !ids.insert(set.id.as_str()) {
-                problems.push(format!("user_data id is repeated: {:?}", set.id));
+                problems.push_in(
+                    Section::UserData,
+                    format!("user_data id is repeated: {:?}", set.id),
+                );
             }
 
-            check_user_data_template(problems, "user_data path", &set.path);
+            check_user_data_template(problems, Section::UserData, "user_data path", &set.path);
 
             if let Some(linux) = set
                 .path_linux
                 .as_deref()
                 .filter(|path| !path.trim().is_empty())
             {
-                check_user_data_template(problems, "user_data path_linux", linux);
+                check_user_data_template(
+                    problems,
+                    Section::UserData,
+                    "user_data path_linux",
+                    linux,
+                );
             }
         }
         // A definition is valid on both systems, so a pair that overlaps in either platform's effective templates is
@@ -172,7 +220,10 @@ impl GameDef {
         ));
 
         for (first, second) in pairs {
-            problems.push(format!("user_data sets {first:?} and {second:?} overlap"));
+            problems.push_in(
+                Section::UserData,
+                format!("user_data sets {first:?} and {second:?} overlap"),
+            );
         }
     }
 
@@ -181,12 +232,16 @@ impl GameDef {
 
         for step in &self.steps {
             if step.id.is_empty() || !ids.insert(&step.id) {
-                problems.push(format!("step id is empty or repeated: {:?}", step.id));
+                problems.push_in(
+                    Section::Steps,
+                    format!("step id is empty or repeated: {:?}", step.id),
+                );
             }
 
             let what = format!("step {}", step.id);
-            problems.relative(&what, [&step.program]);
+            problems.relative(Section::Steps, &what, [&step.program]);
             problems.relative(
+                Section::Steps,
                 &what,
                 step.when_dir
                     .iter()
@@ -199,25 +254,34 @@ impl GameDef {
 
     fn check_logs(&self, problems: &mut Problems) {
         if self.logs.len() > 20 {
-            problems.push("a game may declare at most 20 log sources".to_string());
+            problems.push_in(
+                Section::Logs,
+                "a game may declare at most 20 log sources".to_string(),
+            );
         }
 
         for (index, source) in self.logs.iter().enumerate() {
             let what = format!("log source {}", index + 1);
-            problems.relative(&what, [&source.path]);
+            problems.relative(Section::Logs, &what, [&source.path]);
 
             if source.pattern.is_empty()
                 || source.pattern.contains(['/', '\\'])
                 || source.pattern == ".."
             {
-                problems.push(format!(
-                    "{what} pattern must be a file name without folders: {:?}",
-                    source.pattern
-                ));
+                problems.push_in(
+                    Section::Logs,
+                    format!(
+                        "{what} pattern must be a file name without folders: {:?}",
+                        source.pattern
+                    ),
+                );
             }
 
             if !(1..=20).contains(&source.limit) {
-                problems.push(format!("{what} limit must be between 1 and 20"));
+                problems.push_in(
+                    Section::Logs,
+                    format!("{what} limit must be between 1 and 20"),
+                );
             }
         }
     }
@@ -235,20 +299,24 @@ fn keys_overlap(first: &str, second: &str) -> bool {
 }
 
 /// A user-data template: not empty, no `..`, starting with a path variable, and not the game folder itself.
-fn check_user_data_template(problems: &mut Problems, what: &str, template: &str) {
-    problems.template(what, template);
+fn check_user_data_template(problems: &mut Problems, section: Section, what: &str, template: &str) {
+    problems.template(section, what, template);
     let template = template.trim();
 
     if !template.starts_with('{') {
-        problems.push(format!(
-            "{what} must start with a path variable: {template:?}"
-        ));
+        problems.push_in(
+            section,
+            format!("{what} must start with a path variable: {template:?}"),
+        );
     }
 
     if template.starts_with("{game}") {
-        problems.push(format!(
-            "{what} is inside the game folder; the game mount already covers it: {template:?}"
-        ));
+        problems.push_in(
+            section,
+            format!(
+                "{what} is inside the game folder; the game mount already covers it: {template:?}"
+            ),
+        );
     }
 }
 
@@ -278,4 +346,26 @@ fn overlapping_user_data<'a>(
     }
 
     pairs
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{GameDef, Section};
+    use crate::test_support::games::SLOT;
+
+    #[test]
+    fn a_known_message_carries_its_section() {
+        let text = SLOT.replacen(
+            "[deploy]",
+            "[[user_data]]\nid = \"saves\"\npath = \"{documents}/Saves\"\n\n\
+             [[user_data]]\nid = \"saves\"\npath = \"{documents}/Config\"\n\n[deploy]",
+            1,
+        );
+        let problems = GameDef::parse(&text).unwrap().validate();
+        let found = problems
+            .iter()
+            .find(|problem| problem.message == "user_data id is repeated: \"saves\"")
+            .expect("the duplicate user_data id is reported");
+        assert_eq!(found.section, Section::UserData);
+    }
 }

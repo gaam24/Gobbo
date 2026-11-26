@@ -4,6 +4,7 @@ use crate::error::{AppError, ErrorKind, FileError};
 use crate::import::{ALREADY_IN_LIBRARY, IMPORT_CANCELLED};
 use crate::infra::archive;
 
+/// Why an import could not place an archive in the library.
 #[derive(Debug, thiserror::Error)]
 pub enum InstallError {
     #[error("archive: {0}")]

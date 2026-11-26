@@ -24,16 +24,7 @@ pub fn parse_collection_link(url: &str) -> Result<CollectionLink, AppError> {
             return Err(bad());
         }
 
-        return Ok(CollectionLink {
-            provider: ProviderId::new(ID),
-            game_key: domain.to_ascii_lowercase(),
-            slug: slug.to_ascii_lowercase(),
-            revision,
-            page_url: Some(format!(
-                "https://www.nexusmods.com/games/{}/collections/{slug}",
-                domain.to_ascii_lowercase()
-            )),
-        });
+        return Ok(link(domain, slug, slug, revision));
     }
 
     let url = Url::parse(url.trim()).map_err(|_| bad())?;
@@ -74,15 +65,24 @@ pub fn parse_collection_link(url: &str) -> Result<CollectionLink, AppError> {
     };
     let domain = domain.to_ascii_lowercase();
     let slug = slug.to_ascii_lowercase();
-    Ok(CollectionLink {
+    Ok(link(&domain, &slug, &slug, revision))
+}
+
+/// The collection link both forms name. The game domain is lowercased for the key and the page URL, and `slug` is
+/// lowercased for the slug field. `page_slug` goes into the URL verbatim: the nxm form passes its original slug, while
+/// the website form passes the slug it has already lowercased.
+fn link(domain: &str, slug: &str, page_slug: &str, revision: Option<u32>) -> CollectionLink {
+    let domain = domain.to_ascii_lowercase();
+
+    CollectionLink {
         provider: ProviderId::new(ID),
         page_url: Some(format!(
-            "https://www.nexusmods.com/games/{domain}/collections/{slug}"
+            "https://www.nexusmods.com/games/{domain}/collections/{page_slug}"
         )),
         game_key: domain,
-        slug,
+        slug: slug.to_ascii_lowercase(),
         revision,
-    })
+    }
 }
 
 fn query_revision(url: &Url) -> Option<u32> {
@@ -142,6 +142,17 @@ mod tests {
         assert_eq!(link.game_key, "cyberpunk2077");
         assert_eq!(link.slug, "n0nymh");
         assert_eq!(link.revision, None);
+    }
+
+    #[test]
+    fn an_nxm_page_url_keeps_the_slug_spelling() {
+        let link = parse_collection_link("nxm://Cyberpunk2077/collections/N0nYmH").unwrap();
+        assert_eq!(link.game_key, "cyberpunk2077");
+        assert_eq!(link.slug, "n0nymh");
+        assert_eq!(
+            link.page_url.as_deref(),
+            Some("https://www.nexusmods.com/games/cyberpunk2077/collections/N0nYmH")
+        );
     }
 
     #[test]

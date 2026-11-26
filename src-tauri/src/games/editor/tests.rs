@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use super::super::GameOrigin;
+use super::super::{GameOrigin, layers::DefinitionLayer};
 use super::check::{check_with, save_to, source_from};
 use super::inspect::{inspect_folder, slugify};
 use super::presets::presets_from;
@@ -199,7 +199,10 @@ fn a_folder_inspection_finds_the_program_the_folders_and_an_installed_loader() {
 
 #[test]
 fn a_loader_preset_list_reads_the_shipped_presets() {
-    let presets = presets_from(&[(loaders(), GameOrigin::Bundled)]);
+    let presets = presets_from(&[DefinitionLayer {
+        path: loaders(),
+        origin: GameOrigin::Bundled,
+    }]);
     let bepinex = presets
         .iter()
         .find(|preset| preset.id == "bepinex")
@@ -236,9 +239,18 @@ fn a_loader_preset_list_prefers_user_then_official_then_bundled() {
     );
 
     let presets = presets_from(&[
-        (base.join("user"), GameOrigin::User),
-        (base.join("catalog"), GameOrigin::Official),
-        (base.join("bundled"), GameOrigin::Bundled),
+        DefinitionLayer {
+            path: base.join("user"),
+            origin: GameOrigin::User,
+        },
+        DefinitionLayer {
+            path: base.join("catalog"),
+            origin: GameOrigin::Official,
+        },
+        DefinitionLayer {
+            path: base.join("bundled"),
+            origin: GameOrigin::Bundled,
+        },
     ]);
     let loader = presets
         .iter()
@@ -281,7 +293,10 @@ fn a_user_definition_wins_over_an_official_and_a_bundled_one() {
 
 #[test]
 fn the_shipped_presets_name_their_engines_and_load_without_problems() {
-    let presets = presets_from(&[(loaders(), GameOrigin::Bundled)]);
+    let presets = presets_from(&[DefinitionLayer {
+        path: loaders(),
+        origin: GameOrigin::Bundled,
+    }]);
 
     for preset in &presets {
         assert!(

@@ -8,11 +8,11 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use super::model::{ImportStage, ImportView};
 use crate::context::library::{Library, lock_index};
 use crate::context::{Data, load_library, load_library_shared};
+use crate::domain::fomod::Choice;
 use crate::domain::source::SourceRef;
 use crate::error::AppError;
 use crate::games::{self, GameDef};
 use crate::import::IMPORT_CANCELLED;
-use crate::import::fomod;
 use crate::import::install;
 use crate::infra::tasks::stop_if;
 
@@ -32,7 +32,7 @@ pub struct ImportRequest {
     /// The archive file to import.
     pub zip: PathBuf,
     /// The FOMOD choices picked for it. `Some` (even empty) makes the installer choose the files.
-    pub choices: Option<Vec<fomod::Choice>>,
+    pub choices: Option<Vec<Choice>>,
     /// The provider file the archive came from. Without it, the sidecar or a provider that recognises the archive name
     /// supplies the source.
     pub source: Option<SourceRef>,
@@ -59,7 +59,7 @@ impl ImportRequest {
 
     /// The request with the FOMOD choices to apply.
     #[must_use]
-    pub fn with_choices(mut self, choices: Option<Vec<fomod::Choice>>) -> Self {
+    pub fn with_choices(mut self, choices: Option<Vec<Choice>>) -> Self {
         self.choices = choices;
         self
     }
@@ -176,14 +176,14 @@ fn run_batch(
 /// An archive that was copied and hashed, waiting for its name to be reserved.
 struct Copied {
     slot: usize,
-    choices: Option<Vec<fomod::Choice>>,
+    choices: Option<Vec<Choice>>,
     copy: prepare::Copy,
 }
 
 /// An archive with a reserved name, waiting to be extracted.
 struct Reserved {
     slot: usize,
-    choices: Option<Vec<fomod::Choice>>,
+    choices: Option<Vec<Choice>>,
     copy: prepare::Copy,
     claim: working::Claim,
     file: String,

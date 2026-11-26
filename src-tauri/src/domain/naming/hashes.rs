@@ -2,6 +2,11 @@
 
 use sha2::{Digest, Sha256};
 
+/// The stable short prefix of a digest: its first eight characters, or the whole digest when it is shorter.
+pub fn digest_hex_prefix(digest: &str) -> &str {
+    digest.get(..8).unwrap_or(digest)
+}
+
 /// A short, stable suffix for a family id. It keeps two mods with the same display name apart.
 pub fn short_hash(value: &str) -> String {
     // Eight hex characters are the first four bytes; do not format the whole digest and cut the string.

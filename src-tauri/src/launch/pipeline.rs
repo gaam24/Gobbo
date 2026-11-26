@@ -8,11 +8,12 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
 
 use super::changes::{record_game_changes, watch_game_folder};
+use super::model::Launch;
 use super::output;
 use super::report;
-use super::start::Launch;
 use super::steps::run_steps;
 use super::watch::Snapshot;
+use crate::context::running::mark_started_with_finished;
 use crate::context::{Data, Settings, load_settings};
 use crate::deploy::overlay;
 use crate::error::AppError;
@@ -182,7 +183,7 @@ pub(super) fn run(
         "launch: game={} profile={} with_mods={with_mods} steps={steps} overlay={} background={background}",
         game.id,
         data.active_profile_id(),
-        matches!(&launch, crate::launch::start::Launch::Layered { .. })
+        matches!(&launch, Launch::Layered { .. })
     ));
 
     if begin_report {
@@ -229,11 +230,14 @@ pub(super) fn run(
         report::record_start(data, started, running.timings(), dll_report_us);
     }
 
-    let live_flag = if live {
-        game_id.map(crate::context::running::mark_started)
+    let started = if live {
+        game_id.map(mark_started_with_finished)
     } else {
         None
     };
+    // Both flags come from one launch, so an old wait thread can never mark a relaunched game finished.
+    let live_flag = started.as_ref().map(|started| Arc::clone(&started.running));
+    let live_finished = started.map(|started| started.finished);
     let after = AfterExit {
         data: data.clone(),
         game: game.clone(),
@@ -241,6 +245,7 @@ pub(super) fn run(
         state_root,
         session_root: PathBuf::from(settings.game_root.trim()),
         live_flag,
+        live_finished,
         record,
         notify: on_exit.take(),
         watched,
@@ -277,7 +282,10 @@ struct AfterExit {
     home: PathBuf,
     state_root: PathBuf,
     session_root: PathBuf,
+    /// Cleared when the game's last process ends, while post-exit work is still running.
     live_flag: Option<Arc<AtomicBool>>,
+    /// Set after the post-exit work and the save, belonging to the same launch as `live_flag`.
+    live_finished: Option<Arc<AtomicBool>>,
     record: bool,
     notify: Option<ExitNotice>,
     watched: Option<(PathBuf, Snapshot)>,
@@ -325,6 +333,12 @@ impl AfterExit {
 
         if let Some(notify) = self.notify {
             notify(code);
+        }
+        // The save is complete now, even when a step failed. A caller waiting to quit can exit without losing what
+        // the game wrote; `steps` is returned below so the error still reaches the caller. The flag belongs to this
+        // launch, so a game started while this wait ran keeps its own unfinished flag.
+        if let Some(finished) = &self.live_finished {
+            finished.store(true, Ordering::Release);
         }
 
         steps

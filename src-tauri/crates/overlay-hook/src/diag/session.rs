@@ -157,7 +157,7 @@ fn report(
         .collect();
     let game = config.game();
     let mounts: Vec<serde_json::Value> = config
-        .mounts
+        .mounts()
         .iter()
         .map(|mount| {
             json!({
@@ -223,16 +223,17 @@ mod tests {
     use super::*;
 
     fn layers() -> MountConfig {
-        MountConfig {
-            version: MountConfig::VERSION,
-            mounts: vec![gobbo_overlay_core::MountSpec {
+        MountConfig::try_new(
+            MountConfig::VERSION,
+            vec![gobbo_overlay_core::MountSpec {
                 id: gobbo_overlay_core::MountSpec::GAME_ID.to_string(),
                 guest: std::path::PathBuf::from(r"C:\Game"),
                 root: std::path::PathBuf::from(r"C:\Game"),
                 staging: Some(std::path::PathBuf::from(r"C:\State\mods")),
                 upper: std::path::PathBuf::from(r"C:\State\overwrite"),
             }],
-        }
+        )
+        .unwrap()
     }
 
     #[test]

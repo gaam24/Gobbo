@@ -18,6 +18,9 @@ use specta::Type;
 use crate::error::{AppError, io_at};
 use crate::infra::store;
 
+use super::GameOrigin;
+use super::layers::DefinitionLayers;
+
 /// The address of the generated catalog manifest.
 const CATALOG_URL: &str = "https://raw.githubusercontent.com/gaam24/Gobbo/main/catalog.json";
 /// The address catalog entries join their relative `file` and `icon` paths onto.
@@ -104,6 +107,24 @@ pub(super) struct Folders {
     pub(super) bundled_loaders: PathBuf,
 }
 
+impl Folders {
+    /// The install folders from the shared layers, so their precedence is named in one place.
+    pub(super) fn from_layers(layers: &DefinitionLayers) -> Self {
+        Self {
+            catalog_games: layers
+                .game_path(GameOrigin::Official)
+                .map(Path::to_path_buf),
+            user_loaders: layers.loader_path(GameOrigin::User).map(Path::to_path_buf),
+            catalog_loaders: layers
+                .loader_path(GameOrigin::Official)
+                .map(Path::to_path_buf),
+            bundled_loaders: layers
+                .loader_path(GameOrigin::Bundled)
+                .map_or_else(PathBuf::new, Path::to_path_buf),
+        }
+    }
+}
+
 /// Compares the official catalog with the definitions on this computer. Nothing is written; a network failure is a
 /// retryable error the window may show or ignore.
 pub fn check_catalog() -> Result<CatalogStatus, AppError> {
@@ -135,12 +156,7 @@ pub fn install_catalog(
     install_from(
         CATALOG_URL,
         BASE_URL,
-        &Folders {
-            catalog_games: super::catalog_games_dir(),
-            user_loaders: super::user_loaders_dir(),
-            catalog_loaders: super::catalog_loaders_dir(),
-            bundled_loaders: super::loaders_dir().to_path_buf(),
-        },
+        &Folders::from_layers(&DefinitionLayers::current()),
         ids,
         progress,
     )

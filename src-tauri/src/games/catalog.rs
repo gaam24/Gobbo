@@ -8,22 +8,14 @@ use serde::Serialize;
 
 use crate::error::{AppError, ErrorKind, FileError, io_at};
 
+use super::layers::DefinitionLayers;
 use super::{
     GameDef, GameView, catalog_games_dir, definition_path, games_dir, is_valid_id, loaders_dir,
     read_cached, user_games_dir, user_loaders_dir,
 };
 
-/// Where a game definition came from.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
-#[serde(rename_all = "snake_case")]
-pub enum GameOrigin {
-    /// Shipped with Gobbo in `games/`.
-    Bundled,
-    /// Downloaded from the official catalog into `<data>/catalog/games/`. Read-only, like a bundled definition.
-    Official,
-    /// Added by the user under `<data>/definitions/games/`.
-    User,
-}
+/// Kept here as well as at the `games` root: `GameOrigin` is owned by `layers`, where the precedence is composed.
+pub use super::layers::GameOrigin;
 
 /// A user definition that could not be loaded. The catalog keeps the other games; the Games page shows these paths.
 #[derive(Debug, Serialize, specta::Type)]
@@ -32,6 +24,7 @@ pub struct DefinitionProblem {
     pub error: AppError,
 }
 
+/// The games the window gets, with their origins and the user definitions that failed to load.
 #[derive(Debug, Serialize, specta::Type)]
 pub struct GameCatalog {
     pub games: Vec<GameView>,
@@ -44,6 +37,7 @@ pub struct GameCatalog {
 /// restart. An official file shadows a bundled file with the same id; a user file never replaces either.
 type Definitions = (Vec<(GameDef, GameOrigin)>, Vec<DefinitionProblem>);
 
+/// Every definition from the bundled, official and user folders, with problems for the ones that failed.
 pub fn definitions() -> Result<Definitions, AppError> {
     definitions_from(
         games_dir(),
@@ -53,6 +47,7 @@ pub fn definitions() -> Result<Definitions, AppError> {
     )
 }
 
+/// The definitions from explicit bundled, catalog, user and loader folders, for callers that pass their own roots.
 pub fn definitions_from(
     shipped: &Path,
     catalog: Option<&Path>,
@@ -62,19 +57,13 @@ pub fn definitions_from(
     let mut games: Vec<(GameDef, GameOrigin)> = Vec::new();
     let mut problems = Vec::new();
     let mut seen: BTreeSet<String> = BTreeSet::new();
-    let mut dirs = Vec::with_capacity(3);
+    let layers = DefinitionLayers::with_game_paths(user, catalog, shipped);
 
-    if let Some(catalog) = catalog {
-        dirs.push((catalog.to_path_buf(), GameOrigin::Official));
-    }
-
-    dirs.push((shipped.to_path_buf(), GameOrigin::Bundled));
-
-    if let Some(user) = user {
-        dirs.push((user.to_path_buf(), GameOrigin::User));
-    }
-
-    for (dir, origin) in dirs {
+    for (dir, origin) in layers
+        .game_paths()
+        .into_iter()
+        .zip(layers.game_layers().iter().map(|layer| layer.origin))
+    {
         // A downloaded catalog file and a user file can both be fixed by the user; a broken bundled file is a bug.
         let fixable = matches!(origin, GameOrigin::Official | GameOrigin::User);
         let entries = match std::fs::read_dir(&dir) {
@@ -253,6 +242,7 @@ fn user_loader_for(definition: &[u8]) -> Option<(String, PathBuf)> {
     path.is_file().then_some((loader, path))
 }
 
+/// Writes a shareable zip from the given definition, icon and user loader files.
 pub fn write_export(
     definition: &Path,
     icon: Option<&Path>,

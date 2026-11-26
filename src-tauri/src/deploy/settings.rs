@@ -7,7 +7,7 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
-use crate::deploy::DeployError;
+use crate::deploy::error::DeployError;
 use crate::domain::resolver::SettingsRow;
 use crate::error::FileError;
 use crate::infra::store;

@@ -92,7 +92,7 @@ fn extension_of(url: &str) -> String {
 
 /// A file name that stays in the images folder on both platforms.
 fn is_picture_name(name: &str) -> bool {
-    is_plain_folder(name) && is_safe_component(name)
+    is_plain_folder(name) && is_safe_component(name, crate::platform::is_windows())
 }
 
 #[cfg(test)]

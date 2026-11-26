@@ -24,10 +24,8 @@ use std::path::Path;
 
 pub use flow::BATCH_SIZE;
 pub use flow::ImportRequest;
-#[allow(
-    unused_imports,
-    reason = "the one-archive import entry point is used by test and bench callers, and kept here as the documented single-archive API"
-)]
+// The single-archive entry point is used only by tests and benches; production imports go through `import_batch`.
+#[cfg(any(test, feature = "bench"))]
 pub use flow::import_archive;
 #[cfg(test)]
 pub use flow::remove_folders;

@@ -4,7 +4,7 @@ use super::*;
 use crate::context::data::JOURNAL_FILE;
 #[cfg(target_os = "linux")]
 use crate::context::running::game_running;
-use crate::deploy::journal::{Entry, Journal};
+use crate::deploy::journal::{Journal, JournalOp};
 #[cfg(target_os = "linux")]
 use crate::deploy::ops::{
     apply_deployment, ensure_active_deployed, record_launch, undo_deployment,
@@ -14,14 +14,14 @@ use crate::deploy::overlay;
 use crate::deploy::remove::delete_mod;
 #[cfg(target_os = "linux")]
 use crate::deploy::remove::reinstall_mod;
-use crate::domain::deployment::DeploymentRecord;
+use crate::domain::deployment_record::DeploymentRecord;
 #[cfg(target_os = "linux")]
 use crate::launch::start::overlay_session_state;
 #[cfg(target_os = "linux")]
 use crate::profiles::actions::switch_profile;
 
 /// Writes a finished journal for a prepared state: the entries and the completion marker the undo reads.
-fn prepared_state(state: &Path, entries: &[Entry]) -> PathBuf {
+fn prepared_state(state: &Path, entries: &[JournalOp]) -> PathBuf {
     fs::create_dir_all(state).unwrap();
     let journal = Journal::new(state.join(JOURNAL_FILE));
 
@@ -53,13 +53,13 @@ fn make_room_undoes_a_legacy_and_an_overlay_profile_once() {
     // Two finished deployments: one wrote into the game folder, the other only prepared a layer.
     prepared_state(
         &legacy,
-        &[Entry::FileDeployed {
+        &[JournalOp::FileDeployed {
             path: placed.clone(),
         }],
     );
     prepared_state(
         &layer,
-        &[Entry::LayerPrepared {
+        &[JournalOp::LayerPrepared {
             mods: layer.join("mods"),
             overwrite: layer.join("overwrite"),
         }],

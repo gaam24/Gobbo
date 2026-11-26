@@ -41,32 +41,29 @@ pub use windows::{dll_report, reserved_dll_warnings};
 
 #[cfg(windows)]
 pub use report::clear_decisions;
-// The overlay root keeps the report's names after the split, including the ones that no caller reads through it.
+// The façade lists the report names once for both platforms; the Windows hook's names have no reader in a Linux build.
 #[allow(
     unused_imports,
-    reason = "the overlay root keeps the report's names as its public surface"
+    reason = "the report names read only by the Windows hook have no reader in a Linux build"
 )]
 pub use report::{
-    CRASH_DUMP_FILE, DECISIONS_BASE, DllReport, InjectedDll, LAST_DUMP_FILE, LAYER_DLLS_FILE,
-    LaunchTimings, decisions, decisions_base, latest_dump, layer_dlls, session_layer_dlls,
+    CRASH_DUMP_FILE, DllReport, InjectedDll, LaunchTimings, decisions, decisions_base, latest_dump,
+    session_layer_dlls,
 };
 #[cfg(test)]
 pub use run::run;
-// The same for the run names: `execute`, `run_with_env` and `start_with_env` have no reader outside their module.
 #[allow(
     unused_imports,
-    reason = "the overlay root keeps the run names as its public surface"
+    reason = "`execute` is read only by the overlay tests; the run façade lists its names once for production and tests"
 )]
-pub use run::{
-    Launcher, clear_outputs, execute, run_step, run_with_env, run_with_output, start_with_env,
-};
+pub use run::{Launcher, clear_outputs, execute, run_step, run_with_output};
 #[cfg(test)]
 pub(super) use session::matches_plan;
 pub use session::{
     Session, check_support, finish, make_room, prepare_with_progress, wait_released,
 };
 #[cfg(windows)]
-pub use session::{mount_config, mounts_path};
+pub use windows::{mount_config, mounts_path};
 
 /// Overlayfs on Linux virtualizes every file, so no DLL name is reserved there.
 #[cfg(not(windows))]

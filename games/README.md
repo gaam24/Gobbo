@@ -397,7 +397,7 @@ The Witcher 3 user-data redirect is covered by the synthetic overlay test; check
 treating that part as verified.
 
 Under Proton, Gobbo loads a DLL native when the launched game has it next to the program. The DLLs checked are the common
-mod loaders (`winhttp.dll`, `winmm.dll`, `version.dll`, `dinput8.dll`, `dwmapi.dll` and others, in `games/proxy.rs`) and each DLL the
+mod loaders (`winhttp.dll`, `winmm.dll`, `version.dll`, `dinput8.dll`, `dwmapi.dll` and others, in `src-tauri/src/games/proxy.rs`) and each DLL the
 definition lists in `root_files` or mirrors (`bin/x64/version.dll`). Gobbo adds `n,b` for each one that is there, after
 the names the launch settings already give; a loader no mod provides is not named. A game lists its own proxy in
 `root_files` or as a mirror; the common loader names need no entry.

@@ -267,7 +267,7 @@ fn log_session(config: &MountConfig) {
         std::process::id()
     ));
 
-    for mount in &config.mounts {
+    for mount in config.mounts() {
         log(&format!(
             "mount {}: guest {}, root {}, staging {}, upper {}",
             mount.id,

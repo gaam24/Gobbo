@@ -86,7 +86,7 @@ impl From<Error> for AppError {
 /// Checks the entry count and the summed uncompressed size of `entries` against `count_limit` and `byte_limit`. The sum
 /// saturates, so a header that declares very large sizes cannot wrap into a small total. The limits are parameters so a
 /// test can use a small synthetic list instead of a 200,000-entry archive.
-fn limits_ok(entries: &[Entry], count_limit: usize, byte_limit: u64) -> Result<(), Error> {
+fn limits_ok(entries: &[ArchiveEntry], count_limit: usize, byte_limit: u64) -> Result<(), Error> {
     let count = entries.len();
 
     if count > count_limit {
@@ -111,7 +111,7 @@ fn limits_ok(entries: &[Entry], count_limit: usize, byte_limit: u64) -> Result<(
 
 /// One file or folder in the archive.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Entry {
+pub struct ArchiveEntry {
     /// The path in the archive with `/` as the separator, for example `Mods/modA/content/x.ws`.
     pub name: String,
     pub is_dir: bool,
@@ -123,7 +123,7 @@ pub struct Entry {
 pub struct Archive {
     path: PathBuf,
     format: Format,
-    entries: Vec<Entry>,
+    entries: Vec<ArchiveEntry>,
 }
 
 impl Archive {
@@ -150,7 +150,8 @@ impl Archive {
         })
     }
 
-    pub fn entries(&self) -> &[Entry] {
+    /// The entries of the archive, in archive order.
+    pub fn entries(&self) -> &[ArchiveEntry] {
         &self.entries
     }
 
@@ -198,12 +199,12 @@ fn entry_name(name: &str) -> Cow<'_, str> {
     }
 }
 
-fn list_zip(path: &Path) -> Result<Vec<Entry>, Error> {
+fn list_zip(path: &Path) -> Result<Vec<ArchiveEntry>, Error> {
     let mut archive = zip::ZipArchive::new(open(path)?).map_err(Error::new)?;
     (0..archive.len())
         .map(|index| {
             let entry = archive.by_index(index).map_err(Error::new)?;
-            Ok(Entry {
+            Ok(ArchiveEntry {
                 name: entry_name(&entry.name().map_err(Error::new)?).into_owned(),
                 is_dir: entry.is_dir(),
                 size: entry.size(),
@@ -235,13 +236,13 @@ fn open_7z(path: &Path) -> Result<sevenz_rust2::ArchiveReader<File>, Error> {
     sevenz_rust2::ArchiveReader::new(file, sevenz_rust2::Password::empty()).map_err(Error::new)
 }
 
-fn list_7z(path: &Path) -> Result<Vec<Entry>, Error> {
+fn list_7z(path: &Path) -> Result<Vec<ArchiveEntry>, Error> {
     let reader = open_7z(path)?;
-    let entries: Vec<Entry> = reader
+    let entries: Vec<ArchiveEntry> = reader
         .archive()
         .files
         .iter()
-        .map(|file| Entry {
+        .map(|file| ArchiveEntry {
             name: entry_name(file.name()).into_owned(),
             is_dir: file.is_directory(),
             size: file.size(),
@@ -262,7 +263,7 @@ fn list_7z(path: &Path) -> Result<Vec<Entry>, Error> {
 
 fn visit_7z<E: From<Error>>(
     path: &Path,
-    entries: &[Entry],
+    entries: &[ArchiveEntry],
     wanted: &BTreeSet<usize>,
     visit: &mut Visitor<'_, E>,
 ) -> Result<(), E> {
@@ -298,13 +299,13 @@ fn visit_7z<E: From<Error>>(
     Ok(())
 }
 
-fn list_rar(path: &Path) -> Result<Vec<Entry>, Error> {
+fn list_rar(path: &Path) -> Result<Vec<ArchiveEntry>, Error> {
     unrar::Archive::new(path)
         .open_for_listing()
         .map_err(Error::new)?
         .map(|header| {
             let header = header.map_err(Error::new)?;
-            Ok(Entry {
+            Ok(ArchiveEntry {
                 name: entry_name(&header.filename.to_string_lossy()).into_owned(),
                 is_dir: header.is_directory(),
                 size: header.unpacked_size,
@@ -388,8 +389,8 @@ mod tests {
         out
     }
 
-    fn file_entry(name: &str, size: u64) -> Entry {
-        Entry {
+    fn file_entry(name: &str, size: u64) -> ArchiveEntry {
+        ArchiveEntry {
             name: name.to_string(),
             is_dir: false,
             size,
@@ -431,7 +432,7 @@ mod tests {
         let archive = Archive::open(&path).unwrap();
         assert_eq!(
             archive.entries(),
-            [Entry {
+            [ArchiveEntry {
                 name: "Mods/modA/content/x.ws".to_string(),
                 is_dir: false,
                 size: 8,

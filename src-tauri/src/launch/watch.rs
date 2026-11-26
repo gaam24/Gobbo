@@ -34,6 +34,7 @@ pub struct GameChange {
     pub kind: ChangeKind,
 }
 
+/// How a file or folder below the game folder changed since the last snapshot.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
 pub enum ChangeKind {

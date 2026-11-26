@@ -4,7 +4,6 @@ use crate::collections::model::CollectionSessionView;
 use crate::collections::status;
 use crate::domain::collection::{CollectionOrigin, CollectionPlan};
 use crate::domain::library::LibraryView;
-use crate::library::waiting::find_version;
 
 /// Every family of the profile list that is a member of the collection: the ones it added and the ones the list
 /// already had. Excluded members do not count.
@@ -26,7 +25,7 @@ pub(super) fn member_families(
             continue;
         }
 
-        if let Some((family, _)) = find_version(view, &item.wanted())
+        if let Some((family, _)) = view.find_entry(&item.wanted())
             && listed.contains(family.as_str())
         {
             families.insert(family);

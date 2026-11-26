@@ -9,13 +9,13 @@ use tauri::{Emitter, Manager, State};
 use super::download::PackDownload;
 use super::link::{PackLinkDownload, PackLinkProgress};
 use super::model::{PackExportView, PackImportView, PackIssue, PackOptions, PackPreview};
-use crate::commands::{channel_sink_with_progress, run_task};
+use crate::commands::helpers::{channel_sink_with_progress, run_task};
 use crate::context::Data;
 use crate::error::AppError;
 use crate::import::ImportProgress;
 use crate::infra::tasks::{TaskFlags, TaskKey, kind};
 
-crate::commands::game_commands! {
+crate::commands::macros::game_commands! {
     /// Writes the chosen profiles as a mod pack: a recipe of the mods, their files and choices, with the archives the
     /// options ask for.
     query export_pack(path: String, options: PackOptions) -> PackExportView =
@@ -48,7 +48,7 @@ pub async fn import_pack_with_progress(
     run_task(
         data,
         &tasks,
-        key.as_str().to_string(),
+        key,
         game,
         kind::PACK,
         move |root, game, flag, handle| {
@@ -99,7 +99,7 @@ pub async fn download_pack_mods(
     run_task(
         data,
         &tasks,
-        key.as_str().to_string(),
+        key,
         game,
         kind::PACK,
         move |root, game, flag, handle| {
@@ -158,7 +158,7 @@ pub async fn download_pack_link(
     run_task(
         data,
         &tasks,
-        key.as_str().to_string(),
+        key,
         game,
         kind::PACK_LINK,
         move |root, game, flag, handle| {

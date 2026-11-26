@@ -3,18 +3,21 @@
 
 use crate::games::{Deploy, Mirror, Slot};
 
-use crate::import::install::Placed;
 use crate::import::install::errors::InstallError;
+use crate::import::install::model::Placed;
 
 use super::classify::{extension_allowed, mirror_path, starts_with_path};
 use super::units::{Unit, UnitIndex};
 
+/// Mirrored files (for example `DLC/` or `bin/config/`) belong to the archive's main mod, so they join its group.
+/// Without a main mod they stay together. With several main mods, the first one in name order takes them.
 pub(in crate::import::install) fn attach_mirrored(placed: &mut [Placed]) {
     let main = placed
         .iter()
         .filter(|item| !item.slot.is_empty())
-        .map(|item| item.group.clone())
-        .min();
+        .map(|item| item.group.as_str())
+        .min()
+        .map(str::to_owned);
     if let Some(main) = main {
         for item in placed.iter_mut().filter(|item| item.slot.is_empty()) {
             item.group.clone_from(&main);

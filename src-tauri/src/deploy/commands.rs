@@ -6,7 +6,7 @@ use tauri::ipc::Channel;
 use super::ApplyView;
 use super::DeployProgress;
 use super::preview::DeployPreview;
-use crate::commands::{channel_sink_with_progress, run_task};
+use crate::commands::helpers::{channel_sink_with_progress, run_task};
 use crate::context::Data;
 use crate::error::AppError;
 use crate::error::Message;
@@ -26,7 +26,7 @@ pub async fn apply(
     run_task(
         data,
         &tasks,
-        key.as_str().to_string(),
+        key,
         game,
         kind::APPLY,
         move |root, game, flag, handle| {
@@ -38,7 +38,7 @@ pub async fn apply(
     .await
 }
 
-crate::commands::game_commands! {
+crate::commands::macros::game_commands! {
     /// What a deployment of the active profile would do, before it does anything.
     query preview_deployment() -> DeployPreview = super::preview::preview_deployment;
 

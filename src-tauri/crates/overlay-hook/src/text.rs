@@ -5,6 +5,9 @@ use std::os::windows::ffi::OsStringExt;
 
 use gobbo_overlay_core::fold_unit;
 
+/// The largest number of UTF-16 units scanned for a terminator. Names are capped at the same size in `paths::names`.
+const MAX_TEXT_UNITS: usize = 32_768;
+
 /// The text of a NUL-terminated UTF-16 string.
 ///
 /// # Safety
@@ -16,9 +19,15 @@ pub(crate) unsafe fn text(ptr: *const u16) -> Option<String> {
 
     let mut len = 0;
 
+    // SAFETY: the caller guarantees `ptr` is null or NUL-terminated, and the scan stops at `MAX_TEXT_UNITS`, so every
+    // unit read and handed to `from_raw_parts` is initialized and lies before the terminator.
     unsafe {
-        while *ptr.add(len) != 0 {
+        while len < MAX_TEXT_UNITS && *ptr.add(len) != 0 {
             len += 1;
+        }
+
+        if len == MAX_TEXT_UNITS {
+            return None;
         }
 
         Some(

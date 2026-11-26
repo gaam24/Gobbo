@@ -34,7 +34,7 @@ pub use round::{
     collection_resolve_prompt, collection_run_round, collection_stop,
 };
 
-crate::commands::game_commands! {
+crate::commands::macros::game_commands! {
     /// Opens a collection link and returns the plan and the active profile's statuses.
     query inspect_collection(link: String, revision: Option<u32>) -> CollectionPreview =
         |root, game| super::inspect::inspect(root, game, &link, revision);

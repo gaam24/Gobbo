@@ -9,7 +9,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::domain::resolver::LayoutProfile;
+use crate::domain::layout::LayoutProfile;
 
 pub use model::{
     AdoptPolicy, Archive, ArchiveLabel, Family, Integrity, ModInfo, ModInfoEdit, ModVersion,

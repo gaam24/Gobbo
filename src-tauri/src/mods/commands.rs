@@ -7,7 +7,7 @@ use tauri::ipc::Channel;
 use tauri::{AppHandle, State};
 
 use crate::acquire;
-use crate::commands::run_task;
+use crate::commands::helpers::run_task;
 use crate::context::Data;
 use crate::domain::library::ModInfoEdit;
 use crate::domain::source::{SourceRef, SourceRequirement};
@@ -47,7 +47,7 @@ fn fomod_answer(
     }
 }
 
-crate::commands::game_commands! {
+crate::commands::macros::game_commands! {
     query get_status() -> Status = crate::status::status;
 
     /// Brings every profile in step with the library and answers the fresh status. A change, not a query: it saves
@@ -202,7 +202,7 @@ crate::commands::game_commands! {
 /// import there too.
 #[tauri::command]
 #[specta::specta]
-#[allow(
+#[expect(
     clippy::too_many_arguments,
     reason = "a Tauri command takes each IPC argument and state as its own parameter"
 )]
@@ -228,7 +228,7 @@ pub async fn import_zip(
             run_task(
                 data,
                 &tasks,
-                key.as_str().to_string(),
+                key,
                 game,
                 kind::IMPORT,
                 move |root, game, flag, handle| {

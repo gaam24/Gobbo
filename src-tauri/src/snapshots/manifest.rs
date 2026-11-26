@@ -165,7 +165,7 @@ fn list_in(scope: &SnapshotScope) -> Vec<SnapshotView> {
         let mut view = view_of(&manifest);
 
         if let Some(profiles) = &profiles
-            && let Ok(profile) = profiles.get(&manifest.profile)
+            && let Ok(profile) = profiles.profile(&manifest.profile)
         {
             view.profile_name.clone_from(&profile.name);
         }

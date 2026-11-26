@@ -3,7 +3,7 @@
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::domain::library::{Library, LibraryView};
-use crate::domain::profiles::Entry as ProfileEntry;
+use crate::domain::profiles::ListedMod;
 use crate::domain::profiles::Profiles;
 
 use super::waiting;
@@ -82,7 +82,7 @@ pub fn sync_profiles(profiles: &mut Profiles, library: &Library, view: &LibraryV
             }
         }
 
-        let mut insertions: FxHashMap<usize, Vec<ProfileEntry>> = FxHashMap::default();
+        let mut insertions: FxHashMap<usize, Vec<ListedMod>> = FxHashMap::default();
 
         for id in missing {
             let Some(version) = view.default_version(id) else {
@@ -101,12 +101,12 @@ pub fn sync_profiles(profiles: &mut Profiles, library: &Library, view: &LibraryV
                 })
                 .max()
                 .unwrap_or(profile.mods.len());
-            insertions.entry(after).or_default().push(ProfileEntry {
-                id: id.to_string(),
-                folder: version.folder.clone(),
-                enabled: false,
-                priority: None,
-            });
+            insertions.entry(after).or_default().push(ListedMod::new(
+                id,
+                version.folder.clone(),
+                false,
+                None,
+            ));
             changed = true;
         }
 

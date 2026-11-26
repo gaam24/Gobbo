@@ -4,8 +4,8 @@ use super::*;
 use crate::test_support::scratch;
 use std::fs;
 
-fn entry(id: &str, folder: &str, enabled: bool) -> Entry {
-    Entry {
+fn entry(id: &str, folder: &str, enabled: bool) -> ListedMod {
+    ListedMod {
         id: id.to_string(),
         folder: folder.to_string(),
         enabled,
@@ -24,7 +24,7 @@ fn a_mod_is_listed_by_every_profile_that_has_it() {
     let mut profiles = two_profiles();
     let hardcore = profiles.profiles[1].id.clone();
     profiles
-        .get_mut(&hardcore)
+        .profile_mut(&hardcore)
         .unwrap()
         .mods
         .push(entry("local:moda", "modA", true));
@@ -43,7 +43,7 @@ fn new_profile_starts_empty_and_the_active_one_stays() {
     let mut profiles = two_profiles();
     assert_eq!(profiles.active().name, DEFAULT_NAME);
     let id = profiles.create("Empty", None).unwrap();
-    assert!(profiles.get(&id).unwrap().mods.is_empty());
+    assert!(profiles.profile(&id).unwrap().mods.is_empty());
     assert_eq!(profiles.active().name, DEFAULT_NAME);
 }
 
@@ -53,7 +53,7 @@ fn copy_takes_the_list_and_flags_of_the_source() {
     let source = profiles.profiles[0].id.clone();
     let copy = profiles.create("Copy", Some(&source)).unwrap();
     assert_eq!(
-        profiles.get(&copy).unwrap().mods,
+        profiles.profile(&copy).unwrap().mods,
         vec![entry("local:moda", "modA", true)]
     );
 }
@@ -69,7 +69,7 @@ fn names_are_trimmed_and_unique_ignoring_case() {
             .is_err()
     );
     let id = profiles.create("  New  ", None).unwrap();
-    assert_eq!(profiles.get(&id).unwrap().name, "New");
+    assert_eq!(profiles.profile(&id).unwrap().name, "New");
 }
 
 #[test]
@@ -164,7 +164,7 @@ fn a_copied_profile_takes_the_separators_too() {
         before: Some("local:moda".into()),
     }];
     let copy = profiles.create("Copy", Some("p1")).unwrap();
-    assert_eq!(profiles.get(&copy).unwrap().separators.len(), 1);
+    assert_eq!(profiles.profile(&copy).unwrap().separators.len(), 1);
 }
 
 #[test]
@@ -173,7 +173,7 @@ fn version_helpers_follow_every_profile() {
     let first = profiles.profiles[0].id.clone();
     assert_eq!(ProfilesView::new(&profiles).using_version("modA").len(), 1);
     profiles.replace_version("modA", "modA-2");
-    assert_eq!(profiles.get(&first).unwrap().mods[0].folder, "modA-2");
+    assert_eq!(profiles.profile(&first).unwrap().mods[0].folder, "modA-2");
 }
 
 #[test]
@@ -182,16 +182,16 @@ fn removing_a_mod_takes_it_from_every_list_and_keeps_the_others() {
     let first = profiles.profiles[0].id.clone();
     let hardcore = profiles.profiles[1].id.clone();
     profiles
-        .get_mut(&first)
+        .profile_mut(&first)
         .unwrap()
         .mods
         .push(entry("local:modb", "modB", true));
-    profiles.get_mut(&first).unwrap().deployed_mods = vec![
+    profiles.profile_mut(&first).unwrap().deployed_mods = vec![
         entry("local:moda", "modA", true),
         entry("local:modb", "modB", true),
     ];
     profiles
-        .get_mut(&hardcore)
+        .profile_mut(&hardcore)
         .unwrap()
         .mods
         .push(entry("local:moda", "modA", true));
@@ -199,14 +199,14 @@ fn removing_a_mod_takes_it_from_every_list_and_keeps_the_others() {
     profiles.remove_mod("local:moda");
 
     assert_eq!(
-        profiles.get(&first).unwrap().mods,
+        profiles.profile(&first).unwrap().mods,
         vec![entry("local:modb", "modB", true)]
     );
     assert_eq!(
-        profiles.get(&first).unwrap().deployed_mods,
+        profiles.profile(&first).unwrap().deployed_mods,
         vec![entry("local:modb", "modB", true)]
     );
-    assert!(profiles.get(&hardcore).unwrap().mods.is_empty());
+    assert!(profiles.profile(&hardcore).unwrap().mods.is_empty());
 }
 
 #[test]
@@ -339,5 +339,5 @@ fn a_unique_name_follows_the_same_case_rule_as_the_name_check() {
     // The taken name differs only in a non-ASCII capital: the free name must skip it, not hand `create` a name it
     // then refuses as taken.
     let id = profiles.create_unique("ćwiczenie").unwrap();
-    assert_eq!(profiles.get(&id).unwrap().name, "ćwiczenie (2)");
+    assert_eq!(profiles.profile(&id).unwrap().name, "ćwiczenie (2)");
 }

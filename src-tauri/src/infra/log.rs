@@ -10,7 +10,8 @@ use std::sync::{Mutex, OnceLock};
 
 use crate::infra::http::redact;
 
-/// The file in the data root. Public so the console reads the same file this module writes.
+/// The file in the data root. Visible in the crate so the console and the support bundle read the same file this module
+/// writes.
 pub const FILE_NAME: &str = "gobbo.log";
 /// The one backup of the log. A file over the cap is moved here, replacing the earlier backup.
 const BACKUP_FILE: &str = "gobbo.log.1";
@@ -65,11 +66,15 @@ pub fn error(message: impl Display) {
 fn write(level: &str, message: impl Display) {
     let line = format_line(level, &message.to_string());
 
-    if let Some(log) = LOG.get()
-        && let Ok(mut guard) = log.lock()
-        && let Some(file) = guard.as_mut()
-    {
-        let _ = writeln!(file, "{line}");
+    if let Some(log) = LOG.get() {
+        // A poisoned log still holds a usable file: a panic during an earlier write must not lose this line too.
+        let mut guard = log
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+
+        if let Some(file) = guard.as_mut() {
+            let _ = writeln!(file, "{line}");
+        }
     }
 
     eprintln!("gobbo: {line}");

@@ -81,10 +81,6 @@ pub fn inspect(
 }
 
 /// Opens the plan and keeps its archive when one was fetched. Shared by the preview and the starter.
-#[allow(
-    clippy::option_if_let_else,
-    reason = "a cache hit is one short path; the fetch and its fallback are a match"
-)]
 pub fn open(
     root: &Data,
     game_id: &str,

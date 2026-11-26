@@ -42,7 +42,7 @@ pub(super) fn copy_profile_data(
             continue;
         }
 
-        if source_set.redirects() {
+        if source_set.is_redirected() {
             copy_dir(&source_set.upper, &target_set.upper)?;
             copy_file(
                 &user_data::whiteouts(&source_set.upper),

@@ -6,9 +6,9 @@ use crate::context::load_settings;
 use crate::context::running::game_running_at;
 use crate::deploy::state_is_overlay;
 use crate::deploy::target::journal_roots;
-use crate::deploy::undo;
+use crate::deploy::undo::undo;
 use crate::deploy::undo_blocked_while_running;
-use crate::domain::profiles::Entry;
+use crate::domain::profiles::ListedMod;
 use crate::domain::profiles::Profiles;
 use crate::error::game_running as game_is_running_error;
 use crate::error::{AppError, io_at};
@@ -16,7 +16,6 @@ use crate::games;
 use crate::infra::fs::remove_dir_if_exists;
 use crate::library;
 use std::collections::HashSet;
-use std::path::PathBuf;
 
 /// Removes a whole mod family, see `library::delete_mod`. Prepared deployments that contain the mod are undone first; a
 /// running profile that uses it blocks the removal.
@@ -73,7 +72,7 @@ pub fn reinstall_mod(
     root: &Data,
     game_id: &str,
     folder: &str,
-    choices: Option<&[crate::import::fomod::Choice]>,
+    choices: Option<&[crate::domain::fomod::Choice]>,
 ) -> Result<(), AppError> {
     let _state = crate::context::lock_state(&root.dir)?;
     crate::import::reinstall_mod_with(root, game_id, folder, choices, |data, profiles| {
@@ -88,7 +87,7 @@ fn undo_prepared_holding(
     game_id: &str,
     data: &Data,
     profiles: &mut Profiles,
-    holds: impl Fn(&Entry) -> bool,
+    holds: impl Fn(&ListedMod) -> bool,
 ) -> Result<(), AppError> {
     let states = data.deployment_states();
     let prepared = states.prepared;
@@ -106,12 +105,11 @@ fn undo_prepared_holding(
     let mut cleaned = Vec::new();
     // An interrupted apply has no ledger entry that names its mods, so it is undone for every removal. Its files are
     // not trusted, and leaving them behind would make the next apply see a foreign file.
-    let states: Vec<(&String, &PathBuf, bool)> = incomplete
+    for (profile_id, state, force) in incomplete
         .iter()
         .map(|(id, state)| (id, state, true))
         .chain(prepared.iter().map(|(id, state)| (id, state, false)))
-        .collect();
-    for (profile_id, state, force) in states {
+    {
         let Some(profile) = profiles
             .profiles
             .iter()

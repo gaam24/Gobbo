@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::{AppError, ErrorKind, MOD_MISSING};
 
-use super::profile::{Entry, Profile};
+use super::profile::{ListedMod, Profile};
 
 mod edits;
 mod ids;
@@ -24,6 +24,7 @@ pub const DEFAULT_NAME: &str = "Default";
 /// The longest profile name, in characters.
 pub const MAX_NAME_CHARS: usize = 60;
 
+/// The profiles of a game, with the active one and the one used for the last launch.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Profiles {
     /// The on-disk format. An older file is read as the current version; a newer one is refused.
@@ -40,7 +41,7 @@ pub struct Profiles {
 
 impl Profiles {
     /// A set with one empty profile, at the first start.
-    pub fn with_default(mods: Vec<Entry>) -> Self {
+    pub fn with_default(mods: Vec<ListedMod>) -> Self {
         let profile = Profile::new("p1".to_string(), DEFAULT_NAME.to_string(), mods);
         Self {
             schema_version: crate::domain::STATE_SCHEMA,
@@ -91,7 +92,7 @@ impl Profiles {
     }
 
     /// One entry of the active list. A missing family is a user error.
-    pub fn active_entry_mut(&mut self, id: &str) -> Result<&mut Entry, AppError> {
+    pub fn active_entry_mut(&mut self, id: &str) -> Result<&mut ListedMod, AppError> {
         self.active_mut()
             .mods
             .iter_mut()
@@ -109,7 +110,7 @@ impl Profiles {
     }
 
     /// The profile `id`, or a user error when the set does not hold it.
-    pub fn get(&self, id: &str) -> Result<&Profile, AppError> {
+    pub fn profile(&self, id: &str) -> Result<&Profile, AppError> {
         self.profiles
             .iter()
             .find(|p| p.id == id)
@@ -126,7 +127,7 @@ impl Profiles {
     /// New profile: empty, or a copy of the given one. Does not change the active one. Returns its id.
     pub fn create(&mut self, name: &str, copy_from: Option<&str>) -> Result<String, AppError> {
         let name = self.checked_name(name, None)?;
-        let source = copy_from.map(|id| self.get(id)).transpose()?;
+        let source = copy_from.map(|id| self.profile(id)).transpose()?;
         let list = source.map(Profile::list_state);
         let user_data = source.map(|profile| profile.user_data.clone());
         let pack = source.and_then(|profile| profile.pack.clone());
@@ -153,7 +154,7 @@ impl Profiles {
 
     /// Renames the profile `id` after checking the name and that the profile exists.
     pub fn rename(&mut self, id: &str, name: &str) -> Result<(), AppError> {
-        self.get(id)?;
+        self.profile(id)?;
         let name = self.checked_name(name, Some(id))?;
 
         if let Some(profile) = self.profiles.iter_mut().find(|p| p.id == id) {
@@ -165,7 +166,7 @@ impl Profiles {
 
     /// Deletes a profile. The last one cannot be deleted. When the active one goes, the first one becomes active.
     pub fn delete(&mut self, id: &str) -> Result<(), AppError> {
-        self.get(id)?;
+        self.profile(id)?;
 
         if self.profiles.len() == 1 {
             return Err(AppError::user("profiles.last_profile"));
@@ -182,7 +183,7 @@ impl Profiles {
 
     /// Makes the profile `id` active, after checking that the set holds it.
     pub fn switch(&mut self, id: &str) -> Result<(), AppError> {
-        self.get(id)?;
+        self.profile(id)?;
         self.active = id.to_string();
         Ok(())
     }
@@ -200,7 +201,7 @@ impl Profiles {
     }
 
     /// The profile `id` for an edit, or a user error when the set does not hold it.
-    pub fn get_mut(&mut self, id: &str) -> Result<&mut Profile, AppError> {
+    pub fn profile_mut(&mut self, id: &str) -> Result<&mut Profile, AppError> {
         self.profiles
             .iter_mut()
             .find(|p| p.id == id)
@@ -224,7 +225,7 @@ impl Profiles {
         changed
     }
 
-    fn remap_entries(&mut self, mut map: impl FnMut(&Entry) -> Option<String>) -> bool {
+    fn remap_entries(&mut self, mut map: impl FnMut(&ListedMod) -> Option<String>) -> bool {
         let mut changed = false;
 
         for profile in &mut self.profiles {

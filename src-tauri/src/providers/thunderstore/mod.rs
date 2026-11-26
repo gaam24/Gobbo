@@ -26,6 +26,9 @@ use crate::providers::{
 /// The id the definitions and the library use for Thunderstore.
 pub const ID: &str = "thunderstore";
 
+/// The Thunderstore equivalent of [`NEXUS_NOT_FOUND`].
+pub const THUNDERSTORE_NOT_FOUND: &str = "thunderstore.not_found";
+
 static THUNDERSTORE_COLLECTIONS: collections::ThunderstoreCollections =
     collections::ThunderstoreCollections;
 

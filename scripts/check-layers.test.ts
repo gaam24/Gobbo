@@ -12,6 +12,10 @@ test("a lower layer cannot use a higher layer or a feature module", () => {
 	expect(allowed("context", "games")).toBe(true);
 	expect(allowed("context", "migrations")).toBe(true);
 	expect(allowed("context", "launch")).toBe(false);
+	expect(allowed("migrations", "infra")).toBe(true);
+	expect(allowed("migrations", "domain")).toBe(true);
+	expect(allowed("migrations", "platform")).toBe(false);
+	expect(allowed("migrations", "deploy")).toBe(false);
 });
 
 test("the scanner names the file and the forbidden module", () => {

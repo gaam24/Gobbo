@@ -94,12 +94,12 @@ fn assert_one_mod(import: &Import, folder: &str, files: usize) {
 
 #[test]
 fn a_loader_release_for_the_deployment_root_keeps_its_paths_below_its_wrapper() {
-    let install = crate::games::Install {
+    let install = crate::games::LoaderPackage {
         name: "Loader".into(),
         version: "1.0".into(),
         to: String::new(),
         check: vec!["proxy.dll".into(), "Loader/core.dll".into()],
-        ..crate::games::Install::default()
+        ..crate::games::LoaderPackage::default()
     };
     let names = [
         "Pack/proxy.dll",

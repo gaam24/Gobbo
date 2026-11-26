@@ -3,7 +3,7 @@
 
 use std::path::Path;
 
-use crate::commands::blocking;
+use crate::commands::helpers::blocking;
 use crate::error::AppError;
 
 use super::preview::{self, DefinitionPreview};

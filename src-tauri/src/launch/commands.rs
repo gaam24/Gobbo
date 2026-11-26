@@ -4,15 +4,15 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Emitter, State};
 
 use crate::context::Data;
 use crate::error::AppError;
 use crate::games::paths::home_dir;
-use crate::infra::tasks::{TaskFlags, TaskKey, kind, state};
+use crate::infra::tasks::{TaskFlags, TaskHandle, TaskKey, kind, state};
 use crate::launch::report::RunReport;
 
-crate::commands::game_commands! {
+crate::commands::macros::game_commands! {
     /// Whether the game runs now, from Gobbo or from Steam. Deploying and launching wait while it does; editing does
     /// not.
     query game_running() -> bool = crate::context::running::game_running;
@@ -69,22 +69,20 @@ pub const fn tool_exit_payload(
     }
 }
 
-/// Finishes the task of a tool run and tells the window how it ended. The record and the event use the same
-/// distinction: a cancelled run keeps its `cancelled` state and a null code; exit code `0` is done, any other code is
-/// failed.
+/// Finishes the task of a tool run and tells the window how it ended. The record is settled through the handle of
+/// that run, so a rerun under the same key is not finished by the old program's exit. The record and the event use the
+/// same distinction: a cancelled run keeps its `cancelled` state and a null code; exit code `0` is done, any other
+/// code is failed.
 fn tool_exit_notice(
     app: AppHandle,
-    key: String,
+    handle: TaskHandle,
     game: String,
     tool: String,
     cancel: Arc<AtomicBool>,
 ) -> crate::launch::pipeline::ExitNotice {
     Box::new(move |exit_code| {
         let cancelled = crate::infra::tasks::cancelled(Some(cancel.as_ref()));
-        {
-            let tasks = app.state::<TaskFlags>();
-            tasks.finish(&key, tool_task_state(exit_code, cancelled));
-        }
+        handle.finish(tool_task_state(exit_code, cancelled));
 
         let _ = app.emit(
             TOOL_EXITED_EVENT,
@@ -105,12 +103,11 @@ pub async fn run_tool(
     game: String,
     tool: String,
 ) -> Result<(), AppError> {
-    let key: String = TaskKey::tool(kind::LAUNCH, &game, &tool).into();
-    let notice_key = key.clone();
+    let key = TaskKey::tool(kind::LAUNCH, &game, &tool);
     let notice_game = game.clone();
     let notice_tool = tool.clone();
     // The setup is short: the pipeline starts the program and detaches the wait to its own thread.
-    crate::commands::start_detached_task(
+    crate::commands::helpers::start_detached_task(
         data,
         &tasks,
         key,
@@ -119,7 +116,7 @@ pub async fn run_tool(
         move |root, game, cancel, handle| {
             let notice = tool_exit_notice(
                 app.clone(),
-                notice_key,
+                handle.clone(),
                 notice_game,
                 notice_tool,
                 Arc::clone(&cancel),
@@ -148,8 +145,8 @@ pub async fn install_tool_prerequisites(
     game: String,
     tool: String,
 ) -> Result<(), AppError> {
-    let key: String = TaskKey::tool(kind::INSTALL, &game, &tool).into();
-    crate::commands::start_task(
+    let key = TaskKey::tool(kind::INSTALL, &game, &tool);
+    crate::commands::helpers::start_task(
         data,
         &tasks,
         key,
@@ -186,7 +183,7 @@ pub async fn launch_game(
     let event_game = game.clone();
     let notice_app = app.clone();
     let launch_app = app.clone();
-    let launched = crate::commands::for_game(data, game, move |root, game| {
+    let launched = crate::commands::helpers::for_game(data, game, move |root, game| {
         crate::launch::launch_game_with_notice(
             root,
             game,
@@ -210,7 +207,7 @@ pub async fn stop_game(
     data: tauri::State<'_, crate::context::Data>,
     game: String,
 ) -> Result<bool, crate::error::AppError> {
-    crate::commands::for_game(data, game, |root, game| {
+    crate::commands::helpers::for_game(data, game, |root, game| {
         crate::launch::stop_game_with_notice(root, game, || {})
     })
     .await

@@ -4,7 +4,7 @@
 
 use std::collections::BTreeSet;
 
-use crate::domain::profiles::Entry;
+use crate::domain::profiles::ListedMod;
 use crate::error::AppError;
 
 /// The priorities a game reads, `min..=max`, as its definition names them.
@@ -28,7 +28,7 @@ impl PriorityRange {
 /// does not have, names a mod that `orderable` refuses (the game reads no number for it), or the range has too few
 /// numbers for the order.
 pub fn assign_priorities(
-    mods: &mut [Entry],
+    mods: &mut [ListedMod],
     order: &[String],
     range: PriorityRange,
     orderable: impl Fn(&str) -> bool,
@@ -68,8 +68,8 @@ pub fn assign_priorities(
 mod tests {
     use super::*;
 
-    fn entry(id: &str, priority: Option<u32>) -> Entry {
-        Entry {
+    fn entry(id: &str, priority: Option<u32>) -> ListedMod {
+        ListedMod {
             id: id.to_string(),
             folder: format!("{id}-folder"),
             enabled: true,
@@ -85,7 +85,7 @@ mod tests {
         PriorityRange { min, max }
     }
 
-    fn priorities(mods: &[Entry]) -> Vec<(&str, Option<u32>)> {
+    fn priorities(mods: &[ListedMod]) -> Vec<(&str, Option<u32>)> {
         mods.iter()
             .map(|entry| (entry.id.as_str(), entry.priority))
             .collect()

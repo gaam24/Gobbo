@@ -232,7 +232,8 @@ fn download_verified(
 ) -> Result<(), AppError> {
     let mut report = |received: u64, total: u64| {
         progress(CatalogInstallStep::Downloading {
-            percent: percent(received, total),
+            percent: crate::domain::progress::percent(received, total)
+                .map(|p| u8::try_from(p).unwrap_or(100)),
         });
         true
     };
@@ -247,18 +248,6 @@ fn download_verified(
         Ok(())
     } else {
         Err(AppError::retryable("catalog.changed").with("id", id))
-    }
-}
-
-/// The share of a file received, or `None` when the server sent no length.
-fn percent(received: u64, total: u64) -> Option<u8> {
-    if total == 0 {
-        None
-    } else {
-        Some(
-            u8::try_from(crate::domain::progress::percent(received, total).unwrap_or(100))
-                .unwrap_or(100),
-        )
     }
 }
 

@@ -123,7 +123,7 @@ pub fn before_switch(
         return Ok(());
     };
     // A state file may still name a profile that was removed while the app was not looking. It has no store to save.
-    if load_profiles(&scope.game)?.get(&current).is_err() {
+    if load_profiles(&scope.game)?.profile(&current).is_err() {
         return Ok(());
     }
 

@@ -29,7 +29,7 @@ pub fn set_profile_user_data(
             return Err(game_is_running_error());
         }
 
-        profiles.get_mut(profile)?.set_user_data_isolation(
+        profiles.profile_mut(profile)?.set_user_data_isolation(
             set_id,
             if isolated {
                 Isolation::Isolated
@@ -70,7 +70,7 @@ pub fn move_profile_user_data(
         .iter()
         .find(|set| set.id == set_id)
         .ok_or_else(|| AppError::user("user_data.unknown_set").with("id", set_id))?;
-    let profile = profiles.get(profile_id)?;
+    let profile = profiles.profile(profile_id)?;
 
     if !profile.user_data_isolation(set_id).is_isolated() {
         return Err(AppError::user("user_data.not_isolated").with("id", set_id));
@@ -82,7 +82,7 @@ pub fn move_profile_user_data(
 
     move_set(&data, &game, &settings, &state, profile, set_id)?;
     profiles
-        .get_mut(profile_id)?
+        .profile_mut(profile_id)?
         .set_user_data_isolation(set_id, Isolation::Shared);
     data.save_profiles(&profiles)
 }
@@ -122,7 +122,7 @@ fn move_set(
     let sets = resolved_sets(data, game, settings, state, profile)?;
     let set = find_set(&sets, set_id)?;
 
-    if !set.redirects() {
+    if !set.is_redirected() {
         return Err(AppError::user("user_data.not_redirect").with("id", set_id));
     }
 
@@ -156,7 +156,7 @@ pub fn user_data_size(
     let data = root.game(game_id);
     let settings = load_settings(&data);
     let profiles = load_profiles(&data)?;
-    let profile = profiles.get(profile_id)?;
+    let profile = profiles.profile(profile_id)?;
 
     if !game.user_data.iter().any(|set| set.id == set_id) {
         return Err(AppError::user("user_data.unknown_set").with("id", set_id));
@@ -175,7 +175,7 @@ pub fn user_data_size(
         return Ok(0);
     }
 
-    let folder = if set.redirects() {
+    let folder = if set.is_redirected() {
         &set.upper
     } else {
         &set.store

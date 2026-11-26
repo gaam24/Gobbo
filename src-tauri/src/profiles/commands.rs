@@ -5,7 +5,7 @@ use std::path::Path;
 
 use tauri::State;
 
-use crate::commands::{change_patch, for_game};
+use crate::commands::helpers::{change_patch, for_game};
 use crate::context::Data;
 use crate::context::profile::history::{self, HistoryEntry};
 use crate::domain::profiles::{ModGroup, Row};
@@ -13,12 +13,12 @@ use crate::error::{AppError, io_at};
 use crate::profiles::bisect;
 use crate::profiles::community::{CommunityProfileImport, CommunityProfilePreview};
 use crate::profiles::compare::ProfileCompare;
-use crate::profiles::history::preview::HistoryPreview;
+use crate::profiles::history::HistoryPreview;
 use crate::profiles::mo2::Mo2Import;
 use crate::profiles::{actions, compare};
 use crate::status::views::{KnownRows, Status};
 
-crate::commands::game_commands! {
+crate::commands::macros::game_commands! {
     change create_profile(name: String, copy_from: Option<String>, copy_data: bool) =
         |root, game| actions::create_profile(root, game, &name, copy_from.as_deref(), copy_data);
 
@@ -95,7 +95,7 @@ crate::commands::game_commands! {
 
     /// What restoring an earlier state of the active list would change. Nothing is written.
     query preview_restore(id: u32) -> HistoryPreview =
-        |root, game| crate::profiles::history::preview::preview_restore(root, game, id);
+        |root, game| crate::profiles::history::preview_restore(root, game, id);
 
     /// Takes the last change of the active list back.
     change undo_list() = history::undo_list;

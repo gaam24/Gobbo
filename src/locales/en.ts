@@ -2670,6 +2670,8 @@ const en = {
 		},
 		update: {
 			archive_invalid: "The update archive is damaged: {{detail}}",
+			archive_too_large: "The update archive unpacks to {{bytes}} bytes, but Gobbo only accepts up to {{limit}}.",
+			archive_too_many_entries: "The update archive has {{count}} entries, but Gobbo only accepts up to {{limit}}.",
 			failed: "The update didn't work: {{detail}}",
 			not_available: "There's no newer version to download.",
 			unsupported: "There's no portable update archive for this system.",

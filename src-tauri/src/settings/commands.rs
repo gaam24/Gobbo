@@ -6,8 +6,8 @@ use std::path::PathBuf;
 use tauri::{AppHandle, Manager, State};
 
 use super::storage;
-use crate::commands::blocking;
-use crate::commands::with_data;
+use crate::commands::helpers::blocking;
+use crate::commands::helpers::with_data;
 use crate::context::Data;
 use crate::context::Settings;
 use crate::context::managed::{GameDataUsage, ManagedGame};
@@ -15,8 +15,9 @@ use crate::domain::source::{SourceLinkStatus, SourceLinksReport};
 use crate::error::AppError;
 use crate::settings::config::AppSettings;
 use crate::settings::config::CloseAction;
+use crate::settings::config::WindowState;
 
-crate::commands::game_commands! {
+crate::commands::macros::game_commands! {
     /// Saves the settings of a game.
     change save_settings(settings: Settings) =
         |root, game| crate::context::save_settings(root, game, settings);
@@ -68,15 +69,15 @@ pub async fn save_app_settings(
         let saved = super::config::save_app_settings(root, settings);
 
         if saved.is_ok() {
-            let (focused, minimized) =
-                app.get_webview_window("main")
-                    .map_or((true, false), |window| {
-                        (
-                            window.is_focused().unwrap_or(true),
-                            window.is_minimized().unwrap_or(false),
-                        )
-                    });
-            super::config::apply_efficiency(efficiency, focused, minimized);
+            let state = app
+                .get_webview_window("main")
+                .map_or(WindowState::Focused, |window| {
+                    WindowState::from_window(
+                        window.is_focused().unwrap_or(true),
+                        window.is_minimized().unwrap_or(false),
+                    )
+                });
+            super::config::apply_efficiency(efficiency, state);
         }
 
         saved
@@ -162,7 +163,7 @@ pub async fn proton_builds() -> Result<Vec<crate::platform::ProtonBuild>, AppErr
 #[tauri::command]
 #[specta::specta]
 pub fn proton_options() -> Vec<String> {
-    crate::domain::proton_options::available()
+    crate::domain::proton_options::available(crate::platform::is_windows())
 }
 
 /// Opens a folder in the system file manager, or reveals a file in its folder. Only paths that belong

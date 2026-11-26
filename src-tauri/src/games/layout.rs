@@ -4,7 +4,7 @@
 use std::collections::BTreeSet;
 use std::path::Path;
 
-use super::definition::{GameDef, Install, LoadOrder};
+use super::definition::{GameDef, LoadOrder, LoaderPackage};
 use crate::domain::pathkey::path_key;
 use crate::domain::resolver::DeployPlan;
 
@@ -104,7 +104,7 @@ impl GameDef {
         deploy_root: &Path,
         plan: &DeployPlan,
         placed: &BTreeSet<String>,
-    ) -> Option<&Install> {
+    ) -> Option<&LoaderPackage> {
         let install = self.install.as_ref()?;
         let needed = if install.needed_by.is_empty() {
             plan.file_count > 0

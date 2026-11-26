@@ -9,16 +9,19 @@ use crate::context::load_profiles;
 use crate::context::profile::history::save_profiles;
 use crate::context::profile::lock_profiles;
 use crate::domain::library::Library;
-use crate::domain::profiles::Entry as ProfileEntry;
+use crate::domain::profiles::ListedMod;
 use crate::error::AppError;
 use serde::Serialize;
 use std::cmp::Reverse;
 use std::collections::BTreeMap;
 use std::collections::BinaryHeap;
 
+/// One mod that a sort would move to a new place in the list.
 #[derive(Debug, Clone, Serialize, specta::Type)]
 pub struct SortMove {
+    /// The family id of the mod that moves.
     pub id: String,
+    /// The display name of the mod that moves.
     pub name: String,
     /// One-based place in the current list.
     pub from: u32,
@@ -28,6 +31,7 @@ pub struct SortMove {
 
 #[derive(Debug, Clone, Serialize, specta::Type)]
 pub struct SortPreview {
+    /// The number of mods in the list the preview covers.
     pub total: u32,
     /// The mods whose place changes. Empty when the list already keeps every rule.
     pub moves: Vec<SortMove>,
@@ -104,10 +108,10 @@ pub fn sort_by_name(root: &Data, game_id: &str) -> Result<(), AppError> {
 /// The alphabetical order of a list. Each group moves as one block; a mod outside a group moves alone. `names` is the
 /// lowercased display name of each family, so the pure rule needs no library or disk.
 pub fn sorted_by_name(
-    mods: Vec<ProfileEntry>,
+    mods: Vec<ListedMod>,
     groups: &[crate::domain::profiles::ModGroup],
     names: &BTreeMap<&str, String>,
-) -> Vec<ProfileEntry> {
+) -> Vec<ListedMod> {
     let mut owner: BTreeMap<&str, usize> = BTreeMap::new();
 
     for (at, group) in groups.iter().enumerate() {
@@ -117,7 +121,7 @@ pub fn sorted_by_name(
     }
 
     let mut used: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
-    let mut blocks: Vec<((String, String), Vec<ProfileEntry>)> = Vec::new();
+    let mut blocks: Vec<((String, String), Vec<ListedMod>)> = Vec::new();
 
     for entry in &mods {
         if used.contains(&entry.id) {
@@ -127,7 +131,7 @@ pub fn sorted_by_name(
         let Some(&group) = owner.get(entry.id.as_str()) else {
             continue;
         };
-        let members: Vec<ProfileEntry> = mods
+        let members: Vec<ListedMod> = mods
             .iter()
             .filter(|candidate| owner.get(candidate.id.as_str()) == Some(&group))
             .cloned()
@@ -155,7 +159,7 @@ pub fn sorted_by_name(
     blocks.into_iter().flat_map(|(_, block)| block).collect()
 }
 
-fn key(entry: &ProfileEntry, names: &BTreeMap<&str, String>) -> (String, String) {
+fn key(entry: &ListedMod, names: &BTreeMap<&str, String>) -> (String, String) {
     (
         names
             .get(entry.id.as_str())
@@ -167,10 +171,7 @@ fn key(entry: &ProfileEntry, names: &BTreeMap<&str, String>) -> (String, String)
 
 /// The list in an order that keeps every rule: each mod above the ones it overrides. Of the orders that do, the one
 /// closest to the current list: at each place the mod that stood highest and is free to go there.
-pub fn sorted_by_rules(
-    mods: &[ProfileEntry],
-    library: &Library,
-) -> Result<Vec<ProfileEntry>, AppError> {
+pub fn sorted_by_rules(mods: &[ListedMod], library: &Library) -> Result<Vec<ListedMod>, AppError> {
     let position: BTreeMap<&str, usize> = mods
         .iter()
         .enumerate()
@@ -235,8 +236,8 @@ mod tests {
     use super::*;
     use crate::domain::library::Family;
 
-    fn entry(id: &str) -> ProfileEntry {
-        ProfileEntry {
+    fn entry(id: &str) -> ListedMod {
+        ListedMod {
             id: id.into(),
             folder: id.into(),
             enabled: true,
@@ -262,7 +263,7 @@ mod tests {
         library
     }
 
-    fn ids(list: &[ProfileEntry]) -> Vec<&str> {
+    fn ids(list: &[ListedMod]) -> Vec<&str> {
         list.iter().map(|entry| entry.id.as_str()).collect()
     }
 

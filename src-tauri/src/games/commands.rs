@@ -2,7 +2,7 @@
 
 use tauri::ipc::Channel;
 
-use crate::commands::blocking;
+use crate::commands::helpers::blocking;
 use crate::domain::pathkey::path_key;
 use crate::error::AppError;
 use crate::games::{self, detect, editor};
@@ -63,8 +63,8 @@ pub async fn install_loader(
 ) -> Result<crate::setup::LoaderSetupView, AppError> {
     use crate::infra::tasks::{TaskKey, kind};
 
-    let key: String = TaskKey::loader(&game).into();
-    crate::commands::run_task(
+    let key = TaskKey::loader(&game);
+    crate::commands::helpers::run_task(
         data,
         &tasks,
         key,
@@ -179,7 +179,7 @@ pub async fn catalog_install(
     progress: Channel<games::CatalogInstallStep>,
 ) -> Result<Vec<games::CatalogInstallOutcome>, AppError> {
     blocking(move || {
-        let mut send = crate::commands::channel_sink(progress);
+        let mut send = crate::commands::helpers::channel_sink(progress);
         games::install_catalog(&ids, &mut send)
     })
     .await

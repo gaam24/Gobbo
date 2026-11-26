@@ -16,7 +16,6 @@ use crate::domain::library::LibraryView;
 use crate::domain::pack::WaitingMod;
 use crate::error::AppError;
 use crate::games;
-use crate::library::waiting::find_version;
 
 /// Creates or updates the profile of one collection, then returns its live session.
 pub fn start(
@@ -55,7 +54,7 @@ pub(in crate::collections) fn start_with_plan(
     let mut profiles = load_profiles(&data)?;
     let (profile_id, is_new) = if let Some(id) = &request.profile {
         {
-            let profile = profiles.get(id)?;
+            let profile = profiles.profile(id)?;
 
             if profile.pack.is_some() {
                 return Err(AppError::user("collection.profile_pack").with("profile", id));
@@ -77,7 +76,7 @@ pub(in crate::collections) fn start_with_plan(
 
         (id, true)
     };
-    let profile = profiles.get_mut(&profile_id)?;
+    let profile = profiles.profile_mut(&profile_id)?;
 
     if is_new {
         profile.user_data = game.user_data_defaults();
@@ -139,7 +138,7 @@ pub(in crate::collections) fn start_with_plan(
         for item in &plan.items {
             new_members.insert(item.predicted_family());
 
-            if let Some((family, _)) = find_version(&view, &item.wanted()) {
+            if let Some((family, _)) = view.find_entry(&item.wanted()) {
                 new_members.insert(family);
             }
         }
@@ -221,7 +220,7 @@ pub(in crate::collections) fn start_with_plan(
                 CollectionItemStatus::InLibraryDifferentVersion { .. }
             ) && item.update_policy
                 != crate::domain::collection::CollectionUpdatePolicy::Exact);
-        if accepted && let Some((family, folder)) = find_version(&view, &source) {
+        if accepted && let Some((family, folder)) = view.find_entry(&source) {
             profile.add_mod(&family, &folder);
 
             if !added.contains(&family) {
@@ -270,7 +269,7 @@ pub(in crate::collections) fn start_with_plan(
     }
 
     save_profiles(&data, &profiles)?;
-    let profile = profiles.get(&profile_id)?;
+    let profile = profiles.profile(&profile_id)?;
     let current = status::statuses_with_view(&plan, &library, &view, profile, Some(&origin));
     Ok(session_view(profile_id, origin, plan, current))
 }

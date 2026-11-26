@@ -14,7 +14,7 @@ Switches are read once at install, never per call:
   panic or for an opt-in first-chance exception; an unhandled exception writes the dump and the decision ring.
 - `GOBBO_OVERLAY_CRASH_FIRST` - any non-empty value except `off`: also report first-chance exceptions with a vectored
   handler. Off by default: a program handles many exceptions itself, and the handler must stay out of that path.
-- `GOBBO_OVERLAY_SESSION` - the JSON session report path. Dev default: the developer folder. Format 2 records the
+- `GOBBO_OVERLAY_SESSION` - the JSON session report path. Dev default: the developer folder. Format 3 records the
   layers, the switches, `install_ms` and `install_steps` (the microseconds of each install step, in order), warnings, the ring path, the dumper socket and whether it connected with its handler attached, and the state
   of every hook after installation.
 - `GOBBO_OVERLAY_DUMP` - `1`/`on` for a developer minidump, a path for a specific file, or `off`/unset. This is the

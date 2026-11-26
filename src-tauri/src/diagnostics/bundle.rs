@@ -8,6 +8,8 @@ use std::path::Path;
 use crate::context::Data;
 use crate::error::{AppError, io_at};
 use crate::infra::clock::now_seconds;
+use crate::infra::log::FILE_NAME as LOG_FILE_NAME;
+use crate::launch::report::REPORT_FILE as REPORT_FILE_NAME;
 
 /// The folder under the data root. It is not a mod folder and never part of a deployment.
 const SUPPORT_DIR: &str = "support";
@@ -24,7 +26,7 @@ pub fn create(root: &Data, game: Option<&str>) -> Result<String, AppError> {
     let options = zip::write::SimpleFileOptions::default()
         .compression_method(zip::CompressionMethod::Deflated);
     let replacements = replacements(root, game);
-    let redact = |text: &str| redact_text(text, &replacements);
+    let redact = |text: &str| redact_bundle_text(text, &replacements);
 
     add(
         &mut writer,
@@ -33,8 +35,8 @@ pub fn create(root: &Data, game: Option<&str>) -> Result<String, AppError> {
         &redact(&system_text(root)),
     )?;
 
-    if let Some(log) = read_tail(&root.dir.join("gobbo.log"), LOG_TAIL) {
-        add(&mut writer, options, "gobbo.log", &redact(&log))?;
+    if let Some(log) = read_tail(&root.dir.join(LOG_FILE_NAME), LOG_TAIL) {
+        add(&mut writer, options, LOG_FILE_NAME, &redact(&log))?;
     }
 
     if let Some(game_id) = game {
@@ -54,7 +56,7 @@ pub fn create(root: &Data, game: Option<&str>) -> Result<String, AppError> {
         }
 
         if let Some(report) = crate::launch::report::last_run(root, game_id) {
-            add_json(&mut writer, options, "last_run.json", &report, &redact)?;
+            add_json(&mut writer, options, REPORT_FILE_NAME, &report, &redact)?;
         }
     }
 
@@ -143,6 +145,13 @@ fn replacements(root: &Data, game: Option<&str>) -> Vec<(String, String)> {
     replacements
 }
 
+/// Removes both the user's paths and the HTTP secrets (API keys, tokens, signed links) from text before it goes into
+/// the bundle. The secret pass runs first: a definition, a report or a log line can carry either kind, and neither may
+/// reach the support report.
+fn redact_bundle_text(text: &str, replacements: &[(String, String)]) -> String {
+    redact_text(&crate::infra::http::redact(text), replacements)
+}
+
 fn redact_text(text: &str, replacements: &[(String, String)]) -> String {
     let mut value = text.to_string();
 
@@ -168,7 +177,7 @@ mod tests {
         fs::create_dir_all(&root.dir).unwrap();
         let home = crate::games::paths::home();
         fs::write(
-            root.dir.join("gobbo.log"),
+            root.dir.join(LOG_FILE_NAME),
             format!("log line at {}\n", home.display()),
         )
         .unwrap();
@@ -177,7 +186,7 @@ mod tests {
         let file = fs::File::open(&path).unwrap();
         let mut zip = zip::ZipArchive::new(file).unwrap();
         let mut log = String::new();
-        zip.by_name("gobbo.log")
+        zip.by_name(LOG_FILE_NAME)
             .unwrap()
             .read_to_string(&mut log)
             .unwrap();
@@ -190,5 +199,49 @@ mod tests {
             .unwrap();
         assert!(system.contains(env!("CARGO_PKG_VERSION")));
         assert!(zip.by_name("README.txt").is_ok());
+    }
+
+    #[test]
+    fn a_bundle_masks_api_keys_tokens_and_signed_links() {
+        let base = scratch!("support-bundle-secrets");
+        let root = Data::new(base.join("data"));
+        fs::create_dir_all(&root.dir).unwrap();
+        let secrets = "key=top-secret&token=abc123&sig=deadbeef&X-Amz-Signature=cafebabe";
+        fs::write(
+            root.dir.join(LOG_FILE_NAME),
+            format!("GET https://cdn.example.com/a.zip?{secrets}&page=2\n"),
+        )
+        .unwrap();
+
+        let path = create(&root, None).unwrap();
+        let mut zip = zip::ZipArchive::new(fs::File::open(&path).unwrap()).unwrap();
+        let mut log = String::new();
+        zip.by_name(LOG_FILE_NAME)
+            .unwrap()
+            .read_to_string(&mut log)
+            .unwrap();
+        assert!(log.contains("key=***"));
+        assert!(log.contains("token=***"));
+        assert!(log.contains("sig=***"));
+        assert!(log.contains("X-Amz-Signature=***"));
+        assert!(log.contains("page=2"));
+        for secret in ["top-secret", "abc123", "deadbeef", "cafebabe"] {
+            assert!(!log.contains(secret), "the bundle kept a secret: {log}");
+        }
+    }
+
+    #[test]
+    fn a_definition_text_with_a_secret_is_redacted_before_it_is_written() {
+        let base = scratch!("support-definition-secret");
+        let root = Data::new(base.join("data"));
+        let replacements = replacements(&root, None);
+        let definition =
+            "# generated\ndownload_url = \"https://cdn.example.com/a.zip?key=hidden&expires=99\"\n";
+        let redacted = redact_bundle_text(definition, &replacements);
+
+        assert!(!redacted.contains("hidden"));
+        assert!(redacted.contains("key=***"));
+        assert!(redacted.contains("expires=***"));
+        assert!(redacted.contains("download_url"));
     }
 }

@@ -156,6 +156,7 @@ impl<'a> Reporter<'a> {
         }
     }
 
+    /// Counts `bytes` more as done and reports the progress to the caller.
     pub fn add(&mut self, bytes: u64) {
         self.done = self.done.saturating_add(bytes);
         // A missing total means nothing to divide by, so the bar reads as done.

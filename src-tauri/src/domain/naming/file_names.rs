@@ -55,12 +55,12 @@ fn is_reserved_file_name(name: &str) -> bool {
 
 /// Whether an archive or tool path component can be written as a file on this platform. On Windows a name such as
 /// `CON`, a trailing dot or space, or one of `<>:"/\\|?*` would address a device or an invalid path.
-pub fn is_safe_component(name: &str) -> bool {
+pub fn is_safe_component(name: &str, is_windows: bool) -> bool {
     if name.is_empty() || name == "." || name == ".." {
         return false;
     }
 
-    !cfg!(windows) || is_windows_component(name)
+    !is_windows || is_windows_component(name)
 }
 
 /// Whether a path component is a name Windows stores, on every platform. It is the rule `is_safe_component` applies on
@@ -142,17 +142,29 @@ mod tests {
         assert_eq!(safe_file_name("Console"), "Console");
     }
 
-    #[cfg(windows)]
     #[test]
     fn windows_device_names_and_trailing_dots_are_not_safe_components() {
-        assert!(!is_safe_component("CON"));
-        assert!(!is_safe_component("NUL.txt"));
-        assert!(!is_safe_component("name."));
-        assert!(!is_safe_component("name "));
-        assert!(!is_safe_component("a:b"));
-        assert!(!is_safe_component("a?b"));
-        assert!(is_safe_component("Console"));
-        assert!(is_safe_component("name.txt"));
+        assert!(!is_safe_component("CON", true));
+        assert!(!is_safe_component("NUL.txt", true));
+        assert!(!is_safe_component("name.", true));
+        assert!(!is_safe_component("name ", true));
+        assert!(!is_safe_component("a:b", true));
+        assert!(!is_safe_component("a?b", true));
+        assert!(is_safe_component("Console", true));
+        assert!(is_safe_component("name.txt", true));
+    }
+
+    #[test]
+    fn linux_allows_names_windows_refuses() {
+        assert!(is_safe_component("CON", false));
+        assert!(is_safe_component("NUL.txt", false));
+        assert!(is_safe_component("name.", false));
+        assert!(is_safe_component("name ", false));
+        assert!(is_safe_component("a:b", false));
+        assert!(is_safe_component("a?b", false));
+        assert!(!is_safe_component("", false));
+        assert!(!is_safe_component(".", false));
+        assert!(!is_safe_component("..", false));
     }
 
     #[test]
@@ -254,22 +266,23 @@ mod tests {
         /// A name `safe_file_name` builds can be written as a folder on every platform, Windows included.
         #[test]
         fn safe_file_name_is_a_safe_component(name in name_strategy()) {
-            prop_assert!(is_safe_component(&safe_file_name(&name)));
+            let safe = safe_file_name(&name);
+            prop_assert!(is_safe_component(&safe, true));
+            prop_assert!(is_safe_component(&safe, false));
         }
 
         /// A component is non-empty and is not `.` or `..`; on Windows it also follows the device and character rules.
         #[test]
         fn a_safe_component_is_a_plain_name(name in name_strategy()) {
-            if is_safe_component(&name) {
+            if is_safe_component(&name, false) {
                 prop_assert!(!name.is_empty());
                 prop_assert_ne!(name.as_str(), ".");
                 prop_assert_ne!(name.as_str(), "..");
-
-                if cfg!(windows) {
-                    prop_assert!(!name.ends_with(['.', ' ']));
-                    prop_assert!(!name.chars().any(is_invalid_name_char));
-                    prop_assert!(!is_reserved_file_name(&name));
-                }
+            }
+            if is_safe_component(&name, true) {
+                prop_assert!(!name.ends_with(['.', ' ']));
+                prop_assert!(!name.chars().any(is_invalid_name_char));
+                prop_assert!(!is_reserved_file_name(&name));
             }
         }
     }

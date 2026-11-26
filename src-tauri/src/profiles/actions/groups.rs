@@ -60,11 +60,11 @@ pub fn save_mod_groups(root: &Data, game_id: &str, groups: &[ModGroup]) -> Resul
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::profiles::{Entry, GroupKind, Profile, Profiles};
+    use crate::domain::profiles::{GroupKind, ListedMod, Profile, Profiles};
     use crate::test_support::{games as test_games, scratch, write};
 
-    fn entry(id: &str) -> Entry {
-        Entry {
+    fn entry(id: &str) -> ListedMod {
+        ListedMod {
             id: id.to_string(),
             folder: id.to_string(),
             enabled: true,

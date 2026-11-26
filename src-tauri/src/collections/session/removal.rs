@@ -25,7 +25,7 @@ pub fn remove(
     let _profiles = lock_profiles();
     let mut profiles = load_profiles(&data)?;
     let plan = {
-        let profile = profiles.get(profile_id)?;
+        let profile = profiles.profile(profile_id)?;
         let origin = profile
             .collections
             .iter()
@@ -33,7 +33,7 @@ pub fn remove(
             .ok_or_else(|| AppError::user("collection.not_in_profile"))?;
         cache::read_plan_or_missing(&data, origin)?
     };
-    let profile = profiles.get_mut(profile_id)?;
+    let profile = profiles.profile_mut(profile_id)?;
     let Some(index) = profile
         .collections
         .iter()
@@ -66,7 +66,7 @@ pub fn remove(
         !wanted.iter().any(|item| item.is_same_mod(&waiting.entry))
     });
     save_profiles(&data, &profiles)?;
-    let profile = profiles.get(profile_id)?.clone();
+    let profile = profiles.profile(profile_id)?.clone();
     let current = status::statuses(&plan, &library, &profile, None);
     Ok(session_view(profile_id.to_string(), origin, plan, current))
 }

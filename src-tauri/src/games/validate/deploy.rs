@@ -2,7 +2,7 @@
 
 use std::collections::BTreeSet;
 
-use super::problems::{Problems, is_sha512};
+use super::problems::{Duplicates, Problems, Section, is_sha512};
 use crate::domain::deploy::Deploy;
 use crate::domain::pathkey;
 use crate::games::definition::GameDef;
@@ -14,35 +14,47 @@ impl GameDef {
         let deploy = &self.deploy;
 
         for root in [&deploy.root, &deploy.root_linux].into_iter().flatten() {
-            problems.template("deploy root", root);
+            problems.template(Section::Deploy, "deploy root", root);
 
             if !root.trim().starts_with('{') {
-                problems.push(format!(
-                    "deploy root must start with a path variable: {root:?}"
-                ));
+                problems.push_in(
+                    Section::Deploy,
+                    format!("deploy root must start with a path variable: {root:?}"),
+                );
             }
         }
 
         if deploy.slots.is_empty() && deploy.mirror.is_empty() && !deploy.full_root {
-            problems.push("the game needs at least one slot or mirror");
+            problems.push_in(
+                Section::Deploy,
+                "the game needs at least one slot or mirror",
+            );
         }
 
         if deploy.full_root && !deploy.slots.is_empty() {
-            problems
-                .push("a full-root game cannot use slots; every file already keeps its game path");
+            problems.push_in(
+                Section::Deploy,
+                "a full-root game cannot use slots; every file already keeps its game path",
+            );
         }
 
-        let mut dirs = BTreeSet::new();
+        let mut duplicates = Duplicates::default();
         let places = deploy.slots.iter().map(|slot| &slot.dir);
 
         for dir in places.chain(deploy.mirror.iter().map(|mirror| &mirror.dir)) {
-            if !dirs.insert(dir.to_lowercase()) {
-                problems.push(format!("folder {dir:?} is a slot or mirror twice"));
-            }
+            duplicates.folder(dir, Section::Deploy, problems);
         }
 
-        problems.relative("slot", deploy.slots.iter().map(|slot| &slot.dir));
-        problems.relative("mirror", deploy.mirror.iter().map(|mirror| &mirror.dir));
+        problems.relative(
+            Section::Deploy,
+            "slot",
+            deploy.slots.iter().map(|slot| &slot.dir),
+        );
+        problems.relative(
+            Section::Deploy,
+            "mirror",
+            deploy.mirror.iter().map(|mirror| &mirror.dir),
+        );
         let places: Vec<&str> = deploy_dirs(deploy).collect();
 
         for (index, left) in places.iter().enumerate() {
@@ -59,28 +71,35 @@ impl GameDef {
                         .strip_prefix(left_key.as_str())
                         .is_some_and(|rest| rest.starts_with('/'))
                 {
-                    problems.push(format!(
-                        "folders {left:?} and {right:?} overlap; a file would have two places"
-                    ));
+                    problems.push_in(
+                        Section::Source,
+                        format!(
+                            "folders {left:?} and {right:?} overlap; a file would have two places"
+                        ),
+                    );
                 }
             }
         }
 
-        problems.relative("protected folder", &deploy.protected);
+        problems.relative(Section::Deploy, "protected folder", &deploy.protected);
 
         for slot in &deploy.slots {
             let what = format!("slot {}", slot.dir);
 
             if slot.flat && (slot.marker.is_some() || !slot.markers.is_empty()) {
-                problems.push(format!(
-                    "{what}: a flat slot keeps no mod folders, so it cannot use a marker"
-                ));
+                problems.push_in(
+                    Section::Deploy,
+                    format!("{what}: a flat slot keeps no mod folders, so it cannot use a marker"),
+                );
             }
 
             if slot.flat && slot.enable_file.is_some() {
-                problems.push(format!(
-                    "{what}: a flat slot keeps no mod folders, so it cannot write an enable file"
-                ));
+                problems.push_in(
+                    Section::Deploy,
+                    format!(
+                        "{what}: a flat slot keeps no mod folders, so it cannot write an enable file"
+                    ),
+                );
             }
 
             if let Some(file) = &slot.enable_file {
@@ -90,15 +109,17 @@ impl GameDef {
                     && crate::domain::naming::safe_file_name(file) == *file;
 
                 if !valid {
-                    problems.push(format!(
-                        "{what}: enable_file must be one valid file name: {file:?}"
-                    ));
+                    problems.push_in(
+                        Section::Deploy,
+                        format!("{what}: enable_file must be one valid file name: {file:?}"),
+                    );
                 }
             }
 
-            problems.relative(&what, &slot.marker);
-            problems.relative(&what, &slot.markers);
+            problems.relative(Section::Deploy, &what, &slot.marker);
+            problems.relative(Section::Deploy, &what, &slot.markers);
             problems.extensions(
+                Section::Deploy,
                 &what,
                 slot.extensions
                     .iter()
@@ -108,23 +129,31 @@ impl GameDef {
         }
 
         for mirror in &deploy.mirror {
-            problems.extensions(&format!("mirror {}", mirror.dir), &mirror.extensions);
+            problems.extensions(
+                Section::Deploy,
+                &format!("mirror {}", mirror.dir),
+                &mirror.extensions,
+            );
         }
 
         for (index, rule) in deploy.moves.iter().enumerate() {
             let what = format!("move {}", index + 1);
-            problems.extensions(&what, &rule.extensions);
+            problems.extensions(Section::Source, &what, &rule.extensions);
 
             if rule.extensions.is_empty() {
-                problems.push(format!("{what} needs at least one extension"));
+                problems.push_in(
+                    Section::Source,
+                    format!("{what} needs at least one extension"),
+                );
             }
 
-            problems.relative(&what, std::iter::once(&rule.to));
+            problems.relative(Section::Source, &what, std::iter::once(&rule.to));
 
             if rule.to.trim().is_empty() || rule.to.ends_with(['/', '\\']) {
-                problems.push(format!(
-                    "{what} target must be a folder without a trailing slash"
-                ));
+                problems.push_in(
+                    Section::Source,
+                    format!("{what} target must be a folder without a trailing slash"),
+                );
             }
         }
         // A root file keeps its bare name in the folder that holds the slots and mirrors. No game folder may have that name.
@@ -133,28 +162,31 @@ impl GameDef {
             .filter_map(|dir| dir.split('/').next())
             .map(pathkey::path_key)
             .collect();
-        let mut names = BTreeSet::new();
 
         for name in &deploy.root_files {
             let key = pathkey::path_key(name);
 
             if !is_game_relative(name) || name.contains(['/', '\\']) {
-                problems.push(format!(
-                    "root file {name:?} must be a file name, not a path"
-                ));
+                problems.push_in(
+                    Section::Deploy,
+                    format!("root file {name:?} must be a file name, not a path"),
+                );
             } else if folders.contains(&key) {
-                problems.push(format!("root file {name:?} has the name of a game folder"));
-            } else if !names.insert(key) {
-                problems.push(format!("root file {name:?} is listed twice"));
+                problems.push_in(
+                    Section::Deploy,
+                    format!("root file {name:?} has the name of a game folder"),
+                );
+            } else {
+                duplicates.root_file(name, Section::Deploy, problems);
             }
         }
 
         for shared in &deploy.shared {
             if !shared.dir.is_empty() {
-                problems.relative("shared", [&shared.dir]);
+                problems.relative(Section::Deploy, "shared", [&shared.dir]);
             }
 
-            problems.extensions("shared", &shared.extensions);
+            problems.extensions(Section::Deploy, "shared", &shared.extensions);
         }
     }
 
@@ -167,33 +199,37 @@ impl GameDef {
             .iter()
             .filter_map(|place| place.split('/').next())
             .collect();
-        let mut keys = BTreeSet::new();
+        let mut duplicates = Duplicates::default();
 
         for (name, target) in &deploy.aliases {
             if name.trim().is_empty() || name.contains(['/', '\\']) || !is_game_relative(name) {
-                problems.push(format!("alias {name:?} must be one folder name"));
+                problems.push_in(
+                    Section::Deploy,
+                    format!("alias {name:?} must be one folder name"),
+                );
                 continue;
             }
 
+            duplicates.alias(name, Section::Deploy, problems);
             let key = pathkey::path_key(name);
 
-            if !keys.insert(key.clone()) {
-                problems.push(format!("alias {name:?} is repeated (case is ignored)"));
-            }
-
             if game_folders.contains(key.as_str()) {
-                problems.push(format!(
-                    "alias {name:?} is already a game folder; an archive can use it as it is"
-                ));
+                problems.push_in(
+                    Section::Deploy,
+                    format!(
+                        "alias {name:?} is already a game folder; an archive can use it as it is"
+                    ),
+                );
             }
 
             if target.contains('\\') {
-                problems.push(format!(
-                    "alias {name:?} must use '/' in its target: {target:?}"
-                ));
+                problems.push_in(
+                    Section::Deploy,
+                    format!("alias {name:?} must use '/' in its target: {target:?}"),
+                );
             }
 
-            problems.relative("alias target", std::iter::once(target));
+            problems.relative(Section::Deploy, "alias target", std::iter::once(target));
             let target_key = pathkey::path_key(target);
             let inside = deploy.full_root
                 || places.iter().any(|place| {
@@ -203,9 +239,12 @@ impl GameDef {
                             .is_some_and(|rest| rest.starts_with('/'))
                 });
             if !inside {
-                problems.push(format!(
-                    "alias {name:?} points to {target:?}, which is not inside a slot or mirror"
-                ));
+                problems.push_in(
+                    Section::Deploy,
+                    format!(
+                        "alias {name:?} points to {target:?}, which is not inside a slot or mirror"
+                    ),
+                );
             }
         }
     }
@@ -216,11 +255,15 @@ impl GameDef {
         };
 
         if order.uses_settings_folder() {
-            problems.template("load_order.file", &order.file);
+            problems.template(Section::LoadOrder, "load_order.file", &order.file);
         } else {
             // A UE4SS list sits in the deployment root and names mod folders, so it must lie in a slot's folder,
             // where those mods are. The file name is not checked: a loader may ship another one.
-            problems.relative("load_order.file", std::iter::once(&order.file));
+            problems.relative(
+                Section::LoadOrder,
+                "load_order.file",
+                std::iter::once(&order.file),
+            );
             let in_slot = order.file.rsplit_once('/').is_some_and(|(folder, _)| {
                 self.deploy
                     .slots
@@ -229,48 +272,66 @@ impl GameDef {
             });
 
             if !in_slot {
-                problems.push(format!(
-                    "load_order.file must lie in a slot folder of the game: {:?}",
-                    order.file
-                ));
+                problems.push_in(
+                    Section::Deploy,
+                    format!(
+                        "load_order.file must lie in a slot folder of the game: {:?}",
+                        order.file
+                    ),
+                );
             }
         }
 
         if order.file.ends_with(['/', '\\']) {
-            problems.push(format!(
-                "load_order.file must name a file: {:?}",
-                order.file
-            ));
+            problems.push_in(
+                Section::LoadOrder,
+                format!("load_order.file must name a file: {:?}", order.file),
+            );
         }
 
         if order.priority_min >= order.priority_max {
-            problems.push("priority_min must be less than priority_max");
+            problems.push_in(
+                Section::Source,
+                "priority_min must be less than priority_max",
+            );
         }
     }
 
     pub(super) fn check_tools(&self, problems: &mut Problems) {
         for tool in &self.tools {
             if tool.detect.is_empty() {
-                problems.push(format!("tool {} needs at least one detect path", tool.id));
+                problems.push_in(
+                    Section::Tools,
+                    format!("tool {} needs at least one detect path", tool.id),
+                );
             }
 
-            problems.relative("tool detect path", &tool.detect);
+            problems.relative(Section::Tools, "tool detect path", &tool.detect);
 
             if let Some(source) = &tool.source {
                 if !is_valid_id(source.provider.as_str()) {
-                    problems.push(format!(
-                        "tool {} names an unknown provider: {:?}",
-                        tool.id, source.provider
-                    ));
+                    problems.push_in(
+                        Section::Tools,
+                        format!(
+                            "tool {} names an unknown provider: {:?}",
+                            tool.id, source.provider
+                        ),
+                    );
                 } else if !self.providers.contains_key(source.provider.as_str()) {
-                    problems.push(format!(
-                        "tool {} names provider {} which the game does not list",
-                        tool.id, source.provider
-                    ));
+                    problems.push_in(
+                        Section::Tools,
+                        format!(
+                            "tool {} names provider {} which the game does not list",
+                            tool.id, source.provider
+                        ),
+                    );
                 }
 
                 if source.mod_id.trim().is_empty() {
-                    problems.push(format!("tool {} has no source mod id", tool.id));
+                    problems.push_in(
+                        Section::Tools,
+                        format!("tool {} has no source mod id", tool.id),
+                    );
                 }
             }
 
@@ -278,19 +339,30 @@ impl GameDef {
                 let name = &prerequisite.name;
 
                 if !prerequisite.url.starts_with("https://") {
-                    problems.push(format!("prerequisite {name} must be an https link"));
+                    problems.push_in(
+                        Section::Tools,
+                        format!("prerequisite {name} must be an https link"),
+                    );
                 }
 
                 if !is_sha512(&prerequisite.sha512) {
-                    problems.push(format!(
-                        "prerequisite {name} needs a SHA-512 as 128 hex digits"
-                    ));
+                    problems.push_in(
+                        Section::Tools,
+                        format!("prerequisite {name} needs a SHA-512 as 128 hex digits"),
+                    );
                 }
 
-                problems.relative("prerequisite check", std::iter::once(&prerequisite.check));
+                problems.relative(
+                    Section::Tools,
+                    "prerequisite check",
+                    std::iter::once(&prerequisite.check),
+                );
 
                 if prerequisite.check_starts_with.trim().is_empty() {
-                    problems.push(format!("prerequisite {name} needs check_starts_with"));
+                    problems.push_in(
+                        Section::Tools,
+                        format!("prerequisite {name} needs check_starts_with"),
+                    );
                 }
             }
         }
@@ -304,4 +376,37 @@ fn deploy_dirs(deploy: &Deploy) -> impl Iterator<Item = &str> {
         .iter()
         .map(|slot| slot.dir.as_str())
         .chain(deploy.mirror.iter().map(|mirror| mirror.dir.as_str()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Section;
+    use crate::games::definition::GameDef;
+    use crate::test_support::games::SLOT;
+
+    #[test]
+    fn load_order_problems_keep_their_legacy_sections() {
+        let text = SLOT.replacen(
+            "format = \"mods_settings\"\nfile = \"{documents}/Slot Game/mods.settings\"",
+            "format = \"ue4ss_mods_txt\"\nfile = \"Other/mods.txt\"\npriority_min = 5\npriority_max = 5",
+            1,
+        );
+        let problems = GameDef::parse(&text).unwrap().validate();
+        let section_of = |message: &str| {
+            problems
+                .iter()
+                .find(|problem| problem.message.starts_with(message))
+                .map(|problem| problem.section)
+                .expect("the load order check reports the problem")
+        };
+
+        assert_eq!(
+            section_of("load_order.file must lie in a slot folder of the game"),
+            Section::Deploy
+        );
+        assert_eq!(
+            section_of("priority_min must be less than priority_max"),
+            Section::Source
+        );
+    }
 }

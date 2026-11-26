@@ -2,6 +2,7 @@
 
 use super::{GAMES_DIR, REMOVED_SUFFIX, move_if_absent};
 use crate::error::AppError;
+use crate::infra::deployment::{JOURNAL_FILE, MOUNTS_FILE};
 use std::fs;
 use std::path::Path;
 
@@ -16,7 +17,7 @@ const RENAMED: &[(&str, &str)] = &[
 
 /// Deployment files under a profile's state folder that name absolute paths of the game data folder. The journal is
 /// what undo reads; the mount file is what the hook reads on the next launch.
-const PATH_FILES: &[&str] = &["journal.jsonl", "overlay-mounts.json"];
+const PATH_FILES: &[&str] = &[JOURNAL_FILE, MOUNTS_FILE];
 
 /// The current id for an id from an older definition, or the id itself.
 pub(super) fn current_id(id: &str) -> &str {

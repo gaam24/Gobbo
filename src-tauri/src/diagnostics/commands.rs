@@ -3,7 +3,7 @@
 use super::mounts::{self, MountDiagnostics};
 use super::probe::{self, OverlayProbeReport};
 
-crate::commands::game_commands! {
+crate::commands::macros::game_commands! {
     /// Runs the x64 and x86 overlay probes in the active session and returns their checks.
     query run_overlay_probe() -> Vec<OverlayProbeReport> = probe::run_probe;
 
@@ -24,7 +24,7 @@ pub async fn create_support_bundle(
     data: tauri::State<'_, crate::context::Data>,
     game: Option<String>,
 ) -> Result<String, crate::error::AppError> {
-    crate::commands::with_data(data, move |root| {
+    crate::commands::helpers::with_data(data, move |root| {
         super::bundle::create(root, game.as_deref())
     })
     .await

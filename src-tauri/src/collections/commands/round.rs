@@ -5,7 +5,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::collections::controller::{CollectionDecision, CollectionRoundView};
 use crate::collections::model::CollectionProgress;
-use crate::commands::channel_sink_with_progress;
+use crate::commands::helpers::channel_sink_with_progress;
 use crate::context::Data;
 use crate::error::AppError;
 use crate::infra::tasks::{TaskFlags, TaskKey, kind};
@@ -34,10 +34,10 @@ pub async fn collection_run_round(
 ) -> Result<CollectionRoundView, AppError> {
     let key = TaskKey::collection_install(&game, &profile, &collection);
     let work_app = app.clone();
-    let result = crate::commands::run_task(
+    let result = crate::commands::helpers::run_task(
         data,
         &tasks,
-        key.as_str().to_string(),
+        key,
         game,
         kind::COLLECTION,
         move |root, game, flag, handle| {
@@ -70,7 +70,7 @@ pub async fn collection_run_round(
 /// decision carries only the wizard choices, the picked path or the skip.
 #[tauri::command]
 #[specta::specta]
-#[allow(
+#[expect(
     clippy::too_many_arguments,
     reason = "a Tauri command takes each IPC argument and state as its own parameter"
 )]
@@ -104,10 +104,10 @@ pub async fn collection_resolve_prompt(
     };
     let work_app = app.clone();
     let check_item = item.clone();
-    let result = crate::commands::run_task(
+    let result = crate::commands::helpers::run_task(
         data,
         &tasks,
-        key.as_str().to_string(),
+        key,
         game,
         kind::COLLECTION,
         move |root, game, flag, handle| {

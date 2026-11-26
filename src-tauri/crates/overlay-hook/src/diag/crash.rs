@@ -299,7 +299,11 @@ fn arm_filter() {
 /// Windows passes the exception record of the crashing thread; it is valid for the duration of the call.
 unsafe extern "system" fn on_unhandled(pointers: *const EXCEPTION_POINTERS) -> i32 {
     // The in-process fallback only writes when no out-of-process monitor is armed; a dump failure must not stop the
-    // crash path.
+    // crash path. It stays here deliberately: this is the dev-only `GOBBO_OVERLAY_DUMP` dump, and removing it from the
+    // filter would lose the only dump when no monitor is connected. Heap corruption and a stack overflow can make
+    // allocation and file I/O unsafe in this context; that limitation is accepted for a diagnostic that is off in
+    // production. The robust path needs no such work here: `send_context` below only asks the already attached
+    // minidumper callback (installed before any hooked call) for a dump.
     write_dump(pointers.cast_mut());
     // SAFETY: Windows passes the record of the exception being raised.
     let record = unsafe { pointers.as_ref() }
@@ -404,6 +408,12 @@ fn report_panic(info: &std::panic::PanicHookInfo<'_>) {
 
 /// Writes a minidump when `GOBBO_OVERLAY_DUMP` names a file. This is an in-process dump (DbgHelp), kept as a development
 /// aid; an out-of-process `minidumper` is the robust production path. The exception pointers may be null for a panic.
+///
+/// The last-chance filter calls this after heap corruption or a stack overflow may have broken the allocator. The file
+/// is created and DbgHelp is loaded here deliberately, not preloaded at `install()`: loading `dbghelp.dll` that early
+/// would put it ahead of the game's own DLLs, so a mod could no longer provide a file with that name, and pre-opening
+/// the dump file would leave an empty dump on every run that does not crash. Every step stays best-effort and silent so
+/// the crash path continues to the previous filter and the process terminates as it would have.
 fn write_dump(pointers: *mut EXCEPTION_POINTERS) {
     if dumper_connected() {
         return;

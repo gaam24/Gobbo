@@ -21,14 +21,21 @@ pub struct CollectionRule {
     pub reference: String,
 }
 
+/// An ordering or relationship rule between two collection members.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "snake_case")]
 pub enum CollectionRuleKind {
+    /// The source loads before the reference.
     Before,
+    /// The source loads after the reference.
     After,
+    /// A relationship rule: the source needs the reference.
     Requires,
+    /// A relationship rule: the source cannot be used with the reference.
     Conflicts,
+    /// A relationship rule: the source suggests the reference.
     Recommends,
+    /// A relationship rule: the source supplies what the reference asks for.
     Provides,
 }
 
@@ -41,10 +48,13 @@ pub struct CollectionIssue {
     pub message: Message,
 }
 
+/// How much an issue about a collection member affects the install.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "snake_case")]
 pub enum CollectionIssueSeverity {
+    /// The member is installed, but the user is told about the issue.
     Warning,
+    /// Part of the member is not supported and is left out of the install.
     Unsupported,
 }
 
@@ -154,7 +164,10 @@ fn order_phase(
         let (before, after) = match rule.kind {
             CollectionRuleKind::Before => (reference, source),
             CollectionRuleKind::After => (source, reference),
-            _ => continue,
+            CollectionRuleKind::Requires
+            | CollectionRuleKind::Conflicts
+            | CollectionRuleKind::Recommends
+            | CollectionRuleKind::Provides => continue,
         };
 
         if before == after || !edges.entry(before).or_default().insert(after) {

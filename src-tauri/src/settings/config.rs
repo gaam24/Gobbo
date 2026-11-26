@@ -1,6 +1,7 @@
 //! The configuration: the app's settings file and each game's settings. Provider keys live in the OS credential store.
 
 use crate::context::Data;
+use crate::domain::source::ProviderId;
 use crate::error::AppError;
 use crate::infra::json;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -35,7 +36,7 @@ pub struct AppSettings {
     /// the links.
     #[serde(default, deserialize_with = "taken_links")]
     #[specta(type = Vec<String>)]
-    pub source_links: Vec<String>,
+    pub source_links: Vec<ProviderId>,
     /// The main window opens with the size and place it had when it was closed. Off, it opens at the default size.
     #[serde(default = "on_by_default")]
     pub remember_window: bool,
@@ -100,13 +101,38 @@ pub enum EfficiencyMode {
     Always,
 }
 
+/// The state of the main window when an Efficiency mode decision is made. It is built from Tauri's focus and minimize
+/// flags at the window-event boundary; the saved settings never store it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WindowState {
+    /// The window is visible and has focus.
+    Focused,
+    /// The window is visible but another window has focus.
+    Background,
+    /// The window is minimized. It counts as active even when it still reports focus.
+    Minimized,
+}
+
+impl WindowState {
+    /// The window state from the focus and minimize flags of a window event. Minimized wins over focus.
+    pub const fn from_window(focused: bool, minimized: bool) -> Self {
+        if minimized {
+            Self::Minimized
+        } else if focused {
+            Self::Focused
+        } else {
+            Self::Background
+        }
+    }
+}
+
 impl EfficiencyMode {
-    /// Whether the process should be in Efficiency mode for the window state. `focused` is true when the main window
-    /// has focus; `minimized` is true when it is minimized.
-    pub const fn active(self, focused: bool, minimized: bool) -> bool {
+    /// Whether the process should be in Efficiency mode for this window state. `Auto` is active unless the window is
+    /// focused; a minimized window is always active.
+    pub const fn active(self, state: WindowState) -> bool {
         match self {
             Self::Off => false,
-            Self::Auto => !focused || minimized,
+            Self::Auto => !matches!(state, WindowState::Focused),
             Self::Always => true,
         }
     }
@@ -120,8 +146,8 @@ impl EfficiencyMode {
         reason = "the Windows implementation calls the system, so the function cannot be const there"
     )
 )]
-pub fn apply_efficiency(mode: EfficiencyMode, focused: bool, minimized: bool) {
-    let _ = crate::platform::set_efficiency_mode(mode.active(focused, minimized));
+pub fn apply_efficiency(mode: EfficiencyMode, state: WindowState) {
+    let _ = crate::platform::set_efficiency_mode(mode.active(state));
 }
 
 /// A switch that settings saved before it existed have no value for: it starts on.
@@ -164,14 +190,14 @@ enum SavedSourceLinks {
 
 /// Reads `source_links` from either form. A saved `true` takes the links of every provider that has links, as the single
 /// switch did before.
-fn taken_links<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Vec<String>, D::Error> {
+fn taken_links<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Vec<ProviderId>, D::Error> {
     Ok(match SavedSourceLinks::deserialize(deserializer)? {
-        SavedSourceLinks::Providers(ids) => ids,
+        SavedSourceLinks::Providers(ids) => ids.into_iter().map(ProviderId::from).collect(),
         SavedSourceLinks::AllProviders(false) => Vec::new(),
         SavedSourceLinks::AllProviders(true) => crate::providers::providers()
             .iter()
             .filter(|provider| !provider.schemes().is_empty())
-            .map(|provider| provider.id().as_str().to_string())
+            .map(|provider| provider.id())
             .collect(),
     })
 }
@@ -199,8 +225,9 @@ fn saved_close_action<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Clos
 mod tests {
     use super::{
         APP_NOTIFICATIONS, AppSettings, CloseAction, EfficiencyMode, NOTIFICATION_OUTCOMES,
-        task_notification,
+        WindowState, task_notification,
     };
+    use crate::domain::source::ProviderId;
 
     fn read(json: &str) -> AppSettings {
         serde_json::from_str(json).expect("the settings must parse")
@@ -210,7 +237,7 @@ mod tests {
     fn a_single_saved_switch_takes_the_links_of_every_provider() {
         assert_eq!(
             read(r#"{"source_links": true}"#).source_links,
-            ["nexus", "thunderstore"]
+            [ProviderId::from("nexus"), ProviderId::from("thunderstore")]
         );
         assert!(read(r#"{"source_links": false}"#).source_links.is_empty());
     }
@@ -219,7 +246,7 @@ mod tests {
     fn a_list_of_providers_is_taken_as_it_is() {
         assert_eq!(
             read(r#"{"source_links": ["thunderstore"]}"#).source_links,
-            ["thunderstore"]
+            [ProviderId::from("thunderstore")]
         );
     }
 
@@ -290,10 +317,22 @@ mod tests {
             read(r#"{"efficiency_mode":"always"}"#).efficiency_mode,
             EfficiencyMode::Always
         );
-        assert!(!EfficiencyMode::Off.active(false, true));
-        assert!(EfficiencyMode::Auto.active(false, false));
-        assert!(!EfficiencyMode::Auto.active(true, false));
-        assert!(EfficiencyMode::Always.active(true, false));
+        assert!(!EfficiencyMode::Off.active(WindowState::Minimized));
+        assert!(EfficiencyMode::Auto.active(WindowState::Background));
+        assert!(!EfficiencyMode::Auto.active(WindowState::Focused));
+        assert!(EfficiencyMode::Auto.active(WindowState::Minimized));
+        assert!(EfficiencyMode::Always.active(WindowState::Focused));
+    }
+
+    #[test]
+    fn a_minimized_window_is_not_focused_for_efficiency_mode() {
+        assert_eq!(
+            WindowState::from_window(false, false),
+            WindowState::Background
+        );
+        assert_eq!(WindowState::from_window(true, false), WindowState::Focused);
+        assert_eq!(WindowState::from_window(true, true), WindowState::Minimized);
+        assert!(EfficiencyMode::Auto.active(WindowState::from_window(true, true)));
     }
 
     #[test]
@@ -375,6 +414,7 @@ pub fn load_app_settings(root: &Data) -> AppSettings {
     json::read_json_or_default(&root.dir.join(APP_SETTINGS_FILE))
 }
 
+/// Writes the app settings. The file is created when it is missing.
 pub fn save_app_settings(root: &Data, settings: AppSettings) -> Result<(), AppError> {
     json::write_json(&root.dir.join(APP_SETTINGS_FILE), &settings)
 }

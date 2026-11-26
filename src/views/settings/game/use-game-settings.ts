@@ -19,8 +19,8 @@ export interface SettingsListActions {
 /// answered. Nothing waits for a Save button, so a Proton switch and a folder path behave the same way.
 export function useGameSettings(status: Status, onSave: (patch: Partial<Settings>) => void | Promise<void>, lists: SettingsListActions) {
 	const { t } = useTranslation();
-	const [gameRoot, setGameRoot] = useState(status.settings.game_root);
-	const [settingsDir, setSettingsDir] = useState(status.settings.settings_dir);
+	const [gameRoot, setGameRoot] = useState(status.settings.game_root ?? "");
+	const [settingsDir, setSettingsDir] = useState(status.settings.settings_dir ?? "");
 	const [modsRoot, setModsRoot] = useState(status.settings.mods_root ?? "");
 	const [launchEnv, setLaunchEnv] = useState(status.settings.launch_env ?? "");
 	const [launchArgs, setLaunchArgs] = useState(status.settings.launch_args ?? "");

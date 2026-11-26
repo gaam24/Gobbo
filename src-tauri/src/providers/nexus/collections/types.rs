@@ -170,11 +170,11 @@ impl<'de> Deserialize<'de> for Id {
 }
 
 impl Id {
-    pub(super) fn u32(self) -> Option<u32> {
+    pub(super) fn as_u32(self) -> Option<u32> {
         u32::try_from(self.0).ok()
     }
 
-    pub(super) fn kb(self) -> u32 {
+    pub(super) fn as_kb(self) -> u32 {
         let bytes = self.0;
         u32::try_from(bytes.saturating_div(1024)).unwrap_or(u32::MAX)
     }

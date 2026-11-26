@@ -196,11 +196,9 @@ fn owned_setup(
     let builds = crate::platform::installed_protons(&installs, &libraries);
     let proton = owned_proton_for(settings, &builds)?;
     std::fs::create_dir_all(&compatdata).map_err(crate::error::io_at(&compatdata))?;
-    let steam = crate::platform::steam_installs(home)
-        .into_iter()
-        .find(|dir| dir.is_dir());
+    let steam = installs.iter().find(|dir| dir.is_dir());
     Ok(Setup {
-        store_env: owned_env(&compatdata, game_root, steam.as_deref()),
+        store_env: owned_env(&compatdata, game_root, steam.map(PathBuf::as_path)),
         compatdata,
         proton,
     })

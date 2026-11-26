@@ -53,7 +53,8 @@ Rules for adding a hook:
   table was removed; do not add it back for a new case without a test that proves the mapping cannot work.
 - The one exception is the NT directory cursor: `NtQueryDirectoryFile(Ex)` is stateful, and a merged listing must
   remember the next entry between calls. `nt/directory.rs` keeps a bounded table (128 entries) keyed by the handle and
-  its game-relative folder, evicts the least recently used listing, and rebuilds on `RestartScan` or when a reused
+  its game-relative folder. At `MAX_LISTINGS`, a new handle passes to the original call instead of evicting a live
+  listing; a handle already in the table still updates its own entry. A listing rebuilds on `RestartScan` or when a reused
   handle names another folder. Each listing holds the upper/staging entries, a `RootStream` and the handle's final path
   in UTF-16, and pulls 64 to 128 entries into a batch per response, so memory follows the mod layers, not the size of
   the game folder. A matching final path continues the snapshot without re-probing the layers; a reused handle for the

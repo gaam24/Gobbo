@@ -57,7 +57,7 @@ pub fn history_states(n: usize) -> (ListState, ListState) {
     let mut now = empty_list_state(n);
 
     for index in 0..n {
-        let entry = |enabled| crate::domain::profiles::Entry {
+        let entry = |enabled| crate::domain::profiles::ListedMod {
             id: format!("nexus:{index}"),
             folder: format!("mod{index}"),
             enabled,
@@ -379,7 +379,7 @@ impl StatusFixture {
         library.save(&game.index()).expect("the benchmark index");
         let entries = profile
             .into_iter()
-            .map(|mod_entry| crate::domain::profiles::Entry {
+            .map(|mod_entry| crate::domain::profiles::ListedMod {
                 id: mod_entry.id,
                 folder: mod_entry.folder,
                 enabled: mod_entry.enabled,
@@ -431,11 +431,11 @@ impl StatusFixture {
             let dir = slot_root.join(&own);
             std::fs::create_dir_all(&dir).expect("a deployed mod folder");
             journal
-                .append(&crate::deploy::journal::Entry::DirCreated { path: dir.clone() })
+                .append(&crate::deploy::journal::JournalOp::DirCreated { path: dir.clone() })
                 .expect("the benchmark journal folder");
             for rel in version.files.iter() {
                 journal
-                    .append(&crate::deploy::journal::Entry::FileDeployed {
+                    .append(&crate::deploy::journal::JournalOp::FileDeployed {
                         path: dir.join(rel),
                     })
                     .expect("the benchmark journal file");
@@ -734,6 +734,7 @@ impl DeployFixture {
             game_root,
             settings: None,
             order_file: None,
+            order_format: None,
             state: dir.join("state"),
             user_data: Vec::new(),
         };

@@ -79,6 +79,7 @@ pub enum DownloadEvent {
 }
 
 impl Downloads {
+    /// A copy of every view in the queue, for the window.
     pub fn list(&self) -> Vec<DownloadView> {
         self.lock()
             .iter()

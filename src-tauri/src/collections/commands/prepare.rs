@@ -6,7 +6,7 @@ use tauri::{AppHandle, Manager, State};
 
 use crate::collections::download;
 use crate::collections::model::{CollectionItemAction, CollectionSessionView};
-use crate::commands::blocking;
+use crate::commands::helpers::blocking;
 use crate::context::Data;
 use crate::error::AppError;
 use crate::sources::downloads::Downloads;
@@ -49,7 +49,7 @@ pub async fn prepare_collection_item(
 /// Imports a file the user picked for one member, with the wizard's choices when the archive is a FOMOD.
 #[tauri::command]
 #[specta::specta]
-#[allow(
+#[expect(
     clippy::too_many_arguments,
     reason = "a Tauri command takes each IPC argument and state as its own parameter"
 )]
@@ -72,7 +72,7 @@ pub async fn import_collection_file(
         downloads.inner(),
         &path,
         |_| {
-            crate::commands::blocking(move || {
+            crate::commands::helpers::blocking(move || {
                 download::import_file(
                     &root,
                     &game,

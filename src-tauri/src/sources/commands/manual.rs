@@ -1,6 +1,6 @@
 use tauri::{AppHandle, Emitter, State};
 
-use crate::commands::blocking;
+use crate::commands::helpers::blocking;
 use crate::context::Data;
 use crate::error::AppError;
 use crate::sources::update::{

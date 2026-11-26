@@ -82,33 +82,29 @@ pub enum BlockerKey {
 }
 
 /// The first reason an apply is impossible, in the same order as the stage rules. A game that is ready and playable has
-/// no blocker, so the window does not have to guess from the stage or the next action.
-pub const fn blocker_of(input: &StageInput<'_>) -> Option<BlockerKey> {
-    if !input.game_ready {
-        if input.needs_settings_dir {
-            return Some(BlockerKey::GameAndSettings);
+/// no blocker, so the window does not have to guess from the stage or the next action. Derived from [`game_stage`] so
+/// the ordered checks have one owner.
+pub fn blocker_of(input: &StageInput<'_>) -> Option<BlockerKey> {
+    match game_stage(*input).0 {
+        GameStage::Setup {
+            step: SetupStep::Game,
+        } => {
+            if input.needs_settings_dir {
+                Some(BlockerKey::GameAndSettings)
+            } else {
+                Some(BlockerKey::GameFolder)
+            }
         }
-
-        return Some(BlockerKey::GameFolder);
+        GameStage::Setup {
+            step: SetupStep::Settings,
+        } => Some(BlockerKey::GameAndSettings),
+        GameStage::Setup {
+            step: SetupStep::Mods,
+        } => Some(BlockerKey::ModsFolder),
+        GameStage::Blocked { .. } => Some(BlockerKey::Problems),
+        GameStage::Empty | GameStage::NoEnabled { .. } => Some(BlockerKey::NoMods),
+        GameStage::Draft { .. } | GameStage::Applied { .. } | GameStage::Ready { .. } => None,
     }
-
-    if input.needs_settings_dir && !input.settings_ready {
-        return Some(BlockerKey::GameAndSettings);
-    }
-
-    if input.needs_mods_root && !input.mods_ready {
-        return Some(BlockerKey::ModsFolder);
-    }
-
-    if !input.problems.is_empty() {
-        return Some(BlockerKey::Problems);
-    }
-
-    if input.total == 0 || input.enabled == 0 {
-        return Some(BlockerKey::NoMods);
-    }
-
-    None
 }
 
 /// The values a stage is derived from. `StageInput` is plain data, so the rules are tested without a disk or a window.
@@ -369,51 +365,169 @@ mod tests {
     }
 
     #[test]
-    fn the_blocker_follows_the_same_order_as_the_stage() {
-        assert_eq!(blocker_of(&input()), None);
+    fn every_stage_maps_to_its_blocker() {
+        struct Case<'a> {
+            name: &'static str,
+            input: StageInput<'a>,
+            stage: GameStage,
+            action: NextAction,
+            blocker: Option<BlockerKey>,
+        }
 
-        let both_folders = StageInput {
-            game_ready: false,
-            needs_settings_dir: true,
-            ..input()
-        };
-        assert_eq!(blocker_of(&both_folders), Some(BlockerKey::GameAndSettings));
+        let loader_problems = [Message::new(LOADER_MISSING)];
+        let other_problems = [Message::new("status.requirement_missing")];
 
-        let game = StageInput {
-            game_ready: false,
-            ..input()
-        };
-        assert_eq!(blocker_of(&game), Some(BlockerKey::GameFolder));
+        let cases = [
+            Case {
+                name: "game and settings folders missing",
+                input: StageInput {
+                    game_ready: false,
+                    needs_settings_dir: true,
+                    settings_ready: false,
+                    ..input()
+                },
+                stage: GameStage::Setup {
+                    step: SetupStep::Game,
+                },
+                action: NextAction::SetGameFolder,
+                blocker: Some(BlockerKey::GameAndSettings),
+            },
+            Case {
+                name: "game folder missing",
+                input: StageInput {
+                    game_ready: false,
+                    ..input()
+                },
+                stage: GameStage::Setup {
+                    step: SetupStep::Game,
+                },
+                action: NextAction::SetGameFolder,
+                blocker: Some(BlockerKey::GameFolder),
+            },
+            Case {
+                name: "settings folder missing",
+                input: StageInput {
+                    needs_settings_dir: true,
+                    settings_ready: false,
+                    ..input()
+                },
+                stage: GameStage::Setup {
+                    step: SetupStep::Settings,
+                },
+                action: NextAction::SetSettingsFolder,
+                blocker: Some(BlockerKey::GameAndSettings),
+            },
+            Case {
+                name: "mods folder missing",
+                input: StageInput {
+                    needs_mods_root: true,
+                    mods_ready: false,
+                    ..input()
+                },
+                stage: GameStage::Setup {
+                    step: SetupStep::Mods,
+                },
+                action: NextAction::SetModsFolder,
+                blocker: Some(BlockerKey::ModsFolder),
+            },
+            Case {
+                name: "loader missing problem",
+                input: StageInput {
+                    problems: &loader_problems,
+                    ..input()
+                },
+                stage: GameStage::Blocked {
+                    reasons: loader_problems.to_vec(),
+                },
+                action: NextAction::InstallLoader,
+                blocker: Some(BlockerKey::Problems),
+            },
+            Case {
+                name: "other plan problem",
+                input: StageInput {
+                    problems: &other_problems,
+                    ..input()
+                },
+                stage: GameStage::Blocked {
+                    reasons: other_problems.to_vec(),
+                },
+                action: NextAction::FixProblems,
+                blocker: Some(BlockerKey::Problems),
+            },
+            Case {
+                name: "empty library",
+                input: StageInput {
+                    total: 0,
+                    enabled: 0,
+                    ..input()
+                },
+                stage: GameStage::Empty,
+                action: NextAction::ImportMods,
+                blocker: Some(BlockerKey::NoMods),
+            },
+            Case {
+                name: "no enabled mods",
+                input: StageInput {
+                    enabled: 0,
+                    ..input()
+                },
+                stage: GameStage::NoEnabled { total: 3 },
+                action: NextAction::EnableMods,
+                blocker: Some(BlockerKey::NoMods),
+            },
+            Case {
+                name: "draft deployment",
+                input: StageInput {
+                    deployed: true,
+                    draft_changes: 2,
+                    deployed_at: Some(10),
+                    ..input()
+                },
+                stage: GameStage::Draft {
+                    changes: 2,
+                    enabled: 2,
+                    total: 3,
+                },
+                action: NextAction::Apply,
+                blocker: None,
+            },
+            Case {
+                name: "applied deployment",
+                input: StageInput {
+                    deployed: true,
+                    deployed_at: Some(10),
+                    ..input()
+                },
+                stage: GameStage::Applied {
+                    at: Some(10),
+                    enabled: 2,
+                    total: 3,
+                },
+                action: NextAction::Play,
+                blocker: None,
+            },
+            Case {
+                name: "ready to apply",
+                input: input(),
+                stage: GameStage::Ready {
+                    enabled: 2,
+                    total: 3,
+                },
+                action: NextAction::Apply,
+                blocker: None,
+            },
+        ];
 
-        let settings = StageInput {
-            needs_settings_dir: true,
-            settings_ready: false,
-            ..input()
-        };
-        assert_eq!(blocker_of(&settings), Some(BlockerKey::GameAndSettings));
-
-        let mods = StageInput {
-            needs_mods_root: true,
-            mods_ready: false,
-            ..input()
-        };
-        assert_eq!(blocker_of(&mods), Some(BlockerKey::ModsFolder));
-
-        let problems = StageInput {
-            problems: &[Message::new("plan.duplicate_mod")],
-            ..input()
-        };
-        assert_eq!(blocker_of(&problems), Some(BlockerKey::Problems));
-
-        let empty = StageInput {
-            total: 0,
-            ..input()
-        };
-        assert_eq!(blocker_of(&empty), Some(BlockerKey::NoMods));
-        let none_enabled = StageInput {
-            enabled: 0,
-            ..input()
-        };
-        assert_eq!(blocker_of(&none_enabled), Some(BlockerKey::NoMods));
+        for case in cases {
+            let (actual_stage, actual_action) = game_stage(case.input);
+            assert_eq!(actual_stage, case.stage, "stage: {}", case.name);
+            assert_eq!(actual_action, case.action, "action: {}", case.name);
+            assert_eq!(
+                blocker_of(&case.input),
+                case.blocker,
+                "blocker: {}",
+                case.name
+            );
+        }
     }
 }

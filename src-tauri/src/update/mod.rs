@@ -5,9 +5,16 @@
 
 pub mod archive;
 pub mod commands;
+mod model;
 pub mod portable;
 pub mod relaunch;
 pub mod swap;
+
+#[allow(
+    unused_imports,
+    reason = "the façade exposes the moved IPC types at `update::PortableUpdate` and `update::PortableUpdateStep`; callers import them from `model` directly"
+)]
+pub use model::{PortableUpdate, PortableUpdateStep};
 
 use crate::platform::portable_target;
 use serde::Serialize;

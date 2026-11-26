@@ -255,7 +255,7 @@ pub fn prepare_item(
             mod_id,
             file_id,
             ..
-        } if providers::require(provider_id)?
+        } if providers::require(provider_id.as_str())?
             .credential_account()
             .is_some() =>
         {
@@ -263,9 +263,9 @@ pub fn prepare_item(
                 .ok_or_else(|| AppError::user("collection.item_missing").with("item", &item.key))?;
             let game_key = loaded
                 .game
-                .provider_key(provider_id)
-                .ok_or_else(|| providers::no_game_key(provider_id))?;
-            let provider = providers::require(provider_id)?;
+                .provider_key(provider_id.as_str())
+                .ok_or_else(|| providers::no_game_key(provider_id.as_str()))?;
+            let provider = providers::require(provider_id.as_str())?;
             let url = provider
                 .file_page_url(game_key, mod_id, file_id)
                 .ok_or_else(|| {

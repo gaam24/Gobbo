@@ -43,8 +43,25 @@ pub use metadata::{
 pub use rescan::rescan;
 pub use source_id::set_mod_source;
 
+/// The name shown for a listed mod: the family name when it is set, else the selected version's name, else the id.
+pub fn listed_mod_name(library: &Library, entry: &crate::domain::profiles::ListedMod) -> String {
+    library
+        .families
+        .get(&entry.id)
+        .map(|family| family.name.clone())
+        .filter(|name| !name.is_empty())
+        .or_else(|| {
+            library
+                .versions
+                .get(&entry.folder)
+                .map(|version| version.info.name.clone())
+                .filter(|name| !name.is_empty())
+        })
+        .unwrap_or_else(|| entry.id.clone())
+}
+
 /// The version string a profile entry selects, when the library has that version.
-pub fn version_of(library: &Library, entry: &crate::domain::profiles::Entry) -> Option<String> {
+pub fn version_of(library: &Library, entry: &crate::domain::profiles::ListedMod) -> Option<String> {
     library
         .versions
         .get(&entry.folder)

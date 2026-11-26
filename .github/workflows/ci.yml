@@ -4,9 +4,10 @@ name: CI
 #   changes   decides from the diff which jobs a push or pull request needs (a few seconds)
 #   web       format, lint (types, guard and dead code), unit tests, web bundle
 #   rust      Linux clippy and the full Rust suite
-#   windows   clippy, overlay hook build and the Windows suite, in one job; it runs only when the diff touches code that
-#             Windows compiles differently: a Rust file with `cfg(windows)` code or Win32 calls, the overlay crates, Cargo
-#             files or the hook build script. A push to main also runs it for any Rust change, so main always has a Windows result.
+#   windows   clippy, overlay hook build and the Windows suite, in one job; it runs for any change under `src-tauri/`
+#             (plus the hook build script), `games/` or `loaders/`, since any of it can behave differently on Windows
+#             (definitions affect platform paths and shipped-game deploy tests). A push to main also runs it for any
+#             Rust change, so main always has a Windows result.
 # A run that a newer push replaces is cancelled. There is no nightly run; E2E runs only by hand.
 
 on:
@@ -63,12 +64,10 @@ jobs:
           web_sources='^src/|^scripts/|^e2e/|^src-tauri/|^games/|^loaders/|^catalog\.json$|^release\.json$|^index\.html$|^\.gitignore$|^package\.json$|^bun\.lock$|^biome\.jsonc$|^\.oxlintrc\.json$|^tsconfig|^knip\.json$|^vite\.config\.ts$|^components\.json$|^rust-toolchain\.toml$|^lefthook\.yml$'
           if has "$web_sources|$workflow"; then web=true; fi
           if has "^src-tauri/|^games/|^loaders/|$workflow"; then rust=true; fi
-          if has "^src-tauri/(crates/|\.cargo/|Cargo\.|build\.rs|tauri\.windows)|^scripts/build-overlay-hook\.ts$|$workflow"; then
+          # Windows compiles the whole Rust workspace, so any src-tauri change can expose a platform difference.
+          if has "^src-tauri/|^games/|^loaders/|^scripts/build-overlay-hook\.ts$|$workflow"; then
             windows=true
           fi
-          for file in $(grep -E '^src-tauri/.*\.rs$' <<< "$files" || true); do
-            if [ ! -f "$file" ] || grep -qE 'cfg\([^)]*windows|windows_sys|win32' "$file"; then windows=true; fi
-          done
           if [ "$EVENT" = push ] && [ "$rust" = true ]; then windows=true; fi
           { echo "web=$web"; echo "rust=$rust"; echo "windows=$windows"; } | tee -a "$GITHUB_OUTPUT"
 
@@ -207,7 +206,7 @@ jobs:
 
       - name: Tests
         working-directory: src-tauri
-        run: cargo test --workspace --locked
+        run: cargo test --workspace --features bench --locked
 
   e2e:
     name: E2E

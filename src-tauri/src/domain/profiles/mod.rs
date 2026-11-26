@@ -13,7 +13,7 @@ mod profile;
 mod set;
 
 pub use group::{GroupKind, ModGroup};
-pub use profile::{Entry, ListState, PackOrigin, Profile, Row, Separator};
+pub use profile::{ListState, ListedMod, PackOrigin, Profile, Row, Separator};
 #[cfg(test)]
 use set::DEFAULT_NAME;
 pub use set::{

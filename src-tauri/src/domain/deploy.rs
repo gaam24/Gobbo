@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 
 use serde::Deserialize;
 
-use crate::domain::pathkey::path_key;
+use crate::domain::pathkey::{ends_with_ascii_case, path_key};
 
 /// The deployment rules of one game.
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -66,7 +66,7 @@ impl Deploy {
 
     /// The mirrored folder that holds a game path, for example `DLC` for `DLC/dlcfoo/x.bundle`. Case is ignored, and a
     /// mirror that names a file holds only that file.
-    pub fn mirror_of(&self, rel: &str) -> Option<&Mirror> {
+    fn mirror_of(&self, rel: &str) -> Option<&Mirror> {
         self.mirror
             .iter()
             .find(|mirror| is_inside(rel, &mirror.dir))
@@ -98,7 +98,7 @@ impl Deploy {
             .map(|dir| dir.rsplit('/').next().unwrap_or(dir));
         roots
             .chain(mirrored)
-            .filter(|name| name.to_ascii_lowercase().ends_with(".dll"))
+            .filter(|name| ends_with_ascii_case(name, ".dll"))
             .map(str::to_string)
             .collect()
     }
@@ -157,10 +157,7 @@ impl Deploy {
 
 /// Whether `name` ends with `extension`, ignoring ASCII case. The definition stores extensions lowercase with the dot.
 fn has_extension(name: &str, extension: &str) -> bool {
-    name.len() > extension.len()
-        && name
-            .get(name.len() - extension.len()..)
-            .is_some_and(|suffix| suffix.eq_ignore_ascii_case(extension))
+    name.len() > extension.len() && ends_with_ascii_case(name, extension)
 }
 
 /// A folder where each mod gets a folder of its own, for example `Mods/<mod>/`. The game loads every folder itself.

@@ -86,7 +86,8 @@ pub fn materialize(
     let mut total = 0u64;
 
     for (index, relative) in &members {
-        let Some(relative) = normalized_relative_path(relative) else {
+        let Some(relative) = normalized_relative_path(relative, crate::platform::is_windows())
+        else {
             let _ = fs::remove_dir_all(&staging);
             return Err(AppError::user("collection.bundle_path").with("name", &item.name));
         };

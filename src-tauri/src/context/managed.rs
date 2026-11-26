@@ -1,4 +1,4 @@
-//! The games the user added to Gobbo: the folders under `games/` and the data of the games removed from the list.
+//! The store of the games the user added: their folders under `games/` and the data of games removed from the list.
 
 use crate::context::{Data, load_settings};
 use crate::error::{AppError, io_at};
@@ -38,8 +38,11 @@ pub fn lock_state(root: &Data) -> Result<crate::context::state_lock::StateLock, 
 /// its old layout and does nothing when it is absent.
 pub fn migrate(root: &Data) -> Result<(), AppError> {
     let games = catalog()?;
-    let _state = lock_state(root)?;
-    migrate_with(root, &games);
+    {
+        let _state = lock_state(root)?;
+        migrate_with(root, &games);
+    }
+    // Repair saves settings, and that lock is taken alone: it must not run under `lock_state`.
     repair_game_roots(root, &games);
     Ok(())
 }

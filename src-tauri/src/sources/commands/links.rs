@@ -3,7 +3,7 @@ use std::sync::{Mutex, PoisonError};
 use tauri::{App, AppHandle, Emitter, Manager, State};
 use tauri_plugin_deep_link::DeepLinkExt;
 
-use crate::commands::blocking;
+use crate::commands::helpers::blocking;
 use crate::context::Data;
 use crate::error::AppError;
 use crate::providers;
@@ -63,6 +63,7 @@ fn receive_links(app: &AppHandle, urls: impl IntoIterator<Item = String>) {
         }
 
         let app = app.clone();
+        // Detached on purpose: the work ends with this link's download, and app exit does not join the thread.
         std::thread::spawn(move || {
             let data = app.state::<Data>();
             let changed = |event: DownloadEvent| match event {

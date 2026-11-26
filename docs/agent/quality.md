@@ -16,11 +16,12 @@ visible without blocking a merge on noise. `cargo machete` and `bun run docs:che
 - **Web** — `cargo fmt --check`, `bun run lint`, `bun test`, `bun run build:web`.
 - **Rust** — Linux clippy and `cargo test --workspace --features bench` (no debug info, for faster links); for changes
   under `src-tauri/`, `games/` or `loaders/`.
-- **Windows** — `bun scripts/build-overlay-hook.ts`, clippy and `cargo test --workspace` in one job. A pull request runs
-  it only when a changed Rust file has `cfg(windows)` code or Win32 calls, or the overlay crates, Cargo files or the hook
-  build script changed; a push to `main` runs it for any Rust change. The static CRT for every Windows crate is set in
-  `src-tauri/.cargo/config.toml`, so the test build reuses the hook binaries. `TEMP` points at a long path, because the
-  runner's default is an 8.3 path (see the hook's `ARCHITECTURE.md`).
+- **Windows** — `bun scripts/build-overlay-hook.ts`, clippy and `cargo test --workspace --features bench --locked` in one
+  job. A pull request runs it for any change under `src-tauri/` (plus the hook build script), `games/` or `loaders/`,
+  since any of them can behave differently on Windows (game and loader definitions affect platform paths and
+  shipped-game deploy tests); a push to `main` runs it for any Rust change. The static CRT for every Windows crate is
+  set in `src-tauri/.cargo/config.toml`, so the test build reuses the hook binaries. `TEMP` points at a long path,
+  because the runner's default is an 8.3 path (see the hook's `ARCHITECTURE.md`).
 
 The jobs run in parallel and a newer push cancels an older run. Rust caches are written only from `main`, also after a
 failed run. There is no nightly run: E2E runs only from **Actions → CI → Run workflow**. The release does not run CI
@@ -29,9 +30,9 @@ again; it waits for the CI run of the tagged commit to pass. Tests marked `#[ign
 ## Merge gate
 
 `bun run lint` is the merge gate and runs six stages: Biome, oxlint, the TypeScript check (`tsc`), the E2E type check
-(`e2e:types`), the architecture guard (`guard`: layers, data boundary, production `unwrap`/`expect`/`panic`/`todo`/`dbg`,
-overlay invariants, generated bindings and permissions) and `bun run deadcode` (Knip: unused files, exports and
-dependencies). All six must pass to merge.
+(`e2e:types`), the architecture guard (`guard`: layers, data boundary, module shape, production
+`unwrap`/`expect`/`panic`/`todo`/`dbg`, overlay invariants, generated bindings and permissions) and `bun run deadcode`
+(Knip: unused files, exports and dependencies). All six must pass to merge.
 
 ## Optional local reports
 

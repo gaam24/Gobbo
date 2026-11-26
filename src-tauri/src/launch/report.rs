@@ -12,8 +12,9 @@ use crate::deploy::overlay;
 use crate::games::Phase;
 use crate::infra::clock::now_seconds;
 
-/// The file in the game's data folder that holds the last launch.
-const REPORT_FILE: &str = "last_run.json";
+/// The file in the game's data folder that holds the last launch. Visible in the crate so the support bundle reads the
+/// same file this module writes.
+pub const REPORT_FILE: &str = "last_run.json";
 
 /// How many of the newest overlay decisions the report carries. The ring keeps more; the console shows the tail.
 const DECISION_LIMIT: usize = 200;
@@ -192,18 +193,8 @@ impl From<gobbo_overlay_decisions::Decision> for OverlayDecision {
     }
 }
 
-/// One log file of the game or its mods, as the console shows it.
-#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
-pub struct GameLog {
-    /// The universal kind: `script`, `loader`, `console`, `crash`, `mod` or `game`.
-    pub kind: String,
-    /// The file relative to the game folder, with `/` separators.
-    pub path: String,
-    /// The last lines of the file, oldest first.
-    pub lines: Vec<String>,
-    /// When the file was last written, in Unix seconds.
-    pub modified_at: Option<u32>,
-}
+// One log file of the game or its mods, as the console shows it.
+use crate::launch::model::GameLog;
 
 /// One step of a launch. `code` says what happened (`steps.running`, `steps.done`, `steps.skipped`, or the error code
 /// of a failure), and `params` gives its values.
@@ -220,6 +211,7 @@ pub struct StepReport {
     pub finished_at: Option<u32>,
 }
 
+/// Where one launch step stands: still running, done, skipped or failed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
 pub enum StepStatus {
@@ -237,6 +229,7 @@ pub struct OutputInfo {
 }
 
 impl RunReport {
+    /// An empty report for a launch that started at `started_at`.
     pub const fn new(started_at: u32) -> Self {
         Self {
             started_at,

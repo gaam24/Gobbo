@@ -629,7 +629,7 @@ fn isolated_user_data(f: &Fixture) -> (String, PathBuf, PathBuf) {
 fn is_isolated(f: &Fixture, profile: &str) -> bool {
     load_profiles(&f.data.game(USER_DATA_GAME))
         .unwrap()
-        .get(profile)
+        .profile(profile)
         .unwrap()
         .user_data_isolation("documents")
         .is_isolated()

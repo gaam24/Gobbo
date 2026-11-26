@@ -4,7 +4,7 @@ use super::*;
 use crate::domain::library::Archive;
 use crate::domain::library::ModInfo;
 use crate::domain::library::ModVersion;
-use crate::status::mod_views::version_view;
+use crate::status::mod_builders::version_view;
 use crate::test_support::scratch;
 use crate::test_support::write;
 
@@ -156,20 +156,117 @@ fn a_version_is_named_by_its_archive_only_when_the_info_has_no_name_of_its_own()
     );
 }
 
-#[cfg(feature = "bench")]
+/// A status built from plain rows, with no library on disk. `patch` only reads the rows and their revisions, so the
+/// other fields stay empty. The revision is supplied by the caller, the way a window sends back what it holds.
+fn plain_status(rows: &[(&str, &str)]) -> Status {
+    let (mods, revisions): (Vec<_>, Vec<_>) = rows
+        .iter()
+        .map(|(id, revision)| {
+            (
+                crate::status::views::ModView {
+                    id: (*id).to_string(),
+                    folder: (*id).to_string(),
+                    fomod_installer: false,
+                    version_count: 1,
+                    installed_at: 0,
+                    slot: String::new(),
+                    enabled: true,
+                    priority: 1,
+                    load_priority: None,
+                    orderable: false,
+                    files: 0,
+                    size_kb: 0,
+                    wins: 0,
+                    loses: 0,
+                    archive: None,
+                    archive_file: None,
+                    skipped: 0,
+                    info: ModInfo::default(),
+                    source: None,
+                    sources: Vec::new(),
+                    page_id: None,
+                    page_name: None,
+                    part_id: None,
+                    part_name: None,
+                    part_category: None,
+                    update: None,
+                    tags: Vec::new(),
+                    instructions: String::new(),
+                    unmet_requirements: 0,
+                    requires_names: Vec::new(),
+                    requirement_groups: Vec::new(),
+                    profiles: Vec::new(),
+                    collections: Vec::new(),
+                },
+                (*revision).to_string(),
+            )
+        })
+        .unzip();
+    let count = rows.len() as u32;
+    Status {
+        game_name: "Example Game".to_string(),
+        game_subtitle: String::new(),
+        runtime: crate::games::runtime::Runtime::Native,
+        stage: crate::status::stage::GameStage::Ready {
+            enabled: count,
+            total: count,
+        },
+        next_action: crate::status::stage::NextAction::Apply,
+        blocker: None,
+        settings: Settings::default(),
+        game_ready: true,
+        settings_ready: true,
+        needs_mods_root: false,
+        mods_ready: true,
+        mods_root: String::new(),
+        needs_settings_dir: false,
+        load_order: None,
+        deployed: false,
+        draft_changes: 0,
+        deployed_at: None,
+        deployed_list: Vec::new(),
+        profiles: Vec::new(),
+        mods,
+        revisions,
+        build: 1,
+        patch: false,
+        removed: Vec::new(),
+        order: None,
+        separators: Vec::new(),
+        groups: Vec::new(),
+        history: crate::context::profile::history::HistoryState::default(),
+        bisect: None,
+        has_overwrite: false,
+        conflict_count: 0,
+        problems: Vec::new(),
+        warnings: Vec::new(),
+        library_dir: String::new(),
+        archives_dir: String::new(),
+        profile_dir: None,
+        overwrite_dir: String::new(),
+        game_profile_data: Vec::new(),
+        user_data: Vec::new(),
+        launch_hint: String::new(),
+        executables: Vec::new(),
+        tools: Vec::new(),
+    }
+}
+
 #[test]
-#[ignore = "uses the benchmark fixture"]
 fn a_patch_with_the_same_revisions_is_empty() {
     use crate::status::patch;
     use crate::status::views::KnownRows;
 
-    let fixture = crate::bench_api::StatusFixture::new(100, 0);
-    let full = fixture.status_value();
+    let rows = [("mod-a", "rev-a"), ("mod-b", "rev-b"), ("mod-c", "rev-c")];
     let known = KnownRows {
-        ids: full.mods.iter().map(|view| view.id.clone()).collect(),
-        revisions: full.revisions.clone(),
+        ids: rows.iter().map(|(id, _)| id.to_string()).collect(),
+        revisions: rows
+            .iter()
+            .map(|(_, revision)| revision.to_string())
+            .collect(),
     };
-    let empty = patch(fixture.status_value(), &known);
+
+    let empty = patch(plain_status(&rows), &known);
     assert!(empty.patch);
     assert!(empty.mods.is_empty());
     assert!(empty.revisions.is_empty());
@@ -178,14 +275,15 @@ fn a_patch_with_the_same_revisions_is_empty() {
 
     // A window without revisions gets the whole list and its order, but not the removed ids.
     let fresh = patch(
-        fixture.status_value(),
+        plain_status(&rows),
         &KnownRows {
             ids: Vec::new(),
             revisions: Vec::new(),
         },
     );
-    assert_eq!(fresh.mods.len(), 100);
-    assert_eq!(fresh.order.as_ref().map(Vec::len), Some(100));
+    assert_eq!(fresh.mods.len(), rows.len());
+    assert_eq!(fresh.order.as_ref().map(Vec::len), Some(rows.len()));
+    assert!(fresh.removed.is_empty());
 }
 
 #[test]
@@ -221,6 +319,7 @@ fn the_subtitle_names_the_store_or_the_steam_app_id() {
     assert_eq!(subtitle_for("manual", &[]), "Manual");
     assert_eq!(subtitle_for("", &ids), "Steam 1001");
     assert_eq!(subtitle_for("", &[]), "Manual");
-    assert_eq!(subtitle_for("unknown", &ids), "Steam 1001");
-    assert_eq!(subtitle_for("unknown", &[]), "");
+    // An unknown saved name is a manual install, not a Steam install with an inherited app id.
+    assert_eq!(subtitle_for("unknown", &ids), "Manual");
+    assert_eq!(subtitle_for("unknown", &[]), "Manual");
 }

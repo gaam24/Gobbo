@@ -8,7 +8,7 @@ use std::path::Path;
 
 use crate::error::{FileError, Message};
 
-use super::journal::{Entry, Journal, JournalRoots};
+use super::journal::{Journal, JournalOp, JournalRoots};
 use super::{DeployError, overlay, settings};
 use crate::context::data::JOURNAL_FILE;
 
@@ -36,18 +36,18 @@ pub fn undo(roots: &JournalRoots) -> Result<Vec<Message>, DeployError> {
 
     for entry in entries.iter().rev() {
         match entry {
-            Entry::FileDeployed { path } => {
+            JournalOp::FileDeployed { path } => {
                 if let Err(error) = remove_deployed_file(path, &mut warnings) {
                     warnings.push(entry_failed(path, error));
                 }
             }
-            Entry::DirCreated { path } => {
+            JournalOp::DirCreated { path } => {
                 if let Err(error) = remove_created_dir(path, &mut warnings) {
                     warnings.push(entry_failed(path, error));
                 }
             }
-            Entry::LayerPrepared { overwrite, .. } => overlay::finish(overwrite, &mut warnings),
-            Entry::SettingsSections { .. } => {}
+            JournalOp::LayerPrepared { overwrite, .. } => overlay::finish(overwrite, &mut warnings),
+            JournalOp::SettingsSections { .. } => {}
         }
     }
 
@@ -66,9 +66,9 @@ fn entry_failed(path: &Path, error: impl std::fmt::Display) -> Message {
 }
 
 /// Puts back the settings sections the journal recorded.
-fn undo_settings(entries: &[Entry]) -> Result<(), DeployError> {
+fn undo_settings(entries: &[JournalOp]) -> Result<(), DeployError> {
     let sections = entries.iter().find_map(|entry| match entry {
-        Entry::SettingsSections {
+        JournalOp::SettingsSections {
             path,
             existed,
             touched,
@@ -178,10 +178,10 @@ mod tests {
         fs::write(&file, "x").unwrap();
         let journal = Journal::new(base.join("state").join(JOURNAL_FILE));
         journal
-            .append(&Entry::DirCreated { path: dir.clone() })
+            .append(&JournalOp::DirCreated { path: dir.clone() })
             .unwrap();
         journal
-            .append(&Entry::FileDeployed { path: file.clone() })
+            .append(&JournalOp::FileDeployed { path: file.clone() })
             .unwrap();
 
         let warnings = undo(&roots(&base)).unwrap();
@@ -203,13 +203,13 @@ mod tests {
         fs::write(&output, "generated").unwrap();
         let journal = Journal::new(state.join(JOURNAL_FILE));
         journal
-            .append(&Entry::LayerPrepared {
+            .append(&JournalOp::LayerPrepared {
                 mods: mods.clone(),
                 overwrite: overwrite.clone(),
             })
             .unwrap();
         journal
-            .append(&Entry::FileDeployed {
+            .append(&JournalOp::FileDeployed {
                 path: output.clone(),
             })
             .unwrap();
@@ -279,12 +279,12 @@ mod tests {
         fs::write(&outside, "user file").unwrap();
         let journal = Journal::new(state.join(JOURNAL_FILE));
         journal
-            .append(&Entry::FileDeployed {
+            .append(&JournalOp::FileDeployed {
                 path: inside.clone(),
             })
             .unwrap();
         journal
-            .append(&Entry::FileDeployed {
+            .append(&JournalOp::FileDeployed {
                 path: outside.clone(),
             })
             .unwrap();

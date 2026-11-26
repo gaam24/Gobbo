@@ -9,10 +9,9 @@ use crate::context::profile::lock_profiles;
 use crate::context::{Data, load_game, load_library, load_profiles};
 use crate::domain::collection::CollectionItem;
 use crate::domain::library::LibraryView;
-use crate::domain::profiles::{Entry as ProfileEntry, Profiles};
+use crate::domain::profiles::{ListedMod, Profiles};
 use crate::error::AppError;
 use crate::games;
-use crate::library::waiting::find_version;
 
 /// The live status of one collection in one profile.
 pub fn status(
@@ -61,7 +60,7 @@ pub fn skip(
     let _profiles = lock_profiles();
     let mut profiles = load_profiles(&data)?;
     let plan = {
-        let profile = profiles.get(profile_id)?;
+        let profile = profiles.profile(profile_id)?;
         let origin = profile
             .collections
             .iter()
@@ -79,7 +78,7 @@ pub fn skip(
         .item(item_key)
         .ok_or_else(|| AppError::user("collection.item_missing").with("item", item_key))?
         .clone();
-    let profile = profiles.get_mut(profile_id)?;
+    let profile = profiles.profile_mut(profile_id)?;
     let origin = profile
         .collections
         .iter_mut()
@@ -100,7 +99,7 @@ pub fn skip(
 
     let origin = origin.clone();
     save_profiles(&data, &profiles)?;
-    let profile = profiles.get(profile_id)?.clone();
+    let profile = profiles.profile(profile_id)?.clone();
     let current = status::statuses(&plan, &library, &profile, Some(&origin));
     Ok(session_view(profile_id.to_string(), origin, plan, current))
 }
@@ -132,7 +131,7 @@ pub fn finish_with_manual(
     let _profiles = lock_profiles();
     let mut profiles = load_profiles(&data)?;
     let plan = {
-        let profile = profiles.get(profile_id)?;
+        let profile = profiles.profile(profile_id)?;
         let origin = profile
             .collections
             .iter()
@@ -140,7 +139,7 @@ pub fn finish_with_manual(
             .ok_or_else(|| AppError::user("collection.not_in_profile"))?;
         cache::read_plan_or_missing(&data, origin)?
     };
-    let profile = profiles.get_mut(profile_id)?;
+    let profile = profiles.profile_mut(profile_id)?;
     let mut origin = profile
         .collections
         .iter()
@@ -165,7 +164,7 @@ pub fn finish_with_manual(
             continue;
         }
 
-        let Some((family, folder)) = find_version(&view, &item.wanted()) else {
+        let Some((family, folder)) = view.find_entry(&item.wanted()) else {
             continue;
         };
 
@@ -190,14 +189,14 @@ pub fn finish_with_manual(
     let mut index: BTreeMap<String, usize> = BTreeMap::new();
 
     for (position, item) in plan.ordered().iter().enumerate() {
-        if let Some((family, folder)) = find_version(&view, &item.wanted())
+        if let Some((family, folder)) = view.find_entry(&item.wanted())
             && collection_file_is_exact(item, &view, &folder)
         {
             index.entry(family).or_insert(position);
         }
     }
 
-    let mut collection_entries: Vec<ProfileEntry> = profile
+    let mut collection_entries: Vec<ListedMod> = profile
         .mods
         .iter()
         .filter(|entry| added.contains(&entry.id) && index.contains_key(&entry.id))
@@ -233,7 +232,7 @@ pub fn finish_with_manual(
     }
 
     save_profiles(&data, &profiles)?;
-    let profile = profiles.get(profile_id)?.clone();
+    let profile = profiles.profile(profile_id)?.clone();
     let current = status::statuses_with_view(&plan, &library, &view, &profile, Some(&origin));
     Ok(session_view(profile_id.to_string(), origin, plan, current))
 }

@@ -161,10 +161,6 @@ pub(super) struct Rules<'a> {
 
 /// Reads the copied archive, applies the FOMOD choices and extracts the planned files. The claim removes the reserved
 /// archive and the working folder when this fails.
-#[allow(
-    clippy::too_many_arguments,
-    reason = "the copy, its claim, choices, rules, cancellation and progress are one import"
-)]
 pub(super) fn extract_copy(
     copy: Copy,
     claim: Claim,

@@ -31,6 +31,7 @@ pub struct Phases {
 }
 
 impl ModSteps {
+    /// Reads the text of a `mod_steps.toml` file, or an error when it is malformed.
     pub fn parse(text: &str) -> Result<Self, toml::de::Error> {
         toml::from_str(text)
     }

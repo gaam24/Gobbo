@@ -3,8 +3,8 @@ use super::super::profile::Separator;
 
 use super::*;
 
-fn entry(id: &str, enabled: bool) -> Entry {
-    Entry {
+fn entry(id: &str, enabled: bool) -> ListedMod {
+    ListedMod {
         id: id.to_string(),
         folder: id.to_string(),
         enabled,

@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::error::{AppError, ErrorKind, MOD_MISSING};
 
 use super::super::group::{GroupKind, ModGroup};
-use super::super::profile::{Entry, Profile, Separator};
+use super::super::profile::{ListedMod, Profile, Separator};
 use super::MAX_NAME_CHARS;
 use super::next_separator_id;
 
@@ -43,7 +43,7 @@ impl MoveSide {
 /// The family ids that move or toggle together with `id`, in list order. A stored group wins: every member of it that
 /// is on the list moves as one. Otherwise a run of at least two adjacent, ungrouped mods that share a page key moves as
 /// one, as the window's `movedPage` does. A mod on its own is its own block.
-fn block_of(mods: &[Entry], groups: &[ModGroup], pages: &PageKeys, id: &str) -> Vec<String> {
+fn block_of(mods: &[ListedMod], groups: &[ModGroup], pages: &PageKeys, id: &str) -> Vec<String> {
     if let Some(group) = groups
         .iter()
         .find(|group| group.members.iter().any(|member| member == id))

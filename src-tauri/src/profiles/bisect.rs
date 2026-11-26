@@ -76,7 +76,7 @@ pub fn bisect_answer(root: &Data, game_id: &str, broken: bool) -> Result<(), App
         .partition(|id| testing.contains(id));
     search.suspects = if broken { on } else { off };
     let mut profiles = load_profiles(&data)?;
-    let profile = profiles.get_mut(&search.profile)?;
+    let profile = profiles.profile_mut(&search.profile)?;
     next_test(&mut search, &library, profile);
     json::write_json(&file(&data), &search)?;
     data.save_profiles(&profiles)
@@ -90,7 +90,7 @@ pub fn bisect_stop(root: &Data, game_id: &str, disable_found: bool) -> Result<()
     let search = read(&data).ok_or_else(not_running)?;
     let mut profiles = load_profiles(&data)?;
 
-    if let Ok(profile) = profiles.get_mut(&search.profile) {
+    if let Ok(profile) = profiles.profile_mut(&search.profile) {
         let found =
             (disable_found && search.suspects.len() == 1).then(|| search.suspects[0].clone());
         for entry in &mut profile.mods {

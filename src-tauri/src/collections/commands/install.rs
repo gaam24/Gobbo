@@ -5,7 +5,7 @@ use tauri::ipc::Channel;
 
 use crate::collections::download;
 use crate::collections::model::CollectionProgress;
-use crate::commands::channel_sink_with_progress;
+use crate::commands::helpers::channel_sink_with_progress;
 use crate::context::Data;
 use crate::error::AppError;
 use crate::infra::tasks::TaskFlags;
@@ -24,8 +24,8 @@ pub async fn install_collection(
     collection: String,
     progress: Channel<CollectionProgress>,
 ) -> Result<super::model::CollectionInstallView, AppError> {
-    let key = String::from(TaskKey::collection_install(&game, &profile, &collection));
-    crate::commands::run_task(
+    let key = TaskKey::collection_install(&game, &profile, &collection);
+    crate::commands::helpers::run_task(
         data,
         &tasks,
         key,

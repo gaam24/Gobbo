@@ -18,7 +18,7 @@ use crate::infra::json;
 
 /// One materialized path and the copy that belongs to the profile.
 #[derive(Clone)]
-pub(super) struct Entry {
+pub(super) struct MaterializedPath {
     pub(super) real: PathBuf,
     pub(super) store: PathBuf,
 }
@@ -45,17 +45,17 @@ impl OwnerFile {
 
 /// One per-profile store. `entries` is the only part a store owns; the owner file, the first seed and the switch
 /// order live in this module.
-pub(super) trait Store {
+pub(super) trait ProfileStore {
     /// The owner file in the game's `state` folder.
     fn owner(&self) -> OwnerFile;
 
     /// Whether the store applies to this game at all. A game with no `user_data` sets has nothing to switch.
-    fn active(&self) -> bool {
+    fn is_active(&self) -> bool {
         true
     }
 
     /// The paths materialized for `profile`, with the copy each one uses.
-    fn entries(&self, data: &Data, profile: &str) -> Result<Vec<Entry>, AppError>;
+    fn entries(&self, data: &Data, profile: &str) -> Result<Vec<MaterializedPath>, AppError>;
 
     /// Runs before the owner check: creates the folders a redirect needs, or writes the target's manifest.
     fn prepare(&self, _data: &Data, _profile: &str) -> Result<(), AppError> {
@@ -98,8 +98,8 @@ struct SwitchJournal {
 /// Makes `target` the owner of `store`. The old owner's data is saved first; a first run seeds the target from the
 /// real paths, and a later profile starts from its own store. A switch over existing real files is journaled, so an
 /// interrupted restore is undone before the next switch captures anything.
-pub(super) fn switch(store: &impl Store, data: &Data, target: &str) -> Result<(), AppError> {
-    if !store.active() {
+pub(super) fn switch(store: &impl ProfileStore, data: &Data, target: &str) -> Result<(), AppError> {
+    if !store.is_active() {
         return Ok(());
     }
 
@@ -125,7 +125,12 @@ pub(super) fn switch(store: &impl Store, data: &Data, target: &str) -> Result<()
 /// because no real path changes yet; a failure there leaves the previous switch intact. Once the journal is written, a
 /// failed restore or owner write restores `from` before returning the error. A journal that cannot be removed after a
 /// successful switch is harmless: the next entry sees the owner at `to` and only removes it.
-fn switch_owner(store: &impl Store, data: &Data, from: &str, to: &str) -> Result<(), AppError> {
+fn switch_owner(
+    store: &impl ProfileStore,
+    data: &Data,
+    from: &str,
+    to: &str,
+) -> Result<(), AppError> {
     let owner_file = store.owner();
     let from_entries = store.entries(data, from)?;
     capture(&from_entries)?;
@@ -166,7 +171,7 @@ fn switch_owner(store: &impl Store, data: &Data, from: &str, to: &str) -> Result
 fn rollback(
     data: &Data,
     owner_file: OwnerFile,
-    from_entries: &[Entry],
+    from_entries: &[MaterializedPath],
     journal: &SwitchJournal,
     error: AppError,
 ) -> Result<(), AppError> {
@@ -216,7 +221,7 @@ fn complete_journal(data: &Data, owner_file: OwnerFile, journal: &mut SwitchJour
 /// names `to` the restore finished and only the journal is left. Otherwise the old owner's stored copy is put back,
 /// which is the state the journal was written to protect, and the owner stays at `from`. A journal that cannot be read
 /// is kept aside with a warning; it must not block the switch.
-fn recover(store: &impl Store, data: &Data) -> Result<(), AppError> {
+fn recover(store: &impl ProfileStore, data: &Data) -> Result<(), AppError> {
     let owner_file = store.owner();
     let path = journal_path(data, owner_file);
     let journal = match json::read_json::<SwitchJournal>(&path) {
@@ -291,8 +296,8 @@ fn remove_journal(data: &Data, owner_file: OwnerFile) -> Result<(), AppError> {
 }
 
 /// Saves the owner's paths. Does nothing when no profile owns the store, or the owner is gone.
-pub(super) fn capture_current(store: &impl Store, data: &Data) -> Result<(), AppError> {
-    if !store.active() {
+pub(super) fn capture_current(store: &impl ProfileStore, data: &Data) -> Result<(), AppError> {
+    if !store.is_active() {
         return Ok(());
     }
 
@@ -310,12 +315,12 @@ pub(super) fn capture_current(store: &impl Store, data: &Data) -> Result<(), App
 
 /// Restores `profile`'s paths.
 pub(super) fn restore_profile(
-    store: &impl Store,
+    store: &impl ProfileStore,
     data: &Data,
     profile: &str,
     remove_missing: bool,
 ) -> Result<(), AppError> {
-    if !store.active() {
+    if !store.is_active() {
         return Ok(());
     }
 
@@ -324,7 +329,7 @@ pub(super) fn restore_profile(
 }
 
 /// Copies every real path into its store. A missing real path removes the store entry.
-pub(super) fn capture(entries: &[Entry]) -> Result<(), AppError> {
+pub(super) fn capture(entries: &[MaterializedPath]) -> Result<(), AppError> {
     for entry in entries {
         copy::capture(&entry.real, &entry.store)?;
     }
@@ -333,7 +338,7 @@ pub(super) fn capture(entries: &[Entry]) -> Result<(), AppError> {
 }
 
 /// Copies every store entry back to its real path. `remove_missing` removes a real path with no store entry.
-pub(super) fn restore(entries: &[Entry], remove_missing: bool) -> Result<(), AppError> {
+pub(super) fn restore(entries: &[MaterializedPath], remove_missing: bool) -> Result<(), AppError> {
     for entry in entries {
         copy::restore(&entry.store, &entry.real, remove_missing)?;
     }
@@ -394,16 +399,16 @@ mod tests {
         }
     }
 
-    impl Store for FileStore {
+    impl ProfileStore for FileStore {
         fn owner(&self) -> OwnerFile {
             OWNER
         }
 
-        fn entries(&self, _data: &Data, profile: &str) -> Result<Vec<Entry>, AppError> {
+        fn entries(&self, _data: &Data, profile: &str) -> Result<Vec<MaterializedPath>, AppError> {
             Ok(self
                 .names
                 .iter()
-                .map(|name| Entry {
+                .map(|name| MaterializedPath {
                     real: self.real(name),
                     store: self.stored(profile, name),
                 })

@@ -9,7 +9,7 @@ use crate::error::AppError;
 use crate::infra::storage;
 use crate::platform::portable_target;
 use crate::update::archive;
-use crate::update::commands::PortableUpdateStep;
+use crate::update::model::PortableUpdateStep;
 use crate::update::{relaunch, swap};
 
 /// Downloads the newer portable version, checks its signature, replaces the program files and starts the new copy.

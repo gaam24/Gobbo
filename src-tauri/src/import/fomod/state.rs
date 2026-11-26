@@ -5,8 +5,9 @@
 use serde::Serialize;
 use specta::Type;
 
-use super::model::{Choice, Group, GroupKind, GroupProblem, ModuleConfig, OptionKind};
+use super::model::{Group, GroupKind, GroupProblem, ModuleConfig, OptionKind};
 use super::sources::{chosen_by_group, named_picks, run_installer};
+use crate::domain::fomod::Choice;
 
 /// The wizard's answer for one selection.
 #[derive(Debug, Clone, Serialize, Type)]

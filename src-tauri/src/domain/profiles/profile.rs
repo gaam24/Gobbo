@@ -13,7 +13,7 @@ use super::{diff, group::ModGroup, history};
 /// A mod on a profile list. The order in the list decides which copy of a shared file wins.
 /// `id` is the family, `folder` the version selected for this profile.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Entry {
+pub struct ListedMod {
     pub id: String,
     pub folder: String,
     pub enabled: bool,
@@ -21,6 +21,24 @@ pub struct Entry {
     /// order to the game.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub priority: Option<u32>,
+}
+
+impl ListedMod {
+    /// A mod on a profile list: the family it belongs to, the version chosen for this profile, whether it is enabled,
+    /// and the load priority the user set.
+    pub fn new(
+        id: impl Into<String>,
+        folder: impl Into<String>,
+        enabled: bool,
+        priority: Option<u32>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            folder: folder.into(),
+            enabled,
+            priority,
+        }
+    }
 }
 
 /// A row of a profile list as the window sends it back: the selected version and whether it is enabled. The order is
@@ -43,11 +61,12 @@ pub struct Separator {
     pub before: Option<String>,
 }
 
+/// One named mod list of a game, with its layout and deployment record.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Profile {
     pub id: String,
     pub name: String,
-    pub mods: Vec<Entry>,
+    pub mods: Vec<ListedMod>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub separators: Vec<Separator>,
     /// Groups of related families on the list. Each one holds at least two members.
@@ -55,7 +74,7 @@ pub struct Profile {
     pub groups: Vec<ModGroup>,
     /// The enabled entries as they were at the last deployment. Empty before the first one.
     #[serde(default)]
-    pub deployed_mods: Vec<Entry>,
+    pub deployed_mods: Vec<ListedMod>,
     /// Unix time in seconds of the last deployment of this profile.
     #[serde(default)]
     pub deployed_at: Option<u32>,
@@ -92,7 +111,7 @@ pub struct PackOrigin {
 }
 
 impl Profile {
-    pub(crate) const fn new(id: String, name: String, mods: Vec<Entry>) -> Self {
+    pub(crate) const fn new(id: String, name: String, mods: Vec<ListedMod>) -> Self {
         Self {
             id,
             name,
@@ -126,7 +145,7 @@ impl Profile {
             return false;
         }
 
-        self.mods.push(Entry {
+        self.mods.push(ListedMod {
             id: family.to_string(),
             folder: folder.to_string(),
             enabled: true,
@@ -136,7 +155,7 @@ impl Profile {
     }
 
     /// The enabled entries, in list order.
-    pub fn enabled_mods(&self) -> Vec<Entry> {
+    pub fn enabled_mods(&self) -> Vec<ListedMod> {
         self.mods
             .iter()
             .filter(|entry| entry.enabled)
@@ -207,7 +226,7 @@ impl Profile {
     /// Removes the entries `drop` picks. A separator above a removed mod moves to the next mod that stays, so a group
     /// keeps its place in the list. The deployment ledger and the deployed file winners forget the removed families
     /// too, so a later import of one does not inherit the old deployment.
-    pub fn remove_mods(&mut self, mut drop: impl FnMut(&Entry) -> bool) {
+    pub fn remove_mods(&mut self, mut drop: impl FnMut(&ListedMod) -> bool) {
         let dropped: Vec<bool> = self.mods.iter().map(&mut drop).collect();
         let removed: Vec<String> = self
             .mods
@@ -250,7 +269,12 @@ impl Profile {
 
     /// Records the deployment this profile's list was applied with: the enabled entries, the file winners and the
     /// time of the apply.
-    pub fn mark_deployed(&mut self, mods: Vec<Entry>, winners: BTreeMap<String, String>, at: u32) {
+    pub fn mark_deployed(
+        &mut self,
+        mods: Vec<ListedMod>,
+        winners: BTreeMap<String, String>,
+        at: u32,
+    ) {
         self.deployed_mods = mods;
         self.deployed_winners = winners;
         self.deployed_at = Some(at);
@@ -298,7 +322,7 @@ impl Profile {
 /// and the pack mods still waiting for the library.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ListState {
-    pub mods: Vec<Entry>,
+    pub mods: Vec<ListedMod>,
     #[serde(default)]
     pub separators: Vec<Separator>,
     #[serde(default)]
@@ -327,8 +351,8 @@ impl Profile {
 mod tests {
     use super::*;
 
-    fn entry(id: &str, folder: &str, enabled: bool) -> Entry {
-        Entry {
+    fn entry(id: &str, folder: &str, enabled: bool) -> ListedMod {
+        ListedMod {
             id: id.to_string(),
             folder: folder.to_string(),
             enabled,

@@ -3,7 +3,7 @@
 
 use std::path::Path;
 
-use crate::deploy::DeployError;
+use crate::deploy::error::DeployError;
 use crate::error::FileError;
 use crate::infra::fs;
 

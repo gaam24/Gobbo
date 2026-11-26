@@ -119,7 +119,7 @@ pub fn import(
 
     let profile = crate::context::edit_profiles(root, game_id, |_, game, profiles| {
         let id = profiles.create_unique(name)?;
-        profiles.get_mut(&id)?.user_data = game.user_data_defaults();
+        profiles.profile_mut(&id)?.user_data = game.user_data_defaults();
         profiles.switch(&id)?;
         Ok(id)
     })?;

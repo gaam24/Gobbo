@@ -5,6 +5,8 @@
 use super::*;
 use crate::deploy::ops::apply_deployment;
 #[cfg(target_os = "linux")]
+use crate::deploy::ops::undo_deployment;
+#[cfg(target_os = "linux")]
 use crate::deploy::overlay::Session;
 use crate::games::GameDef;
 #[cfg(target_os = "linux")]
@@ -55,6 +57,27 @@ pub(super) const BEPINEX_ARCHIVE: &[(&str, &str)] = &[
     ("doorstop_config.ini", "[UnityDoorstop]"),
     ("BepInEx/plugins/FastShop/FastShop.dll", "plugin"),
 ];
+
+/// Undoes the deployment of a shipped preset and checks that undo leaves neither files in the game folder nor a
+/// prepared overlay layer behind. The game never receives a Gobbo file, before or after undo.
+#[cfg(target_os = "linux")]
+fn undo_leaves_the_game_and_profile_clean(data: &Data, id: &str, game_root: &Path) {
+    undo_deployment(data, id).unwrap();
+    for file in ["winhttp.dll", "doorstop_config.ini", "BepInEx"] {
+        assert!(
+            !game_root.join(file).exists(),
+            "{id}: {file} is in the game folder after undo"
+        );
+    }
+    assert!(
+        !status(data, id).unwrap().deployed,
+        "{id}: still deployed after undo"
+    );
+    assert!(
+        overlay_session_state(&data.game(id)).unwrap().is_none(),
+        "{id}: the overlay layer is still prepared after undo"
+    );
+}
 
 /// The game folder of a Steam install: `steamapps/common/<folder>` with the game's marker files, and the prefix Proton
 /// creates on the first run (`compatdata/<app id>/pfx`).
@@ -198,6 +221,7 @@ fn a_bepinex_archive_is_served_where_the_game_loads_it_and_the_game_folder_stays
 
         assert!(!game_root.join("winhttp.dll").exists(), "{id}");
         assert!(!game_root.join("BepInEx").exists(), "{id}");
+        undo_leaves_the_game_and_profile_clean(&data, id, &game_root);
         let _ = fs::remove_dir_all(&base);
     }
 }
@@ -226,6 +250,7 @@ fn a_bare_plugin_at_the_archive_root_goes_to_the_plugins_folder() {
                 .is_some(),
             "{id}: a bare .dll must reach the plugins folder of its mod"
         );
+        undo_leaves_the_game_and_profile_clean(&data, id, &game_root);
         let _ = fs::remove_dir_all(&base);
     }
 }
@@ -237,7 +262,7 @@ fn gobbo_run_gives_the_program_the_launch_settings_and_the_proxy_override() {
 
     for id in &bepinex_games() {
         let base = scratch!("unity-run");
-        let (data, _) = installed_game(&base, id, BEPINEX_ARCHIVE, "PROTON_USE_WINED3D=1");
+        let (data, game_root) = installed_game(&base, id, BEPINEX_ARCHIVE, "PROTON_USE_WINED3D=1");
         apply_deployment(&data, id).unwrap();
 
         // Steam's launch option calls `gobbo run <game> -- %command%`: the program is Proton, which writes what it got.
@@ -265,6 +290,7 @@ fn gobbo_run_gives_the_program_the_launch_settings_and_the_proxy_override() {
             "{id}: the launch settings did not reach the program"
         );
         assert_eq!(lines[2], "waitforexitandrun", "{id}");
+        undo_leaves_the_game_and_profile_clean(&data, id, &game_root);
         let _ = fs::remove_dir_all(&base);
     }
 }
@@ -294,6 +320,7 @@ fn a_plugins_folder_at_the_archive_root_is_served_from_the_bepinex_plugins_folde
                 .is_some(),
             "{id}: a `plugins/` folder at the archive root must reach BepInEx/plugins"
         );
+        undo_leaves_the_game_and_profile_clean(&data, id, &game_root);
         let _ = fs::remove_dir_all(&base);
     }
 }
@@ -324,6 +351,7 @@ fn a_plugin_folder_at_the_archive_root_is_served_from_the_plugins_folder() {
                 .is_some(),
             "{id}: a plugin folder must reach the plugins folder of its mod"
         );
+        undo_leaves_the_game_and_profile_clean(&data, id, &game_root);
         let _ = fs::remove_dir_all(&base);
     }
 }
@@ -350,6 +378,7 @@ fn a_mod_config_is_served_in_the_bepinex_config_folder() {
             "{id}: a mod's config must reach BepInEx/config"
         );
         assert!(!game_root.join("BepInEx").exists(), "{id}");
+        undo_leaves_the_game_and_profile_clean(&data, id, &game_root);
         let _ = fs::remove_dir_all(&base);
     }
 }

@@ -76,21 +76,122 @@ impl MountSpec {
     }
 }
 
+/// The most mounts a session accepts: the game and seven user-data sets. The pass-through path checks every mount, so
+/// the list stays small on purpose.
+pub const MAX_MOUNTS: usize = 8;
+
+/// Why a mount set was refused. A bad set fails the launch instead of running the game against the real folder.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct InvalidMountConfig {
+    reason: &'static str,
+}
+
+impl std::fmt::Display for InvalidMountConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "invalid mount config: {}", self.reason)
+    }
+}
+
+impl std::error::Error for InvalidMountConfig {}
+
 /// The complete mount set of a session, written by Gobbo and read by the hook before the game runs.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MountConfig {
     /// The format version. The hook refuses a version it does not understand instead of guessing.
-    pub version: u32,
+    version: u32,
     /// The game mount first, then the user-data redirects.
-    pub mounts: Vec<MountSpec>,
+    mounts: Vec<MountSpec>,
 }
 
 impl MountConfig {
     /// The current format version.
     pub const VERSION: u32 = 1;
 
-    /// The game mount, which is first and carries `MountSpec::GAME_ID`. The shape is validated before this is read
-    /// (the hook in `session_config`, Gobbo where it writes the file), so this only selects and never validates.
+    /// Builds a mount set and refuses one the hook cannot use safely. Gobbo and the hook both go through this or
+    /// [`MountConfig::validate`], so an unchecked set never reaches a game.
+    pub fn try_new(version: u32, mounts: Vec<MountSpec>) -> Result<Self, InvalidMountConfig> {
+        Self { version, mounts }.validate()
+    }
+
+    /// Checks a mount set read from a file, returning it unchanged when the hook can use it. A bad set fails the launch
+    /// instead of running the game against the real folder.
+    pub fn validate(self) -> Result<Self, InvalidMountConfig> {
+        if self.version != Self::VERSION {
+            return Err(InvalidMountConfig {
+                reason: "unsupported version",
+            });
+        }
+
+        if self.mounts.len() > MAX_MOUNTS {
+            return Err(InvalidMountConfig {
+                reason: "too many mounts",
+            });
+        }
+
+        if !self
+            .mounts
+            .first()
+            .is_some_and(|mount| mount.id == MountSpec::GAME_ID)
+        {
+            return Err(InvalidMountConfig {
+                reason: "the game mount must be first",
+            });
+        }
+
+        let mut ids = BTreeSet::new();
+
+        for mount in &self.mounts {
+            if mount.id.is_empty() {
+                return Err(InvalidMountConfig {
+                    reason: "empty mount id",
+                });
+            }
+
+            if !ids.insert(mount.id.as_str()) {
+                return Err(InvalidMountConfig {
+                    reason: "duplicate mount id",
+                });
+            }
+
+            if !mount.guest.is_absolute() {
+                return Err(InvalidMountConfig {
+                    reason: "guest path is not absolute",
+                });
+            }
+
+            if !mount.root.is_absolute() {
+                return Err(InvalidMountConfig {
+                    reason: "root path is not absolute",
+                });
+            }
+
+            if !mount.upper.is_absolute() {
+                return Err(InvalidMountConfig {
+                    reason: "upper path is not absolute",
+                });
+            }
+
+            if mount
+                .staging
+                .as_ref()
+                .is_some_and(|path| !path.is_absolute())
+            {
+                return Err(InvalidMountConfig {
+                    reason: "staging path is not absolute",
+                });
+            }
+        }
+
+        Ok(self)
+    }
+
+    /// The mounts of this session, the game first and then the user-data redirects.
+    pub fn mounts(&self) -> &[MountSpec] {
+        &self.mounts
+    }
+
+    /// The game mount, which is first and carries `MountSpec::GAME_ID`. The shape is validated before this is read, so
+    /// this only selects and never validates.
     pub fn game(&self) -> Option<&MountSpec> {
         let [game, ..] = &self.mounts[..] else {
             return None;
@@ -125,6 +226,7 @@ pub struct Whiteouts {
 
 impl Whiteouts {
     /// The whiteouts from their file: one relative path per line. Blank lines are skipped.
+    #[must_use]
     pub fn parse(text: &str) -> Self {
         let mut whiteouts = Self::default();
 
@@ -136,6 +238,7 @@ impl Whiteouts {
     }
 
     /// The text of the whiteouts file: one relative path per line.
+    #[must_use]
     pub fn to_text(&self) -> String {
         let mut text = String::with_capacity(self.paths.len() * 32);
 
@@ -1050,13 +1153,22 @@ mod tests {
         }
     }
 
+    /// An absolute path in this platform's spelling, so a config built for a test passes validation.
+    fn absolute(rel: &str) -> PathBuf {
+        #[cfg(windows)]
+        let path = format!(r"C:\{rel}");
+        #[cfg(not(windows))]
+        let path = format!("/{rel}");
+        PathBuf::from(path)
+    }
+
     fn mount(id: &str) -> MountSpec {
         MountSpec {
             id: id.to_string(),
-            guest: PathBuf::from("/game"),
-            root: PathBuf::from("/game"),
+            guest: absolute("game"),
+            root: absolute("game"),
             staging: None,
-            upper: PathBuf::from("/state/upper"),
+            upper: absolute("state").join("upper"),
         }
     }
 
@@ -1500,10 +1612,11 @@ mod tests {
 
     #[test]
     fn the_game_mount_and_the_redirects_follow_the_config_shape() {
-        let config = MountConfig {
-            version: MountConfig::VERSION,
-            mounts: vec![mount("game"), mount("saves")],
-        };
+        let config = MountConfig::try_new(
+            MountConfig::VERSION,
+            vec![mount(MountSpec::GAME_ID), mount("saves")],
+        )
+        .unwrap();
         assert_eq!(config.game().map(|mount| mount.id.as_str()), Some("game"));
         assert_eq!(
             config
@@ -1512,22 +1625,87 @@ mod tests {
                 .collect::<Vec<_>>(),
             ["saves"]
         );
-        assert_eq!(
-            MountConfig {
-                mounts: vec![mount("saves")],
-                ..config.clone()
-            }
-            .game(),
-            None
+        // `game` still says `None` for a set assembled without validation.
+        let mut wrong_first = config.clone();
+        wrong_first.mounts = vec![mount("saves")];
+        assert_eq!(wrong_first.game(), None);
+        let mut empty = config;
+        empty.mounts = Vec::new();
+        assert_eq!(empty.game(), None);
+    }
+
+    #[test]
+    fn a_valid_two_mount_config_is_accepted() {
+        let config = MountConfig::try_new(
+            MountConfig::VERSION,
+            vec![mount(MountSpec::GAME_ID), mount("saves")],
+        )
+        .unwrap();
+        assert_eq!(config.mounts().len(), 2);
+        assert_eq!(config.mounts()[0].id, MountSpec::GAME_ID);
+        assert_eq!(config.redirects().count(), 1);
+        assert!(config.clone().validate().is_ok());
+    }
+
+    #[test]
+    fn too_many_mounts_are_refused() {
+        let mut mounts = vec![mount(MountSpec::GAME_ID)];
+        mounts.extend((1..=MAX_MOUNTS).map(|index| mount(&format!("set-{index}"))));
+        assert_eq!(mounts.len(), MAX_MOUNTS + 1);
+        assert!(MountConfig::try_new(MountConfig::VERSION, mounts.clone()).is_err());
+        mounts.truncate(MAX_MOUNTS);
+        assert!(MountConfig::try_new(MountConfig::VERSION, mounts).is_ok());
+    }
+
+    #[test]
+    fn a_config_without_the_game_mount_first_is_refused() {
+        assert!(
+            MountConfig::try_new(
+                MountConfig::VERSION,
+                vec![mount("saves"), mount(MountSpec::GAME_ID)],
+            )
+            .is_err()
         );
-        assert_eq!(
-            MountConfig {
-                mounts: Vec::new(),
-                ..config
-            }
-            .game(),
-            None
+        assert!(MountConfig::try_new(MountConfig::VERSION, Vec::new()).is_err());
+    }
+
+    #[test]
+    fn duplicate_and_empty_mount_ids_are_refused() {
+        assert!(
+            MountConfig::try_new(
+                MountConfig::VERSION,
+                vec![mount(MountSpec::GAME_ID), mount(MountSpec::GAME_ID)],
+            )
+            .is_err()
         );
+        assert!(
+            MountConfig::try_new(
+                MountConfig::VERSION,
+                vec![mount(MountSpec::GAME_ID), mount("")],
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn a_relative_mount_path_is_refused() {
+        let config = MountConfig::try_new(
+            MountConfig::VERSION,
+            vec![mount(MountSpec::GAME_ID), mount("saves")],
+        )
+        .unwrap();
+        let mut relative_guest = config.clone();
+        relative_guest.mounts[0].guest = PathBuf::from("relative");
+        assert!(relative_guest.validate().is_err());
+        let mut relative_root = config.clone();
+        relative_root.mounts[0].root = PathBuf::from("relative");
+        assert!(relative_root.validate().is_err());
+        let mut relative_upper = config.clone();
+        relative_upper.mounts[0].upper = PathBuf::from("relative");
+        assert!(relative_upper.validate().is_err());
+        let mut relative_staging = config;
+        relative_staging.mounts[0].staging = Some(PathBuf::from("relative"));
+        assert!(relative_staging.validate().is_err());
     }
 
     #[test]

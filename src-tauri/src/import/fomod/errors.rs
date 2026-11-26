@@ -5,9 +5,12 @@ use crate::error::{AppError, ErrorKind};
 /// An error of the FOMOD installer: the choices break the group rules, or the XML is broken.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum FomodError {
-    /// The XML cannot be read, for example a broken tag.
+    /// The first tag is not `<config>`: a semantic error the parser describes itself.
     #[error("FOMOD installer: {message}")]
     Parse { message: String },
+    /// The XML cannot be read, for example a broken tag. The parser's own error is kept for the log.
+    #[error("FOMOD installer: {0}")]
+    Xml(#[from] roxmltree::Error),
     /// The chosen option does not exist in this group.
     #[error("FOMOD installer: option {option:?} does not exist in group {group:?}")]
     UnknownOption { group: String, option: String },
@@ -25,6 +28,9 @@ impl From<FomodError> for AppError {
         match error {
             FomodError::Parse { message } => Self::new("fomod.parse_failed")
                 .with("detail", message)
+                .kind(ErrorKind::Permanent),
+            FomodError::Xml(source) => Self::new("fomod.parse_failed")
+                .with("detail", source)
                 .kind(ErrorKind::Permanent),
             FomodError::UnknownOption { group, option } => Self::new("fomod.unknown_option")
                 .with("group", group)

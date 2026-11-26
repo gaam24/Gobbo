@@ -4,6 +4,7 @@
 use std::borrow::Cow;
 use std::sync::Arc;
 
+use crate::domain::layout::LayoutProfile;
 use crate::error::Message;
 
 /// A mod version from the profile. The order of the mods passed in is the priority order.
@@ -27,31 +28,6 @@ pub struct ModInput<'a> {
     /// The files a summary can materialize, computed when the library was loaded. `None` falls back to checking every
     /// file; a full plan always checks every file.
     pub layout: Option<&'a LayoutProfile>,
-}
-
-/// What a summary has to materialize for one file list. The profile is computed once with the game's rules, so a
-/// status does not run the mirror, root-file and shared-kind checks for every file of every mod.
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
-pub struct LayoutProfile {
-    /// The files that can land outside the mod's own folder, in file order. `None` means none of them can; `All` means
-    /// every file can (a mirrored-only list or a shared rule over the whole list).
-    pub materialized: Materialized,
-    /// Every file keeps its game path, so the per-file mirror check is already answered.
-    pub mirrored_only: bool,
-}
-
-/// How much of a file list a summary materializes: none, all, or the files named by index.
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
-pub enum Materialized {
-    /// No profile was computed for this list; check every file.
-    #[default]
-    Unknown,
-    /// No file of the list can materialize.
-    None,
-    /// Every file of the list materializes.
-    All,
-    /// These file indexes materialize, in file order.
-    Some(Vec<u32>),
 }
 
 /// One mod of a plan: its family, its folder and the file list that its planned files index into. A plan keeps one

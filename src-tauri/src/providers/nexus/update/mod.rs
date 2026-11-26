@@ -22,8 +22,8 @@ pub(super) struct Listed {
 pub(super) fn check_updates(api_key: &str, requests: &[SourceUpdateRequest]) -> Vec<SourceUpdate> {
     let domain = requests.first().map(|request| request.game_key.as_str());
     let client = NexusClient::new(api_key);
-    let mut results = Vec::new();
-    let mut lookups = Vec::new();
+    let mut results = Vec::with_capacity(requests.len());
+    let mut lookups = Vec::with_capacity(requests.len());
 
     for request in requests {
         match lookup::lookup(request) {

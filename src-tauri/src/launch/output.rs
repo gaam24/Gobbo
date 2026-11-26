@@ -40,7 +40,11 @@ pub fn begin(data: &Data) -> io::Result<PipeWriter> {
 pub fn begin_at(path: &Path) -> io::Result<PipeWriter> {
     let file = File::create(path)?;
     let (reader, writer) = io::pipe()?;
-    std::thread::spawn(move || copy(reader, file));
+    // The thread ends when the game and every child have closed the pipe. It is intentionally not joined during quit:
+    // a child still holding the write end would block exit forever.
+    let _ = std::thread::Builder::new()
+        .name("gobbo-output".into())
+        .spawn(move || copy(reader, file))?;
     Ok(writer)
 }
 

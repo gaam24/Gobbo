@@ -10,6 +10,7 @@ use std::time::{Duration, Instant};
 
 use crate::error::{AppError, ErrorKind};
 
+/// The User-Agent header sent with every request, naming Gobbo and its version.
 pub const USER_AGENT: &str = concat!(
     "Gobbo/",
     env!("CARGO_PKG_VERSION"),
@@ -108,23 +109,30 @@ pub fn trace(event: Trace<'_>) {
         return;
     }
 
-    let outcome = match (event.status, &event.error) {
-        (Some(status), _) => format!("{status}"),
-        (None, Some(error)) => format!("failed: {error}"),
-        (None, None) => "failed".to_string(),
-    };
+    let outcome = trace_outcome(event.status, event.error.as_deref());
     let size = event
         .bytes
         .map_or_else(String::new, |bytes| format!(" {bytes} B"));
-    eprintln!(
-        "gobbo http: {} {} {} {}{} in {} ms",
+    crate::infra::log::info(format!(
+        "http: {} {} {} {}{} in {} ms",
         event.method,
         event.service,
         outcome,
         redact(event.url),
         size,
         event.elapsed.as_millis()
-    );
+    ));
+}
+
+/// The outcome as it is printed. `ureq::Error::BadUri` can carry a whole signed address, so a failure message gets the
+/// same redaction as the URL before either reaches the log.
+fn trace_outcome(status: Option<u16>, error: Option<&str>) -> String {
+    let outcome = match (status, error) {
+        (Some(status), _) => status.to_string(),
+        (None, Some(error)) => format!("failed: {error}"),
+        (None, None) => "failed".to_string(),
+    };
+    redact(&outcome)
 }
 
 /// Reports a request that produced an answer.
@@ -166,21 +174,48 @@ pub fn trace_failure(
     });
 }
 
-/// Replaces the values of the query names that carry a secret in a URL or a diagnostic text. `key=` also covers
-/// `apikey=` and `api_key=`.
+/// The query names whose values carry a secret: an API key, a signed link's expiry or signature, and a download token.
+/// The match ignores case, so `X-Amz-Signature=` is masked like `x-amz-signature=`. The API-key spellings are listed
+/// explicitly: a name is only a match at a query boundary, so `key=` no longer reaches inside `apikey=` or `api_key=`.
+const SECRET_PARAMS: [&str; 10] = [
+    "apikey=",
+    "api_key=",
+    "key=",
+    "expires=",
+    "token=",
+    "sig=",
+    "signature=",
+    "x-amz-signature=",
+    "se=",
+    "sp=",
+];
+
+/// Replaces the values of the query names that carry a secret in a URL or a diagnostic text. A name matches only at a
+/// query boundary — the start of the text, `?`, `&` or `;` — so an ordinary name such as `case=` or `license=` keeps its
+/// value. The boundary stays in the output and the value ends at the first `&`, space, newline or quote, as before.
 pub fn redact(text: &str) -> String {
     let mut out = text.to_string();
 
-    for name in ["key=", "expires=", "token="] {
+    for name in SECRET_PARAMS {
         let mut search = 0;
 
-        while let Some(found) = out[search..].find(name) {
-            let at = search + found + name.len();
-            let end = out[at..]
+        loop {
+            // Names are ASCII, so folding to lowercase keeps the byte positions used to edit `out`.
+            let folded = out.to_ascii_lowercase();
+            let Some(found) = folded[search..].find(name) else {
+                break;
+            };
+            let at = search + found;
+            if at != 0 && !matches!(folded.as_bytes()[at - 1], b'?' | b'&' | b';') {
+                search = at + name.len();
+                continue;
+            }
+            let value_start = at + name.len();
+            let end = out[value_start..]
                 .find(['&', ' ', '\n', '\r', '"', '\''])
-                .map_or(out.len(), |end| at + end);
-            out.replace_range(at..end, "***");
-            search = at + 3;
+                .map_or(out.len(), |end| value_start + end);
+            out.replace_range(value_start..end, "***");
+            search = value_start + 3;
         }
     }
 
@@ -259,6 +294,45 @@ mod tests {
             "GET https://cdn.example.com/a.zip?token=***&user_id=7 failed"
         );
         assert_eq!(redact("no secrets here"), "no secrets here");
+    }
+
+    #[test]
+    fn signed_link_parameters_are_masked_and_an_ordinary_page_is_untouched() {
+        let url = "https://cdn.example.com/a.zip?sig=abc123&X-Amz-Signature=deadbeef&page=2";
+        assert_eq!(
+            redact(url),
+            "https://cdn.example.com/a.zip?sig=***&X-Amz-Signature=***&page=2"
+        );
+        // The same signature name in lowercase, and the other signed-link names, are masked too.
+        assert_eq!(
+            redact("?x-amz-signature=abc&signature=def&se=1&sp=r"),
+            "?x-amz-signature=***&signature=***&se=***&sp=***"
+        );
+        assert_eq!(redact("?page=2&sort=name"), "?page=2&sort=name");
+    }
+
+    #[test]
+    fn a_secret_name_needs_a_query_boundary() {
+        let ordinary = "?case=1&license=MIT&base=foo";
+        assert_eq!(redact(ordinary), ordinary);
+
+        assert_eq!(
+            redact("?key=one&se=two&X-Amz-Signature=three&apikey=four"),
+            "?key=***&se=***&X-Amz-Signature=***&apikey=***"
+        );
+        // A semicolon is a boundary too, and the underscored API-key spelling needs its own name.
+        assert_eq!(redact("?page=1;api_key=secret"), "?page=1;api_key=***");
+    }
+
+    #[test]
+    fn a_failed_trace_masks_a_signed_url_in_the_error() {
+        let error = Some("bad uri: https://cdn.example.com/a.zip?key=secret&expires=1");
+        assert_eq!(
+            trace_outcome(None, error),
+            "failed: bad uri: https://cdn.example.com/a.zip?key=***&expires=***"
+        );
+        assert_eq!(trace_outcome(Some(200), None), "200");
+        assert_eq!(trace_outcome(None, None), "failed");
     }
 
     /// ureq would otherwise keep its rustls default, which this Windows build does not enable, and panic on the first

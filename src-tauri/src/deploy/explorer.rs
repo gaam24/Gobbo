@@ -13,6 +13,7 @@ use crate::domain::resolver::{Conflict, PlanMode};
 use crate::error::AppError;
 use crate::library::active_mods;
 
+/// One file several enabled mods write, with the winning family and the ones it overrides.
 #[derive(Debug, Clone, Serialize, specta::Type)]
 pub struct ConflictEntry {
     /// Relative to the deployment root, with `/`.
@@ -27,6 +28,7 @@ pub struct ConflictEntry {
     pub copies: u32,
 }
 
+/// The shared files of the active profile, in path order, for the window's conflict list.
 #[derive(Debug, Clone, Serialize, specta::Type)]
 pub struct ConflictExplorer {
     pub total: u32,

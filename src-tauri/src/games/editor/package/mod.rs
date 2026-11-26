@@ -10,11 +10,9 @@ use std::path::{Path, PathBuf};
 use serde::Serialize;
 use specta::Type;
 
+use super::super::GameOrigin;
+use super::super::layers::DefinitionLayers;
 use super::super::view::GameLoaderView;
-use super::super::{
-    catalog_games_dir, catalog_loaders_dir, games_dir, loaders_dir, user_games_dir,
-    user_loaders_dir,
-};
 use super::DefinitionCheck;
 use super::DefinitionProblemView;
 use crate::error::{AppError, ErrorKind};
@@ -83,17 +81,29 @@ pub fn import_package(path: &Path, overwrite: bool) -> Result<ImportedDefinition
 }
 
 fn package_context() -> Result<PackageContext, AppError> {
-    let user_games = user_games_dir()
-        .ok_or_else(|| AppError::new("games.user_definitions_unavailable").kind(ErrorKind::Bug))?;
-    let user_loaders = user_loaders_dir()
-        .ok_or_else(|| AppError::new("games.user_definitions_unavailable").kind(ErrorKind::Bug))?;
+    let layers = DefinitionLayers::current();
+    let unavailable = || AppError::new("games.user_definitions_unavailable").kind(ErrorKind::Bug);
     Ok(PackageContext {
-        user_games,
-        user_loaders,
-        catalog_games: catalog_games_dir(),
-        catalog_loaders: catalog_loaders_dir(),
-        bundled_games: games_dir().to_path_buf(),
-        bundled_loaders: loaders_dir().to_path_buf(),
+        user_games: layers
+            .game_path(GameOrigin::User)
+            .map(Path::to_path_buf)
+            .ok_or_else(unavailable)?,
+        user_loaders: layers
+            .loader_path(GameOrigin::User)
+            .map(Path::to_path_buf)
+            .ok_or_else(unavailable)?,
+        catalog_games: layers
+            .game_path(GameOrigin::Official)
+            .map(Path::to_path_buf),
+        catalog_loaders: layers
+            .loader_path(GameOrigin::Official)
+            .map(Path::to_path_buf),
+        bundled_games: layers
+            .game_path(GameOrigin::Bundled)
+            .map_or_else(PathBuf::new, Path::to_path_buf),
+        bundled_loaders: layers
+            .loader_path(GameOrigin::Bundled)
+            .map_or_else(PathBuf::new, Path::to_path_buf),
     })
 }
 

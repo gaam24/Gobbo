@@ -2,7 +2,7 @@
 
 use crate::deploy::overwrite::{self, OverwriteView};
 
-crate::commands::game_commands! {
+crate::commands::macros::game_commands! {
     /// The files the game and its tools wrote into the overlay of the active profile.
     query overwrite_files() -> OverwriteView = overwrite::overwrite_files;
 

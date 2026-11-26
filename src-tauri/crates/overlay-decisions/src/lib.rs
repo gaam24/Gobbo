@@ -79,9 +79,13 @@ const PATH_AT: usize = 32;
 const PATH_MAX: usize = RECORD - PATH_AT;
 const WRITE_AT: usize = 24;
 
-/// Generates the stable lowercase `name` and the `from_u8` decoder of a decision enum.
+/// Generates the stable lowercase `name`, the `from_u8` decoder and the test inventory of a decision enum. A
+/// compile-time assertion ties every decoder literal to the `#[repr(u8)]` discriminant, so the on-disk codes cannot
+/// drift from the enum.
 macro_rules! enum_code {
     ($name:ident, $($variant:ident => $code:literal, $text:literal),* $(,)?) => {
+        $(const _: () = assert!($name::$variant as u8 == $code);)*
+
         impl $name {
             /// The stable lowercase name, for the app and the log.
             pub const fn name(self) -> &'static str {
@@ -96,6 +100,9 @@ macro_rules! enum_code {
                     _ => None,
                 }
             }
+
+            #[cfg(test)]
+            pub(crate) const ALL: &[Self] = &[$(Self::$variant),*];
         }
     };
 }
@@ -712,5 +719,39 @@ mod tests {
         assert!(!matches_ring("base.abc.ring", "base."));
         assert!(!matches_ring("base.123.tmp", "base."));
         assert!(!matches_ring("other.123.ring", "base."));
+    }
+
+    #[test]
+    fn every_variant_has_a_unique_name_and_round_trips_through_its_code() {
+        fn check<T: Copy + PartialEq + std::fmt::Debug>(
+            all: &[T],
+            code: impl Fn(T) -> u8,
+            from_u8: impl Fn(u8) -> Option<T>,
+            name: impl Fn(T) -> &'static str,
+            seen: &mut std::collections::HashSet<&'static str>,
+        ) {
+            for &variant in all {
+                assert_eq!(from_u8(code(variant)), Some(variant));
+                let text = name(variant);
+                assert!(!text.is_empty());
+                assert!(seen.insert(text), "duplicate name: {text}");
+            }
+        }
+
+        let mut names = std::collections::HashSet::new();
+        check(
+            Kind::ALL,
+            |variant| variant as u8,
+            Kind::from_u8,
+            Kind::name,
+            &mut names,
+        );
+        check(
+            Layer::ALL,
+            |variant| variant as u8,
+            Layer::from_u8,
+            Layer::name,
+            &mut names,
+        );
     }
 }

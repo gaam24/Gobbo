@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
 use super::super::errors::FomodError;
-use super::super::model::{Choice, Group, GroupKind, GroupProblem, ModuleConfig};
+use super::super::model::{Group, GroupKind, GroupProblem, ModuleConfig};
+use crate::domain::fomod::Choice;
 
 /// Finds the group a choice belongs to. The indices decide; a record written before the indices existed has zeroes
 /// and falls back to a group name that appears exactly once.

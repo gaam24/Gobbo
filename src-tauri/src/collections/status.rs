@@ -146,7 +146,7 @@ mod tests {
     };
     use crate::domain::library::{Archive, Library, ModInfo, ModInfoEdit, ModVersion};
     use crate::domain::pack::PackMod;
-    use crate::domain::profiles::{Entry, Profile};
+    use crate::domain::profiles::{ListedMod, Profile};
     use crate::domain::source::ProviderId;
     use std::sync::Arc;
 
@@ -248,7 +248,7 @@ mod tests {
             Some(&CollectionItemStatus::InLibrary)
         );
         let mut installed = profile;
-        installed.mods.push(Entry {
+        installed.mods.push(ListedMod {
             id: "bundled".into(),
             folder: "Bundled Mod".into(),
             enabled: true,
@@ -357,7 +357,7 @@ mod tests {
         );
 
         let mut profile = Profile::new("p1".into(), "Default".into(), Vec::new());
-        profile.mods.push(Entry {
+        profile.mods.push(ListedMod {
             id: family.clone(),
             folder: "placeholder-folder".into(),
             enabled: true,

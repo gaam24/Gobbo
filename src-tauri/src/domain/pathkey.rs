@@ -96,8 +96,15 @@ fn push_lower(key: &mut String, segment: &str) {
 /// keys are built into one buffer, `push_lower` appends a segment without allocating a separate string.
 pub fn fold_case(text: &str) -> String {
     let mut folded = String::with_capacity(text.len());
-    push_lower(&mut folded, text);
+    fold_case_into(text, &mut folded);
     folded
+}
+
+/// Clears `out` and folds `text` into it with the same rule as `fold_case`, so a caller comparing many names can reuse
+/// one buffer instead of allocating a string per name.
+pub fn fold_case_into(text: &str, out: &mut String) {
+    out.clear();
+    push_lower(out, text);
 }
 
 /// Whether `path` is `root` or lies below it. Windows compares ignoring case; Linux compares the paths as they
@@ -133,10 +140,25 @@ pub fn starts_with_ignore_ascii_case(text: &str, prefix: &str) -> bool {
     }
 }
 
+/// Whether `text` ends with `suffix`, ignoring ASCII case.
+pub fn ends_with_ascii_case(text: &str, suffix: &str) -> bool {
+    text.len() >= suffix.len()
+        && text
+            .as_bytes()
+            .get(text.len() - suffix.len()..)
+            .is_some_and(|tail| tail.eq_ignore_ascii_case(suffix.as_bytes()))
+}
+
 /// `path` relative to `base`, when it is `base` or lies below it. Windows compares ignoring case; Linux compares the
 /// paths as they are. The result keeps the spelling of `path`.
 pub fn relative_to(base: &Path, path: &Path) -> Option<PathBuf> {
-    if cfg!(windows) {
+    relative_to_for(cfg!(windows), base, path)
+}
+
+/// `relative_to` with the platform given, so the Windows and Linux rules can both be tested on one machine. This is
+/// the only place that decides how the two platforms compare path components.
+fn relative_to_for(is_windows: bool, base: &Path, path: &Path) -> Option<PathBuf> {
+    if is_windows {
         let base_key = windows_key(&base.to_string_lossy());
         let path_key = windows_key(&path.to_string_lossy());
         let rest = path_key.strip_prefix(&base_key)?;
@@ -151,12 +173,15 @@ pub fn relative_to(base: &Path, path: &Path) -> Option<PathBuf> {
     }
 }
 
-/// Whether two paths name the same file or folder. Links are resolved when both exist; otherwise the paths are
-/// compared as they are.
+/// Whether two paths name the same file or folder, following the platform's case rule. Links are resolved when both
+/// exist, so a store's path and the game folder it points at compare equal; paths that cannot be resolved are compared
+/// as they are.
 pub fn same_path(first: &Path, second: &Path) -> bool {
     match (first.canonicalize(), second.canonicalize()) {
-        (Ok(first), Ok(second)) => first == second,
-        _ => first == second,
+        (Ok(first), Ok(second)) => {
+            relative_to(&first, &second).is_some_and(|relative| relative.as_os_str().is_empty())
+        }
+        _ => relative_to(first, second).is_some_and(|relative| relative.as_os_str().is_empty()),
     }
 }
 
@@ -216,6 +241,15 @@ mod tests {
     }
 
     #[test]
+    fn a_suffix_match_ignores_ascii_case() {
+        assert!(ends_with_ascii_case(".dll", ".dll"));
+        assert!(ends_with_ascii_case("Mod/DLL.DLL", ".dll"));
+        assert!(!ends_with_ascii_case("d", ".dll"));
+        assert!(!ends_with_ascii_case("Mod/other.exe", ".dll"));
+        assert!(ends_with_ascii_case("anything", ""));
+    }
+
+    #[test]
     fn containment_requires_a_whole_component() {
         assert!(is_inside(Path::new("a"), Path::new("a/b")));
         assert!(is_inside(Path::new("a"), Path::new("a")));
@@ -235,6 +269,37 @@ mod tests {
         assert!(is_inside(
             Path::new(r"C:\Games"),
             Path::new(r"c:\games\Mods")
+        ));
+    }
+
+    #[test]
+    fn same_path_matches_equal_paths_and_spelling_differences() {
+        let path = Path::new("games/example/game");
+
+        assert!(same_path(path, Path::new("games/example/game")));
+        assert!(same_path(path, Path::new("games/example/game/")));
+        assert!(same_path(path, Path::new("games/example/./game")));
+        assert!(!same_path(path, Path::new("games/example/other")));
+    }
+
+    #[test]
+    fn both_case_rules_can_be_checked_on_one_machine() {
+        let upper = Path::new("/Games/ExampleGame");
+        let lower = Path::new("/games/examplegame");
+
+        assert!(relative_to_for(false, upper, lower).is_none());
+        assert!(
+            relative_to_for(true, upper, lower)
+                .is_some_and(|relative| relative.as_os_str().is_empty())
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn same_path_ignores_case_on_windows() {
+        assert!(same_path(
+            Path::new(r"C:\Games\ExampleGame"),
+            Path::new(r"c:\games\examplegame")
         ));
     }
 

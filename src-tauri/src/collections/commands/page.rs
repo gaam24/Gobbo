@@ -3,7 +3,7 @@
 use tauri::AppHandle;
 use tauri::Manager;
 
-use crate::commands::blocking;
+use crate::commands::helpers::blocking;
 use crate::context::{Data, load_game};
 use crate::domain::profiles::Profiles;
 use crate::error::AppError;

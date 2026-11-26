@@ -1,6 +1,8 @@
 //! What a tray menu click does. Every action either calls an existing use case or tells the window which screen to open;
 //! the tray never reimplements a game rule.
 
+use std::time::Duration;
+
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
 
@@ -12,6 +14,11 @@ use crate::tray::labels::TrayLabels;
 
 use super::state::TrayState;
 use super::view::{Snapshot, snapshot};
+
+/// How long a quit waits for the launch's post-exit save before exiting a game that is already stopped. It covers a
+/// 20 s overlay release wait plus a 10 s save lock wait, with 5 s of margin; `wait_finished` returns at once for a game
+/// Gobbo did not start.
+const POST_EXIT_WAIT: Duration = Duration::from_secs(35);
 
 /// Brings the main window back. The tray owns this so the webview needs no extra window permissions.
 pub fn show_window(app: &AppHandle) {
@@ -33,6 +40,8 @@ fn log(error: &AppError) {
 }
 
 fn blocking(app: AppHandle, work: impl FnOnce(&Data) -> Result<(), AppError> + Send + 'static) {
+    // The quit path calls `exit` from inside its task, so its join handle is intentionally dropped: joining it would
+    // wait for the task that is doing the exiting. App exit never joins this work.
     drop(tauri::async_runtime::spawn_blocking(move || {
         let data = app.state::<Data>();
 
@@ -141,7 +150,17 @@ fn quit(app: &AppHandle, snapshot: &Snapshot, labels: &TrayLabels) {
                         let data = handle.state::<Data>();
 
                         match crate::launch::start::stop_game(&data, &game) {
-                            Ok(_) => handle.exit(0),
+                            Ok(_) => {
+                                // A game Gobbo started has a background run that still has to save the profile data.
+                                // For a game from Steam, or one already finished, the wait returns at once, so the
+                                // exit is never held by a run that does not belong to this process.
+                                if !crate::context::running::wait_finished(&game, POST_EXIT_WAIT) {
+                                    crate::infra::log::warn(format!(
+                                        "quit: the post-exit work of {game} did not finish in time; exiting"
+                                    ));
+                                }
+                                handle.exit(0);
+                            }
                             Err(error) => {
                                 crate::infra::log::warn(format!(
                                     "quit: the game was not stopped: {error}"

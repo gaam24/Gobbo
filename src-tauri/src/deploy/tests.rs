@@ -47,6 +47,7 @@ fn snapshot(f: &Fixture) -> (Vec<String>, PathBuf, Option<String>) {
 /// A fixture under `base`: the game folder `base/game` with its target, and the library `base/library`.
 fn fixture_in(base: &Path, deploy: Deploy, settings: Option<PathBuf>) -> Fixture {
     let mut target = crate::test_support::target(base);
+    target.order_format = Some(OrderFormat::ModsSettings);
     target.settings = settings;
     let root = target.root.clone();
     Fixture {
@@ -109,6 +110,7 @@ fn external_fixture(name: &str) -> (Fixture, PathBuf) {
             game_root: base.join("game"),
             settings: None,
             order_file: None,
+            order_format: None,
             state: base.join("state"),
             user_data: Vec::new(),
         },
@@ -133,14 +135,14 @@ fn only_a_layer_prepared_journal_is_an_overlay_state() {
 
     let journal = Journal::new(state.join(JOURNAL_FILE));
     journal
-        .append(&Entry::FileDeployed {
+        .append(&JournalOp::FileDeployed {
             path: base.join("game/x"),
         })
         .unwrap();
     assert!(!state_is_overlay(&state));
 
     journal
-        .append(&Entry::LayerPrepared {
+        .append(&JournalOp::LayerPrepared {
             mods: state.join("mods"),
             overwrite: state.join("overwrite"),
         })

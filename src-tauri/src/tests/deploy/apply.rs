@@ -5,7 +5,7 @@ use crate::deploy::DeployStage;
 use crate::deploy::ops::apply_deployment;
 use crate::deploy::ops::apply_deployment_with_progress;
 use crate::deploy::ops::undo_deployment;
-use crate::domain::profiles::Entry as ProfileEntry;
+use crate::domain::profiles::ListedMod;
 use crate::domain::profiles::diff::changed_count;
 use crate::profiles::actions::create_profile;
 use crate::profiles::actions::delete_profile;
@@ -106,7 +106,7 @@ fn preflight_names_the_folders_the_overlay_and_the_free_space() {
 
 #[test]
 fn draft_changes_count_what_differs_from_the_deployed_list() {
-    let entry = |id: &str, folder: &str| ProfileEntry {
+    let entry = |id: &str, folder: &str| ListedMod {
         id: id.to_string(),
         folder: folder.to_string(),
         enabled: true,

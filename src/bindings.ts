@@ -726,7 +726,9 @@ export type AppSettings_Serialize = {
 	muted_notifications: string[],
 };
 
+/**  The result of an apply as the window sees it. */
 export type ApplyView = {
+	/**  How many files the deployment placed. */
 	files: number,
 };
 
@@ -928,6 +930,7 @@ export type CatalogStatus_Serialize = {
 	blocked: CatalogEntryView_Serialize[],
 };
 
+/**  How a file or folder below the game folder changed since the last snapshot. */
 export type ChangeKind = "created" | "modified" | "removed";
 
 /**  How a preflight check ended. A warning does not block an apply; a problem does. */
@@ -1235,7 +1238,12 @@ export type CollectionInstallView_Serialize = {
 /**  Something the user should know before or during the install. */
 export type CollectionIssue = CollectionIssue_Serialize | CollectionIssue_Deserialize;
 
-export type CollectionIssueSeverity = "warning" | "unsupported";
+/**  How much an issue about a collection member affects the install. */
+export type CollectionIssueSeverity = 
+/**  The member is installed, but the user is told about the issue. */
+"warning" | 
+/**  Part of the member is not supported and is left out of the install. */
+"unsupported";
 
 /**  Something the user should know before or during the install. */
 export type CollectionIssue_Deserialize = {
@@ -1639,7 +1647,20 @@ export type CollectionRule = {
 	reference: string,
 };
 
-export type CollectionRuleKind = "before" | "after" | "requires" | "conflicts" | "recommends" | "provides";
+/**  An ordering or relationship rule between two collection members. */
+export type CollectionRuleKind = 
+/**  The source loads before the reference. */
+"before" | 
+/**  The source loads after the reference. */
+"after" | 
+/**  A relationship rule: the source needs the reference. */
+"requires" | 
+/**  A relationship rule: the source cannot be used with the reference. */
+"conflicts" | 
+/**  A relationship rule: the source suggests the reference. */
+"recommends" | 
+/**  A relationship rule: the source supplies what the reference asks for. */
+"provides";
 
 /**  A collection attached to a profile, with its live statuses. */
 export type CollectionSessionView = CollectionSessionView_Serialize | CollectionSessionView_Deserialize;
@@ -1676,7 +1697,7 @@ export type CollectionSource = CollectionSource_Serialize | CollectionSource_Des
 /**  The kind of source one collection member names. */
 export type CollectionSource_Deserialize = 
 /**  A file of a registered provider: a Nexus file or a Thunderstore package version. The provider downloads it. */
-{ kind: "provider"; provider: string; mod_id: string; file_id: string; 
+{ kind: "provider"; provider: ProviderId; mod_id: string; file_id: string; 
 /**  The persistent part id (a Nexus `mod_file_id`), when the manifest already names it. */
 part_id?: string | null } | 
 /**  A folder inside the collection archive, under `bundled/<path>`. */
@@ -1693,7 +1714,7 @@ part_id?: string | null } |
 /**  The kind of source one collection member names. */
 export type CollectionSource_Serialize = 
 /**  A file of a registered provider: a Nexus file or a Thunderstore package version. The provider downloads it. */
-{ kind: "provider"; provider: string; mod_id: string; file_id: string; 
+{ kind: "provider"; provider: ProviderId; mod_id: string; file_id: string; 
 /**  The persistent part id (a Nexus `mod_file_id`), when the manifest already names it. */
 part_id?: string } | 
 /**  A folder inside the collection archive, under `bundled/<path>`. */
@@ -1842,6 +1863,7 @@ export type CompareSide_Serialize = {
 	enabled: boolean,
 };
 
+/**  One file several enabled mods write, with the winning family and the ones it overrides. */
 export type ConflictEntry = {
 	/**  Relative to the deployment root, with `/`. */
 	path: string,
@@ -1855,6 +1877,7 @@ export type ConflictEntry = {
 	copies: number,
 };
 
+/**  The shared files of the active profile, in path order, for the window's conflict list. */
 export type ConflictExplorer = {
 	total: number,
 	/**  The paths in path order, so the window can group neighbours without sorting 10k rows itself. */
@@ -2037,6 +2060,7 @@ export type DefinitionSummary_Serialize = {
 	user_data: string[],
 };
 
+/**  What applying the active list would do, compared with the deployment the game has now. */
 export type DeployPreview = {
 	/**  The active profile is deployed now, so the deployment replaces it. */
 	replaces: boolean,
@@ -2469,14 +2493,17 @@ export type Found = {
 	store: string,
 };
 
+/**  The games the window gets, with their origins and the user definitions that failed to load. */
 export type GameCatalog = GameCatalog_Serialize | GameCatalog_Deserialize;
 
+/**  The games the window gets, with their origins and the user definitions that failed to load. */
 export type GameCatalog_Deserialize = {
 	games: GameView_Deserialize[],
 	/**  Invalid or duplicate user definitions, with the reason and the file to fix. */
 	problems: DefinitionProblem_Deserialize[],
 };
 
+/**  The games the window gets, with their origins and the user definitions that failed to load. */
 export type GameCatalog_Serialize = {
 	games: GameView_Serialize[],
 	/**  Invalid or duplicate user definitions, with the reason and the file to fix. */
@@ -3251,6 +3278,7 @@ export type LoaderPresetView_Serialize = {
 	engine: LoaderEngineView_Serialize | null,
 };
 
+/**  Where the loader stands for the game: absent, already in the library, or an older official release to update. */
 export type LoaderSetupState = "missing" | "installed" | 
 /**
  *  The enabled copy is an older official release. A build from a mod site is never reported as outdated: it is
@@ -4022,6 +4050,7 @@ export type OverwriteFile = {
 	size_kb: number,
 };
 
+/**  The folder of the active profile's overwrite layer and the files it holds. */
 export type OverwriteView = {
 	/**  The folder of the layer, for opening it in the file manager. */
 	folder: string,
@@ -4797,9 +4826,9 @@ export type Settings = Settings_Serialize | Settings_Deserialize;
 /**  Settings entered in the app. Saved in `config.json` in the game's data folder. */
 export type Settings_Deserialize = {
 	/**  The game folder, for example `.../The Witcher 3`. */
-	game_root: string,
+	game_root?: string,
 	/**  The folder with `mods.settings`. Empty when the game does not use it. */
-	settings_dir: string,
+	settings_dir?: string,
 	/**
 	 *  The folder that holds the game's mods when it is not the game folder, for example
 	 *  `%APPDATA%/MyGame`. Empty means "use the definition or the game folder".
@@ -4922,8 +4951,11 @@ export type SnapshotView = {
 	sets: SnapshotSetView[],
 };
 
+/**  One mod that a sort would move to a new place in the list. */
 export type SortMove = {
+	/**  The family id of the mod that moves. */
 	id: string,
+	/**  The display name of the mod that moves. */
 	name: string,
 	/**  One-based place in the current list. */
 	from: number,
@@ -4932,6 +4964,7 @@ export type SortMove = {
 };
 
 export type SortPreview = {
+	/**  The number of mods in the list the preview covers. */
 	total: number,
 	/**  The mods whose place changes. Empty when the list already keeps every rule. */
 	moves: SortMove[],
@@ -5528,6 +5561,7 @@ export type StepReport_Serialize = {
 	finished_at: number | null,
 };
 
+/**  Where one launch step stands: still running, done, skipped or failed. */
 export type StepStatus = "running" | "done" | "skipped" | "failed";
 
 /**  The data folder, its mode, and the file that records the choice. */

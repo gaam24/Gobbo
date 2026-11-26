@@ -1,7 +1,7 @@
 use tauri::State;
 use tauri::ipc::Channel;
 
-use crate::commands::{channel_sink_with_progress, run_task};
+use crate::commands::helpers::{channel_sink_with_progress, run_task};
 use crate::context::Data;
 use crate::error::AppError;
 use crate::infra::tasks::{TaskFlags, TaskKey, kind};
@@ -24,7 +24,7 @@ pub async fn update_mod(
     run_task(
         data,
         &tasks,
-        key.as_str().to_string(),
+        key,
         game,
         kind::UPDATE,
         move |root, game, flag, handle| {
@@ -59,7 +59,7 @@ pub async fn update_all(
     run_task(
         data,
         &tasks,
-        key.as_str().to_string(),
+        key,
         game,
         kind::UPDATE_ALL,
         move |root, game, flag, handle| {

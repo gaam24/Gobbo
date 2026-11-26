@@ -3,8 +3,9 @@
 //! window offers only the mods `is_orderable` accepts; both call the rules here, so the window never offers a number
 //! that the planner would drop.
 
-use super::model::{Materialized, ModInput};
+use super::model::ModInput;
 use crate::domain::deploy::{Deploy, Slot};
+use crate::domain::layout::Materialized;
 
 /// Whether a mod in `slot` gets a folder of its own there: the slot is not flat, and the mod does not only keep game
 /// paths, since those files go to their game paths and not into a folder of the mod.

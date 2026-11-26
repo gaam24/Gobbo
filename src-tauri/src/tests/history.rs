@@ -15,7 +15,7 @@ use crate::profiles::actions::switch_profile;
 use crate::profiles::bisect::bisect_answer;
 use crate::profiles::bisect::bisect_start;
 use crate::profiles::bisect::bisect_stop;
-use crate::profiles::history::preview::preview_restore;
+use crate::profiles::history::preview_restore;
 use crate::profiles::order::{preview_sort, sort_by_rules};
 use crate::status::sync_profiles as status;
 use crate::test_support::import;

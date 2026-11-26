@@ -70,8 +70,8 @@ pub(super) fn listed_requirements(
     };
     let older_version = older.as_ref().map(|older| older.version.clone());
     let (requires, dlcs) = match older {
-        Some(older) => (as_requirements(older.requirements), older.dlcs),
-        None => (as_requirements(read.requirements), read.dlcs),
+        Some(older) => (into_requirements(older.requirements), older.dlcs),
+        None => (into_requirements(read.requirements), read.dlcs),
     };
     Some(Listed {
         requires: with_mod_level(requires, &mod_level, item.nexus_id),
@@ -172,7 +172,7 @@ pub(super) fn match_file(
 
 /// The requirements of the family, from what Nexus lists. Alternatives share a group, so any one of them satisfies
 /// the requirement.
-pub(super) fn as_requirements(requirements: Vec<Vec<ModRequirement>>) -> Vec<NexusRequirement> {
+pub(super) fn into_requirements(requirements: Vec<Vec<ModRequirement>>) -> Vec<NexusRequirement> {
     requirements
         .into_iter()
         .enumerate()

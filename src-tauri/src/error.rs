@@ -114,30 +114,18 @@ pub const LOADER_MISSING_DEPLOY: &str = "deploy.loader_missing";
 /// refused paid download and a browser route all answer with it, and the window opens the mod's files page.
 pub const PAYMENT_REQUIRED: &str = "source.payment_required";
 
-/// A file the provider refuses to serve for moderation or quarantine reasons. This is *not* an entitlement failure:
-/// use `PAYMENT_REQUIRED` when the account tier is the cause.
-pub const DOWNLOAD_UNAVAILABLE: &str = "nexus.download_unavailable";
-
-// The credential family: a missing saved key, a game definition without a provider key, and a key the provider
-// rejected. These describe the key, not the account's tier, so they stay separate from PAYMENT_REQUIRED. Each one
-// carries a `provider` param; saving the key is the fix for the first and last of them.
+// The credential family: a missing saved key and a game definition without a provider key. These describe the key,
+// not the account's tier, so they stay separate from PAYMENT_REQUIRED. Each one carries a `provider` param; saving
+// the key is the fix for a missing one.
 
 /// The saved key has not been entered yet.
 pub const KEY_MISSING: &str = "source.key_missing";
 /// The game definition does not name a key for this provider.
 pub const NO_GAME_KEY: &str = "source.no_game_key";
-/// The provider rejected the key it was given.
-pub const KEY_REJECTED: &str = "nexus.key_rejected";
 
 /// A mod that is not in the library, however the caller names it: a family id, a provider's mod id or a required mod.
 /// The `folder` param names the mod; a source-related failure also passes `provider`.
 pub const MOD_MISSING: &str = "library.mod_missing";
-
-/// A provider 404. The `kind` param says what was not found (`mod`, `file` or `collection`), so one code per provider
-/// family replaces a code per endpoint.
-pub const NEXUS_NOT_FOUND: &str = "nexus.not_found";
-/// The Thunderstore equivalent of [`NEXUS_NOT_FOUND`].
-pub const THUNDERSTORE_NOT_FOUND: &str = "thunderstore.not_found";
 
 impl AppError {
     /// Whether the user stopped the work. The codes are per-context siblings (`download.cancelled`,

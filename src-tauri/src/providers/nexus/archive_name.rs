@@ -93,7 +93,7 @@ mod tests {
     use super::*;
 
     // The helper mirrors the shape of `parse`, which returns None for names it cannot read.
-    #[allow(
+    #[expect(
         clippy::unnecessary_wraps,
         reason = "the helper mirrors `parse`'s Option so the assertions compare like with like"
     )]

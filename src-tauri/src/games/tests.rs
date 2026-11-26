@@ -17,6 +17,9 @@ fn problems(text: &str) -> Vec<String> {
     GameDef::parse(text)
         .expect("the text must parse; these tests check validation")
         .validate()
+        .into_iter()
+        .map(|problem| problem.message)
+        .collect()
 }
 
 fn has_problem(text: &str, part: &str) {

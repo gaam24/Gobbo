@@ -15,7 +15,10 @@ pub fn check(root: &Data, game_id: &str, profile_id: &str) -> Result<(), AppErro
     let data = root.game(game_id);
     // Provider reads can be slow, so they run without the profile lock. The profile is read again under the lock before
     // the write, so a list edit made while the providers answered is not overwritten.
-    let origins = load_profiles(&data)?.get(profile_id)?.collections.clone();
+    let origins = load_profiles(&data)?
+        .profile(profile_id)?
+        .collections
+        .clone();
     let mut answers = Vec::with_capacity(origins.len());
 
     for origin in &origins {
@@ -31,7 +34,7 @@ pub fn check(root: &Data, game_id: &str, profile_id: &str) -> Result<(), AppErro
 
     let _guard = lock_profiles();
     let mut profiles = load_profiles(&data)?;
-    let changed = record_latest(&mut profiles.get_mut(profile_id)?.collections, &answers);
+    let changed = record_latest(&mut profiles.profile_mut(profile_id)?.collections, &answers);
 
     if changed {
         save_profiles(&data, &profiles)?;

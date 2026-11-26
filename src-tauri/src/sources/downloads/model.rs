@@ -4,6 +4,12 @@ use crate::domain::source::SourceRef;
 use crate::error::AppError;
 use serde::Serialize;
 
+/// The name a download shows when the provider has not named its file yet: the game key and the mod id, or just the mod
+/// id when the link has no game key.
+pub fn download_name(game_key: Option<&str>, mod_id: &str) -> String {
+    game_key.map_or_else(|| mod_id.to_string(), |key| format!("{key} {mod_id}"))
+}
+
 /// Where a download is on its way into the library.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
 #[serde(rename_all = "snake_case")]

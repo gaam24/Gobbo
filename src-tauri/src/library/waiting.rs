@@ -1,16 +1,10 @@
 //! The mods of a pack that wait for their archive. `sync_profiles` needs it on every status read, and the packs module
-//! uses it while importing, so it lives with the profile list rather than in the pack reader.
+//! uses it while importing, so it lives with the library view that resolves the waiting mods; the profile list owns the
+//! entries.
 
 use crate::domain::library::LibraryView;
-use crate::domain::pack::PackMod;
-use crate::domain::profiles::Entry as ProfileEntry;
+use crate::domain::profiles::ListedMod;
 use crate::domain::profiles::Profile;
-
-/// The library family and folder a pack mod stands for, by the shared rule in `LibraryView::find`. A mod with no
-/// version in the pack takes the newest one; a mod whose version the library lacks is not found.
-pub fn find_version(view: &LibraryView, entry: &PackMod) -> Option<(String, String)> {
-    view.find(entry, None)?.entry()
-}
 
 /// Puts the waiting mods of a profile in its list as soon as the library has them. Each one goes right above the mod it
 /// sat above in the pack, and every name of it in the list (separators, file winners, groups, the anchors of the other
@@ -23,7 +17,7 @@ pub fn settle_waiting(profile: &mut Profile, view: &LibraryView) -> Vec<String> 
     let mut at = 0;
 
     while at < profile.waiting.len() {
-        let Some((family, folder)) = find_version(view, &profile.waiting[at].entry) else {
+        let Some((family, folder)) = view.find_entry(&profile.waiting[at].entry) else {
             at += 1;
             continue;
         };
@@ -42,12 +36,12 @@ pub fn settle_waiting(profile: &mut Profile, view: &LibraryView) -> Vec<String> 
             .unwrap_or(profile.mods.len());
         profile.mods.insert(
             position,
-            ProfileEntry {
-                id: family,
+            ListedMod::new(
+                family,
                 folder,
-                enabled: waiting.entry.enabled,
-                priority: waiting.entry.priority,
-            },
+                waiting.entry.enabled,
+                waiting.entry.priority,
+            ),
         );
     }
 
@@ -58,6 +52,7 @@ pub fn settle_waiting(profile: &mut Profile, view: &LibraryView) -> Vec<String> 
 mod tests {
     use super::*;
     use crate::domain::library::{Library, ModInfo, ModInfoEdit, ModVersion};
+    use crate::domain::pack::PackMod;
     use std::collections::BTreeMap;
 
     fn archived(folder: &str, sha: &str) -> ModVersion {
@@ -113,7 +108,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            find_version(&view, &entry),
+            view.find_entry(&entry),
             Some(("nexus:12345".to_string(), "Example Mod".to_string()))
         );
     }
@@ -135,7 +130,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            find_version(&view, &entry).map(|(_, folder)| folder),
+            view.find_entry(&entry).map(|(_, folder)| folder),
             Some("a-old".into()),
             "without a hint the first folder in the library wins"
         );

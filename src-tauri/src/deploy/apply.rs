@@ -7,11 +7,11 @@ use std::path::{Path, PathBuf};
 
 use rustc_hash::FxHasher;
 
-use crate::domain::deployment::DeploymentRecord;
+use crate::domain::deployment_record::DeploymentRecord;
 use crate::domain::resolver::{DeployPlan, SettingsRow};
 use crate::error::FileError;
 
-use super::journal::{Entry, Journal};
+use super::journal::{Journal, JournalOp};
 use super::overlay;
 use super::settings;
 use super::undo;
@@ -117,7 +117,7 @@ fn settings_source(target: &Target, path: &Path) -> PathBuf {
         .user_data
         .iter()
         .find_map(|set| {
-            if !set.redirects() {
+            if !set.is_redirected() {
                 return None;
             }
 
@@ -143,7 +143,7 @@ pub fn write_settings(
     let before = settings::read(&source)?;
     let (text, touched) = settings::merge(before.as_deref(), rows);
     let changed = !touched.is_empty();
-    journal.append(&Entry::SettingsSections {
+    journal.append(&JournalOp::SettingsSections {
         path: path.clone(),
         existed: before.is_some(),
         touched,

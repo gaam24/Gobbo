@@ -24,6 +24,10 @@ src-tauri/overlay-hook
 /gobbo.storage.json
 /gobbo.portable
 
+#
+.agents/skills
+!.agents/skills/gobbo-*
+
 # Game definitions removed from the shipped catalog, kept locally for reference.
 /.removed-games/
 

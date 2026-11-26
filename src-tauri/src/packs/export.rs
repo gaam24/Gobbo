@@ -67,7 +67,7 @@ pub fn export_pack(
     let mut mods = 0;
 
     for id in &options.profiles {
-        let profile = profiles.get(id)?;
+        let profile = profiles.profile(id)?;
         let mut pack = pack_profile(&data, &library, &steps, profile);
 
         for entry in &mut pack.mods {

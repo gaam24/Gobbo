@@ -17,12 +17,12 @@ mod planner;
 mod shared;
 
 #[cfg(test)]
-pub use model::Materialized;
+pub use crate::domain::layout::Materialized;
 #[cfg(all(test, windows))]
 pub use model::PlanSource;
 #[cfg(test)]
 pub use model::PlannedFile;
-pub use model::{Conflict, DeployPlan, LayoutProfile, ModInput, PlanMode, Problem, SettingsRow};
+pub use model::{Conflict, DeployPlan, ModInput, PlanMode, Problem, SettingsRow};
 pub use own_folder::is_orderable;
 pub use planner::LayoutRules;
 pub use planner::{layout_profile, plan_with_mode};

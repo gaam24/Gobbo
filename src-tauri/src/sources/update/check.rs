@@ -130,7 +130,7 @@ fn requests(
     let view = LibraryView::new(library);
     let selected = selected_folders(profiles);
     let images = data.images();
-    let mut requests = Vec::new();
+    let mut requests = Vec::with_capacity(library.families.len());
 
     for family in library.families.values() {
         if only.is_some_and(|id| family.id != id) {
@@ -258,11 +258,10 @@ fn selected_folders(profiles: &Profiles) -> rustc_hash::FxHashMap<&str, &str> {
 }
 
 fn report(update: SourceUpdate, view: &LibraryView<'_>) -> UpdateReport {
-    let latest_file = update.latest_file_id.clone();
     let state = with_ignored(
         update.state,
         update.latest.as_deref(),
-        latest_file.as_deref(),
+        update.latest_file_id.as_deref(),
         view.ignored_version(&update.family, &update.source.provider),
     );
     UpdateReport {
@@ -271,14 +270,14 @@ fn report(update: SourceUpdate, view: &LibraryView<'_>) -> UpdateReport {
         mod_id: update.source.mod_id,
         current: update.current,
         latest: update.latest,
-        latest_file_id: latest_file.clone(),
+        latest_file_id: update.latest_file_id,
         state,
         latest_installed: false,
         installed_folder: None,
         has_update: false,
         error: update.error,
     }
-    .with_library(view, latest_file.as_deref())
+    .with_library(view)
 }
 
 fn no_source(id: &str) -> AppError {

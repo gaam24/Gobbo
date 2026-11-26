@@ -55,6 +55,7 @@ impl GameDef {
         self.view_with_origin(GameOrigin::Bundled)
     }
 
+    /// The game as the interface sees it, labelled with where its definition came from.
     pub fn view_with_origin(&self, origin: GameOrigin) -> GameView {
         GameView {
             id: self.id.clone(),

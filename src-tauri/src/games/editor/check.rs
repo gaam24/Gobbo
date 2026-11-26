@@ -5,9 +5,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use super::super::definition::GameDef;
+use super::super::layers::DefinitionLayers;
+use super::super::validate::{Section, duplicate_problems};
 use super::super::{
-    GameOrigin, catalog_games_dir, catalog_loaders_dir, games_dir, invalid_user_definition,
-    is_valid_id, loaders_dir, user_games_dir, user_loaders_dir,
+    GameOrigin, catalog_games_dir, games_dir, invalid_user_definition, is_valid_id, user_games_dir,
 };
 use super::{
     DefinitionCheck, DefinitionProblemView, DefinitionSource, DefinitionSummary, ExecutableSummary,
@@ -18,23 +19,7 @@ use crate::infra::store;
 
 /// Checks a definition without touching the disk. The loader presets in `loader_dirs` are merged under it, in order.
 pub fn check(text: &str) -> DefinitionCheck {
-    check_with(text, &loader_dirs())
-}
-
-/// The folders searched for loader presets: the user's first, the official catalog second, the bundled folder last.
-fn loader_dirs() -> Vec<PathBuf> {
-    let mut dirs = Vec::with_capacity(3);
-
-    if let Some(user) = user_loaders_dir() {
-        dirs.push(user);
-    }
-
-    if let Some(catalog) = catalog_loaders_dir() {
-        dirs.push(catalog);
-    }
-
-    dirs.push(loaders_dir().to_path_buf());
-    dirs
+    check_with(text, &DefinitionLayers::current().loader_paths())
 }
 
 pub(super) fn check_with(text: &str, loader_dirs: &[PathBuf]) -> DefinitionCheck {
@@ -52,16 +37,16 @@ pub(super) fn check_with(text: &str, loader_dirs: &[PathBuf]) -> DefinitionCheck
     };
     let mut problems = Vec::new();
     // A merge replaces an entry with the same key, so a duplicate that is already in this file would disappear.
-    for message in super::super::validate::duplicate_problems(&game.deploy) {
-        problems.push(problem("deploy", message));
+    for entry in duplicate_problems(&game.deploy, Section::Deploy) {
+        problems.push(problem(section_key(entry.section), entry.message));
     }
 
     if let Err(detail) = super::super::loaders::apply(&mut game, loader_dirs) {
         problems.push(problem("loader", detail));
     }
 
-    for message in game.validate() {
-        problems.push(problem(section_of(&message), message));
+    for entry in game.validate() {
+        problems.push(problem(section_key(entry.section), entry.message));
     }
 
     let summary = Some(summary_of(&game));
@@ -74,45 +59,20 @@ pub(super) fn check_with(text: &str, loader_dirs: &[PathBuf]) -> DefinitionCheck
     }
 }
 
-/// The section of the editor a developer message belongs to. The messages are stable English by design; the window
-/// groups them by this key and shows the message under the fields that own it.
-fn section_of(message: &str) -> &'static str {
-    if message.contains("user_data") || message.contains("profile_data") {
-        "profiles"
-    } else if message.contains("slot")
-        || message.contains("mirror")
-        || message.contains("root file")
-        || message.contains("alias")
-        || message.contains("protected")
-        || message.contains("shared")
-        || message.contains("deploy root")
-    {
-        "deploy"
-    } else if message.contains("executable")
-        || message.contains("detect marker")
-        || message.contains("detect linux marker")
-        || message.contains("required file")
-        || message.contains("requirement")
-    {
-        "detection"
-    } else if message.contains("load_order") {
-        "load_order"
-    } else if message.contains("step") {
-        "steps"
-    } else if message.contains("log source") {
-        "extras"
-    } else if message.contains("tool") || message.contains("prerequisite") {
-        "tools"
-    } else if message.contains("loader") {
-        "loader"
-    } else if message.contains("provider")
-        || message.contains("game id")
-        || message.contains("game name")
-        || message.contains("schema")
-    {
-        "general"
-    } else {
-        "source"
+/// The editor key for a check's section. These are the keys the window already knows; the message text never takes
+/// part in the choice, so rewording a problem cannot move it to another section.
+const fn section_key(section: Section) -> &'static str {
+    match section {
+        Section::General => "general",
+        Section::Source | Section::Install => "source",
+        Section::Loader => "loader",
+        Section::Detection => "detection",
+        Section::UserData => "profiles",
+        Section::Deploy => "deploy",
+        Section::LoadOrder => "load_order",
+        Section::Steps => "steps",
+        Section::Tools => "tools",
+        Section::Logs => "extras",
     }
 }
 
@@ -203,7 +163,7 @@ pub fn save(text: &str, overwrite: bool) -> Result<SavedDefinition, AppError> {
         &user,
         catalog_games_dir().as_deref(),
         games_dir(),
-        &loader_dirs(),
+        &DefinitionLayers::current().loader_paths(),
         text,
         overwrite,
     )
@@ -265,23 +225,104 @@ pub fn merged(text: &str) -> Result<GameDef, AppError> {
     }
 
     let mut game = GameDef::parse(text).map_err(invalid_user_definition)?;
-    super::super::loaders::apply(&mut game, &loader_dirs()).map_err(invalid_user_definition)?;
+    super::super::loaders::apply(&mut game, &DefinitionLayers::current().loader_paths())
+        .map_err(invalid_user_definition)?;
     Ok(game)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::section_of;
+    use super::{Section, check_with, section_key};
+    use crate::games::validate::Problem;
 
     #[test]
-    fn both_marker_problems_are_shown_in_the_detection_section() {
+    fn every_section_maps_to_an_existing_editor_key() {
+        let sections = [
+            Section::General,
+            Section::Source,
+            Section::Loader,
+            Section::Detection,
+            Section::UserData,
+            Section::Deploy,
+            Section::LoadOrder,
+            Section::Steps,
+            Section::Tools,
+            Section::Logs,
+            Section::Install,
+        ];
         assert_eq!(
-            section_of("detect marker is not a relative path"),
-            "detection"
+            sections.map(section_key),
+            [
+                "general",
+                "source",
+                "loader",
+                "detection",
+                "profiles",
+                "deploy",
+                "load_order",
+                "steps",
+                "tools",
+                "extras",
+                "source",
+            ]
+        );
+    }
+
+    #[test]
+    fn a_reworded_message_keeps_its_editor_section() {
+        let before = Problem {
+            section: Section::UserData,
+            message: "user_data id is repeated: \"saves\"".to_string(),
+        };
+        let after = Problem {
+            section: Section::UserData,
+            message: "the same save set is declared twice".to_string(),
+        };
+        assert_eq!(section_key(before.section), "profiles");
+        assert_eq!(section_key(after.section), section_key(before.section));
+    }
+
+    #[test]
+    fn three_legacy_messages_keep_their_editor_sections() {
+        use std::path::PathBuf;
+
+        use crate::test_support::games::SLOT;
+
+        let text = SLOT
+            .replacen(
+                "format = \"mods_settings\"\nfile = \"{documents}/Slot Game/mods.settings\"",
+                "format = \"ue4ss_mods_txt\"\nfile = \"Other/mods.txt\"\npriority_min = 5\npriority_max = 5",
+                1,
+            )
+            .replacen(
+                "[deploy]",
+                &format!(
+                    "[install]\nname = \"Loader\"\nversion = \"1\"\nurl = \"https://example.com/loader.zip\"\nsha256 = \"{}\"\n\n[deploy]",
+                    "a".repeat(64)
+                ),
+                1,
+            );
+        let loader_dirs = [PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../loaders")];
+        let check = check_with(&text, &loader_dirs);
+        let section_of = |start: &str| {
+            check
+                .problems
+                .iter()
+                .find(|problem| problem.message.starts_with(start))
+                .map_or("missing", |problem| problem.section.as_str())
+        };
+
+        assert_eq!(
+            section_of("load_order.file must lie in a slot folder of the game"),
+            "deploy"
         );
         assert_eq!(
-            section_of("detect linux marker is not a relative path"),
-            "detection"
+            section_of("priority_min must be less than priority_max"),
+            "source"
+        );
+        assert_eq!(
+            section_of("install: needs at least one check path that proves the loader is there"),
+            "loader"
         );
     }
 }

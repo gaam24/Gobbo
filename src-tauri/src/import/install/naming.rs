@@ -75,7 +75,7 @@ pub(super) fn is_folder_for(folder: &str, wanted: &str, digest: &str) -> bool {
 
 /// The name with the start of the digest after it: the name a mod gets when the plain one is taken.
 pub(super) fn with_digest(name: &str, digest: &str) -> String {
-    let short = digest.get(..8).unwrap_or(digest);
+    let short = crate::domain::naming::digest_hex_prefix(digest);
     format!("{name} ({short})")
 }
 

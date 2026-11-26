@@ -70,7 +70,7 @@ pub use updates::{
     __tauri_command_name_cancel_update_all, __tauri_command_name_update_all,
     __tauri_command_name_update_mod, cancel_update_all, update_all, update_mod,
 };
-crate::commands::game_commands! {
+crate::commands::macros::game_commands! {
     /// Checks every source of the game for updates through its provider. Requires the provider's saved key when it
     /// needs one.
     query check_updates() -> Vec<UpdateReport> = super::update::check_updates;

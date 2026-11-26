@@ -3,24 +3,24 @@
 
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use super::Entry;
+use super::ListedMod;
 
 /// What differs between an old list and a new one. The references borrow the two input slices.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct ListDiff<'a> {
     /// Entries only the new list has, in its order.
-    pub added: Vec<&'a Entry>,
+    pub added: Vec<&'a ListedMod>,
     /// Entries only the old list has, in its order.
-    pub removed: Vec<&'a Entry>,
+    pub removed: Vec<&'a ListedMod>,
     /// Entries both lists have with another version folder. The pairs are `(old, new)`.
-    pub updated: Vec<(&'a Entry, &'a Entry)>,
+    pub updated: Vec<(&'a ListedMod, &'a ListedMod)>,
     /// Entries that must change place so the others keep their relative order. A move counts once, and an
     /// insertion or removal does not move the entries around it. A version change is counted in `updated`, not here.
     pub moved: u32,
     /// Entries both lists have that are switched on only in the new list; the new entry is the side the view shows.
-    pub enabled_on: Vec<&'a Entry>,
+    pub enabled_on: Vec<&'a ListedMod>,
     /// Entries both lists have that are switched off only in the new list.
-    pub enabled_off: Vec<&'a Entry>,
+    pub enabled_off: Vec<&'a ListedMod>,
     /// Entries both lists have with another load priority.
     pub priority_changed: u32,
     /// Entries whose place, version or presence changed. The status's draft count also takes the priority changes, see
@@ -32,12 +32,12 @@ pub struct ListDiff<'a> {
 /// `changed_count` and `diff`.
 struct Prepared<'a> {
     new_ids: FxHashSet<&'a str>,
-    common: Vec<(usize, &'a Entry, &'a Entry)>,
-    added: Vec<&'a Entry>,
+    common: Vec<(usize, &'a ListedMod, &'a ListedMod)>,
+    added: Vec<&'a ListedMod>,
 }
 
-fn prepare<'a>(old: &'a [Entry], new: impl IntoIterator<Item = &'a Entry>) -> Prepared<'a> {
-    let mut old_at: FxHashMap<&'a str, (usize, &'a Entry)> = FxHashMap::default();
+fn prepare<'a>(old: &'a [ListedMod], new: impl IntoIterator<Item = &'a ListedMod>) -> Prepared<'a> {
+    let mut old_at: FxHashMap<&'a str, (usize, &'a ListedMod)> = FxHashMap::default();
     old_at.reserve(old.len());
 
     for (at, entry) in old.iter().enumerate() {
@@ -45,7 +45,7 @@ fn prepare<'a>(old: &'a [Entry], new: impl IntoIterator<Item = &'a Entry>) -> Pr
     }
 
     let mut new_ids: FxHashSet<&'a str> = FxHashSet::default();
-    let mut common: Vec<(usize, &'a Entry, &'a Entry)> = Vec::with_capacity(old.len());
+    let mut common: Vec<(usize, &'a ListedMod, &'a ListedMod)> = Vec::with_capacity(old.len());
     let mut added = Vec::new();
 
     for entry in new {
@@ -66,18 +66,18 @@ fn prepare<'a>(old: &'a [Entry], new: impl IntoIterator<Item = &'a Entry>) -> Pr
 
 /// The status's draft count of the whole list, see `changed_count_filtered`.
 #[cfg(test)]
-pub fn changed_count(old: &[Entry], new: &[Entry]) -> u32 {
+pub fn changed_count(old: &[ListedMod], new: &[ListedMod]) -> u32 {
     changed_count_filtered(old, new, |_| true)
 }
 
 /// The number of entries whose place, version, presence or load priority changed, after `keep` picks the new entries.
 /// This is the status's draft count: `diff(...).changed` plus the priority changes, because the deployment writes the
 /// priorities into the game's order file, so a changed priority waits for a deployment like a moved mod does. Borrowing
-/// the new list lets a caller count only the enabled entries without cloning them into an owned `Vec<Entry>`.
+/// the new list lets a caller count only the enabled entries without cloning them into an owned `Vec<ListedMod>`.
 pub fn changed_count_filtered<'a>(
-    old: &'a [Entry],
-    new: impl IntoIterator<Item = &'a Entry>,
-    mut keep: impl FnMut(&Entry) -> bool,
+    old: &'a [ListedMod],
+    new: impl IntoIterator<Item = &'a ListedMod>,
+    mut keep: impl FnMut(&ListedMod) -> bool,
 ) -> u32 {
     let prepared = prepare(old, new.into_iter().filter(move |entry| keep(entry)));
     let removed = old
@@ -99,7 +99,7 @@ pub fn changed_count_filtered<'a>(
 }
 
 /// Compares two lists by family id. A family that appears twice keeps the last entry, as the map-based drafts did.
-pub fn diff<'a>(old: &'a [Entry], new: &'a [Entry]) -> ListDiff<'a> {
+pub fn diff<'a>(old: &'a [ListedMod], new: &'a [ListedMod]) -> ListDiff<'a> {
     let prepared = prepare(old, new);
     let mut result = ListDiff::default();
 
@@ -142,7 +142,7 @@ pub fn diff<'a>(old: &'a [Entry], new: &'a [Entry]) -> ListDiff<'a> {
 
 /// The common entries that must change place so the rest keep their relative order. A version change is already
 /// counted in `updated`, so its entry is not counted here too.
-fn moved(common: &[(usize, &Entry, &Entry)]) -> u32 {
+fn moved(common: &[(usize, &ListedMod, &ListedMod)]) -> u32 {
     if common.len() < 2 {
         return 0;
     }
@@ -158,7 +158,7 @@ fn moved(common: &[(usize, &Entry, &Entry)]) -> u32 {
 
 /// Whether each common entry is part of the longest increasing run of the old places. The entries that are not keep
 /// their relative order only if they move.
-fn in_order_flags(common: &[(usize, &Entry, &Entry)]) -> Vec<bool> {
+fn in_order_flags(common: &[(usize, &ListedMod, &ListedMod)]) -> Vec<bool> {
     let positions: Vec<usize> = common.iter().map(|(at, _, _)| *at).collect();
     longest_increasing(&positions)
 }
@@ -201,8 +201,8 @@ fn longest_increasing(positions: &[usize]) -> Vec<bool> {
 mod tests {
     use super::*;
 
-    fn entry(id: &str, folder: &str, enabled: bool) -> Entry {
-        Entry {
+    fn entry(id: &str, folder: &str, enabled: bool) -> ListedMod {
+        ListedMod {
             id: id.into(),
             folder: folder.into(),
             enabled,
@@ -301,11 +301,11 @@ mod tests {
 
     #[test]
     fn a_priority_change_is_counted_without_changing_the_position() {
-        let old = [Entry {
+        let old = [ListedMod {
             priority: Some(1),
             ..entry("a", "a1", true)
         }];
-        let new = [Entry {
+        let new = [ListedMod {
             priority: Some(2),
             ..entry("a", "a1", true)
         }];
@@ -317,7 +317,7 @@ mod tests {
 
     #[test]
     fn a_priority_change_is_a_draft_change_and_an_entry_counts_once() {
-        let prioritized = |id: &str, folder: &str, priority: u32| Entry {
+        let prioritized = |id: &str, folder: &str, priority: u32| ListedMod {
             priority: Some(priority),
             ..entry(id, folder, true)
         };
@@ -344,7 +344,7 @@ mod tests {
 
         // Switched off, the entry is removed; its new priority is not a second change.
         let switched_off = [
-            Entry {
+            ListedMod {
                 enabled: false,
                 ..prioritized("a", "a1", 2)
             },

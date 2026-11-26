@@ -2,21 +2,13 @@
 //! in the plan.
 
 use crate::domain::deploy::Shared;
-use crate::domain::pathkey::path_key;
-
-/// Whether `text` ends with `suffix`, ignoring ASCII case. Both are paths, so the suffix is ASCII in practice.
-fn ends_with_ignore_ascii_case(text: &str, suffix: &str) -> bool {
-    text.len() >= suffix.len()
-        && text
-            .as_bytes()
-            .get(text.len() - suffix.len()..)
-            .is_some_and(|tail| tail.eq_ignore_ascii_case(suffix.as_bytes()))
-}
+use crate::domain::pathkey::{ends_with_ascii_case, path_key};
 
 /// The shared kinds of file with their folder keys prepared once, so the check of one file does not rebuild them.
 pub struct SharedRules(Vec<(String, Vec<String>)>);
 
 impl SharedRules {
+    /// Prepares the shared-folder rules once, so checking a file does not rebuild their path keys.
     pub fn new(rules: &[Shared]) -> Self {
         Self(
             rules
@@ -50,7 +42,7 @@ impl SharedRules {
             if !extensions.is_empty()
                 && !extensions
                     .iter()
-                    .any(|extension| ends_with_ignore_ascii_case(rel, extension))
+                    .any(|extension| ends_with_ascii_case(rel, extension))
             {
                 continue;
             }

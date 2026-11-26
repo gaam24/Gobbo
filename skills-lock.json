@@ -1,12 +1,47 @@
 {
 	"version": 2,
 	"skills": {
+		"coding-guidelines": {
+			"source": "actionbook/rust-skills",
+			"commit": "5c40d3ad785193231b7d0dbfb8e1eb447e5edd94",
+			"sourceType": "github",
+			"skillPath": "skills/coding-guidelines/SKILL.md",
+			"computedHash": "ba0a5f9bf6b89da76fee85bcc92d6dbd34c5e92098d0d8b6fd732ee198b09068"
+		},
 		"prune-tests": {
 			"source": "caldoai/skills",
 			"commit": "bd73b2ea5eb854ab8f0553fb41f77c8786f28f82",
 			"sourceType": "github",
 			"skillPath": "skills/prune-tests/SKILL.md",
 			"computedHash": "5f72196ebe7519a9dded8fb87e4680e0ec3d026ea938fdf692b1e47d43da4459"
+		},
+		"rust-best-practices": {
+			"source": "apollographql/skills",
+			"commit": "9dda1397730370aeb8df4ff8f2015c34c86b5003",
+			"sourceType": "github",
+			"skillPath": "skills/rust-best-practices/SKILL.md",
+			"computedHash": "7e12e68aa50152eb7ba9ea1f88ca5380c846ea0175f8ab6788bb79b7faf12ca0"
+		},
+		"rust-patterns": {
+			"source": "affaan-m/ECC",
+			"commit": "4adeee6732a12d1540f49a4d50a38ce8c97f9a53",
+			"sourceType": "github",
+			"skillPath": "skills/rust-patterns/SKILL.md",
+			"computedHash": "14ef9aaa812d58a8342ac913f2c00b1564b85606e588c9a2d9a4e4ffe2e5441e"
+		},
+		"rust-refactor-helper": {
+			"source": "actionbook/rust-skills",
+			"commit": "5c40d3ad785193231b7d0dbfb8e1eb447e5edd94",
+			"sourceType": "github",
+			"skillPath": "skills/rust-refactor-helper/SKILL.md",
+			"computedHash": "d8617e08e5be6363b5164d4dc22509372ca0cb0716a164af5b14bf730dba32e8"
+		},
+		"rust-skills": {
+			"source": "leonardomso/rust-skills",
+			"commit": "fd2a861ab0406a4ac536a55274d14ea6fd1ca9c9",
+			"sourceType": "github",
+			"skillPath": "SKILL.md",
+			"computedHash": "94e92a36737ebd97af3c79710bf413609fd161cbdf02ce3fac5d9d5b5966697b"
 		},
 		"untangle-codebase": {
 			"source": "caldoai/skills",
