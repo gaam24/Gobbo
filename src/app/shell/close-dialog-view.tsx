@@ -1,3 +1,4 @@
+import { cn } from "cn";
 import { EyeOff, type LucideIcon, Minimize2, Power } from "lucide-react";
 import type { CloseAction } from "@/bindings";
 import { Button } from "@/components/ui/button";
@@ -10,11 +11,27 @@ export interface CloseRequest {
 	game_running: boolean;
 }
 
-/// One choice: the button is the action, and its second line says what happens next.
-function CloseOption({ icon: Icon, title, detail, onClick }: { icon: LucideIcon; title: string; detail: string; onClick: () => void }) {
+/// The icon colour carries the outcome: green is the choice Gobbo recommends, red is the one that ends the session.
+/// The text still says what each choice does, so colour never works alone.
+function CloseOption({
+	icon: Icon,
+	title,
+	detail,
+	tone,
+	onClick,
+}: {
+	icon: LucideIcon;
+	title: string;
+	detail: string;
+	tone?: "primary" | "destructive";
+	onClick: () => void;
+}) {
 	return (
 		<Button variant="outline" className="h-auto justify-start gap-3 px-3 py-2.5 text-left whitespace-normal" onClick={onClick}>
-			<Icon className="text-muted-foreground" aria-hidden />
+			<Icon
+				className={cn("text-muted-foreground", tone === "primary" && "text-primary", tone === "destructive" && "text-destructive")}
+				aria-hidden
+			/>
 			<span className="grid gap-0.5">
 				<span>{title}</span>
 				<span className="text-muted-foreground text-xs font-normal">{detail}</span>
@@ -45,6 +62,7 @@ export function CloseDialogChoice({
 						icon={EyeOff}
 						title={t("closeDialog.hideToTray")}
 						detail={t("closeDialog.hideDetail")}
+						tone="primary"
 						onClick={() => onChoose("hide_to_tray")}
 					/>
 				)}
@@ -58,6 +76,7 @@ export function CloseDialogChoice({
 					icon={Power}
 					title={t("closeDialog.exit")}
 					detail={request.game_running ? t("closeDialog.exitGameDetail") : t("closeDialog.exitDetail")}
+					tone="destructive"
 					onClick={() => onChoose("exit")}
 				/>
 			</div>

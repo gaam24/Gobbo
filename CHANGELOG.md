@@ -67,6 +67,7 @@ All notable changes to this project are documented in this file. The format foll
 ### Changed
 
 - **Profile comparison names a mod by its family name.** A mod with several versions now shows the same name in the comparison as in the list history.
+- **The closing dialog shows which choice keeps Gobbo running and which ends it.** Hiding to the tray has a green icon and Exit has a red one.
 
 ### Fixed
 
