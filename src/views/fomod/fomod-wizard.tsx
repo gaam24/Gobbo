@@ -2,6 +2,7 @@ import { cn } from "cn";
 import { X } from "lucide-react";
 import { useRef, useState } from "react";
 import type { FomodState, FomodStepView, GroupProblem } from "@/bindings";
+import { StatusLine } from "@/components/app/content-blocks";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { FieldError } from "@/components/ui/field";
@@ -209,7 +210,7 @@ export function FomodWizard({
 
 					<div className="grid min-h-0 content-start gap-6 overflow-y-auto px-6 py-5">
 						{failure && <FieldError>{t("fomod.readFailed", { detail: failure })}</FieldError>}
-						{answer === null && failure === null && <p className="text-muted-foreground text-sm">{t("fomod.reading")}</p>}
+						{answer === null && failure === null && <StatusLine tone="loading">{t("fomod.reading")}</StatusLine>}
 						{answer && step && stepIndex !== undefined && (
 							<section aria-labelledby="fomod-step-title" className="grid gap-4">
 								<h3 id="fomod-step-title" className="text-base font-semibold">

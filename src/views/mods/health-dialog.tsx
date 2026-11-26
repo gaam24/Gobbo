@@ -5,7 +5,7 @@ import { useNavigation } from "@/app/contexts/navigation-context";
 import { useUiActions } from "@/app/contexts/ui-context";
 import { useWorkspace } from "@/app/contexts/workspace-context";
 import { commands, type HealthActionKind, type HealthItem } from "@/bindings";
-import { BoxList, BoxListRow } from "@/components/app/content-blocks";
+import { BoxList, BoxListRow, StatusLine } from "@/components/app/content-blocks";
 import { DialogCloseFooter, ModalDialog } from "@/components/modal-dialog";
 import { Button } from "@/components/ui/button";
 import { ItemActions, ItemContent, ItemMedia, ItemTitle } from "@/components/ui/item";
@@ -45,9 +45,9 @@ export function HealthDialog({ gameId, onClose }: { gameId: string; onClose: () 
 	let body: ReactNode;
 
 	if (!report) {
-		body = <p className="text-muted-foreground text-sm">{t("health.loading")}</p>;
+		body = <StatusLine tone="loading">{t("health.loading")}</StatusLine>;
 	} else if (report.items.length === 0) {
-		body = <p className="text-muted-foreground text-sm">{t("health.empty")}</p>;
+		body = <StatusLine>{t("health.empty")}</StatusLine>;
 	} else {
 		body = (
 			<BoxList>

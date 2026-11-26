@@ -2,7 +2,7 @@ import { ExternalLink } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { useWorkspaceActions } from "@/app/contexts/workspace-context";
 import { commands } from "@/bindings";
-import { BoxList, BoxListRow, Disclosure } from "@/components/app/content-blocks";
+import { BoxList, BoxListRow, Disclosure, StatusLine } from "@/components/app/content-blocks";
 import { closeThen, ModalDialog } from "@/components/modal-dialog";
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
@@ -45,7 +45,7 @@ export function PackImportDialog({
 	if (failure) {
 		content = <FieldError>{failure}</FieldError>;
 	} else if (preview === undefined) {
-		content = <p className="text-muted-foreground text-sm">{t("pack.reading")}</p>;
+		content = <StatusLine tone="loading">{t("pack.reading")}</StatusLine>;
 	} else {
 		content = (
 			<>

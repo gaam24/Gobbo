@@ -1,5 +1,6 @@
 import { useGames } from "@/app/contexts/games-context";
 import { useWorkspace } from "@/app/contexts/workspace-context";
+import { StatusLine } from "@/components/app/content-blocks";
 import { StatusError } from "@/components/app/status-error";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/i18n";
@@ -30,7 +31,7 @@ export function ModsPage() {
 		return (
 			<div className="mx-auto flex max-w-md flex-col items-center gap-4 p-10 text-center">
 				<h1 className="text-lg font-semibold">{t("games.noneAdded")}</h1>
-				<p className="text-muted-foreground text-sm">{t("games.emptyHint")}</p>
+				<StatusLine>{t("games.emptyHint")}</StatusLine>
 				<Button onClick={showGames}>{t("games.goToGames")}</Button>
 			</div>
 		);

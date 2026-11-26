@@ -4,6 +4,7 @@ import { useGames } from "@/app/contexts/games-context";
 import { useNavigation } from "@/app/contexts/navigation-context";
 import { useUiActions, useUiState } from "@/app/contexts/ui-context";
 import { useWorkspace } from "@/app/contexts/workspace-context";
+import { elementOf, hasCtrl, inOverlay, isTypingTarget, MOUSE_BACK, MOUSE_FORWARD } from "@/lib/keyboard";
 import { shortcutKey, shortcutKeys } from "@/lib/shortcuts";
 
 const PALETTE_KEY = shortcutKey("palette");
@@ -18,9 +19,6 @@ const IMPORT_KEY = shortcutKey("import");
 /// clearing the selection and the search.
 const ESC_BACK_VIEWS: ReadonlySet<string> = new Set(["app", "settings", "downloads", "notifications", "storage"]);
 
-/// `MouseEvent.button` of the side buttons most mice have: 3 is back, 4 is forward.
-const MOUSE_BACK = 3;
-const MOUSE_FORWARD = 4;
 const DIGIT = /^[1-9]$/;
 
 /// The shortcuts that work from anywhere: the command palette, the shortcut list, the details column, the console, the
@@ -113,8 +111,8 @@ export function useGlobalShortcuts({ openPalette }: { openPalette: () => void })
 		};
 
 		const onKey = (event: KeyboardEvent) => {
-			const target = event.target instanceof HTMLElement ? event.target : null;
-			const ctrl = event.ctrlKey || event.metaKey;
+			const target = elementOf(event.target);
+			const ctrl = hasCtrl(event);
 			const key = event.key.toLowerCase();
 			// A dialog owns the keyboard. The palette does not open above it: the user closes the dialog first.
 			if (latest.current.dialog) return;
@@ -125,9 +123,7 @@ export function useGlobalShortcuts({ openPalette }: { openPalette: () => void })
 				return;
 			}
 
-			const typing = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target?.isContentEditable;
-
-			if (typing || target?.closest("[role='dialog'], [role='alertdialog'], [role='menu']")) return;
+			if (isTypingTarget(target) || inOverlay(target)) return;
 
 			if (ctrl ? onCtrlKey(event, key) : onPlainKey(event, key)) event.preventDefault();
 		};

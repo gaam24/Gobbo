@@ -3,7 +3,7 @@ import { type ReactNode, useState } from "react";
 
 import { useWorkspace } from "@/app/contexts/workspace-context";
 import { commands } from "@/bindings";
-import { BoxList, BoxListRow } from "@/components/app/content-blocks";
+import { BoxList, BoxListRow, StatusLine } from "@/components/app/content-blocks";
 import { ModalDialog } from "@/components/modal-dialog";
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
@@ -31,7 +31,7 @@ export function SortPreviewDialog({ gameId, onClose }: { gameId: string; onClose
 	let body: ReactNode;
 
 	if (!preview) {
-		body = <p className="text-muted-foreground text-sm">{t("sortPreview.loading")}</p>;
+		body = <StatusLine tone="loading">{t("sortPreview.loading")}</StatusLine>;
 	} else if (preview.moves.length === 0) {
 		body = (
 			<Empty>

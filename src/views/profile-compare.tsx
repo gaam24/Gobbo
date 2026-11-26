@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { type CompareRow, type CompareSide, commands, type ProfileView } from "@/bindings";
-import { BoxList, BoxListRow, SectionHeading } from "@/components/app/content-blocks";
+import { BoxList, BoxListRow, SectionHeading, StatusLine } from "@/components/app/content-blocks";
 import { DialogCloseFooter, ModalDialog } from "@/components/modal-dialog";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item";
@@ -77,8 +77,8 @@ export function ProfileCompareDialog({
 				</Field>
 			)}
 
-			{failed && <p className="text-destructive text-sm">{t("profiles.compare.failed")}</p>}
-			{!(failed || result) && <p className="text-muted-foreground text-sm">{t("profiles.compare.loading")}</p>}
+			{failed && <StatusLine tone="error">{t("profiles.compare.failed")}</StatusLine>}
+			{!(failed || result) && <StatusLine tone="loading">{t("profiles.compare.loading")}</StatusLine>}
 			{result && result.rows.length === 0 && <p className="text-sm">{t("profiles.compare.same")}</p>}
 			{result && result.rows.length > 0 && (
 				<>

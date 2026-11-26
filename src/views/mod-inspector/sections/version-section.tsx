@@ -2,7 +2,7 @@ import { Check, Trash2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useWorkspaceActions } from "@/app/contexts/workspace-context";
 import type { UpdateReport, VersionView } from "@/bindings";
-import { BoxList, BoxListRow, SectionHeading } from "@/components/app/content-blocks";
+import { BoxList, BoxListRow, SectionHeading, StatusLine } from "@/components/app/content-blocks";
 import { Button } from "@/components/ui/button";
 import { ItemActions, ItemContent } from "@/components/ui/item";
 import { useTranslation } from "@/i18n";
@@ -55,7 +55,7 @@ export function VersionSection({
 	if (mod.version_count <= 1) {
 		body = <span className="font-mono text-sm tabular-nums">{mod.info.version ?? t("common.none")}</span>;
 	} else if (versions.length === 0) {
-		body = <p className="text-muted-foreground text-sm">{t("mods.version.loading")}</p>;
+		body = <StatusLine tone="loading">{t("mods.version.loading")}</StatusLine>;
 	} else {
 		body = (
 			<BoxList scroll>

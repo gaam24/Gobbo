@@ -1,7 +1,7 @@
 import { ArrowUpDown, FileStack, Files, Minus, Plus, RefreshCw } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { commands, type DeployPreview } from "@/bindings";
-import { BoxList, BoxListRow, Disclosure, OutcomeRow } from "@/components/app/content-blocks";
+import { BoxList, BoxListRow, Disclosure, OutcomeRow, StatusLine } from "@/components/app/content-blocks";
 import { ModalDialog } from "@/components/modal-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -43,7 +43,7 @@ export function DeployPreviewDialog({
 
 	if (preview !== undefined) body = <PreviewBody preview={preview} />;
 	else if (failure) body = <FieldError>{failure}</FieldError>;
-	else body = <p className="text-muted-foreground text-sm">{t("preview.loading")}</p>;
+	else body = <StatusLine tone="loading">{t("preview.loading")}</StatusLine>;
 
 	return (
 		<ModalDialog title={t(launch ? "preview.titleLaunch" : "preview.title")} description={t("preview.hint")} width="lg" onClose={onClose}>

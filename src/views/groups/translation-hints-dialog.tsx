@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useWorkspace } from "@/app/contexts/workspace-context";
 import type { ModGroup } from "@/bindings";
-import { BoxList, BoxListRow } from "@/components/app/content-blocks";
+import { BoxList, BoxListRow, StatusLine } from "@/components/app/content-blocks";
 import { ModalDialog } from "@/components/modal-dialog";
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
@@ -51,7 +51,7 @@ export function TranslationHintsDialog({ onClose }: { onClose: () => void }) {
 	return (
 		<ModalDialog title={t("mods.hints.title")} description={t("mods.hints.hint")} width="xl" onClose={onClose}>
 			{hints.length === 0 ? (
-				<p className="text-muted-foreground text-sm">{t("mods.hints.empty")}</p>
+				<StatusLine>{t("mods.hints.empty")}</StatusLine>
 			) : (
 				<BoxList scroll tall>
 					{hints.map((hint) => {

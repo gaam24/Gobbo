@@ -119,6 +119,10 @@ Use the semantic tokens in `src/index.css`. Never use raw colours in components.
   - `BoxList` + `BoxListRow` for every list of records: one bordered box with dividers, capped with `scroll` when it
     can be long. No outlined card per item and no bare `grid gap-1` list.
   - `Disclosure` for anything that opens and closes. Never the browser's `<details>`.
+  - `StatusLine` for the one line a dialog or panel shows instead of its content: `loading` (with a spinner),
+    the default muted line for "nothing here", and `error`. Never a hand-written `<p className="text-muted…">`.
+  - `FailureAlert` (`failure-alert.tsx`) for a read that failed: the title, the error and the retry, always in the
+    same place.
   - `OutcomeRow` inside a `BoxList` for a dialog that reports what will happen (an apply preview, a check, a delete):
     an icon, what happens and one sentence on what it means. It is the closing dialog's pattern: the icon colour
     carries the outcome (`primary` good, `warning` worth a look, `destructive` lost) and the text says the same.
@@ -150,6 +154,8 @@ Use the semantic tokens in `src/index.css`. Never use raw colours in components.
 - A group header (a page of parts, a separator) shows only what its rows share or add up to. An empty cell in a header
   stays blank; the dash `—` marks an empty value in a row, not in a header.
 - Put advanced and destructive actions behind a menu or in the last section, never next to the everyday controls.
+- Keyboard handlers ask `src/lib/keyboard.ts` whether the user is typing, whether the key came from an overlay and
+  whether a dialog is open, so every field and dialog keeps its keys the same way.
 - Every screen goes back the same way: the arrow in the header, Alt+←, the mouse's back button, and Esc on a page
   opened over the main screens. A shortcut is registered once in `src/lib/shortcuts.ts`, listed in the shortcut list
   and named in the tooltip of the button it stands for.

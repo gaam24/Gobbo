@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { useCollections } from "@/app/contexts/collections-context";
 import { useSettingsActions } from "@/app/contexts/settings-context";
 import { useWorkspaceActions } from "@/app/contexts/workspace-context";
-import { BoxList, BoxListRow, Disclosure } from "@/components/app/content-blocks";
+import { BoxList, BoxListRow, Disclosure, StatusLine } from "@/components/app/content-blocks";
 import { ModalDialog } from "@/components/modal-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -199,11 +199,7 @@ export function CollectionInstallView({ onClose }: { onClose: () => void }) {
 					renderState={liveState}
 					className="min-h-48 flex-1 grid-rows-[auto_minmax(0,1fr)]"
 				/>
-				{collections.failure && (
-					<p role="alert" className="text-destructive text-sm">
-						{collections.failure}
-					</p>
-				)}
+				{collections.failure && <StatusLine tone="error">{collections.failure}</StatusLine>}
 			</div>
 			<DialogFooter>
 				<Button variant="outline" onClick={onClose}>

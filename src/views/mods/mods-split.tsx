@@ -5,11 +5,6 @@ const ConsoleSplit = lazy(async () => {
 	return { default: component };
 });
 
-/// Whether an element is inside a dialog, a menu or a select, whose keys are their own.
-export function inOverlay(element: HTMLElement | null): boolean {
-	return Boolean(element?.closest("[role='dialog'], [role='alertdialog'], [role='menu'], [role='listbox'], [role='combobox']"));
-}
-
 /// The console's starting share of the main column, in percent.
 export const CONSOLE_SHARE = 36;
 

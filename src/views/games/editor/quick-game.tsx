@@ -1,9 +1,9 @@
 import { Check, FolderOpen } from "lucide-react";
 import type { EngineSuggestion_Serialize } from "@/bindings";
+import { StatusLine } from "@/components/app/content-blocks";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Spinner } from "@/components/ui/spinner";
 import { useTranslation } from "@/i18n";
 import { idForName } from "@/views/games/editor/draft";
 import { EditorField } from "@/views/games/editor/fields";
@@ -53,12 +53,8 @@ export function QuickGame({
 					</Button>
 				</div>
 			</EditorField>
-			{inspecting && (
-				<p className="text-muted-foreground flex items-center gap-2 text-sm" role="status">
-					<Spinner aria-hidden /> {t("editor.quick.inspecting")}
-				</p>
-			)}
-			{inspectError && <p className="text-destructive text-sm">{inspectError}</p>}
+			{inspecting && <StatusLine tone="loading">{t("editor.quick.inspecting")}</StatusLine>}
+			{inspectError && <StatusLine tone="error">{inspectError}</StatusLine>}
 			{inspection && !inspecting && (
 				<div className="grid gap-2 rounded-lg border p-3 text-sm">
 					<p className="flex flex-wrap items-center gap-2">
@@ -133,7 +129,7 @@ export function QuickGame({
 					/>
 				</EditorField>
 			</div>
-			{idWarning && <p className="text-destructive text-sm">{idWarning}</p>}
+			{idWarning && <StatusLine tone="error">{idWarning}</StatusLine>}
 		</QuickSection>
 	);
 }

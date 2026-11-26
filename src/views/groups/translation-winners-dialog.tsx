@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useWorkspace } from "@/app/contexts/workspace-context";
 import { commands } from "@/bindings";
-import { BoxList, BoxListRow } from "@/components/app/content-blocks";
+import { BoxList, BoxListRow, StatusLine } from "@/components/app/content-blocks";
 import { PathText } from "@/components/app/path-text";
 import { ModalDialog } from "@/components/modal-dialog";
 import { Button } from "@/components/ui/button";
@@ -55,8 +55,8 @@ export function TranslationWinnersDialog({ gameId, groupId, onClose }: { gameId:
 		<ModalDialog title={t("mods.winners.translationTitle")} description={t("mods.winners.translationHint")} width="lg" onClose={onClose}>
 			{members.length > 2 && <p className="text-sm">{t("mods.winners.usingFirst", { name: nameOf(translationId) })}</p>}
 			{failure && <FieldError>{failure}</FieldError>}
-			{loading && <p className="text-muted-foreground text-sm">{t("mods.winners.loading")}</p>}
-			{details && paths.length === 0 && <p className="text-muted-foreground text-sm">{t("mods.winners.empty")}</p>}
+			{loading && <StatusLine tone="loading">{t("mods.winners.loading")}</StatusLine>}
+			{details && paths.length === 0 && <StatusLine>{t("mods.winners.empty")}</StatusLine>}
 			{details && paths.length > 0 && (
 				<BoxList scroll tall>
 					{paths.map((path) => (

@@ -1,8 +1,8 @@
 import { ArrowLeft } from "lucide-react";
 import type { ReactNode } from "react";
 import { useState } from "react";
-
 import { commands } from "@/bindings";
+import { StatusLine } from "@/components/app/content-blocks";
 import { PathText } from "@/components/app/path-text";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -30,7 +30,7 @@ export function ConflictPreviewPanel({
 	let previewBody: ReactNode;
 
 	if (!preview) {
-		previewBody = <p className="text-muted-foreground text-sm">{t("conflicts.loading")}</p>;
+		previewBody = <StatusLine tone="loading">{t("conflicts.loading")}</StatusLine>;
 	} else if (preview.data_url) {
 		previewBody = (
 			<img

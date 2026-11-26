@@ -1,32 +1,11 @@
-import {
-	ArchiveRestore,
-	ChevronDown,
-	CircleAlert,
-	Download,
-	Files,
-	Layers,
-	ListOrdered,
-	OctagonX,
-	PanelRightClose,
-	PanelRightOpen,
-	Play,
-	RefreshCw,
-	RotateCcw,
-	SlidersHorizontal,
-	Stethoscope,
-	ToggleRight,
-	Undo2,
-	Upload,
-	Wrench,
-} from "lucide-react";
+import { ChevronDown, CircleAlert, PanelRightClose, PanelRightOpen, Play, SlidersHorizontal, Undo2 } from "lucide-react";
 import { useState } from "react";
 import { useNavigation } from "@/app/contexts/navigation-context";
 import { useUiActions, useUiState } from "@/app/contexts/ui-context";
 import { useWorkspace } from "@/app/contexts/workspace-context";
-import { type GameAction, type GameTone, gamePresentation } from "@/app/selectors/game-presentation";
+import { type GameAction, gamePresentation } from "@/app/selectors/game-presentation";
 import type { Status } from "@/bindings";
 import { PageHeader } from "@/components/app/page-layout";
-import { StatusBadge } from "@/components/app/status-badge";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -41,6 +20,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useTranslation } from "@/i18n";
 import { shortcutHint } from "@/lib/shortcuts";
 import { CollectionBadge } from "@/views/mods/collection-badge";
+import { actionIcon, StateChip } from "@/views/mods/game-action-icon";
+import { GameToolsMenu } from "@/views/mods/game-tools-menu";
 import { ProfileActions, ProfileSwitcher } from "@/views/profile-tabs";
 
 /// The game, its profiles and one state. The one primary action starts the game (applying the list first when it
@@ -181,36 +162,7 @@ export function GameHeader({ gameId, status }: { gameId: string; status: Status 
 				</Button>
 			)}
 			{chip()}
-			<DropdownMenu>
-				<DropdownMenuTrigger asChild>
-					<Button variant="ghost" aria-label={t("header.menu.tools")} title={t("header.menu.tools")}>
-						<Wrench /> <span className="hidden @5xl:inline">{t("header.menu.tools")}</span>
-					</Button>
-				</DropdownMenuTrigger>
-				<DropdownMenuContent align="end" className="w-64">
-					<DropdownMenuItem onSelect={() => openDialog({ kind: "conflicts" })}>
-						<Files /> {t("conflicts.title")}
-						{status.conflict_count > 0 && (
-							<span className="text-muted-foreground ml-auto text-xs tabular-nums">{status.conflict_count}</span>
-						)}
-					</DropdownMenuItem>
-					{status.load_order && (
-						<DropdownMenuItem onSelect={() => openDialog({ kind: "load-order" })}>
-							<ListOrdered /> {t("loadOrder.title")}
-						</DropdownMenuItem>
-					)}
-					<DropdownMenuItem onSelect={() => openDialog({ kind: "snapshots" })}>
-						<ArchiveRestore /> {t("snapshots.title")}
-					</DropdownMenuItem>
-					<DropdownMenuSeparator />
-					<DropdownMenuItem onSelect={() => openDialog({ kind: "health" })}>
-						<Stethoscope /> {t("health.title")}
-					</DropdownMenuItem>
-					<DropdownMenuItem onSelect={() => openDialog({ kind: "setup" })}>
-						<Wrench /> {t("setupCheck.title")}
-					</DropdownMenuItem>
-				</DropdownMenuContent>
-			</DropdownMenu>
+			<GameToolsMenu status={status} />
 			<div className="flex items-center">
 				{primary()}
 				<DropdownMenu>
@@ -334,42 +286,5 @@ export function GameHeader({ gameId, status }: { gameId: string; status: Status 
 				onConfirm={discardChanges}
 			/>
 		</>
-	);
-}
-
-/// The icon of an action. The same action keeps the same icon in the primary button and in the menu.
-function actionIcon(action: GameAction) {
-	switch (action.id) {
-		case "play":
-		case "apply-and-play":
-			return <Play />;
-		case "apply":
-			return <Layers />;
-		case "discard":
-			return <RotateCcw />;
-		case "enable":
-			return <ToggleRight />;
-		case "retry":
-			return <RefreshCw />;
-		case "stop":
-			return <OctagonX />;
-		case "import":
-			return <Upload />;
-		case "fix-setup":
-		case "fix-problems":
-			return <Wrench />;
-		case "install-loader":
-			return <Download />;
-		default:
-			return <Play />;
-	}
-}
-
-/// The state chip uses the shared status tones. The text says the state, so colour is not the only signal.
-function StateChip({ tone, children }: { tone: GameTone; children: string }) {
-	return (
-		<StatusBadge tone={tone} dot className="h-8 max-w-full min-w-0 shrink px-3 text-sm">
-			<span className="truncate">{children}</span>
-		</StatusBadge>
 	);
 }

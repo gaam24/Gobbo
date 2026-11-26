@@ -1,5 +1,6 @@
 import { type ReactNode, useState } from "react";
 import { commands, type HistoryEntry_Serialize } from "@/bindings";
+import { StatusLine } from "@/components/app/content-blocks";
 import { ModalDialog } from "@/components/modal-dialog";
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
@@ -71,7 +72,7 @@ export function HistoryDialog({
 	} else if (previewFailure !== null && preview === undefined) {
 		previewBody = <FieldError>{previewFailure}</FieldError>;
 	} else if (preview === undefined) {
-		previewBody = <p className="text-muted-foreground text-sm">{t("history.preview.loading")}</p>;
+		previewBody = <StatusLine tone="loading">{t("history.preview.loading")}</StatusLine>;
 	} else {
 		previewBody = <HistoryPreviewPane preview={preview} locale={locale} />;
 	}
@@ -81,7 +82,7 @@ export function HistoryDialog({
 	if (failure !== null && entries === undefined) {
 		body = <FieldError>{failure}</FieldError>;
 	} else if (entries === undefined) {
-		body = <p className="text-muted-foreground text-sm">{t("history.loading")}</p>;
+		body = <StatusLine tone="loading">{t("history.loading")}</StatusLine>;
 	} else {
 		body = (
 			<div className="grid gap-4 sm:grid-cols-[minmax(0,17rem)_minmax(0,1fr)]">

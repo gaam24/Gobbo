@@ -3,7 +3,7 @@ import { type ReactNode, useState } from "react";
 
 import { useWorkspace } from "@/app/contexts/workspace-context";
 import { commands, type RestorePreview, type SnapshotView } from "@/bindings";
-import { BoxList, BoxListRow } from "@/components/app/content-blocks";
+import { BoxList, BoxListRow, StatusLine } from "@/components/app/content-blocks";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { DialogCloseFooter, ModalDialog } from "@/components/modal-dialog";
 import { Button } from "@/components/ui/button";
@@ -101,9 +101,9 @@ export function SnapshotDialog({ gameId, onClose }: { gameId: string; onClose: (
 	let listBody: ReactNode;
 
 	if (!snapshots) {
-		listBody = <p className="text-muted-foreground text-sm">{t("snapshots.loading")}</p>;
+		listBody = <StatusLine tone="loading">{t("snapshots.loading")}</StatusLine>;
 	} else if (snapshots.length === 0) {
-		listBody = <p className="text-muted-foreground text-sm">{t("snapshots.empty")}</p>;
+		listBody = <StatusLine>{t("snapshots.empty")}</StatusLine>;
 	} else {
 		listBody = (
 			<BoxList scroll>
@@ -194,7 +194,7 @@ export function SnapshotDialog({ gameId, onClose }: { gameId: string; onClose: (
 								})}
 							</FieldError>
 						)}
-						{pending.preview.running && <p className="text-destructive text-sm">{t("snapshots.gameRunning")}</p>}
+						{pending.preview.running && <StatusLine tone="error">{t("snapshots.gameRunning")}</StatusLine>}
 						<div className="flex flex-wrap gap-2">
 							<Button size="sm" disabled={!canRestore} onClick={restore}>
 								<History aria-hidden />

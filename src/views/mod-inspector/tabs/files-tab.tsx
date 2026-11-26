@@ -1,7 +1,7 @@
 import { cn } from "cn";
 import { FileSearch, ShieldCheck } from "lucide-react";
 import type { IntegrityStatus, ModDetails as ModDetailsData } from "@/bindings";
-import { BoxList, BoxListRow } from "@/components/app/content-blocks";
+import { BoxList, BoxListRow, StatusLine } from "@/components/app/content-blocks";
 import { PathText } from "@/components/app/path-text";
 import { StatusBadge, type StatusTone } from "@/components/app/status-badge";
 import { Button } from "@/components/ui/button";
@@ -45,7 +45,7 @@ export function FilesTab({
 		Recorded: t("mods.integrity.recorded"),
 	}[integrity ?? "Recorded"];
 
-	if (files === null) return <p className="text-muted-foreground text-sm">{t("mods.files.loading")}</p>;
+	if (files === null) return <StatusLine tone="loading">{t("mods.files.loading")}</StatusLine>;
 
 	if (files.length === 0) {
 		return (

@@ -5,6 +5,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useTranslation } from "@/i18n";
+import { hasCtrl, hasOpenDialog, MOUSE_BACK } from "@/lib/keyboard";
+import { shortcutKey } from "@/lib/shortcuts";
 import { DefinitionSource, MoreOptions } from "@/views/games/editor/advanced-form";
 import { AdvancedLinux } from "@/views/games/editor/advanced-linux";
 import { ArchiveCheck } from "@/views/games/editor/archive-check";
@@ -13,6 +15,9 @@ import { useGameEditor } from "@/views/games/editor/use-game-editor";
 import { Section } from "@/views/settings/controls";
 
 type EditorPart = "basics" | "more" | "linux" | "source";
+
+const SAVE_KEY = shortcutKey("save");
+const BACK_KEY = shortcutKey("back");
 
 /// The definition editor, in four parts. Basics is all most games need: the folder, how mods get in, the program and
 /// the check. More options holds the rules a few games need, each folded under a sentence that says when; Linux and
@@ -32,19 +37,19 @@ export function GameEditor({ id, onClose }: { id: string | null; onClose: () => 
 	// the same unsaved-changes question as the back arrow. The global shortcuts step aside while the editor is open.
 	useEffect(() => {
 		const onKey = (event: KeyboardEvent) => {
-			if (document.querySelector("[role='dialog'], [role='alertdialog']")) return;
+			if (hasOpenDialog()) return;
 
-			if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+			if (hasCtrl(event) && event.key.toLowerCase() === SAVE_KEY) {
 				event.preventDefault();
 
 				if (!latest.current.blocked) void latest.current.save();
-			} else if (event.altKey && event.key === "ArrowLeft") {
+			} else if (event.altKey && event.key === BACK_KEY) {
 				event.preventDefault();
 				latest.current.leave();
 			}
 		};
 		const onMouseUp = (event: MouseEvent) => {
-			if (event.button !== 3 || document.querySelector("[role='dialog'], [role='alertdialog']")) return;
+			if (event.button !== MOUSE_BACK || hasOpenDialog()) return;
 			event.preventDefault();
 			latest.current.leave();
 		};

@@ -2,6 +2,7 @@ import { cn } from "cn";
 import { CircleArrowUp, ExternalLink, Eye, EyeOff } from "lucide-react";
 import type { ReactNode } from "react";
 import type { UpdateReport } from "@/bindings";
+import { StatusLine } from "@/components/app/content-blocks";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/i18n";
 import { errorText } from "@/lib/ipc";
@@ -28,7 +29,7 @@ export function UpdateLine({
 	if (!update) return null;
 
 	if (update.error) {
-		return <p className="text-destructive text-sm">{errorText(update.error)}</p>;
+		return <StatusLine tone="error">{errorText(update.error)}</StatusLine>;
 	}
 
 	if (update.state === "ignored") {

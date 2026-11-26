@@ -4,10 +4,11 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useUiActions } from "@/app/contexts/ui-context";
 import { CatalogDialog } from "@/app/lazy-views";
 import type { DefinitionProblem_Serialize, GameScan, GameView, ManagedGame } from "@/bindings";
+import { FailureAlert } from "@/components/app/failure-alert";
 import { ListGroupHeader, PageEmpty } from "@/components/app/page-layout";
 import { ConfirmRemoveGame } from "@/components/confirm-remove-game";
 import { PageFrame } from "@/components/page-frame";
-import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertAction, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
@@ -176,48 +177,28 @@ export function GamesPanel({
 				{(catalogError !== null || definitionProblems.length > 0 || scanError !== null) && (
 					<div className="grid gap-3 px-6 pt-4">
 						{catalogError && (
-							<Alert variant="destructive">
-								<AlertTitle>{t("games.catalogFailed")}</AlertTitle>
-								<AlertDescription>{catalogError}</AlertDescription>
-								<AlertAction>
-									<Button variant="outline" size="sm" onClick={() => void onReload()}>
-										{t("common.retry")}
-									</Button>
-								</AlertAction>
-							</Alert>
+							<FailureAlert title={t("games.catalogFailed")} onRetry={() => void onReload()}>
+								{catalogError}
+							</FailureAlert>
 						)}
 
 						{definitionProblems.length > 0 && (
-							<Alert variant="destructive">
-								<AlertTitle>{t("games.definitionProblems")}</AlertTitle>
-								<AlertDescription>
-									<ul className="grid gap-1">
-										{definitionProblems.map((problem) => (
-											<li key={problem.path}>
-												<span className="font-mono text-xs break-all">{problem.path}</span>
-												<span className="block">{errorText(problem.error)}</span>
-											</li>
-										))}
-									</ul>
-								</AlertDescription>
-								<AlertAction>
-									<Button variant="outline" size="sm" onClick={() => void onReload()}>
-										{t("common.retry")}
-									</Button>
-								</AlertAction>
-							</Alert>
+							<FailureAlert title={t("games.definitionProblems")} onRetry={() => void onReload()}>
+								<ul className="grid gap-1">
+									{definitionProblems.map((problem) => (
+										<li key={problem.path}>
+											<span className="font-mono text-xs break-all">{problem.path}</span>
+											<span className="block">{errorText(problem.error)}</span>
+										</li>
+									))}
+								</ul>
+							</FailureAlert>
 						)}
 
 						{scanError && (
-							<Alert variant="destructive">
-								<AlertTitle>{t("games.scanFailed")}</AlertTitle>
-								<AlertDescription>{scanError}</AlertDescription>
-								<AlertAction>
-									<Button variant="outline" size="sm" onClick={onScan} disabled={scanning}>
-										{t("common.retry")}
-									</Button>
-								</AlertAction>
-							</Alert>
+							<FailureAlert title={t("games.scanFailed")} onRetry={onScan} retrying={scanning}>
+								{scanError}
+							</FailureAlert>
 						)}
 					</div>
 				)}

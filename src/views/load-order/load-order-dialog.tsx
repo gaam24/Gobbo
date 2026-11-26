@@ -1,7 +1,7 @@
 import { type ReactNode, useState } from "react";
 
 import type { LoadOrderRange } from "@/bindings";
-import { SectionHeading } from "@/components/app/content-blocks";
+import { SectionHeading, StatusLine } from "@/components/app/content-blocks";
 import { ModalDialog } from "@/components/modal-dialog";
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
@@ -83,11 +83,7 @@ export function LoadOrderDialog({
 	return (
 		<ModalDialog title={t("loadOrder.title")} description={t("loadOrder.hint")} width="lg" onClose={close}>
 			{!settingsReady && <p className="text-sm">{t("loadOrder.noSettings")}</p>}
-			{tooMany && (
-				<p role="alert" className="text-destructive text-sm">
-					{t("loadOrder.tooMany", { count: capacity(range) })}
-				</p>
-			)}
+			{tooMany && <StatusLine tone="error">{t("loadOrder.tooMany", { count: capacity(range) })}</StatusLine>}
 			{dropped.length > 0 && (
 				<p className="text-muted-foreground text-sm">{t("loadOrder.dropped", { names: dropped.map((mod) => mod.info.name).join(", ") })}</p>
 			)}

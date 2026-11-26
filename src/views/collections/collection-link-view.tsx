@@ -1,8 +1,8 @@
 import { Boxes } from "lucide-react";
 import { useState } from "react";
-
 import { useCollections } from "@/app/contexts/collections-context";
 import { useSettingsData } from "@/app/contexts/settings-context";
+import { StatusLine } from "@/components/app/content-blocks";
 import { ModalDialog } from "@/components/modal-dialog";
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
@@ -43,11 +43,7 @@ export function CollectionLinkView({ onClose }: { onClose: () => void }) {
 				/>
 				<FieldDescription className="whitespace-pre-line">{t("collection.link.hint")}</FieldDescription>
 			</Field>
-			{failure && (
-				<p role="alert" className="text-destructive text-sm">
-					{failure}
-				</p>
-			)}
+			{failure && <StatusLine tone="error">{failure}</StatusLine>}
 			<DialogFooter>
 				<Button variant="outline" onClick={onClose}>
 					{t("common.cancel")}

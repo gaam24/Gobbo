@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { StatusLine } from "@/components/app/content-blocks";
 import { Input } from "@/components/ui/input";
 import { useTranslation } from "@/i18n";
 import { pickFile } from "@/lib/tauri";
@@ -61,7 +62,7 @@ export function QuickLaunch({ draft, onChange, inspection, folder }: QuickProps)
 						placeholder="Game.exe"
 						onBrowse={folder.trim() === "" ? undefined : () => void browse()}
 					/>
-					{outside && <p className="text-destructive text-sm">{t("editor.quick.programOutside")}</p>}
+					{outside && <StatusLine tone="error">{t("editor.quick.programOutside")}</StatusLine>}
 				</EditorField>
 				<EditorField id="editor-executable-name" label={t("editor.quick.executableName")}>
 					<Input

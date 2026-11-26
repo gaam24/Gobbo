@@ -1,8 +1,8 @@
 import { Eye, Search } from "lucide-react";
 import { type ReactNode, useDeferredValue, useRef, useState } from "react";
-
 import { useWorkspace } from "@/app/contexts/workspace-context";
 import { commands } from "@/bindings";
+import { StatusLine } from "@/components/app/content-blocks";
 import { PathText } from "@/components/app/path-text";
 import { DialogCloseFooter, ModalDialog } from "@/components/modal-dialog";
 import { Button } from "@/components/ui/button";
@@ -79,11 +79,11 @@ export function ConflictExplorerDialog({ gameId, onClose }: { gameId: string; on
 	if (preview) {
 		body = <ConflictPreviewPanel gameId={gameId} path={preview.path} families={preview.families} onBack={() => setPreview(null)} />;
 	} else if (!explorer) {
-		body = <p className="text-muted-foreground text-sm">{t("conflicts.loading")}</p>;
+		body = <StatusLine tone="loading">{t("conflicts.loading")}</StatusLine>;
 	} else if (explorer.entries.length === 0) {
-		body = <p className="text-muted-foreground text-sm">{t("conflicts.empty")}</p>;
+		body = <StatusLine>{t("conflicts.empty")}</StatusLine>;
 	} else if (filtered.length === 0) {
-		body = <p className="text-muted-foreground text-sm">{t("conflicts.noMatch")}</p>;
+		body = <StatusLine>{t("conflicts.noMatch")}</StatusLine>;
 	} else {
 		body = (
 			// The box is as tall as its rows, up to 55% of the window: one shared file no longer floats in an empty frame.

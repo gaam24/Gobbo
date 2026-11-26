@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { type CollectionMode, useCollections } from "@/app/contexts/collections-context";
 import { useNavigation } from "@/app/contexts/navigation-context";
 import type { CollectionPreview_Serialize, CollectionProfileView } from "@/bindings";
-import { BoxList, BoxListRow, Disclosure, SectionHeading } from "@/components/app/content-blocks";
+import { BoxList, BoxListRow, Disclosure, SectionHeading, StatusLine } from "@/components/app/content-blocks";
 import { ModalDialog } from "@/components/modal-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -232,11 +232,7 @@ export function CollectionPreviewView({ preview, onClose }: { preview: Collectio
 						<FieldDescription>{modeHint}</FieldDescription>
 					</Field>
 				</div>
-				{failure && (
-					<p role="alert" className="text-destructive text-sm">
-						{failure}
-					</p>
-				)}
+				{failure && <StatusLine tone="error">{failure}</StatusLine>}
 			</div>
 			<DialogFooter className="items-center">
 				<span className="text-muted-foreground mr-auto font-mono text-xs tabular-nums">

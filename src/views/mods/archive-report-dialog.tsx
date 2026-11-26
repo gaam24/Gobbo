@@ -1,7 +1,7 @@
 import { CircleAlert } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { commands, type SkipReason } from "@/bindings";
-import { BoxList, BoxListRow, SectionHeading } from "@/components/app/content-blocks";
+import { BoxList, BoxListRow, SectionHeading, StatusLine } from "@/components/app/content-blocks";
 import { PathText } from "@/components/app/path-text";
 import { DialogCloseFooter, ModalDialog } from "@/components/modal-dialog";
 import { FieldError } from "@/components/ui/field";
@@ -43,7 +43,7 @@ export function ArchiveReportDialog({
 			</FieldError>
 		);
 	} else if (!report) {
-		body = <p className="text-muted-foreground text-sm">{t("archiveReport.loading")}</p>;
+		body = <StatusLine tone="loading">{t("archiveReport.loading")}</StatusLine>;
 	} else {
 		const clean = report.missing.length === 0 && report.extra.length === 0 && report.changed.length === 0 && report.skipped.length === 0;
 		body = (

@@ -1,8 +1,8 @@
 import { type RefObject, useEffect } from "react";
 import type { Status } from "@/bindings";
 import { type GridCell, gridNeighbour } from "@/lib/grid-neighbour";
+import { elementOf, hasCtrl, inOverlay, isTypingTarget } from "@/lib/keyboard";
 import { comboEventKey, comboHasModifier, shortcut, shortcutKey, shortcutKeys } from "@/lib/shortcuts";
-import { inOverlay } from "@/views/mods/mods-split";
 
 /// The arrows the list uses: up and down in the table; in the grid, all four.
 const TABLE_ARROWS: readonly string[] = shortcutKeys("move");
@@ -74,11 +74,6 @@ export function useListKeys({
 	/// Shortcuts: Ctrl+F searches, F5 rescans, arrows move the selection, Alt+arrows move a mod, Space toggles.
 	/// Typing in a field keeps its keys, and the arrows only act when the focus is in the list.
 	useEffect(() => {
-		const typingTarget = (target: EventTarget | null): boolean =>
-			target instanceof HTMLInputElement ||
-			target instanceof HTMLTextAreaElement ||
-			(target instanceof HTMLElement && target.isContentEditable);
-
 		const focusRow = (modId: string) => {
 			tableRef.current?.querySelector<HTMLElement>(`[data-mod="${CSS.escape(modId)}"]`)?.focus();
 		};
@@ -168,9 +163,9 @@ export function useListKeys({
 
 		/// Ctrl+Z takes the last change of the list back; Ctrl+Shift+Z and Ctrl+Y bring it again. Fields keep their own.
 		const onHistoryKey = (event: KeyboardEvent): boolean => {
-			const target = event.target instanceof HTMLElement ? event.target : null;
+			const target = elementOf(event.target);
 
-			if (typingTarget(event.target) || inOverlay(target) || !(event.ctrlKey || event.metaKey)) return false;
+			if (isTypingTarget(event.target) || inOverlay(target) || !hasCtrl(event)) return false;
 			const key = event.key.toLowerCase();
 
 			if (UNDO_KEYS.includes(key) && !event.shiftKey && history.can_undo) void onUndoList();
@@ -182,14 +177,14 @@ export function useListKeys({
 
 		/// Ctrl+F and F5 work everywhere, including while typing in a field, but not inside a dialog or a menu.
 		const onGlobalKey = (event: KeyboardEvent): boolean => {
-			const target = event.target instanceof HTMLElement ? event.target : null;
+			const target = elementOf(event.target);
 
 			if (inOverlay(target)) return false;
 
 			// "/" focuses the search too, as in most apps with a list; in a field it stays a slash.
-			const slash = event.key === SEARCH_SLASH_KEY && !event.ctrlKey && !event.metaKey && !event.altKey && !typingTarget(event.target);
+			const slash = event.key === SEARCH_SLASH_KEY && !event.ctrlKey && !event.metaKey && !event.altKey && !isTypingTarget(event.target);
 
-			if (slash || ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === SEARCH_KEY)) {
+			if (slash || (hasCtrl(event) && event.key.toLowerCase() === SEARCH_KEY)) {
 				event.preventDefault();
 				searchRef.current?.focus();
 				return true;
@@ -201,7 +196,7 @@ export function useListKeys({
 				return true;
 			}
 
-			if ((event.ctrlKey || event.metaKey) && event.key === APPLY_KEY && onApply && !typingTarget(event.target)) {
+			if (hasCtrl(event) && event.key === APPLY_KEY && onApply && !isTypingTarget(event.target)) {
 				event.preventDefault();
 				onApply();
 				return true;
@@ -266,9 +261,9 @@ export function useListKeys({
 		/// Typing in a field keeps its keys, and the arrows only act when the focus is in the list.
 		const onListKey = (event: KeyboardEvent) => {
 			// `instanceof` narrows without a cast; anything but an element (the document) behaves like no target.
-			const target = event.target instanceof HTMLElement ? event.target : null;
+			const target = elementOf(event.target);
 
-			if (event.defaultPrevented || typingTarget(event.target) || inOverlay(target)) return;
+			if (event.defaultPrevented || isTypingTarget(event.target) || inOverlay(target)) return;
 			// Space and arrows belong to the window only on the list itself or on the focused row's name button. Other
 			// buttons, selects and separators keep their own keyboard behaviour.
 			const rowButton = target?.dataset.mod ?? null;
@@ -287,15 +282,9 @@ export function useListKeys({
 
 		/// Ctrl+A selects every mod the list shows, outside fields, dialogs and menus.
 		const onSelectAllKey = (event: KeyboardEvent): boolean => {
-			const target = event.target instanceof HTMLElement ? event.target : null;
+			const target = elementOf(event.target);
 
-			if (
-				typingTarget(event.target) ||
-				inOverlay(target) ||
-				!(event.ctrlKey || event.metaKey) ||
-				event.key.toLowerCase() !== SELECT_ALL_KEY
-			)
-				return false;
+			if (isTypingTarget(event.target) || inOverlay(target) || !hasCtrl(event) || event.key.toLowerCase() !== SELECT_ALL_KEY) return false;
 			event.preventDefault();
 			onSelect(shown.map((mod) => mod.id));
 			return true;

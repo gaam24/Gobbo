@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { StatusLine } from "@/components/app/content-blocks";
 import { useTranslation } from "@/i18n";
 import { pickFile } from "@/lib/tauri";
 import type { DetectDraft, ExecutableDraft, GameDraft } from "@/views/games/editor/draft";
@@ -145,7 +146,7 @@ export function AdvancedDetection({
 										menuLabel={t("editor.quick.foundPrograms")}
 										onBrowse={folder.trim() === "" ? undefined : () => void browseProgram(index)}
 									/>
-									{outsideRow === index && <p className="text-destructive text-sm">{t("editor.quick.programOutside")}</p>}
+									{outsideRow === index && <StatusLine tone="error">{t("editor.quick.programOutside")}</StatusLine>}
 								</EditorField>
 								<LinesField
 									id={`editor-exe-args-${index}`}

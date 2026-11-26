@@ -1,4 +1,4 @@
-import { SectionHeading } from "@/components/app/content-blocks";
+import { SectionHeading, StatusLine } from "@/components/app/content-blocks";
 import { useTranslation } from "@/i18n";
 import type { DeployDraft, DetectDraft, ExecutableDraft, GameDraft, UserDataDraft } from "@/views/games/editor/draft";
 import { EditorField, LinesField, TextInput } from "@/views/games/editor/fields";
@@ -58,7 +58,7 @@ export function AdvancedLinux({ draft, onChange }: { draft: GameDraft; onChange:
 			<section className="grid gap-4 border-t pt-8">
 				<SectionHeading title={t("editor.linux.programs")} />
 				{draft.executables.length === 0 ? (
-					<p className="text-muted-foreground text-sm">{t("editor.linux.programsEmpty")}</p>
+					<StatusLine>{t("editor.linux.programsEmpty")}</StatusLine>
 				) : (
 					draft.executables.map((executable, index) => (
 						<EditorField

@@ -4,6 +4,7 @@ import { type ComponentProps, type ReactNode, useState } from "react";
 import { HelpHint } from "@/components/app/help-hint";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "@/components/ui/item";
+import { Spinner } from "@/components/ui/spinner";
 
 /// The building blocks inside a dialog or the details panel, so every list, heading and fold there looks the same.
 
@@ -147,5 +148,35 @@ export function OutcomeRow({
 			</ItemContent>
 			{action && <ItemActions>{action}</ItemActions>}
 		</BoxListRow>
+	);
+}
+
+/// The one line a dialog or a panel shows instead of its content: while it loads (with a spinner), when it has nothing to
+/// show, or when reading it failed. Every such line looks and is announced the same way, so a loading state never reads
+/// as an empty one and a failure is always read out.
+export function StatusLine({
+	tone = "muted",
+	className,
+	children,
+}: {
+	tone?: "loading" | "muted" | "error";
+	className?: string;
+	children: ReactNode;
+}) {
+	if (tone === "loading") {
+		return (
+			<p role="status" className={cn("text-muted-foreground flex items-center gap-2 text-sm", className)}>
+				<Spinner aria-hidden /> {children}
+			</p>
+		);
+	}
+
+	return (
+		<p
+			role={tone === "error" ? "alert" : undefined}
+			className={cn("text-sm", tone === "error" ? "text-destructive" : "text-muted-foreground", className)}
+		>
+			{children}
+		</p>
 	);
 }

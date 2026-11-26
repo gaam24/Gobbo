@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { commands, type ZipInspect } from "@/bindings";
+import { StatusLine } from "@/components/app/content-blocks";
 import { DialogCloseFooter, ModalDialog } from "@/components/modal-dialog";
 import { FieldError } from "@/components/ui/field";
 import { useTranslation } from "@/i18n";
@@ -47,7 +48,7 @@ export function ReinstallDialog({
 		);
 	}
 
-	let body = <p className="text-muted-foreground text-sm">{t("fomod.reading")}</p>;
+	let body = <StatusLine tone="loading">{t("fomod.reading")}</StatusLine>;
 
 	if (failure) {
 		body = <FieldError>{t("fomod.readFailed", { detail: failure })}</FieldError>;

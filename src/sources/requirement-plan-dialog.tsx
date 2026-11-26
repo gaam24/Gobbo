@@ -2,6 +2,7 @@ import { CircleAlert, CircleCheck, Download, ToggleRight } from "lucide-react";
 import { useState } from "react";
 import { useWorkspace } from "@/app/contexts/workspace-context";
 import { commands, type RequirementAction, type RequirementStep } from "@/bindings";
+import { StatusLine } from "@/components/app/content-blocks";
 import { DialogCloseFooter, ModalDialog } from "@/components/modal-dialog";
 import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/field";
@@ -46,7 +47,7 @@ export function RequirementPlanDialog({ folder, onClose }: { folder: string; onC
 	return (
 		<ModalDialog title={t("requirements.title")} description={t("requirements.hint")} width="xl" onClose={onClose}>
 			{!plan ? (
-				<p className="text-muted-foreground text-sm">{t("requirements.loading")}</p>
+				<StatusLine tone="loading">{t("requirements.loading")}</StatusLine>
 			) : (
 				<div className="grid gap-3">
 					<p className="text-sm">
@@ -58,7 +59,7 @@ export function RequirementPlanDialog({ folder, onClose }: { folder: string; onC
 						})}
 					</p>
 					{plan.steps.length === 0 ? (
-						<p className="text-muted-foreground text-sm">{t("requirements.empty")}</p>
+						<StatusLine>{t("requirements.empty")}</StatusLine>
 					) : (
 						<ul className="grid gap-2">
 							{plan.steps.map((step) => (
