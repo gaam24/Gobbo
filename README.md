@@ -104,8 +104,9 @@ The first start asks where Gobbo should keep your data. **Portable** keeps the m
 | <img src="games/tcg-card-shop-simulator/icon.webp" width="20" height="20" alt=""> TCG Card Shop Simulator                    | <img src="games/content-warning/icon.webp" width="20" height="20" alt=""> Content Warning                            |
 | <img src="games/lethal-company/icon.webp" width="20" height="20" alt=""> Lethal Company                                      | <img src="games/palworld/icon.webp" width="20" height="20" alt=""> Palworld                                           |
 | <img src="games/tainted-grail-the-fall-of-avalon/icon.webp" width="20" height="20" alt=""> Tainted Grail: The Fall of Avalon | <img src="games/the-witcher-enhanced-edition/icon.webp" width="20" height="20" alt=""> The Witcher: Enhanced Edition |
+|                                                                                                                              | <img src="games/hell-is-us/icon.webp" width="20" height="20" alt=""> Hell is Us                                      |
 
-A game is a data folder, not code: `games/<id>/game.toml`, with shared layouts in `loaders/<id>.toml`. If your game is missing, see [games/README.md](games/README.md). BepInEx for TCG Card Shop Simulator still needs a manual install; Palworld's UE4SS comes from a verified setup card. The full list and the test statuses are in [Supported games](docs/user/games.md).
+A game is a data folder, not code: `games/<id>/game.toml`, with shared layouts in `loaders/<id>.toml`. If your game is missing, see [games/README.md](games/README.md). BepInEx for TCG Card Shop Simulator still needs a manual install; Palworld's UE4SS comes from a verified setup card. Hell is Us signed paks may need a community signature bypass for plain paks; its UE4SS build can load paks itself. The full list and the test statuses are in [Supported games](docs/user/games.md).
 
 ## Platforms
 

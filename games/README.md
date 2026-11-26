@@ -375,6 +375,7 @@ blocking the mods. A native install (its folder has the
 | R.E.P.O.                          | `loader = "bepinex"`; Nexus and Thunderstore                                                                                                                                                                              | no     |
 | Content Warning                   | `loader = "bepinex"`; BepInEx mods only; Nexus and Thunderstore                                                                                                                                                           | no     |
 | Palworld                          | `loader = { id = "unreal", variant = "ue4ss-4" }`; `root = "{game}/Pal"`; pak/IoStore, LogicMods and UE4SS Lua/C++ mods; Nexus                                                                                            | no     |
+| Hell is Us                        | `loader = { id = "unreal", variant = "ue4ss-4" }`; `root = "{game}/HellIsUs"`; pak/IoStore, LogicMods and UE4SS Lua/C++ mods; signature bypass for signed paks; Nexus                                                     | no     |
 
 The Witcher: Enhanced Edition covers loose files only. Custom adventures (`.adv` in `{documents}/The Witcher`),
 campaign modules (`.mod`/`.mmd` in `Data/modules`), language packs (`.tlk`/`.key`) and installer-based overhauls

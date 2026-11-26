@@ -1,0 +1,37 @@
+# Hell is Us. An Unreal Engine 5 game whose project folder is `HellIsUs`. The `unreal` loader preset supplies the pak
+# and IoStore layout, the LogicMods folder and the UE4SS 4.x mod slot; the game only names its project root and the
+# files the setup check needs.
+#
+# The game ships signed paks. The game-specific UE4SS build (Nexus mod 43) includes a pak enabler and loads custom
+# paks itself; a plain pak in ~mods that does not load may need the community signature bypass
+# (https://github.com/rm-NoobInCoding/UniversalSigBypasser/releases). Neither is a DRM bypass: the game has no Denuvo
+# or anti-cheat, and the bypass only hooks the engine's pak signature check.
+#
+# UE4SS 4.0.0 supports UE 5.5 and installs with one click. A game-specific build, such as Nexus mod 43, counts as
+# another loader copy and can be picked in Setup check.
+
+schema = 1
+id = "hell-is-us"
+name = "Hell is Us"
+providers = { nexus = { key = "hellisus" } }
+loader = { id = "unreal", variant = "ue4ss-4" }
+
+[detect]
+steam_app_ids = [1620730]
+steam_install_dirs = ["Hell Is Us"]
+markers = [
+  "HellIsUs/Binaries/Win64/HellIsUs-Win64-Shipping.exe",
+  "HellIsUs/Content/Paks",
+]
+
+[[executables]]
+name = "Hell is Us"
+path = "HellIsUs/Binaries/Win64/HellIsUs-Win64-Shipping.exe"
+
+[deploy]
+# The preset's paths are relative to the project folder, not the folder that holds HellIsUs.exe.
+root = "{game}/HellIsUs"
+
+[[logs]]
+kind = "loader"
+path = "HellIsUs/Binaries/Win64/ue4ss/UE4SS.log"

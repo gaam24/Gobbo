@@ -17,6 +17,7 @@ apply to every game, and a game definition never adds a branch to the program.
 | Content Warning                   | Not yet verified on a real installation |
 | The Witcher: Enhanced Edition     | Not yet verified on a real installation |
 | Palworld                          | Not yet verified on a real installation |
+| Hell is Us                        | Not yet verified on a real installation |
 
 **Tested** means detection, import, apply, undo and launch were run on a real installation. A definition without that
 test can still work, but treat it as unfinished: report what you find, and add the evidence to `game.toml` only after
@@ -42,6 +43,13 @@ adds Okaetsu's Palworld build of UE4SS to your mods, the one Palworld mods on Ne
 Palworld layout file; a manual install is accepted too. The
 definition is prepared for the external (non-Steam) build first; Steam detection uses app id 1623730. UE4SS injects
 code into the game, so use it only on a single-player or private setup with no anti-cheat.
+
+Hell is Us uses the shared `unreal` loader preset as well. Its project folder is `HellIsUs`, so pak and IoStore mods
+land in `Content/Paks/~mods`, blueprint mods in `LogicMods`, and Lua/C++ mods in `Binaries/Win64/ue4ss/Mods`. The game
+ships signed paks: the game-specific UE4SS build (Nexus mod 43) includes a pak enabler and loads custom paks itself,
+while a plain pak that does not load may need the community signature bypass. Neither is a DRM bypass. UE4SS 4.0.0
+installs with one click, and Nexus mod 43 can be imported and picked as the loader copy. Steam detection uses app id
+1620730.
 
 ## Add a game
 

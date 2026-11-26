@@ -59,6 +59,10 @@ All notable changes to this project are documented in this file. The format foll
 
 ## v0.2.1 (Unreleased)
 
+### Added
+
+- **Hell is Us mods work in Gobbo.** Pak, IoStore and UE4SS mods install and deploy.
+
 ### Changed
 
 - **Profile comparison names a mod by its family name.** A mod with several versions now shows the same name in the comparison as in the list history.

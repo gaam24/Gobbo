@@ -23,6 +23,17 @@
       "iconSha256": "edb4681f1fe86d9e728eaeb0b3dc41ee548c6d971ef6c9ea41cc9727e9c6e0ae"
     },
     {
+      "id": "hell-is-us",
+      "name": "Hell is Us",
+      "schema": 1,
+      "loader": "unreal",
+      "verified": false,
+      "file": "games/hell-is-us/game.toml",
+      "sha256": "c7c38c16496e45501cd932cacfa813be20e83198edced89bc34d43185f71520f",
+      "icon": "games/hell-is-us/icon.webp",
+      "iconSha256": "c60d7af0b3f4d0aef9c8f96e278f32074bb6aae232914f41b9ad0d82a045df05"
+    },
+    {
       "id": "lethal-company",
       "name": "Lethal Company",
       "schema": 1,
