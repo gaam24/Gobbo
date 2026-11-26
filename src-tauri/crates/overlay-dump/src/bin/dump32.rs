@@ -3,6 +3,7 @@
 //!
 //! Usage: `gobbo_overlay_dump32 <state folder> <socket> <ready file>`.
 
+#[cfg(any(windows, test))]
 use std::ffi::OsString;
 
 /// The three paths the helper needs, in order. Extra arguments are ignored, as they were by the original CLI.

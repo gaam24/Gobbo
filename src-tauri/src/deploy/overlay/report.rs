@@ -33,6 +33,13 @@ pub struct LaunchTimings {
 pub const DECISIONS_BASE: &str = BASE_STEM;
 
 /// The hook's report of the installed hooks, the mounts and the switches, written once at start.
+#[cfg_attr(
+    not(windows),
+    allow(
+        dead_code,
+        reason = "only the Windows hook writes and reads the session report"
+    )
+)]
 pub const SESSION_FILE: &str = "session.json";
 
 /// The file that names the last out-of-process crash dump of a session.
