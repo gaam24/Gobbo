@@ -24,9 +24,13 @@ src-tauri/overlay-hook
 /gobbo.storage.json
 /gobbo.portable
 
-#
-.agents/skills
-!.agents/skills/gobbo-*
+# Skills downloaded by agent tooling. Only Gobbo's own skills are tracked, so the
+# glob ignores the contents and the negation can still re-include a `gobbo-*` folder
+# (a negation never matches inside an ignored parent directory).
+/.agents/skills/*
+!/.agents/skills/gobbo-*/
+# Claude Code keeps a real copy of the installed skills here on Windows.
+/.claude/skills/
 
 # Game definitions removed from the shipped catalog, kept locally for reference.
 /.removed-games/
